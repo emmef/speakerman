@@ -1,10 +1,10 @@
 /*
- * TemplateFileName.cpp
+ * Speakerman.cpp
  *
- * Part of 'TemplateProjectDescription'
+ * Part of 'Speaker management system'
  *
- * TemplateProjectCopyrightNotice
- * TemplateProjectCopyrightContact
+ * Copyright (C) 2013 Michel Fleur.
+ * https://github.com/emmef/simpledsp
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,10 +19,15 @@
  * limitations under the License.
  */
 
-#include <speakerman/TemplateFileName.hpp>
+#include <speakerman/utils/Mutex.hpp>
 
-namespace TemplateProjectNameSpace {
+namespace speakerman {
 
-// Your definitions
+Mutex mutex;
 
-} /* End of namespace TemplateProjectNameSpace */
+int main(int count, char * arguments[]) {
+	Guard g = mutex.guard();
+	return 0;
+}
+
+} /* End of namespace speakerman */
