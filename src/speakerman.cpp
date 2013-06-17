@@ -19,15 +19,61 @@
  * limitations under the License.
  */
 
+#include <chrono>
+#include <thread>
+#include <iostream>
 #include <speakerman/utils/Mutex.hpp>
+#include <speakerman/JackConnector.hpp>
 
-namespace speakerman {
+using namespace speakerman;
 
-Mutex mutex;
+class SumToAll : public JackClient
+{
+protected:
+	virtual int process(jack_nframes_t frameCount)
+	{
+		const jack_default_audio_sample_t* input1 = getInput(0, frameCount);
+		const jack_default_audio_sample_t* input2 = getInput(1, frameCount);
+		jack_default_audio_sample_t* output1 = getOutput(0, frameCount);
+		jack_default_audio_sample_t* output2 = getOutput(1, frameCount);
+
+		for (jack_nframes_t i = 0; i < frameCount; i++) {
+			jack_default_audio_sample_t x = input1[i] + input2[i];
+			output1[i] = x;
+			output2[i] = x;
+		}
+
+		return 0;
+	}
+
+	virtual void prepareActivate()
+	{
+		std::cout << "Activate!" << std::endl;
+	}
+	virtual void prepareDeactivate()
+	{
+		std::cout << "De-activate!" << std::endl;
+	}
+
+public:
+	SumToAll(string name) : JackClient(name) {
+		addInput("left_in");
+		addInput("right_in");
+
+		addOutput("left_out");
+		addOutput("right_out");
+	};
+
+
+};
+
 
 int main(int count, char * arguments[]) {
-	Guard g = mutex.guard();
+	SumToAll client("Speakerman");
+	client.open();
+	client.activate();
+	std::chrono::milliseconds duration(10000);
+	std::this_thread::sleep_for( duration );
 	return 0;
 }
 
-} /* End of namespace speakerman */
