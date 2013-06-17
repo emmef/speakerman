@@ -1,0 +1,119 @@
+#! /bin/sh
+
+projectCopyRightHolder="Michel Fleur"
+projectCopyRightContact="https:\\/\\/github.com\\/emmef\\/simpledsp"
+projectInitialCopyrightYear="2013"
+projectTemplateProjectDescription="Speaker management system"
+projectTemplateProjectPrefix="sms_"
+projectTemplateProjectNameSpace="speakerman"
+
+printSynopsis() {
+	if test -n "$1"
+	then
+		echo "ERROR:\n\t$1" >&2
+	fi
+	echo "SYNOPSIS"
+	echo "\t`basename $0` [--np] fileBaseName fileExtension..."
+	echo "\tfileBaseName and fileExtension form the new file name(s) based"
+	echo "\ton the following patten:" 
+	echo "\t\${projectTemplateProjectPrefix}fileBaseName.fileExtension"
+	echo "\t\t--np No prefix. Omits the prefix "${projectTemplateProjectPrefix}" from the file name"
+}
+
+projectTemplateProjectPrefixLowerCase=`echo ${projectTemplateProjectPrefix} | tr '[:upper:]' '[:lower:]'`
+projectTemplateProjectPrefixUpperCase=`echo ${projectTemplateProjectPrefix} | tr '[:lower:]' '[:upper:]'`
+
+
+validRegExp() {
+	if test -z "$2"
+	then
+		echo "Empty is no match" >&2
+		exit 1
+	fi
+	if echo "$1" | grep -Ei "$2" >/dev/null
+	then
+		echo "$1"
+	else
+		echo "Input '$1' does not match regexp '$2'" >&2
+		exit 1
+	fi
+}
+
+checkRegExp() {
+	echo "$1" | grep -Ei "$2" >/dev/null
+}
+
+if test "x$1" = "x--prefix" 
+then
+	noPrefix=
+	shift
+else
+	noPrefix="true"
+fi
+
+
+if ! test -n "$2"
+then
+	printSynopsis "Missing argument(s)"
+	exit 1
+fi
+
+fileNameRegExp="^[A-Z][-_A-Z0-9]+\$"
+
+if ! fileBaseName=`validRegExp "$1" "${fileNameRegExp}"`
+then
+	printSynopsis "File base name not valid: $1"
+	exit 2
+fi
+shift
+
+if test "x${noPrefix}" = "xtrue" 
+then
+	fileBaseName="${fileBaseName}"
+	fileGuardName=`echo "${projectTemplateProjectNameSpace}_${fileBaseName}" | sed -r s/"\\-"/"_"/g | tr '[:lower:]' '[:upper:]'`
+else
+	fileBaseName="${projectTemplateProjectPrefixLowerCase}${fileBaseName}"
+	fileGuardName=`echo "${fileBaseName}" | sed -r s/"\\-"/"_"/g | tr '[:lower:]' '[:upper:]'`
+fi 
+fileGuardName="${projectTemplateProjectPrefixUpperCase}${fileGuardName}_GUARD_H_"
+currentYear=`date +"%Y"`
+if test "${currentYear}" = "${projectInitialCopyrightYear}"
+then
+	copyRightNotice="Copyright (C) ${projectInitialCopyrightYear} ${projectCopyRightHolder}."
+else
+	copyRightNotice="Copyright (C) ${projectInitialCopyrightYear}-${currentYear} ${projectCopyRightHolder}."
+fi
+
+echo "Generating files from tempates with"
+echo "\tCopyright = ${copyRightNotice}"
+echo "\tContact   = ${projectCopyRightContact}"
+echo "\tGuard     = ${fileGuardName}"
+
+
+for fileExtension in $*
+do
+	directory=""
+	for tryDirectory in `find sourcetemplates -mindepth 1 -type d`
+	do
+		templateFile="${tryDirectory}/template.${fileExtension}"
+		if test -f "$templateFile"
+		then
+			directory=`echo "${tryDirectory}" | sed -r s/"sourcetemplates\/(.*)"/"\\1"/`
+			generatedFile="${directory}/${fileBaseName}.${fileExtension}"
+			echo "Generating \"${generatedFile}\" from template \"${templateFile}\"..."
+			cat "${templateFile}" |\
+				sed -r s/"TemplateFileNameLowerCase"/"${fileName}"/g |\
+				sed -r s/"TemplateProjectCopyrightNotice"/"${copyRightNotice}"/g |\
+				sed -r s/"TemplateProjectCopyrightContact"/"${projectCopyRightContact}"/g |\
+				sed -r s/"TemplateFileName"/"${fileBaseName}"/g |\
+				sed -r s/"TemplateProjectFileGuard"/"${fileGuardName}"/g |\
+				sed -r s/"TemplateProjectNameSpace"/"${projectTemplateProjectNameSpace}"/g |\
+				sed -r s/"TemplateProjectDescription"/"${projectTemplateProjectDescription}"/g \
+				> ${generatedFile}
+		fi
+	done
+	if test -z "${directory}"
+	then
+		echo "WARNING: There is no template for file extension \"${fileExtension}\"" >&2
+	fi
+done
