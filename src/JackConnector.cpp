@@ -46,11 +46,11 @@ void JackPort::registerPort(jack_client_t *client)
 	}
 	switch(direction) {
 	case Direction::IN:
-		port = jack_port_register(client, name.c_str(), "input", JackPortIsInput, 0);
+		port = jack_port_register(client, name.c_str(), JACK_DEFAULT_AUDIO_TYPE, JackPortIsInput, 0);
 		std::cout << "Port registered: " << name.c_str() << port << std::endl;
 		break;
 	case Direction::OUT:
-		port = jack_port_register(client, name.c_str(), "output", JackPortIsOutput, 0);
+		port = jack_port_register(client, name.c_str(), JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0);
 		std::cout << "Port registered: " << name.c_str() << port << std::endl;
 		break;
 	default:
@@ -74,11 +74,113 @@ void JackPort::deRegisterPort()
 jack_default_audio_sample_t * JackPort::getBuffer(jack_nframes_t frames)
 {
 	if (!port) {
-		string message = "Port not registered yet: " + name;
+		string message = "Port not registered (yet): " + name;
 		throw std::runtime_error(message);
 	}
 	return (jack_default_audio_sample_t *)jack_port_get_buffer(port, frames);
 }
+
+JackProcessor::JackProcessor() : inputs(10), outputs(10)
+{
+
+}
+
+void JackProcessor::addInput(string name)
+{
+	inputs.add(name, Direction::IN);
+}
+
+void JackProcessor::addOutput(string name)
+{
+	outputs.add(name, Direction::OUT);
+}
+
+void JackProcessor::registerPorts(jack_client_t *client)
+{
+	for (size_t i = 0 ; i < inputs.size(); i++) {
+		inputs.get(i).registerPort(client);
+	}
+	for (size_t i = 0 ; i < outputs.size(); i++) {
+		outputs.get(i).registerPort(client);
+	}
+}
+
+void JackProcessor::unRegisterPorts()
+{
+	for (size_t i = 0 ; i < inputs.size(); i++) {
+		inputs.get(i).deRegisterPort();
+	}
+	for (size_t i = 0 ; i < outputs.size(); i++) {
+		outputs.get(i).deRegisterPort();
+	}
+}
+
+
+const jack_default_audio_sample_t *JackProcessor::getInput(size_t number, jack_nframes_t frameCount) const
+{
+	return inputs.get(number).getBuffer(frameCount);
+}
+jack_default_audio_sample_t *JackProcessor::getOutput(size_t number, jack_nframes_t frameCount) const
+{
+	return outputs.get(number).getBuffer(frameCount);
+}
+
+int JackClient::rawProcess(jack_nframes_t nframes, void* arg) {
+	try {
+		JackClient& me = *((JackClient*) (arg));
+		if (me.processor.process(nframes)) {
+			return 0;
+		}
+	}
+	catch(const char *msg) {
+		std::cerr << "rawProcess: Exception: " << msg << std::endl;
+	}
+	catch (const std::exception &e) {
+		std::cerr << "rawProcess: Exception: " << e.what() << std::endl;
+	}
+	catch (...) {
+		std::cerr << "rawProcess: Exception (last-resort-catch)" << std::endl;
+	}
+	return 1;
+}
+
+void JackClient::rawShutdown(void* arg) {
+	try {
+		JackClient& me = *((JackClient*) (arg));
+		me.processor.shutdownByServer();
+		me.shutdownByServer();
+	}
+	catch(const char *msg) {
+		std::cerr << "rawShutdown: Exception: " << msg << std::endl;
+	}
+	catch (const std::exception &e) {
+		std::cerr << "rawShutdown: Exception: " << e.what() << std::endl;
+	}
+	catch (...) {
+		std::cerr << "rawShutdown: Exception (last-resort-catch)" << std::endl;
+	}
+}
+
+int JackClient::rawSetSampleRate(jack_nframes_t nframes, void* arg) {
+	try {
+		JackClient& me = *((JackClient*) (arg));
+		if (me.processor.setSampleRate(nframes)) {
+			return 0;
+		}
+	}
+	catch(const char *msg) {
+		std::cerr << "rawSetSampleRate: Exception: " << msg << std::endl;
+	}
+	catch (const std::exception &e) {
+		std::cerr << "rawSetSampleRate: Exception: " << e.what() << std::endl;
+	}
+	catch (...) {
+		std::cerr << "rawSetSampleRate: Exception (last-resort-catch)" << std::endl;
+	}
+	return 1;
+}
+
+
 
 void JackClient::shutdownByServer()
 {
@@ -105,16 +207,14 @@ void JackClient::unsafeOpen()
 	jack_on_shutdown(client, rawShutdown, this);
 	jack_set_error_function(printError);
 	try {
+		if (jack_set_sample_rate_callback(client, rawSetSampleRate, this) != 0) {
+			throw std::runtime_error("Couldn't set sample-rate call-back");
+		}
 		if (jack_set_process_callback(client, rawProcess, this) != 0) {
-			throw std::runtime_error("Couldn't set call-backs");
+			throw std::runtime_error("Couldn't set processing call-back");
 		}
-		std::cout << "Installed call-backs " << jack_get_client_name(client) << std::endl;
-		for (size_t i = 0 ; i < inputs.size(); i++) {
-			inputs.get(i).registerPort(client);
-		}
-		for (size_t i = 0 ; i < outputs.size(); i++) {
-			outputs.get(i).registerPort(client);
-		}
+		std::cout << "Installed processing call-backs " << jack_get_client_name(client) << std::endl;
+		processor.registerPorts(client);
 		std::cout << "Registered ports " << jack_get_client_name(client) << std::endl;
 		state = ClientState::REGISTERED;
 	}
@@ -122,35 +222,10 @@ void JackClient::unsafeOpen()
 		close();
 	}
 }
-const jack_default_audio_sample_t *JackClient::getInput(size_t number, jack_nframes_t frameCount) const
-{
-	return inputs.get(number).getBuffer(frameCount);
-}
-
-jack_default_audio_sample_t *JackClient::getOutput(size_t number, jack_nframes_t frameCount) const
-{
-	return outputs.get(number).getBuffer(frameCount);
-}
 
 
-JackClient::JackClient(string n) : name(n), inputs(10), outputs(10)
+JackClient::JackClient(string n, JackProcessor &p) : name(n), processor(p)
 {
-}
-
-void JackClient::addInput(string name)
-{
-	Guard g = m.guard();
-	checkCanAddIO();
-	inputs.add(name, Direction::IN);
-	state = ClientState::DEFINED_PORTS;
-}
-
-void JackClient::addOutput(string name)
-{
-	Guard g = m.guard();
-	checkCanAddIO();
-	outputs.add(name, Direction::OUT);
-	state = ClientState::DEFINED_PORTS;
 }
 
 void JackClient::open()
@@ -158,7 +233,11 @@ void JackClient::open()
 	Guard g = m.guard();
 	switch (state) {
 	case ClientState::INITIAL:
-		throw std::runtime_error("Cannot open client: no ports defined");
+		if (processor.inputs.size() == 0 && processor.outputs.size() == 0) {
+			throw std::runtime_error("Cannot open client: no ports defined");
+		}
+		std::cout << "Inputs: " << processor.inputs.size() << "; outputs: " << processor.outputs.size() << std::endl;
+		/* no break */
 	case ClientState::CLOSED:
 	case ClientState::DEFINED_PORTS:
 		unsafeOpen();
@@ -185,7 +264,7 @@ void JackClient::activate()
 
 	state = ClientState::ACTIVE;
 
-	prepareActivate();
+	processor.prepareActivate();
 }
 
 void JackClient::deactivate()
@@ -196,7 +275,7 @@ void JackClient::deactivate()
 	}
 	for (int attempt = 0; attempt < 10; attempt++) {
 		if (jack_deactivate(client) == 0) {
-			prepareDeactivate();
+			processor.prepareDeactivate();
 			return ;
 		}
 		std::this_thread::yield();
@@ -208,16 +287,16 @@ void JackClient::deactivate()
 void JackClient::close()
 {
 	Guard g = m.guard();
-	for (size_t i = 0 ; i < inputs.size(); i++) {
-		inputs.get(i).deRegisterPort();
-	}
-	for (size_t i = 0 ; i < inputs.size(); i++) {
-		inputs.get(i).deRegisterPort();
-	}
-	for (int attempt = 0; attempt < 10; attempt++) {
-		if (jack_client_close(client) != 0) {
+	if (client) {
+		std::cout << "Closing jack client " << name << std::endl;
+		for (int attempt = 0; attempt < 10; attempt++) {
+			if (jack_client_close(client) == 0) {
+				break;
+			}
 			std::this_thread::yield();
 		}
+		std::cout << "Unregister ports" << std::endl;
+		processor.unRegisterPorts();
 	}
 	client = nullptr;
 	state = ClientState::CLOSED;

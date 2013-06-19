@@ -51,7 +51,7 @@ class JackPort
 public:
 	JackPort(std::string name, Direction direction);
 	~JackPort();
-	friend class JackClient;
+	friend class JackProcessor;
 };
 
 
@@ -64,24 +64,57 @@ enum class ClientState
 	ACTIVE
 };
 
+class JackProcessor
+{
+	friend class JackClient;
+
+	List<JackPort> inputs;
+	List<JackPort> outputs;
+
+	void registerPorts(jack_client_t *client);
+	void unRegisterPorts();
+
+protected:
+
+	JackProcessor();
+	void addInput(string name);
+	void addOutput(string name);
+	const jack_default_audio_sample_t *getInput(size_t number, jack_nframes_t frameCount) const;
+	jack_default_audio_sample_t *getOutput(size_t number, jack_nframes_t frameCount) const;
+
+public:
+
+	virtual void prepareActivate() = 0;
+	virtual void prepareDeactivate() = 0;
+
+	virtual bool process(jack_nframes_t frameCount) = 0;
+	virtual bool setSampleRate(jack_nframes_t sampleRate) = 0;
+	virtual void shutdownByServer() = 0;
+
+	virtual ~JackProcessor() {};
+};
+
+template <typename T> class LockFreeAtomicState {
+public:
+	LockFreeAtomicState(T initialValue);
+	virtual bool set(T newValue);
+	virtual bool get(T newValue);
+	virtual bool compareAndSet(T expected, T newValue) = 0;
+	virtual ~	LockFreeAtomicState() {};
+};
+
 
 class JackClient
 {
 	speakerman::Mutex m;
 	string name;
 	jack_client_t *client = nullptr;
-	List<JackPort> inputs;
-	List<JackPort> outputs;
 	ClientState state = ClientState::INITIAL;
+	JackProcessor &processor;
 
-	static int rawProcess(jack_nframes_t nframes, void *arg)
-	{
-		return ((JackClient *)arg) -> process(nframes);
-	}
-	static void rawShutdown(void *arg)
-	{
-		((JackClient *)arg) -> shutdownByServer();
-	}
+	static int rawProcess(jack_nframes_t nframes, void* arg);
+	static void rawShutdown(void* arg);
+	static int rawSetSampleRate(jack_nframes_t nframes, void* arg);
 
 	void checkCanAddIO();
 	void shutdownByServer();
@@ -89,21 +122,13 @@ class JackClient
 
 protected:
 
-	virtual void prepareActivate() = 0;
-	virtual void prepareDeactivate() = 0;
-
-	virtual int process(jack_nframes_t frameCount) = 0;
-	const jack_default_audio_sample_t *getInput(size_t number, jack_nframes_t frameCount) const;
-	jack_default_audio_sample_t *getOutput(size_t number, jack_nframes_t frameCount) const;
-
 public:
-	JackClient(string name);
-	void addInput(string name);
-	void addOutput(string name);
+	JackClient(string name, JackProcessor &processor);
 	void open();
 	void activate();
 	void deactivate();
 	void close();
+
 	virtual ~JackClient();
 };
 
