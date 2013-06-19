@@ -70,7 +70,7 @@ protected:
 			// - matrix from processing to output chains
 			// - output chains have output channels = N x input channels (depends on number of cross-overs)
 			// - matrix to actual outputs (may sum crossovers)
-			// - limiting per output
+			// - equalizing/limiting (both optional) per output
 
 			jack_default_audio_sample_t subL1 = filter2.filter(0, filter1.filter(0, inL1));
 			jack_default_audio_sample_t subR1 = filter2.filter(1, filter1.filter(1, inR1));
