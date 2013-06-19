@@ -63,6 +63,14 @@ protected:
 			const jack_default_audio_sample_t inL2 = inputLeft2[i];
 			const jack_default_audio_sample_t inR2 = inputRight2[i];
 
+			// profiles
+			// - number of dynamic processing chains
+			// - number of output chains
+			// - matrix from number of inputs to processing chains
+			// - matrix from processing to output chains
+			// - output chains have N x input channels (depends on number of cross-overs)
+			// - matrix to actual outputs (may sum crossovers)
+
 			jack_default_audio_sample_t subL1 = filter2.filter(0, filter1.filter(0, inL1));
 			jack_default_audio_sample_t subR1 = filter2.filter(1, filter1.filter(1, inR1));
 			jack_default_audio_sample_t subL2 = filter2.filter(2, filter1.filter(2, inL2));
