@@ -1,5 +1,5 @@
 /*
- * JackConnector.hpp
+ * JackClient.hpp
  *
  * Part of 'Speaker management system'
  *
@@ -19,41 +19,19 @@
  * limitations under the License.
  */
 
-#ifndef SMS_SPEAKERMAN_JACKCONNECTOR_GUARD_H_
-#define SMS_SPEAKERMAN_JACKCONNECTOR_GUARD_H_
+#ifndef SMS_SPEAKERMAN_JACKCLIENT_GUARD_H_
+#define SMS_SPEAKERMAN_JACKCLIENT_GUARD_H_
 
 #include <string>
 #include <atomic>
 #include <jack/jack.h>
 #include <simpledsp/List.hpp>
 #include <speakerman/utils/Mutex.hpp>
+#include <speakerman/JackProcessor.hpp>
 
 namespace speakerman {
 
 using namespace simpledsp;
-
-enum class Direction
-{
-	IN, OUT
-};
-
-class JackClient;
-class JackPort
-{
-	std::string name;
-	Direction direction;
-	jack_port_t * port = nullptr;
-
-	void registerPort(jack_client_t *client);
-	void deRegisterPort();
-	jack_default_audio_sample_t * getBuffer(jack_nframes_t frames);
-
-public:
-	JackPort(std::string name, Direction direction);
-	~JackPort();
-	friend class JackProcessor;
-};
-
 
 enum class ClientState
 {
@@ -63,46 +41,6 @@ enum class ClientState
 	REGISTERED,
 	ACTIVE
 };
-
-class JackProcessor
-{
-	friend class JackClient;
-
-	List<JackPort> inputs;
-	List<JackPort> outputs;
-
-	void registerPorts(jack_client_t *client);
-	void unRegisterPorts();
-
-protected:
-
-	JackProcessor();
-	void addInput(string name);
-	void addOutput(string name);
-	const jack_default_audio_sample_t *getInput(size_t number, jack_nframes_t frameCount) const;
-	jack_default_audio_sample_t *getOutput(size_t number, jack_nframes_t frameCount) const;
-
-public:
-
-	virtual void prepareActivate() = 0;
-	virtual void prepareDeactivate() = 0;
-
-	virtual bool process(jack_nframes_t frameCount) = 0;
-	virtual bool setSampleRate(jack_nframes_t sampleRate) = 0;
-	virtual void shutdownByServer() = 0;
-
-	virtual ~JackProcessor() {};
-};
-
-template <typename T> class LockFreeAtomicState {
-public:
-	LockFreeAtomicState(T initialValue);
-	virtual bool set(T newValue);
-	virtual bool get(T newValue);
-	virtual bool compareAndSet(T expected, T newValue) = 0;
-	virtual ~	LockFreeAtomicState() {};
-};
-
 
 class JackClient
 {
@@ -134,4 +72,4 @@ public:
 
 } /* End of namespace speakerman */
 
-#endif /* SMS_SPEAKERMAN_JACKCONNECTOR_GUARD_H_ */
+#endif /* SMS_SPEAKERMAN_JACKCLIENT_GUARD_H_ */

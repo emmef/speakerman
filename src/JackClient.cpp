@@ -23,7 +23,7 @@
 #include <thread>
 #include <iostream>
 #include <simpledsp/Precondition.hpp>
-#include <speakerman/JackConnector.hpp>
+#include <speakerman/JackClient.hpp>
 
 namespace speakerman {
 
@@ -31,99 +31,6 @@ static void printError(const char *message) {
 	std::cerr << "Error: " << message << std::endl;
 }
 
-JackPort::JackPort(std::string n, Direction d) :
-		name(n), direction(d)
-{
-}
-JackPort::~JackPort()
-{
-}
-
-void JackPort::registerPort(jack_client_t *client)
-{
-	if (port) {
-		throw std::runtime_error("Cannot connect while already connected");
-	}
-	switch(direction) {
-	case Direction::IN:
-		port = jack_port_register(client, name.c_str(), JACK_DEFAULT_AUDIO_TYPE, JackPortIsInput, 0);
-		std::cout << "Port registered: " << name.c_str() << port << std::endl;
-		break;
-	case Direction::OUT:
-		port = jack_port_register(client, name.c_str(), JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0);
-		std::cout << "Port registered: " << name.c_str() << port << std::endl;
-		break;
-	default:
-		throw invalid_argument("Invalid port direction");
-	}
-	if (!port) {
-		string message = "Could not open port " + name;
-		std::cout << "Failure for " << name.c_str() << std::endl;
-		throw std::runtime_error(message);
-	}
-}
-
-void JackPort::deRegisterPort()
-{
-	if (port) {
-		std::cout << "Port de-registered: " << jack_port_name(port) << std::endl;
-		port = nullptr;
-	}
-}
-
-jack_default_audio_sample_t * JackPort::getBuffer(jack_nframes_t frames)
-{
-	if (!port) {
-		string message = "Port not registered (yet): " + name;
-		throw std::runtime_error(message);
-	}
-	return (jack_default_audio_sample_t *)jack_port_get_buffer(port, frames);
-}
-
-JackProcessor::JackProcessor() : inputs(10), outputs(10)
-{
-
-}
-
-void JackProcessor::addInput(string name)
-{
-	inputs.add(name, Direction::IN);
-}
-
-void JackProcessor::addOutput(string name)
-{
-	outputs.add(name, Direction::OUT);
-}
-
-void JackProcessor::registerPorts(jack_client_t *client)
-{
-	for (size_t i = 0 ; i < inputs.size(); i++) {
-		inputs.get(i).registerPort(client);
-	}
-	for (size_t i = 0 ; i < outputs.size(); i++) {
-		outputs.get(i).registerPort(client);
-	}
-}
-
-void JackProcessor::unRegisterPorts()
-{
-	for (size_t i = 0 ; i < inputs.size(); i++) {
-		inputs.get(i).deRegisterPort();
-	}
-	for (size_t i = 0 ; i < outputs.size(); i++) {
-		outputs.get(i).deRegisterPort();
-	}
-}
-
-
-const jack_default_audio_sample_t *JackProcessor::getInput(size_t number, jack_nframes_t frameCount) const
-{
-	return inputs.get(number).getBuffer(frameCount);
-}
-jack_default_audio_sample_t *JackProcessor::getOutput(size_t number, jack_nframes_t frameCount) const
-{
-	return outputs.get(number).getBuffer(frameCount);
-}
 
 int JackClient::rawProcess(jack_nframes_t nframes, void* arg) {
 	try {

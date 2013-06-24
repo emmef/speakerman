@@ -30,9 +30,10 @@
 #include <signal.h>
 #include <simpledsp/Precondition.hpp>
 #include <simpledsp/Butterworth.hpp>
+#include <simpledsp/Noise.hpp>
 #include <simpledsp/SingleReadDelay.hpp>
 #include <speakerman/utils/Mutex.hpp>
-#include <speakerman/JackConnector.hpp>
+#include <speakerman/JackClient.hpp>
 
 using namespace speakerman;
 
@@ -49,6 +50,7 @@ class SumToAll : public JackProcessor
 {
 	CoefficientBuilder builder;
 	JackFilters::FixedOrderMultiFilter<2, 8> lowPass;
+	simpledsp::Noise<4> noise;
 	Delay *delay[4];
 
 protected:
@@ -134,7 +136,7 @@ protected:
 				// - matrix from number of inputs to processing chains
 				// - matrix from processing to output chains
 				// - output chains have output channels = N x input channels (depends on number of cross-overs)
-				// - matrix to actual outputs (may sum crossovers)
+				// - matrix to actual outputs (may sum crossovers)	>n-1 + Sn
 				// - equalizing/limiting (both optional) per output
 
 				jack_default_audio_sample_t subL1 = lowPass.filter(0, lowPass.filter(1, inL1));
@@ -152,10 +154,10 @@ protected:
 			break;
 		default:
 			for (jack_nframes_t i = 0; i < frameCount; i++) {
-				const jack_default_audio_sample_t inL1 = inputLeft1[i];
-				const jack_default_audio_sample_t inR1 = inputRight1[i];
-				const jack_default_audio_sample_t inL2 = inputLeft2[i];
-				const jack_default_audio_sample_t inR2 = inputRight2[i];
+				const jack_default_audio_sample_t inL1 = inputLeft1[i] + noise.get(0);
+				const jack_default_audio_sample_t inR1 = inputRight1[i] + noise.get(1);
+				const jack_default_audio_sample_t inL2 = inputLeft2[i] + noise.get(2);
+				const jack_default_audio_sample_t inR2 = inputRight2[i] + noise.get(3);
 
 				// profiles
 				// - number of dynamic processing chains
@@ -205,6 +207,13 @@ protected:
 		delay[2]->setDelay(0.5 * sampleRate / frequency);
 		delay[3]->setDelay(0.5 * sampleRate / frequency);
 
+		size_t length = simpledsp::effectiveLength(builder, sampleRate, frequency, pow(2, -18), 10);
+
+		std::cout << "Effective filter length is " << length << " samples or " << 1e3*length / sampleRate << " ms." << " or " << (length * frequency / sampleRate) << " cycles " << std::endl;
+
+		noise.setCutoff(sampleRate, 20);
+		noise.setAmplitude(pow(2, -24));
+
 		return true;
 	}
 
@@ -222,7 +231,7 @@ protected:
 	}
 
 public:
-	SumToAll() : builder(2), lowPass(builder) {
+	SumToAll() : builder(2), lowPass(builder), noise(0.001, 100, 9600) {
 		addInput("left_in1");
 		addInput("right_in1");
 		addInput("left_in2");
@@ -285,7 +294,7 @@ static JackClientOwner client;
 extern "C" {
 	void signal_callback_handler(int signum)
 	{
-	   std::cerr << "Caught signal " << strsignal(signum) << std::endl;
+	   std::cerr << std::endl << "Caught signal " << strsignal(signum) << std::endl;
 
 	   exit(signum);
 	}
@@ -295,6 +304,7 @@ int main(int count, char * arguments[]) {
 	signal(SIGINT, signal_callback_handler);
 	signal(SIGTERM, signal_callback_handler);
 	signal(SIGABRT, signal_callback_handler);
+
 
 	SumToAll processor;
 	client.set(new JackClient("Speakerman", processor));
