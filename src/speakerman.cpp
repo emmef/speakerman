@@ -34,10 +34,9 @@
 #include <simpledsp/SingleReadDelay.hpp>
 #include <speakerman/utils/Mutex.hpp>
 #include <speakerman/JackClient.hpp>
+#include <speakerman/SpeakerMan.hpp>
 
 using namespace speakerman;
-
-typedef Iir<jack_default_audio_sample_t, double> JackFilters;
 
 enum class Modus { FILTER, BYPASS, ZERO, HIGH, LOW };
 
@@ -49,7 +48,7 @@ typedef SingleReadDelay<jack_default_audio_sample_t> Delay;
 class SumToAll : public JackProcessor
 {
 	CoefficientBuilder builder;
-	JackFilters::FixedOrderMultiFilter<2, 8> lowPass;
+	Iir::FixedOrderMultiFilter<jack_default_audio_sample_t, accurate_t, 2, 8> lowPass;
 	simpledsp::Noise<4> noise;
 	Delay *delay[4];
 
