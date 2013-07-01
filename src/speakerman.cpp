@@ -35,26 +35,47 @@
 #include <speakerman/utils/Mutex.hpp>
 #include <speakerman/JackClient.hpp>
 #include <speakerman/SpeakerMan.hpp>
+#include <speakerman/Matrix.hpp>
+#include <speakerman/Limiter.hpp>
+#include <speakerman/BandSplitter.hpp>
 
 using namespace speakerman;
 
-enum class Modus { FILTER, BYPASS, ZERO, HIGH, LOW };
+enum class Modus { FILTER, BYPASS, ZERO, HIGH, LOW, DOUBLE };
 
 Modus modus = Modus::FILTER;
 jack_default_audio_sample_t lowOutputOne = 0;
 jack_default_audio_sample_t lowOutputOneNew;
 typedef SingleReadDelay<jack_default_audio_sample_t> Delay;
 
+static void printCoefficients(CoefficientBuilder &builder, string message) {
+	std::cout << message << ":" << std::endl;
+	std::cout << "\tOrder: " << builder.order();
+
+	std::cout << std::endl;
+	for (size_t i = 0; i < builder.order(); i++) {
+		std::cout << " \tC[" << i << "]=" << builder.getC()[i];
+	}
+	std::cout << std::endl;
+	for (size_t i = 0; i < builder.order(); i++) {
+		std::cout << " \tD[" << i << "]=" << builder.getD()[i];
+	}
+	std::cout << std::endl;
+
+}
+
 class SumToAll : public JackProcessor
 {
-	CoefficientBuilder builder;
-	Iir::FixedOrderMultiFilter<jack_default_audio_sample_t, accurate_t, 2, 8> lowPass;
-	simpledsp::Noise<4> noise;
-	Delay *delay[4];
+	SpeakerManager * manager = nullptr;
+	LimiterSettings settings1;
+	LimiterSettings settings2;
 
 protected:
 	virtual bool process(jack_nframes_t frameCount)
 	{
+		if (!manager) {
+			return false;
+		}
 		const jack_default_audio_sample_t* inputLeft1 = getInput(0, frameCount);
 		const jack_default_audio_sample_t* inputRight1 = getInput(1, frameCount);
 		const jack_default_audio_sample_t* inputLeft2 = getInput(2, frameCount);
@@ -66,154 +87,30 @@ protected:
 		jack_default_audio_sample_t* outputRight2 = getOutput(3, frameCount);
 		jack_default_audio_sample_t* subOut = getOutput(4, frameCount);
 
+		for (size_t frame = 0; frame < frameCount; frame++) {
+			manager->setInputValue(0, *inputLeft1++);
+			manager->setInputValue(1, *inputRight1++);
+			manager->setInputValue(2, *inputLeft2++);
+			manager->setInputValue(3, *inputRight2++);
 
-		switch (modus) {
-		case Modus::ZERO:
-			for (jack_nframes_t i = 0; i < frameCount; i++) {
-				outputLeft1[i] = 0;
-				outputRight1[i] = 0;
-				outputLeft2[i] = 0;
-				outputRight2[i] = 0;
+			manager->process();
 
-				subOut[i] = 0;
-			}
-			break;
-		case Modus::BYPASS :
-			for (jack_nframes_t i = 0; i < frameCount; i++) {
-				outputLeft1[i] = inputLeft1[i];
-				outputRight1[i] = inputRight1[i];
-				outputLeft2[i] = inputLeft2[i];
-				outputRight2[i] = inputRight2[i];
-
-				subOut[i] = 0;
-			}
-			break;
-		case Modus::HIGH:
-			for (jack_nframes_t i = 0; i < frameCount; i++) {
-				const jack_default_audio_sample_t inL1 = inputLeft1[i];
-				const jack_default_audio_sample_t inR1 = inputRight1[i];
-				const jack_default_audio_sample_t inL2 = inputLeft2[i];
-				const jack_default_audio_sample_t inR2 = inputRight2[i];
-
-				// profiles
-				// - number of dynamic processing chains
-				// - number of output chains
-				// - matrix from number of inputs to processing chains
-				// - matrix from processing to output chains
-				// - output chains have output channels = N x input channels (depends on number of cross-overs)
-				// - matrix to actual outputs (may sum crossovers)
-				// - equalizing/limiting (both optional) per output
-
-				jack_default_audio_sample_t subL1 = lowPass.filter(0, lowPass.filter(1, inL1));
-				jack_default_audio_sample_t subR1 = lowPass.filter(2, lowPass.filter(3, inR1));
-				jack_default_audio_sample_t subL2 = lowPass.filter(4, lowPass.filter(5, inL2));
-				jack_default_audio_sample_t subR2 = lowPass.filter(6, lowPass.filter(7, inR2));
-
-				delay[0]->write(inL1);
-				delay[1]->write(inR1);
-				delay[2]->write(inL2);
-				delay[3]->write(inR2);
-
-				outputLeft1[i] = delay[0]->read() - subL1;
-				outputRight1[i] = delay[1]->read() - subR1;
-				outputLeft2[i] = delay[2]->read() - subL2;
-				outputRight2[i] = delay[3]->read() - subL2;
-
-				subOut[i] = 0;
-			}
-			break;
-		case Modus::LOW:
-			for (jack_nframes_t i = 0; i < frameCount; i++) {
-				const jack_default_audio_sample_t inL1 = inputLeft1[i];
-				const jack_default_audio_sample_t inR1 = inputRight1[i];
-				const jack_default_audio_sample_t inL2 = inputLeft2[i];
-				const jack_default_audio_sample_t inR2 = inputRight2[i];
-
-				// profiles
-				// - number of dynamic processing chains
-				// - number of output chains
-				// - matrix from number of inputs to processing chains
-				// - matrix from processing to output chains
-				// - output chains have output channels = N x input channels (depends on number of cross-overs)
-				// - matrix to actual outputs (may sum crossovers)	>n-1 + Sn
-				// - equalizing/limiting (both optional) per output
-
-				jack_default_audio_sample_t subL1 = lowPass.filter(0, lowPass.filter(1, inL1));
-				jack_default_audio_sample_t subR1 = lowPass.filter(2, lowPass.filter(3, inR1));
-				jack_default_audio_sample_t subL2 = lowPass.filter(4, lowPass.filter(5, inL2));
-				jack_default_audio_sample_t subR2 = lowPass.filter(6, lowPass.filter(7, inR2));
-
-				outputLeft1[i] = 0;
-				outputRight1[i] = 0;
-				outputLeft2[i] = 0;
-				outputRight2[i] = 0;
-
-				subOut[i] = 0.5 * (subL1 + subR1 + subL2 + subR2);;
-			}
-			break;
-		default:
-			for (jack_nframes_t i = 0; i < frameCount; i++) {
-				const jack_default_audio_sample_t inL1 = inputLeft1[i] + noise.get(0);
-				const jack_default_audio_sample_t inR1 = inputRight1[i] + noise.get(1);
-				const jack_default_audio_sample_t inL2 = inputLeft2[i] + noise.get(2);
-				const jack_default_audio_sample_t inR2 = inputRight2[i] + noise.get(3);
-
-				// profiles
-				// - number of dynamic processing chains
-				// - number of output chains
-				// - matrix from number of inputs to processing chains
-				// - matrix from processing to output chains
-				// - output chains have output channels = N x input channels (depends on number of cross-overs)
-				// - matrix to actual outputs (may sum crossovers)
-				// - equalizing/limiting (both optional) per output
-
-				jack_default_audio_sample_t subL1 = lowPass.filter(0, lowPass.filter(1, inL1));
-				jack_default_audio_sample_t subR1 = lowPass.filter(2, lowPass.filter(3, inR1));
-				jack_default_audio_sample_t subL2 = lowPass.filter(4, lowPass.filter(5, inL2));
-				jack_default_audio_sample_t subR2 = lowPass.filter(6, lowPass.filter(7, inR2));
-
-				delay[0]->write(inL1);
-				delay[1]->write(inR1);
-				delay[2]->write(inL2);
-				delay[3]->write(inR2);
-
-				outputLeft1[i] = delay[0]->read() - subL1;
-				outputRight1[i] = delay[1]->read() - subR1;
-				outputLeft2[i] = delay[2]->read() - subL2;
-				outputRight2[i] = delay[3]->read() - subL2;
-
-
-				subOut[i] = 0.5 * (subL1 + subR1 + subL2 + subR2);
-			}
-			break;
+			*outputLeft1++ = manager->getOutputValue(0);
+			*outputRight1++ = manager->getOutputValue(1);
+			*outputLeft2++ = manager->getOutputValue(2);
+			*outputRight2++ = manager->getOutputValue(3);
+			*subOut++ = manager->getSubWooferValue(0);
 		}
+
 		return true;
 	}
 	virtual bool setSampleRate(jack_nframes_t sampleRate)
 	{
-		std::cout << "Sample rate set to " << sampleRate << std::endl;
-		double frequency = 80;
-		Butterworth::createCoefficients(builder, (frequency_t)sampleRate, frequency, Butterworth::Pass::LOW);
-		lowPass.setCoefficients(builder);
-
-		delay[0]->buffer().clear();
-		delay[1]->buffer().clear();
-		delay[2]->buffer().clear();
-		delay[3]->buffer().clear();
-
-		delay[0]->setDelay(0.5 * sampleRate / frequency);
-		delay[1]->setDelay(0.5 * sampleRate / frequency);
-		delay[2]->setDelay(0.5 * sampleRate / frequency);
-		delay[3]->setDelay(0.5 * sampleRate / frequency);
-
-		size_t length = simpledsp::effectiveLength(builder, sampleRate, frequency, pow(2, -18), 10);
-
-		std::cout << "Effective filter length is " << length << " samples or " << 1e3*length / sampleRate << " ms." << " or " << (length * frequency / sampleRate) << " cycles " << std::endl;
-
-		noise.setCutoff(sampleRate, 20);
-		noise.setAmplitude(pow(2, -24));
-
-		return true;
+		if (manager) {
+			manager->configure(sampleRate);
+			return true;
+		}
+		return false;
 	}
 
 	virtual void shutdownByServer()
@@ -230,7 +127,7 @@ protected:
 	}
 
 public:
-	SumToAll() : builder(2), lowPass(builder), noise(0.001, 100, 9600) {
+	SumToAll() {
 		addInput("left_in1");
 		addInput("right_in1");
 		addInput("left_in2");
@@ -242,13 +139,22 @@ public:
 		addOutput("right_out2");
 		addOutput("sub_out");
 
-		delay[0] = new Delay(96000);
-		delay[1] = new Delay(96000);
-		delay[2] = new Delay(96000);
-		delay[3] = new Delay(96000);
+		MultibandLimiterConfigList builder;
+
+		builder
+				.addCrossover(160).addCrossover(640).addCrossover(2560).setChannels(2).setLimiterConfig(&settings1).add()
+				.addCrossover(160).addCrossover(640).addCrossover(2560).setChannels(2).setLimiterConfig(&settings2).add();
+
+		manager = new SpeakerManager(4, builder, 4, 1, 80.0);
 	};
 
-
+	~SumToAll()
+	{
+		if (manager) {
+			delete manager;
+			manager = nullptr;
+		}
+	}
 };
 
 class JackClientOwner
@@ -341,6 +247,11 @@ int main(int count, char * arguments[]) {
 		case 'H':
 			std::cout << "High-pass" << std::endl;
 			modus = Modus::HIGH;
+			break;
+		case 'd' :
+		case 'D' :
+			std::cout << "Double filtering" << std::endl;
+			modus = Modus::DOUBLE;
 			break;
 		default:
 			std::cerr << "Unknown command " << cmnd << std::endl;
