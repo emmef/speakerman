@@ -27,21 +27,23 @@
 
 namespace speakerman {
 
+using namespace simpledsp;
 // Your definitions
 
 template<typename Sample> class Matrix
 {
-
-	Array<Sample *> ins;
-	Array<Sample *> outs;
+	const size_t ins;
+	const size_t outs;
 	Array<Sample> factors;
-	Array<Sample> unconnected_ins;
-	Array<Sample> unconnected_outs;
+	Array<Sample> unconnected_in;
+	Array<Sample> unconnected_out;
+	Array<Sample> *inSamples;
+	Array<Sample> *outSamples;
 	Sample min;
 	Sample max;
 
 	inline size_t indexOf(size_t input, size_t output) const {
-		return ins.length() * output + input;
+		return ins * output + input;
 	}
 
 public:
@@ -49,116 +51,124 @@ public:
 		ins(Precondition::validPositiveCount<Sample>(inputs, "Matrix: inputs")),
 		outs(Precondition::validPositiveCount<Sample>(outputs, "Matrix: outputs")),
 		factors(Precondition::validPositiveProduct<Sample>(inputs, outputs, "Matrix: total size")),
-		unconnected_ins(inputs),
-		unconnected_outs(outputs),
+		unconnected_in(ins, CopyZero::ZERO),
+		unconnected_out(outs, CopyZero::ZERO),
+		inSamples(&unconnected_in),
+		outSamples(&unconnected_out),
 		min(minimum < maximum ? minimum : maximum),
 		max(minimum < maximum ? maximum : minimum)
 	{
-		for (size_t in = 0; in < ins.length(); in++) {
-			unconnected_ins[in] = 0.0;
-			ins[in] = &unconnected_ins[in];
-		}
-		for (size_t out = 0; out < outs.length(); out++) {
-			unconnected_outs[out] = 0.0;
-			outs[out] = &unconnected_outs[out];
-		}
 		for (size_t factor = 0; factor < factors.length(); factor++) {
 			factors[factor] = min;
 		}
 	}
 
+	Matrix(Array<Sample> &inputs, size_t outputs, Sample minimum, Sample maximum) :
+		ins(inputs.length()),
+		outs(Precondition::validPositiveCount<Sample>(outputs, "Matrix: outputs")),
+		factors(Precondition::validPositiveProduct<Sample>(inputs, outputs, "Matrix: total size")),
+		unconnected_in(ins, CopyZero::ZERO),
+		unconnected_out(outs, CopyZero::ZERO),
+		inSamples(&inputs),
+		outSamples(&unconnected_out),
+		min(minimum < maximum ? minimum : maximum),
+		max(minimum < maximum ? maximum : minimum)
+	{
+		for (size_t factor = 0; factor < factors.length(); factor++) {
+			factors[factor] = min;
+		}
+	}
+
+	Matrix(size_t inputs, Array<Sample> &outputs, Sample minimum, Sample maximum) :
+		ins(inputs),
+		outs(outputs.length()),
+		factors(Precondition::validPositiveProduct<Sample>(inputs, outputs, "Matrix: total size")),
+		unconnected_in(ins, CopyZero::ZERO),
+		unconnected_out(outs, CopyZero::ZERO),
+		inSamples(&unconnected_in),
+		outSamples(&outputs),
+		min(minimum < maximum ? minimum : maximum),
+		max(minimum < maximum ? maximum : minimum)
+	{
+		for (size_t factor = 0; factor < factors.length(); factor++) {
+			factors[factor] = min;
+		}
+	}
 	size_t inputs() const
 	{
-		return ins.length();
+		return ins;
 	}
 
 	size_t outputs() const
 	{
-		return outs.length();
+		return outs;
+	}
+	Array<Sample> &getInput() const
+	{
+		return *inSamples;
+	}
+	Array<Sample> &getOutput() const
+	{
+		return *outSamples;
+	}
+	void setInput(Array<Sample> &input)
+	{
+		if (input.length() == ins) {
+			inSamples = &input;
+			return;
+		}
+		throw std::invalid_argument("Input array must have same size as number of matrix inputs");
 	}
 
-	void setInput(size_t index, Sample &input)
+	void setOutput(Array<Sample> &output)
 	{
-		ins[index] = &input != nullptr ? &input : &unconnected_ins[index];
-	}
-
-	void setOutput(size_t index, Sample &output)
-	{
-		outs[index] = &output != nullptr ? &output : &unconnected_outs[index];
+		if (output.length() == outs) {
+			outSamples = &output;
+			return;
+		}
+		throw std::invalid_argument("Output array must have same size as number of matrix outputs");
 	}
 
 	void resetInput(size_t index)
 	{
-		ins[index] = &unconnected_ins[index];
+		inSamples = &unconnected_in;
 	}
 
 	void resetOutput(size_t index)
 	{
-		outs[index] = &unconnected_outs[index];
+		outSamples = &unconnected_out;
 	}
 
 	void setFactor(size_t in, size_t out, Sample factor)
 	{
-		if (in < ins.length() && out < outs.length()) {
+		if (in < ins && out < outs) {
 			factors[indexOf(in, out)] = factor <= min ? min : factor >= max ? max : factor;
 		}
 	}
 
 	const Sample getFactor(size_t in, size_t out)
 	{
-		if (in < ins.length() && out < outs.length()) {
+		if (in < ins && out < outs) {
 			return factors[indexOf(in, out)];
 		}
 
 		return min;
 	}
 
-	Sample input(size_t index) const
-	{
-		return *ins[index];
-	}
-
-	Sample output(size_t index) const
-	{
-		return *outs[index];
-	}
-
-	void setInputValue(size_t index, Sample value)
-	{
-		*ins[index] = value;
-	}
-
-	void setUnconnectedInputValues(Sample value) const
-	{
-		for (size_t in = 0; in < ins.length(); in++) {
-			unconnected_ins[in] = value;
-		}
-	}
-
-	Sample &unconnectedInput(size_t index) const
-	{
-		return unconnected_ins[index];
-	}
-
 	void multiply() const
 	{
-		for (size_t out = 0; out < outs.length(); out++) {
+		const Array<Sample> &input = *inSamples;
+		const Array<Sample> &output = *outSamples;
+
+		for (size_t out = 0; out < outs; out++) {
 			Sample sum = 0.0;
-			for (size_t in = 0; in < ins.length(); in++) {
-				sum += *ins[in] * factors[indexOf(in, out)];
+			for (size_t in = 0; in < ins; in++) {
+				sum += input[in] * factors[indexOf(in, out)];
 			}
-			*outs[out] = sum;
+			output[out] = sum;
 		}
 	}
 };
-
-static void bla() {
-	Matrix<double> m(10, 10, 0, 1);
-
-	m.resetOutput(1);
-	m.input(2);
-	m.multiply();
-}
 
 } /* End of namespace speakerman */
 

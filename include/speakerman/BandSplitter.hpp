@@ -31,8 +31,9 @@
 #include <simpledsp/Iir.hpp>
 #include <simpledsp/List.hpp>
 #include <simpledsp/Multiplexer.hpp>
-#include <speakerman/Limiter.hpp>
 #include <simpledsp/Noise.hpp>
+#include <speakerman/Limiter.hpp>
+#include <speakerman/PartialIO.hpp>
 
 namespace speakerman {
 
@@ -47,8 +48,8 @@ private:
 	typedef Iir::FixedOrderMultiFilter<sample_t, accurate_t, 2, 2 * MAX_INPUTS> Filter;
 
 	Noise<MAX_INPUTS> noise;
-	Array<sample_t> input;
-	Array<sample_t> output;
+	PartialIO<sample_t> input;
+	PartialIO<sample_t> output;
 	Array<frequency_t> crossover;
 	ButterflyPlan plan;
 	Array<sample_t> filterOutput;
@@ -80,13 +81,12 @@ private:
 	void configureFilters()
 	{
 		CoefficientBuilder builder(2);
-		for (size_t i = 0, j = 0; i < crossover.length(); i++) {
+		for (size_t i = 0; i < crossover.length(); i++) {
+			std::cout << "Setting crossover " << crossover[i] << std::endl;
 			Butterworth::createCoefficients(builder, sampleFrequency, crossover[i], Butterworth::Pass::LOW, true);
-			lowPass.get(j++).setCoefficients(builder);
-			lowPass.get(j++).setCoefficients(builder);
+			lowPass.get(i).setCoefficients(builder);
 			Butterworth::createCoefficients(builder, sampleFrequency, crossover[i], Butterworth::Pass::HIGH, true);
-			highPass.get(j++).setCoefficients(builder);
-			highPass.get(j++).setCoefficients(builder);
+			highPass.get(i).setCoefficients(builder);
 		}
 		noise.setCutoff(sampleFrequency, 1000);
 	}
@@ -107,29 +107,28 @@ public:
 	{
 		CoefficientBuilder builder(2);
 		for (size_t i =0; i < crossover.length(); i++) {
-			Butterworth::createCoefficients(builder, 96000, crossover[i], Butterworth::Pass::HIGH);
-			highPass.add(builder);
-			highPass.add(builder); // Linkwitz Riley applies 2 Butterworth filters
-			Butterworth::createCoefficients(builder, 96000, crossover[i], Butterworth::Pass::LOW);
-			highPass.add(builder);
-			highPass.add(builder); // Linkwitz Riley applies 2 Butterworth filters
+			highPass.add(); // Linkwitz Riley applies 2 Butterworth filters
+			lowPass.add(); // Linkwitz Riley applies 2 Butterworth filters
 		}
 		for (size_t i = 0; i < plan.outputs(); i++) {
 			limiterSetting.add(LimiterSettingsWithThreshold(limiterSettings));
 			limiter.add(limiterSetting.get(i));
+		}
+		for (size_t i = 0; i < plan.size(); i++) {
+			std::cout << "Input " << plan[i].input() << " split (" << crossover[plan[i].input()] << "Hz.) -> " << plan[i].output1() << " + " << plan[i].output2() << std::endl;
 		}
 	}
 	size_t channels() const
 	{
 		return input.length();
 	}
-	Array<sample_t> &in()
+	void setInput(Array<sample_t> &array, size_t offset)
 	{
-		return input;
+		input.connect(array, offset);
 	}
-	Array<sample_t> &out()
-			{
-		return output;
+	void setOutput(Array<sample_t> &array, size_t offset)
+	{
+		output.connect(array, offset);
 	}
 	const Array<frequency_t> &crossovers() const
 	{
@@ -146,44 +145,48 @@ public:
 	}
 	void process() {
 		// Frequency-splitting
-		for (size_t channel = 0; channel < input.length(); channel++) {
+		for (size_t channel = 0, filterChannel = 0; channel < input.length(); channel++, filterChannel += 2) {
 			ButterflyEntry entry = plan[0];
+
 			filterOutput[indexOf(channel, entry.input())] = input[channel] + noise.get(channel);
 
-			for (size_t band = 0, filterOffs = 0; band < plan.size(); band++) {
+			for (size_t band = 0, filterOffs = 0; band < plan.size(); band++, filterOffs += 2) {
 				entry = plan[band];
-				size_t inPosition = 2 * entry.input();
-				accurate_t y = filterOutput[indexOf(channel, entry.input())];
+				size_t i = entry.input();
+				accurate_t input = filterOutput[indexOf(channel, i)];
+				accurate_t &output1 = filterOutput[indexOf(channel, entry.output1())];
+				accurate_t &output2 = filterOutput[indexOf(channel, entry.output2())];
 
-				accurate_t butterLo = lowPass.get(filterOffs).fixed(channel, y);
-				accurate_t butterHi = highPass.get(filterOffs).fixed(channel, y);
-				filterOffs++;
-				accurate_t linkwitzLo = lowPass.get(filterOffs).fixed(channel, butterLo);
-				accurate_t linkwitzHi = highPass.get(filterOffs).fixed(channel, butterHi);
-				filterOffs++;
+				accurate_t butterLo = lowPass.get(i).fixed(filterChannel, input);
+				accurate_t linkwitzLo = lowPass.get(i).fixed(filterChannel + 1, butterLo);
+				output1 = linkwitzLo;
 
-				filterOutput[indexOf(channel, entry.output1())] = linkwitzLo;
-				filterOutput[indexOf(channel, entry.output2())] = linkwitzHi;
+				accurate_t butterHi = highPass.get(i).fixed(filterChannel, input);
+				accurate_t linkwitzHi = highPass.get(i).fixed(filterChannel + 1, butterHi);
+				output2 = linkwitzHi;
+
+				output1 = 0.25 * input;
+				output2 = 0.25 * input;
 			}
 		}
 		// Detect and limit
-		for (size_t band = 0; band < plan.outputs(); band++) {
-			accurate_t detection = 0.0;
-			for (size_t channel = 0; channel < input.length(); channel++) {
-				accurate_t x = filterOutput[indexOf(channel, band)];
-				detection += x * x;
-			}
-			Limiter &lim = limiter.get(band);
-			lim.detect(sqrt(detection));
-			for (size_t channel = 0; channel < input.length(); channel++) {
-				accurate_t &x = filterOutput[indexOf(channel, band)];
-				x = lim.getLimited(x);
-			}
-		}
+//		for (size_t band = 0; band < plan.outputs(); band++) {
+//			accurate_t detection = 0.0;
+//			for (size_t channel = 0; channel < input.length(); channel++) {
+//				accurate_t x = filterOutput[indexOf(channel, band)];
+//				detection += x * x;
+//			}
+//			Limiter &lim = limiter.get(band);
+//			lim.detect(sqrt(detection));
+//			for (size_t channel = 0; channel < input.length(); channel++) {
+//				accurate_t &x = filterOutput[indexOf(channel, band)];
+//				x = lim.getLimited(x);
+//			}
+//		}
 		// Write to output
 		for (size_t channel = 0; channel < input.length(); channel++) {
 			sample_t y = 0.0;
-			for (size_t band = 0, filterOffs = 0; band < plan.size(); band++) {
+			for (size_t band = 0; band < plan.size(); band++) {
 				y += filterOutput[indexOf(channel, band)];
 			}
 			output[channel] = y;
@@ -197,6 +200,7 @@ public:
 
 	void configure(frequency_t sampleRate) {
 		sampleFrequency = Frequency::validRate(sampleRate);
+		configure();
 	}
 };
 

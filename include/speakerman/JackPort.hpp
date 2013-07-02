@@ -35,16 +35,25 @@ enum class Direction
 class JackPort
 {
 	std::string name;
+	std::string connectNamePattern;
+	std::string connectTypePattern;
+	unsigned long connectFlags;
 	Direction direction;
 	jack_port_t * port = nullptr;
 
 	void registerPort(jack_client_t *client);
-	void deRegisterPort();
+	signed connect(jack_client_t *, bool disconnectPrevious);
+	void deRegisterPort(jack_client_t *client);
 	jack_default_audio_sample_t * getBuffer(jack_nframes_t frames);
 
 public:
-	JackPort(std::string name, Direction direction);
+	JackPort(Direction direction, std::string name, std::string namePattern, std::string typePattern, unsigned long flags);
+	JackPort(Direction direction, std::string name);
 	~JackPort();
+	std::string getName() const
+	{
+		return name;
+	}
 	friend class JackProcessor;
 };
 

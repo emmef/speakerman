@@ -128,16 +128,16 @@ protected:
 
 public:
 	SumToAll() {
-		addInput("left_in1");
-		addInput("right_in1");
+		addInput("left_in1", "^PulseAudio JACK Sink.*left$", ".*", 0);
+		addInput("right_in1", "^PulseAudio JACK Sink.*right$", ".*", 0);
 		addInput("left_in2");
 		addInput("right_in2");
 
-		addOutput("left_out1");
-		addOutput("right_out1");
+		addOutput("left_out1", ".*OUTPUT_1", "firewire_pcm", 0);
+		addOutput("right_out1", ".*OUTPUT_1", "firewire_pcm", 0);
 		addOutput("left_out2");
 		addOutput("right_out2");
-		addOutput("sub_out");
+		addOutput("sub_out",  ".*OUTPUT*", "firewire_pcm", 0);
 
 		MultibandLimiterConfigList builder;
 

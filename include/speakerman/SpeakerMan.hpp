@@ -22,6 +22,7 @@
 #ifndef SMS_SPEAKERMAN_SPEAKERMAN_GUARD_H_
 #define SMS_SPEAKERMAN_SPEAKERMAN_GUARD_H_
 
+#include <iostream>
 #include <jack/jack.h>
 #include <simpledsp/Values.hpp>
 #include <simpledsp/Precondition.hpp>
@@ -46,7 +47,7 @@ public:
 	MultibandLimiterConfig(const Array<frequency_t> &crossovers, const size_t channels, const LimiterSettings &settings) :
 		channels_(Precondition::validPositiveProduct<sample_t>(channels, crossovers.length()) / crossovers.length()),
 		crossovers_(crossovers),
-		settings_(settings_)
+		settings_(settings)
 	{
 	}
 	size_t channels() const
@@ -157,6 +158,7 @@ class SpeakerManager
 	Filter lowPass;
 	Filter highPass;
 
+
 	void connectDefaults(Matrix<sample_t> &matrix, sample_t scale)
 	{
 		size_t max = matrix.inputs() < matrix.outputs() ? matrix.outputs() : matrix.inputs();
@@ -177,22 +179,23 @@ public:
 		splitter(2),
 		crossover(crossoverFrequency)
 	{
-		const List<MultibandLimiterConfig> &configs = list.build();
-		size_t ioIndex = 0;
-		for (size_t i = 0; i < splitter.size(); i++) {
-			const MultibandLimiterConfig &config = configs.get(i);
-			BandSplitter &s = splitter.add(config.channels(), config.crossovers(), config.settings());
-			for (size_t channel = 0; channel < s.channels(); channel++, ioIndex++) {
-				inMatrix.setOutput(ioIndex, s.in()[channel]);
-				outMatrix.setInput(ioIndex, s.in()[channel]);
-			}
-		}
-		for (size_t channel = 0; channel < outMatrix.outputs(); channel++) {
-			subsMatrix.setInput(channel, lowOutput[channel]);
-		}
 		connectDefaults(inMatrix, 1.0);
 		connectDefaults(outMatrix, 1.0);
 		connectDefaults(subsMatrix, 0.5);
+
+		const List<MultibandLimiterConfig> &configs = list.build();
+		size_t ioIndex = 0;
+		for (size_t i = 0; i < configs.size(); i++) {
+			const MultibandLimiterConfig &config = configs.get(i);
+			BandSplitter &s = splitter.add(config.channels(), config.crossovers(), config.settings());
+			std::cout << "In-matrix output: " << inMatrix.getOutput().unsafeData() << "; offs=" << ioIndex << "; address=" << &inMatrix.getOutput()[ioIndex] << std::endl;
+			std::cout << "Out-matrix output: " << outMatrix.getInput().unsafeData() << "; offs=" << ioIndex << "; address=" << &outMatrix.getInput()[ioIndex] << std::endl;
+			s.setInput(inMatrix.getOutput(), ioIndex);
+			s.setOutput(outMatrix.getInput(), ioIndex);
+			ioIndex += s.channels();
+		}
+		outMatrix.setOutput(highOutput);
+		subsMatrix.setInput(lowOutput);
 	}
 	Matrix<sample_t> &inputMatrix()
 	{
@@ -208,7 +211,7 @@ public:
 	}
 	void setInputValue(size_t index, sample_t value)
 	{
-		inMatrix.setInputValue(index, value);
+		inMatrix.getInput()[index] = value;
 	}
 	sample_t getOutputValue(size_t index) const
 	{
@@ -226,12 +229,20 @@ public:
 			splitter.get(i).process();
 		}
 		outMatrix.multiply();
-		for (size_t channel = 0, filterOffs = 0; channel < outMatrix.outputs(); channel++, filterOffs += 2) {
-			sample_t output = outMatrix.output(channel);
-			lowOutput[channel] = lowPass.fixed(filterOffs, lowPass.fixed(filterOffs + 1, output));
-			highOutput[channel] = highPass.fixed(filterOffs, highPass.fixed(filterOffs + 1, output));
+		for (size_t i = 0; i < highOutput.length(); i++) {
+			lowOutput[i] = highOutput[i];
 		}
 		subsMatrix.multiply();
+//		for (size_t channel = 0; channel < inMatrix.outputs(); channel++) {
+//			outMatrix.setInputValue(channel, inMatrix.output(channel));
+//		}
+//		outMatrix.multiply();
+//		for (size_t channel = 0, filterOffs = 0; channel < outMatrix.outputs(); channel++, filterOffs += 2) {
+//			sample_t output = outMatrix.output(channel);
+//			lowOutput[channel] = lowPass.fixed(filterOffs, lowPass.fixed(filterOffs + 1, output));
+//			highOutput[channel] = highPass.fixed(filterOffs, highPass.fixed(filterOffs + 1, output));
+//		}
+//		subsMatrix.multiply();
 	}
 	void configure(frequency_t sampleRate)
 	{

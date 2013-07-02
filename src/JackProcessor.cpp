@@ -28,16 +28,6 @@ JackProcessor::JackProcessor() : inputs(10), outputs(10)
 
 }
 
-void JackProcessor::addInput(string name)
-{
-	inputs.add(name, Direction::IN);
-}
-
-void JackProcessor::addOutput(string name)
-{
-	outputs.add(name, Direction::OUT);
-}
-
 void JackProcessor::registerPorts(jack_client_t *client)
 {
 	for (size_t i = 0 ; i < inputs.size(); i++) {
@@ -48,14 +38,30 @@ void JackProcessor::registerPorts(jack_client_t *client)
 	}
 }
 
-void JackProcessor::unRegisterPorts()
+void JackProcessor::unRegisterPorts(jack_client_t *client)
 {
 	for (size_t i = 0 ; i < inputs.size(); i++) {
-		inputs.get(i).deRegisterPort();
+		inputs.get(i).deRegisterPort(client);
 	}
 	for (size_t i = 0 ; i < outputs.size(); i++) {
-		outputs.get(i).deRegisterPort();
+		outputs.get(i).deRegisterPort(client);
 	}
+}
+
+signed JackProcessor::connectPorts(jack_client_t *client, bool disconnectPreviousOutputs, bool disconnectPreviousInputs)
+{
+	signed total = 0;
+	for (size_t i = 0 ; i < inputs.size(); i++) {
+		if (inputs.get(i).connect(client, disconnectPreviousOutputs) > 0) {
+			total ++;
+		}
+	}
+	for (size_t i = 0 ; i < outputs.size(); i++) {
+		if (outputs.get(i).connect(client, disconnectPreviousInputs) > 0) {
+			total++;
+		}
+	}
+	return total;
 }
 
 

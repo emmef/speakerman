@@ -37,15 +37,24 @@ class JackProcessor
 	List<JackPort> outputs;
 
 	void registerPorts(jack_client_t *client);
-	void unRegisterPorts();
+	void unRegisterPorts(jack_client_t *client);
+	signed connectPorts(jack_client_t *client, bool disconnectPreviousOutputs, bool disconnectPreviousInputs);
 
 protected:
 
 	JackProcessor();
-	void addInput(string name);
-	void addOutput(string name);
+	template <typename... Args> void addInput(Args... arguments)
+	{
+		inputs.add(Direction::IN, arguments...);
+	}
+	template <typename... Args> void addOutput(Args... arguments)
+	{
+		outputs.add(Direction::OUT, arguments...);
+	}
+	void addOutput(string name, string connectTo = "");
 	const jack_default_audio_sample_t *getInput(size_t number, jack_nframes_t frameCount) const;
 	jack_default_audio_sample_t *getOutput(size_t number, jack_nframes_t frameCount) const;
+
 
 public:
 

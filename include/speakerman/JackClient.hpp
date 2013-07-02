@@ -64,6 +64,7 @@ public:
 	JackClient(string name, JackProcessor &processor);
 	void open();
 	void activate();
+	signed connectPorts(bool disconnectPreviousOutputs, bool disconnectPreviousInputs);
 	void deactivate();
 	void close();
 

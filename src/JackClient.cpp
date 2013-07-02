@@ -174,6 +174,15 @@ void JackClient::activate()
 	processor.prepareActivate();
 }
 
+signed JackClient::connectPorts(bool disconnectPreviousOutputs, bool disconnectPreviousInputs)
+{
+	Guard g = m.guard();
+	if (state != ClientState::ACTIVE) {
+		throw std::runtime_error("Cannot connect ports: not activated");
+	}
+	return processor.connectPorts(client, disconnectPreviousOutputs, disconnectPreviousInputs);
+}
+
 void JackClient::deactivate()
 {
 	Guard g = m.guard();
@@ -195,6 +204,8 @@ void JackClient::close()
 {
 	Guard g = m.guard();
 	if (client) {
+		std::cout << "Unregister ports" << std::endl;
+		processor.unRegisterPorts(client);
 		std::cout << "Closing jack client " << name << std::endl;
 		for (int attempt = 0; attempt < 10; attempt++) {
 			if (jack_client_close(client) == 0) {
@@ -202,8 +213,6 @@ void JackClient::close()
 			}
 			std::this_thread::yield();
 		}
-		std::cout << "Unregister ports" << std::endl;
-		processor.unRegisterPorts();
 	}
 	client = nullptr;
 	state = ClientState::CLOSED;
