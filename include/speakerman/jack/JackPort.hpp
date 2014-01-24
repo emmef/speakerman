@@ -26,6 +26,7 @@
 #include <string>
 
 namespace speakerman {
+namespace jack {
 
 enum class Direction
 {
@@ -57,7 +58,7 @@ public:
 	friend class JackProcessor;
 };
 
-
+} /* End of namespace jack */
 } /* End of namespace speakerman */
 
 #endif /* SMS_SPEAKERMAN_JACKPORT_GUARD_H_ */

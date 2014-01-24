@@ -1,9 +1,9 @@
 /*
- * SpeakerMan.cpp
+ * ClientState.hpp
  *
  * Part of 'Speaker management system'
  *
- * Copyright (C) 2013 Michel Fleur.
+ * Copyright (C) 2013-2014 Michel Fleur.
  * https://github.com/emmef/simpledsp
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -19,10 +19,30 @@
  * limitations under the License.
  */
 
-#include <speakerman/SpeakerMan.hpp>
+#ifndef SMS_SPEAKERMAN_CLIENTSTATE_GUARD_H_
+#define SMS_SPEAKERMAN_CLIENTSTATE_GUARD_H_
+
+#include <stdexcept>
+#include <mutex>
+#include <thread>
+
+#include <jack/jack.h>
+#include <simpledsp/Guard.hpp>
 
 namespace speakerman {
+
+enum class ClientState
+{
+	INITIAL,
+	CLOSED,
+	DEFINED_PORTS,
+	REGISTERED,
+	ACTIVE,
+	CLOSING
+};
 
 // Your definitions
 
 } /* End of namespace speakerman */
+
+#endif /* SMS_SPEAKERMAN_CLIENTSTATE_GUARD_H_ */

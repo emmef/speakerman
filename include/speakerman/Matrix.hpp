@@ -91,7 +91,7 @@ public:
 		max(minimum < maximum ? maximum : minimum)
 	{
 		for (size_t factor = 0; factor < factors.length(); factor++) {
-			factors[factor] = min;
+			factors[factor] = 0;
 		}
 	}
 	size_t inputs() const
@@ -142,7 +142,7 @@ public:
 	void setFactor(size_t in, size_t out, Sample factor)
 	{
 		if (in < ins && out < outs) {
-			factors[indexOf(in, out)] = factor <= min ? min : factor >= max ? max : factor;
+			factors[indexOf(in, out)] = factor <= min ? 0 : factor >= max ? max : factor;
 		}
 	}
 
@@ -167,6 +167,14 @@ public:
 			}
 			output[out] = sum;
 		}
+	}
+	Sample getMinimum() const
+	{
+		return min;
+	}
+	Sample getMaximum() const
+	{
+		return max;
 	}
 };
 

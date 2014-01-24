@@ -23,141 +23,35 @@
 #define SMS_SPEAKERMAN_SPEAKERMAN_GUARD_H_
 
 #include <iostream>
+#include <vector>
 #include <jack/jack.h>
+#include <simpledsp/Types.hpp>
 #include <simpledsp/Values.hpp>
 #include <simpledsp/Precondition.hpp>
 #include <simpledsp/Array.hpp>
 #include <simpledsp/List.hpp>
+#include <simpledsp/MultibandSplitter.hpp>
 #include <speakerman/Frame.hpp>
 #include <speakerman/Matrix.hpp>
-#include <speakerman/BandSplitter.hpp>
-#include <speakerman/Limiter.hpp>
 
 namespace speakerman {
 
 static constexpr size_t MAX_CHANNELS = 16;
 static constexpr size_t SUB_FILTER_ORDER = 2;
 
-class MultibandLimiterConfig
+
+template<size_t ORDER, size_t CROSSOVERS, size_t INS, size_t CHANNELS, size_t OUTS, size_t SUBS> class SpeakerManager
 {
-	const size_t channels_;
-	const Array<frequency_t> crossovers_;
-	const LimiterSettings &settings_;
-public:
-	MultibandLimiterConfig(const Array<frequency_t> &crossovers, const size_t channels, const LimiterSettings &settings) :
-		channels_(Precondition::validPositiveProduct<sample_t>(channels, crossovers.length()) / crossovers.length()),
-		crossovers_(crossovers),
-		settings_(settings)
-	{
-	}
-	size_t channels() const
-	{
-		return channels_;
-	}
-	const Array<frequency_t> &crossovers() const
-	{
-		return crossovers_;
-	}
-	const LimiterSettings &settings() const
-	{
-		return settings_;
-	}
-};
+	typedef Multiband::Splitter<accurate_t, ORDER, CROSSOVERS, CHANNELS> Splitter;
+	typedef typename Splitter::SplitterPlan Plan;
 
-class MultibandLimiterConfigList
-{
-	const LimiterSettings *settings;
-	Array<frequency_t> crossovers;
-	size_t crossoverIndex = 0;
-	size_t ch = 0;
-	List<MultibandLimiterConfig> list;
-	size_t totalInputs_ = 0;
-
-public:
-	MultibandLimiterConfigList() : crossovers(12), list(2) {};
-
-	MultibandLimiterConfigList &addCrossover(frequency_t frequency)
-	{
-		if (crossoverIndex == BandSplitter::MAX_CROSSOVERS) {
-			throw std::runtime_error("Cannot add more crossovers");
-		}
-		for (size_t i = 0; i < crossoverIndex; i++) {
-			if (crossovers[i] > frequency) {
-				throw std::invalid_argument("Each crossovers must have higher frequency than previous one");
-			}
-		}
-		crossovers[crossoverIndex++] = frequency;
-
-		return *this;
-	}
-
-	MultibandLimiterConfigList &setChannels(size_t channels)
-	{
-		ch = Precondition::validPositiveCount<sample_t>(channels);
-
-		return *this;
-	}
-
-	MultibandLimiterConfigList &setLimiterConfig(const LimiterSettings *config) {
-		if (config == nullptr) {
-			throw nullptr_error("MultibandLimiterConfigList::setLimiterConfig");
-		}
-		settings = config;
-
-		return *this;
-	}
-
-	MultibandLimiterConfigList &add()
-	{
-		if (crossoverIndex == 0) {
-			throw runtime_error("No crossovers configured");
-		}
-		if (ch == 0) {
-			throw runtime_error("No number of channels configured");
-		}
-		if (!settings) {
-			throw runtime_error("No limiter settings specified");
-		}
-		Array<frequency_t> cr(crossoverIndex, crossovers);
-		list.add(cr, ch, *settings);
-
-		totalInputs_ += ch;
-
-		crossoverIndex = 0;
-		ch = 0;
-		settings = nullptr;
-
-		return *this;
-	}
-
-	size_t totalInputs() const {
-		if (totalInputs_ == 0) {
-			throw runtime_error("MultibandLimiterConfigList: no configurations yet");
-		}
-		return totalInputs_;
-	}
-
-	const List<MultibandLimiterConfig> &build() const
-	{
-		return list;
-	}
-
-};
-
-class SpeakerManager
-{
-	typedef Iir::FixedOrderMultiFilter<sample_t, accurate_t, 2, 2 * BandSplitter::MAX_INPUTS> Filter;
-
+	Plan plan;
+	Splitter splitter;
 	Matrix<sample_t> inMatrix;
 	Matrix<sample_t> outMatrix;
-	Matrix<sample_t> subsMatrix;
-	List<BandSplitter> splitter;
-	Array<sample_t> lowOutput;
-	Array<sample_t> highOutput;
-	frequency_t crossover;
-	Filter lowPass;
-	Filter highPass;
-
+	Matrix<sample_t> subMatrix;
+	array<accurate_t, CHANNELS> afterInMatrix;
+	array<freq_t, CROSSOVERS> crossovers;
 
 	void connectDefaults(Matrix<sample_t> &matrix, sample_t scale)
 	{
@@ -170,32 +64,17 @@ class SpeakerManager
 
 public:
 	// ins, outs and subs should be named groups so that named volume controls can apply
-	SpeakerManager(size_t ins, const MultibandLimiterConfigList &list, size_t outs, size_t subs, frequency_t crossoverFrequency) :
-		inMatrix(ins, list.totalInputs(), 1e-6, 1.0),
-		outMatrix(list.totalInputs(), outs, 1e-6, 1.0),
-		subsMatrix(outs, subs, 1e-6, 1.0),
-		lowOutput(outs),
-		highOutput(outs),
-		splitter(2),
-		crossover(crossoverFrequency)
+	SpeakerManager() :
+		splitter(plan),
+		inMatrix(INS, CHANNELS, 1e-6, 1.0 * CHANNELS / INS),
+		outMatrix(CHANNELS, OUTS, 1e-6, 1.0 * OUTS / CHANNELS),
+		subMatrix(CHANNELS, SUBS, 1e-6, 1.0 * SUBS / CHANNELS)
 	{
-		connectDefaults(inMatrix, 1.0);
-		connectDefaults(outMatrix, 1.0);
-		connectDefaults(subsMatrix, 0.5);
+		splitter.reload();
 
-		const List<MultibandLimiterConfig> &configs = list.build();
-		size_t ioIndex = 0;
-		for (size_t i = 0; i < configs.size(); i++) {
-			const MultibandLimiterConfig &config = configs.get(i);
-			BandSplitter &s = splitter.add(config.channels(), config.crossovers(), config.settings());
-			std::cout << "In-matrix output: " << inMatrix.getOutput().unsafeData() << "; offs=" << ioIndex << "; address=" << &inMatrix.getOutput()[ioIndex] << std::endl;
-			std::cout << "Out-matrix output: " << outMatrix.getInput().unsafeData() << "; offs=" << ioIndex << "; address=" << &outMatrix.getInput()[ioIndex] << std::endl;
-			s.setInput(inMatrix.getOutput(), ioIndex);
-			s.setOutput(outMatrix.getInput(), ioIndex);
-			ioIndex += s.channels();
-		}
-		outMatrix.setOutput(highOutput);
-		subsMatrix.setInput(lowOutput);
+		connectDefaults(inMatrix, inMatrix.getMaximum());
+		connectDefaults(outMatrix, outMatrix.getMaximum());
+		connectDefaults(subMatrix, subMatrix.getMaximum());
 	}
 	Matrix<sample_t> &inputMatrix()
 	{
@@ -207,53 +86,48 @@ public:
 	}
 	Matrix<sample_t> &subWooferMatrix()
 	{
-		return subsMatrix;
+		return subMatrix;
 	}
-	void setInputValue(size_t index, sample_t value)
+	Array<sample_t> &getInput()
 	{
-		inMatrix.getInput()[index] = value;
+		inMatrix.getInput();
 	}
-	sample_t getOutputValue(size_t index) const
+	const Array<sample_t> &getOutput() const
 	{
-		return highOutput[index];
+		return outMatrix.getOutput();
 	}
-	sample_t getSubWooferValue(size_t index) const
+	const Array<sample_t> &getSubWoofer() const
 	{
-		return lowOutput[index];
+		return subMatrix.getOutput();
 	}
 
 	void process()
 	{
 		inMatrix.multiply();
-		for (size_t i = 0; i < splitter.size(); i++) {
-			splitter.get(i).process();
+
+		Array<sample_t> &inOutput = inMatrix.getOutput();
+		for (size_t i = 0; i < CHANNELS; i++) {
+			afterInMatrix[i] = inOutput(i);
 		}
+
+		auto separated = splitter.process(afterInMatrix);
+
+		Array<sample_t> &outInput = outMatrix.getInput();
+		Array<sample_t> &subInput = subMatrix.getInput();
+		for (size_t i = 0; i < CHANNELS; i++) {
+			subInput[i] = separated[0][i];
+			outInput[i] = separated[1][i];
+		}
+
 		outMatrix.multiply();
-		for (size_t i = 0; i < highOutput.length(); i++) {
-			lowOutput[i] = highOutput[i];
-		}
-		subsMatrix.multiply();
-//		for (size_t channel = 0; channel < inMatrix.outputs(); channel++) {
-//			outMatrix.setInputValue(channel, inMatrix.output(channel));
-//		}
-//		outMatrix.multiply();
-//		for (size_t channel = 0, filterOffs = 0; channel < outMatrix.outputs(); channel++, filterOffs += 2) {
-//			sample_t output = outMatrix.output(channel);
-//			lowOutput[channel] = lowPass.fixed(filterOffs, lowPass.fixed(filterOffs + 1, output));
-//			highOutput[channel] = highPass.fixed(filterOffs, highPass.fixed(filterOffs + 1, output));
-//		}
-//		subsMatrix.multiply();
+		subMatrix.multiply();
 	}
-	void configure(frequency_t sampleRate)
+	void configure(array<freq_t, CROSSOVERS> frequencies, freq_t sampleRate)
 	{
-		for (size_t i = 0; i < splitter.size(); i++) {
-			splitter.get(i).configure(sampleRate);
+		for (size_t i = 0; i < CROSSOVERS; i++) {
+			plan.setCrossover(i, frequencies[i] / sampleRate);
 		}
-		CoefficientBuilder builder(2);
-		Butterworth::createCoefficients(builder, sampleRate, crossover, Butterworth::Pass::LOW, true);
-		lowPass.setCoefficients(builder);
-		Butterworth::createCoefficients(builder, sampleRate, crossover, Butterworth::Pass::HIGH, true);
-		highPass.setCoefficients(builder);
+		splitter.reload();
 	}
 	void configure() {
 		for (size_t i = 0; i < splitter.size(); i++) {

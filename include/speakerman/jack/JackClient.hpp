@@ -23,30 +23,23 @@
 #define SMS_SPEAKERMAN_JACKCLIENT_GUARD_H_
 
 #include <string>
-#include <atomic>
+#include <mutex>
 #include <jack/jack.h>
-#include <simpledsp/List.hpp>
-#include <speakerman/utils/Mutex.hpp>
-#include <speakerman/JackProcessor.hpp>
+#include <simpledsp/Guard.hpp>
+#include <speakerman/jack/JackProcessor.hpp>
+#include <speakerman/jack/ClientState.hpp>
+#include <speakerman/jack/Connection.hpp>
 
 namespace speakerman {
+namespace jack {
 
 using namespace simpledsp;
 
-enum class ClientState
-{
-	INITIAL,
-	CLOSED,
-	DEFINED_PORTS,
-	REGISTERED,
-	ACTIVE
-};
-
 class JackClient
 {
-	speakerman::Mutex m;
+	recursive_mutex m;
 	string name;
-	jack_client_t *client = nullptr;
+	Client client;
 	ClientState state = ClientState::INITIAL;
 	JackProcessor &processor;
 
@@ -56,13 +49,36 @@ class JackClient
 
 	void checkCanAddIO();
 	void shutdownByServer();
-	void unsafeOpen();
+	static bool staticClose(JackClient &self, jack_client_t *client);
+	bool unsafeClose(jack_client_t *client);
 
-protected:
+	static signed staticClosePorts(JackClient &self, jack_client_t *client);
+	signed unsafeClosePorts(jack_client_t *client);
 
 public:
 	JackClient(string name, JackProcessor &processor);
-	void open();
+	template<typename... Args> void open(JackOptions options, Args... args)
+	{
+		Guard g(m);
+
+		switch (state) {
+		case ClientState::INITIAL:
+			if (processor.inputs.size() == 0 && processor.outputs.size() == 0) {
+				throw std::runtime_error("Cannot open client: no ports defined");
+			}
+			std::cout << "Inputs: " << processor.inputs.size() << "; outputs: " << processor.outputs.size() << std::endl;
+			/* no break */
+		case ClientState::CLOSED:
+		case ClientState::DEFINED_PORTS:
+			client.connect(name, options, args...);
+			state = ClientState::REGISTERED;
+			break;
+		case ClientState::REGISTERED:
+			break;
+		default:
+			throw std::runtime_error("Cannot open client: invalid state");
+		}
+	}
 	void activate();
 	signed connectPorts(bool disconnectPreviousOutputs, bool disconnectPreviousInputs);
 	void deactivate();
@@ -71,6 +87,7 @@ public:
 	virtual ~JackClient();
 };
 
+} /* End of namespace jack */
 } /* End of namespace speakerman */
 
 #endif /* SMS_SPEAKERMAN_JACKCLIENT_GUARD_H_ */

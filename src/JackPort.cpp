@@ -21,10 +21,11 @@
 
 #include <stdexcept>
 #include <iostream>
-#include <speakerman/JackPort.hpp>
+#include <speakerman/jack/JackPort.hpp>
 #include <simpledsp/Values.hpp>
 
 namespace speakerman {
+namespace jack {
 
 using namespace std;
 
@@ -116,4 +117,5 @@ jack_default_audio_sample_t * JackPort::getBuffer(jack_nframes_t frames)
 	return (jack_default_audio_sample_t *)jack_port_get_buffer(port, frames);
 }
 
+} /* End of namespace jack */
 } /* End of namespace speakerman */

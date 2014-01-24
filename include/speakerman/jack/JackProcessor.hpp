@@ -23,9 +23,10 @@
 #define SMS_SPEAKERMAN_JACKPROCESSOR_GUARD_H_
 
 #include <simpledsp/List.hpp>
-#include <speakerman/JackPort.hpp>
+#include <speakerman/jack/JackPort.hpp>
 
 namespace speakerman {
+namespace jack {
 
 using namespace simpledsp;
 
@@ -69,6 +70,7 @@ public:
 };
 // Your definitions
 
+} /* End of namespace jack */
 } /* End of namespace speakerman */
 
 #endif /* SMS_SPEAKERMAN_JACKPROCESSOR_GUARD_H_ */

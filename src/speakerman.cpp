@@ -22,6 +22,7 @@
 #include <chrono>
 #include <thread>
 #include <iostream>
+#include <mutex>
 #include <signal.h>
 #include <string.h>
 #include <exception>
@@ -32,14 +33,12 @@
 #include <simpledsp/Butterworth.hpp>
 #include <simpledsp/Noise.hpp>
 #include <simpledsp/SingleReadDelay.hpp>
-#include <speakerman/utils/Mutex.hpp>
-#include <speakerman/JackClient.hpp>
+#include <speakerman/jack/JackClient.hpp>
 #include <speakerman/SpeakerMan.hpp>
 #include <speakerman/Matrix.hpp>
-#include <speakerman/Limiter.hpp>
-#include <speakerman/BandSplitter.hpp>
 
 using namespace speakerman;
+using namespace speakerman::jack;
 
 enum class Modus { FILTER, BYPASS, ZERO, HIGH, LOW, DOUBLE };
 
@@ -48,38 +47,23 @@ jack_default_audio_sample_t lowOutputOne = 0;
 jack_default_audio_sample_t lowOutputOneNew;
 typedef SingleReadDelay<jack_default_audio_sample_t> Delay;
 
-static void printCoefficients(CoefficientBuilder &builder, string message) {
-	std::cout << message << ":" << std::endl;
-	std::cout << "\tOrder: " << builder.order();
-
-	std::cout << std::endl;
-	for (size_t i = 0; i < builder.order(); i++) {
-		std::cout << " \tC[" << i << "]=" << builder.getC()[i];
-	}
-	std::cout << std::endl;
-	for (size_t i = 0; i < builder.order(); i++) {
-		std::cout << " \tD[" << i << "]=" << builder.getD()[i];
-	}
-	std::cout << std::endl;
-
-}
-
-class SumToAll : public JackProcessor
+template<size_t CROSSOVERS> class SumToAll : public JackProcessor
 {
-	SpeakerManager * manager = nullptr;
-	LimiterSettings settings1;
-	LimiterSettings settings2;
+	std::recursive_mutex mutex;
+	SpeakerManager<2,CROSSOVERS,8,4,4,1> manager;
+	array<freq_t,CROSSOVERS> frequencies;
 
 protected:
 	virtual bool process(jack_nframes_t frameCount)
 	{
-		if (!manager) {
-			return false;
-		}
 		const jack_default_audio_sample_t* inputLeft1 = getInput(0, frameCount);
 		const jack_default_audio_sample_t* inputRight1 = getInput(1, frameCount);
 		const jack_default_audio_sample_t* inputLeft2 = getInput(2, frameCount);
 		const jack_default_audio_sample_t* inputRight2 = getInput(3, frameCount);
+		const jack_default_audio_sample_t* inputLeft3 = getInput(4, frameCount);
+		const jack_default_audio_sample_t* inputRight3 = getInput(5, frameCount);
+		const jack_default_audio_sample_t* inputLeft4 = getInput(6, frameCount);
+		const jack_default_audio_sample_t* inputRight4 = getInput(7, frameCount);
 
 		jack_default_audio_sample_t* outputLeft1 = getOutput(0, frameCount);
 		jack_default_audio_sample_t* outputRight1 = getOutput(1, frameCount);
@@ -87,30 +71,36 @@ protected:
 		jack_default_audio_sample_t* outputRight2 = getOutput(3, frameCount);
 		jack_default_audio_sample_t* subOut = getOutput(4, frameCount);
 
+		Array<sample_t> &input = manager.getInput();
+		const Array<sample_t> &output = manager.getOutput();
+		const Array<sample_t> &sub = manager.getSubWoofer();
+
 		for (size_t frame = 0; frame < frameCount; frame++) {
-			manager->setInputValue(0, *inputLeft1++);
-			manager->setInputValue(1, *inputRight1++);
-			manager->setInputValue(2, *inputLeft2++);
-			manager->setInputValue(3, *inputRight2++);
+			input[0] = *inputLeft1++;
+			input[1] = *inputRight1++;
+			input[2] = *inputLeft2++;
+			input[3] = *inputRight2++;
+			input[4] = *inputLeft3++;
+			input[5] = *inputRight3++;
+			input[6] = *inputLeft4++;
+			input[7] = *inputRight4++;
 
-			manager->process();
+			manager.process();
 
-			*outputLeft1++ = manager->getOutputValue(0);
-			*outputRight1++ = manager->getOutputValue(1);
-			*outputLeft2++ = manager->getOutputValue(2);
-			*outputRight2++ = manager->getOutputValue(3);
-			*subOut++ = manager->getSubWooferValue(0);
+			*outputLeft1++ = output[0];
+			*outputRight1++ = output[1];
+			*outputLeft2++ = output[2];
+			*outputRight2++ = output[3];
+			*subOut++ = sub[0];
 		}
 
 		return true;
 	}
 	virtual bool setSampleRate(jack_nframes_t sampleRate)
 	{
-		if (manager) {
-			manager->configure(sampleRate);
-			return true;
-		}
-		return false;
+		Guard guard(mutex);
+		manager.configure(frequencies, sampleRate);
+		return true;
 	}
 
 	virtual void shutdownByServer()
@@ -127,43 +117,37 @@ protected:
 	}
 
 public:
-	SumToAll() {
-		addInput("left_in1", "^PulseAudio JACK Sink.*left$", ".*", 0);
-		addInput("right_in1", "^PulseAudio JACK Sink.*right$", ".*", 0);
+	SumToAll(array<freq_t, CROSSOVERS> freqs) :
+		frequencies(freqs)
+	{
+		addInput("left_in1");
+		addInput("right_in1");
 		addInput("left_in2");
 		addInput("right_in2");
+		addInput("left_in3");
+		addInput("right_in3");
+		addInput("left_in4");
+		addInput("right_in4");
 
-		addOutput("left_out1", ".*OUTPUT_1", "firewire_pcm", 0);
-		addOutput("right_out1", ".*OUTPUT_1", "firewire_pcm", 0);
+		addOutput("left_out1");
+		addOutput("right_out1");
 		addOutput("left_out2");
 		addOutput("right_out2");
-		addOutput("sub_out",  ".*OUTPUT*", "firewire_pcm", 0);
-
-		MultibandLimiterConfigList builder;
-
-		builder
-				.addCrossover(160).addCrossover(640).addCrossover(2560).setChannels(2).setLimiterConfig(&settings1).add()
-				.addCrossover(160).addCrossover(640).addCrossover(2560).setChannels(2).setLimiterConfig(&settings2).add();
-
-		manager = new SpeakerManager(4, builder, 4, 1, 80.0);
+		addOutput("sub_out");
 	};
 
 	~SumToAll()
 	{
-		if (manager) {
-			delete manager;
-			manager = nullptr;
-		}
 	}
 };
 
 class JackClientOwner
 {
-	Mutex m;
+	std::recursive_mutex m;
 	JackClient * client = nullptr;
 
 	void unsafeSet(JackClient *newClient) {
-		Guard guard = m.guard();
+		Guard guard(mutex);
 		if (client) {
 			client->close();
 			delete client;
@@ -181,7 +165,7 @@ public:
 	}
 
 	JackClient &get() {
-		Guard guard = m.guard();
+		Guard guard(mutex);
 		if (client) {
 			return *client;
 		}
@@ -210,11 +194,14 @@ int main(int count, char * arguments[]) {
 	signal(SIGTERM, signal_callback_handler);
 	signal(SIGABRT, signal_callback_handler);
 
+	array<freq_t, 1> frequencies;
+	frequencies[1] = 80;
 
-	SumToAll processor;
+	SumToAll<1> processor(frequencies);
+
 	client.set(new JackClient("Speakerman", processor));
 
-	client.get().open();
+	client.get().open(JackOptions::JackNullOption);
 	client.get().activate();
 
 	std::chrono::milliseconds duration(1000);
@@ -257,7 +244,6 @@ int main(int count, char * arguments[]) {
 			std::cerr << "Unknown command " << cmnd << std::endl;
 			break;
 		}
-		std::cout << "Magnitude of DC is " <<  lowOutputOneNew << std::endl;
 	}
 
 	return 0;

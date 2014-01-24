@@ -23,9 +23,11 @@
 #include <thread>
 #include <iostream>
 #include <simpledsp/Precondition.hpp>
-#include <speakerman/JackClient.hpp>
+#include <simpledsp/Guard.hpp>
+#include <speakerman/jack/JackClient.hpp>
 
 namespace speakerman {
+namespace jack {
 
 static void printError(const char *message) {
 	std::cerr << "Error: " << message << std::endl;
@@ -100,71 +102,20 @@ void JackClient::checkCanAddIO()
 		throw std::runtime_error("Cannot only define ports in initial state");
 	}
 }
-void JackClient::unsafeOpen()
-{
-	jack_status_t returnStatus;
-	client = jack_client_open("speaker-management", JackNullOption, &returnStatus);
-	if (client == 0) {
-		throw std::runtime_error("Couldn't open connection to jack");
-	}
-	if (returnStatus != 0) {
-		throw std::runtime_error("Invalid return state when opening client");
-	}
-	std::cout << "Opened client " << jack_get_client_name(client) << std::endl;
-	jack_on_shutdown(client, rawShutdown, this);
-	jack_set_error_function(printError);
-	try {
-		if (jack_set_sample_rate_callback(client, rawSetSampleRate, this) != 0) {
-			throw std::runtime_error("Couldn't set sample-rate call-back");
-		}
-		if (jack_set_process_callback(client, rawProcess, this) != 0) {
-			throw std::runtime_error("Couldn't set processing call-back");
-		}
-		std::cout << "Installed processing call-backs " << jack_get_client_name(client) << std::endl;
-		processor.registerPorts(client);
-		std::cout << "Registered ports " << jack_get_client_name(client) << std::endl;
-		state = ClientState::REGISTERED;
-	}
-	catch (...) {
-		close();
-	}
-}
-
 
 JackClient::JackClient(string n, JackProcessor &p) : name(n), processor(p)
 {
 }
 
-void JackClient::open()
-{
-	Guard g = m.guard();
-	switch (state) {
-	case ClientState::INITIAL:
-		if (processor.inputs.size() == 0 && processor.outputs.size() == 0) {
-			throw std::runtime_error("Cannot open client: no ports defined");
-		}
-		std::cout << "Inputs: " << processor.inputs.size() << "; outputs: " << processor.outputs.size() << std::endl;
-		/* no break */
-	case ClientState::CLOSED:
-	case ClientState::DEFINED_PORTS:
-		unsafeOpen();
-		break;
-	case ClientState::REGISTERED:
-		// Nothing to do
-		return;
-	default:
-		throw std::runtime_error("Cannot open client: invalid state");
-	}
-}
-
 void JackClient::activate()
 {
-	Guard g = m.guard();
+	Guard g(m);
 	if (state != ClientState::REGISTERED) {
 		throw std::runtime_error("Cannot activate: invalid state");
 	}
-
-	if (jack_activate(client) != 0) {
+	if (client.useClient<bool>([](jack_client_t *c) {
+		return jack_activate(c) != 0 ;
+	})) {
 		close();
 		throw std::runtime_error("Couldn't activate jack client: an error occurred");
 	}
@@ -173,24 +124,32 @@ void JackClient::activate()
 
 	processor.prepareActivate();
 }
-
+signed JackClient::staticClosePorts(JackClient &self, jack_client_t *client)
+{
+	return self.unsafeClosePorts(client);
+}
+signed JackClient::unsafeClosePorts(jack_client_t *client)
+{
+	processor.connectPorts(client, true, true);
+}
 signed JackClient::connectPorts(bool disconnectPreviousOutputs, bool disconnectPreviousInputs)
 {
-	Guard g = m.guard();
+	Guard g(m);
 	if (state != ClientState::ACTIVE) {
 		throw std::runtime_error("Cannot connect ports: not activated");
 	}
-	return processor.connectPorts(client, disconnectPreviousOutputs, disconnectPreviousInputs);
+	return client.useClient<signed,JackClient>(*this, staticClosePorts);
 }
 
 void JackClient::deactivate()
 {
-	Guard g = m.guard();
+	Guard g(m);
 	if (state != ClientState::ACTIVE) {
 		throw std::runtime_error("Cannot deactivate: not activated");
 	}
 	for (int attempt = 0; attempt < 10; attempt++) {
-		if (jack_deactivate(client) == 0) {
+		if (client.useClient<bool>([](jack_client_t *c) {return jack_deactivate(c) == 0;}))
+		{
 			processor.prepareDeactivate();
 			return ;
 		}
@@ -199,33 +158,29 @@ void JackClient::deactivate()
 	close();
 	throw std::runtime_error("Couldn't deactivate jack client: an error occurred");
 }
-
+bool JackClient::staticClose(JackClient &self, jack_client_t *client)
+{
+	self.unsafeClose(client);
+}
+bool JackClient::unsafeClose(jack_client_t *jackClient)
+{
+	processor.unRegisterPorts(jackClient);
+	state = ClientState::CLOSED;
+	return true;
+}
 void JackClient::close()
 {
-	Guard g = m.guard();
-	if (client) {
-		std::cout << "Unregister ports" << std::endl;
-		processor.unRegisterPorts(client);
-		std::cout << "Closing jack client " << name << std::endl;
-		for (int attempt = 0; attempt < 10; attempt++) {
-			if (jack_client_close(client) == 0) {
-				break;
-			}
-			std::this_thread::yield();
-		}
-	}
-	client = nullptr;
-	state = ClientState::CLOSED;
+	Guard g(m);
+	client.disconnect<JackClient>(staticClose, *this);
 }
 JackClient::~JackClient()
 {
-	Guard g = m.guard();
+	Guard g(m);
 	if (state == ClientState::ACTIVE) {
 		deactivate();
 	}
 	close();
 }
 
-
-
+} /* End of namespace jack */
 } /* End of namespace speakerman */

@@ -19,9 +19,10 @@
  * limitations under the License.
  */
 
-#include <speakerman/JackProcessor.hpp>
+#include <speakerman/jack/JackProcessor.hpp>
 
 namespace speakerman {
+namespace jack {
 
 JackProcessor::JackProcessor() : inputs(10), outputs(10)
 {
@@ -74,4 +75,5 @@ jack_default_audio_sample_t *JackProcessor::getOutput(size_t number, jack_nframe
 	return outputs.get(number).getBuffer(frameCount);
 }
 
+} /* End of namespace jack */
 } /* End of namespace speakerman */
