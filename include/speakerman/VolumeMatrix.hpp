@@ -28,9 +28,9 @@ namespace speakerman {
 
 using namespace simpledsp;
 
-template<typename Sample, size_t COLUMNS, size_t ROWS> class VolumeMatrix
+template<typename Sample, size_t ROWS, size_t COLUMNS> class VolumeMatrix
 {
-	Matrix<Sample, COLUMNS, ROWS> matrix;
+	Matrix<Sample, ROWS, COLUMNS> matrix;
 	const Sample min, max;
 
 
@@ -41,11 +41,11 @@ public:
 
 	size_t columns() const
 	{
-		return COLUMNS;
+		return matrix.columns();
 	}
 	size_t rows() const
 	{
-		return ROWS;
+		return matrix.rows();
 	}
 	void set(size_t column, size_t row, Sample value)
 	{

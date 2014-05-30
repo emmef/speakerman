@@ -48,9 +48,9 @@ template<size_t ORDER, size_t CROSSOVERS, size_t INS, size_t CHANNELS, size_t OU
 
 	Plan plan;
 	Splitter splitter;
-	VolumeMatrix<accurate_t, INS, CHANNELS> inMatrix;
-	VolumeMatrix<accurate_t, CHANNELS, OUTS> outMatrix;
-	VolumeMatrix<accurate_t, CHANNELS, SUBS> subMatrix;
+	VolumeMatrix<accurate_t, CHANNELS, INS> inMatrix;
+	VolumeMatrix<accurate_t, OUTS, CHANNELS> outMatrix;
+	VolumeMatrix<accurate_t, SUBS, CHANNELS> subMatrix;
 	array<accurate_t, INS> input;
 	array<accurate_t, OUTS> output;
 	array<accurate_t, SUBS> subs;
@@ -116,11 +116,11 @@ public:
 
 		for (size_t i = 0; i < CHANNELS; i++) {
 			accurate_t highs = 0.0;
-			for (size_t i = 0; i < CROSSOVERS; i++) {
+			for (size_t i = 1; i <= CROSSOVERS; i++) {
 				highs += separated(1, i);
 			}
 			outInput[i] = highs;
-			subInput[i] = separated(CROSSOVERS, i);
+			subInput[i] = separated(0, i);
 		}
 
 		outMatrix.multiply(outInput, output);
