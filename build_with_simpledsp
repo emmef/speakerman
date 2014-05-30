@@ -1,0 +1,46 @@
+#!/bin/bash
+
+if test "x$1" = "x"
+then
+	echo "Must provide relative location of simpledsp project"
+	exit 1
+fi
+
+simpleDsp="$1"
+
+if ! test -f "src/speakerman.cpp"
+then
+	echo "In wrong directory!"
+	exit 1
+fi
+
+if ! cd "$simpleDsp"
+then
+	echo "Couldn't change to simpledsp project: $simpleDsp"
+	exit 1
+fi
+
+if ! make -j 
+then	
+	echo "Couldn't compile libsimpledsp"
+	cd - 
+	exit 1
+fi
+
+echo '>>> Make install: you might need to provide a password here!'
+
+if ! sudo make install
+then	
+	echo "Couldn't install libsimpledsp"
+	exit 1
+fi
+
+cd - 
+
+if ! make -j
+then
+	echo "Couldn't build speakerman"
+	exit 1
+fi
+
+
