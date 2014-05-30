@@ -24,6 +24,7 @@
 
 #include <iostream>
 #include <vector>
+#include <array>
 #include <jack/jack.h>
 #include <simpledsp/Types.hpp>
 #include <simpledsp/Values.hpp>
@@ -31,8 +32,8 @@
 #include <simpledsp/Array.hpp>
 #include <simpledsp/List.hpp>
 #include <simpledsp/MultibandSplitter.hpp>
+#include <speakerman/VolumeMatrix.hpp>
 #include <speakerman/Frame.hpp>
-#include <speakerman/Matrix.hpp>
 
 namespace speakerman {
 
@@ -47,18 +48,24 @@ template<size_t ORDER, size_t CROSSOVERS, size_t INS, size_t CHANNELS, size_t OU
 
 	Plan plan;
 	Splitter splitter;
-	Matrix<sample_t> inMatrix;
-	Matrix<sample_t> outMatrix;
-	Matrix<sample_t> subMatrix;
+	VolumeMatrix<accurate_t, INS, CHANNELS> inMatrix;
+	VolumeMatrix<accurate_t, CHANNELS, OUTS> outMatrix;
+	VolumeMatrix<accurate_t, CHANNELS, SUBS> subMatrix;
+	array<accurate_t, INS> input;
+	array<accurate_t, OUTS> output;
+	array<accurate_t, SUBS> subs;
+	array<accurate_t, CHANNELS> outInput;
+	array<accurate_t, CHANNELS> subInput;
+
 	array<accurate_t, CHANNELS> afterInMatrix;
 	array<freq_t, CROSSOVERS> crossovers;
 
-	void connectDefaults(Matrix<sample_t> &matrix, sample_t scale)
+	template <size_t C, size_t R> void connectDefaults(VolumeMatrix<accurate_t, C, R> &matrix, accurate_t scale)
 	{
-		size_t max = matrix.inputs() < matrix.outputs() ? matrix.outputs() : matrix.inputs();
+		size_t max = matrix.columns() < matrix.rows() ? matrix.rows() : matrix.columns();
 
 		for (size_t i = 0; i < max; i++) {
-			matrix.setFactor(i % matrix.inputs(), i % matrix.outputs(), scale);
+			matrix.set(i % matrix.columns(), i % matrix.rows(), scale);
 		}
 	}
 
@@ -66,9 +73,9 @@ public:
 	// ins, outs and subs should be named groups so that named volume controls can apply
 	SpeakerManager() :
 		splitter(plan),
-		inMatrix(INS, CHANNELS, 1e-6, 1.0 * CHANNELS / INS),
-		outMatrix(CHANNELS, OUTS, 1e-6, 1.0 * OUTS / CHANNELS),
-		subMatrix(CHANNELS, SUBS, 1e-6, 1.0 * SUBS / CHANNELS)
+		inMatrix(1e-6, 1.0 * CHANNELS / INS),
+		outMatrix(1e-6, 1.0 * OUTS / CHANNELS),
+		subMatrix(1e-6, 1.0 * SUBS / CHANNELS)
 	{
 		splitter.reload();
 
@@ -76,51 +83,48 @@ public:
 		connectDefaults(outMatrix, outMatrix.getMaximum());
 		connectDefaults(subMatrix, subMatrix.getMaximum());
 	}
-	Matrix<sample_t> &inputMatrix()
+	VolumeMatrix<accurate_t, INS, CHANNELS> &inputMatrix()
 	{
 		return inMatrix;
 	}
-	Matrix<sample_t> &outputMatrix()
+	VolumeMatrix<accurate_t, CHANNELS, OUTS> &outputMatrix()
 	{
 		return outMatrix;
 	}
-	Matrix<sample_t> &subWooferMatrix()
+	VolumeMatrix<accurate_t, CHANNELS, SUBS> &subWooferMatrix()
 	{
 		return subMatrix;
 	}
-	Array<sample_t> &getInput()
+	array<accurate_t, INS> &getInput()
 	{
-		inMatrix.getInput();
+		return input;
 	}
-	const Array<sample_t> &getOutput() const
+	const array<accurate_t, OUTS> &getOutput()
 	{
-		return outMatrix.getOutput();
+		return output;
 	}
-	const Array<sample_t> &getSubWoofer() const
+	const array<accurate_t, SUBS> &getSubWoofer()
 	{
-		return subMatrix.getOutput();
+		return subs;
 	}
 
 	void process()
 	{
-		inMatrix.multiply();
-
-		Array<sample_t> &inOutput = inMatrix.getOutput();
-		for (size_t i = 0; i < CHANNELS; i++) {
-			afterInMatrix[i] = inOutput(i);
-		}
+		inMatrix.multiply(input, afterInMatrix);
 
 		auto separated = splitter.process(afterInMatrix);
 
-		Array<sample_t> &outInput = outMatrix.getInput();
-		Array<sample_t> &subInput = subMatrix.getInput();
 		for (size_t i = 0; i < CHANNELS; i++) {
-			subInput[i] = separated[0][i];
-			outInput[i] = separated[1][i];
+			accurate_t highs = 0.0;
+			for (size_t i = 0; i < CROSSOVERS; i++) {
+				highs += separated(1, i);
+			}
+			outInput[i] = highs;
+			subInput[i] = separated(CROSSOVERS, i);
 		}
 
-		outMatrix.multiply();
-		subMatrix.multiply();
+		outMatrix.multiply(outInput, output);
+		subMatrix.multiply(subInput, subs);
 	}
 	void configure(array<freq_t, CROSSOVERS> frequencies, freq_t sampleRate)
 	{

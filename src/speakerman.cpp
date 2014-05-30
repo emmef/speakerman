@@ -33,9 +33,8 @@
 #include <simpledsp/Butterworth.hpp>
 #include <simpledsp/Noise.hpp>
 #include <simpledsp/SingleReadDelay.hpp>
-#include <speakerman/jack/JackClient.hpp>
+#include <speakerman/jack/Client.hpp>
 #include <speakerman/SpeakerMan.hpp>
-#include <speakerman/Matrix.hpp>
 
 using namespace speakerman;
 using namespace speakerman::jack;
@@ -47,43 +46,68 @@ jack_default_audio_sample_t lowOutputOne = 0;
 jack_default_audio_sample_t lowOutputOneNew;
 typedef SingleReadDelay<jack_default_audio_sample_t> Delay;
 
-template<size_t CROSSOVERS> class SumToAll : public JackProcessor
+template<size_t CROSSOVERS> class SumToAll : public Client
 {
-	std::recursive_mutex mutex;
-	SpeakerManager<2,CROSSOVERS,8,4,4,1> manager;
+	SpeakerManager<2,CROSSOVERS,4,4,4,1> manager;
 	array<freq_t,CROSSOVERS> frequencies;
+	ClientPort input_0_0;
+	ClientPort input_0_1;
+	ClientPort input_1_0;
+	ClientPort input_1_1;
+	ClientPort output_0_0;
+	ClientPort output_0_1;
+	ClientPort output_1_0;
+	ClientPort output_1_1;
+	ClientPort output_sub;
 
 protected:
 	virtual bool process(jack_nframes_t frameCount)
 	{
-		const jack_default_audio_sample_t* inputLeft1 = getInput(0, frameCount);
-		const jack_default_audio_sample_t* inputRight1 = getInput(1, frameCount);
-		const jack_default_audio_sample_t* inputLeft2 = getInput(2, frameCount);
-		const jack_default_audio_sample_t* inputRight2 = getInput(3, frameCount);
-		const jack_default_audio_sample_t* inputLeft3 = getInput(4, frameCount);
-		const jack_default_audio_sample_t* inputRight3 = getInput(5, frameCount);
-		const jack_default_audio_sample_t* inputLeft4 = getInput(6, frameCount);
-		const jack_default_audio_sample_t* inputRight4 = getInput(7, frameCount);
+		const jack_default_audio_sample_t* inputLeft1 = input_0_0.getBuffer();
+		const jack_default_audio_sample_t* inputRight1 = input_0_1.getBuffer();
+		const jack_default_audio_sample_t* inputLeft2 = input_1_0.getBuffer();
+		const jack_default_audio_sample_t* inputRight2 = input_1_1.getBuffer();
 
-		jack_default_audio_sample_t* outputLeft1 = getOutput(0, frameCount);
-		jack_default_audio_sample_t* outputRight1 = getOutput(1, frameCount);
-		jack_default_audio_sample_t* outputLeft2 = getOutput(2, frameCount);
-		jack_default_audio_sample_t* outputRight2 = getOutput(3, frameCount);
-		jack_default_audio_sample_t* subOut = getOutput(4, frameCount);
+		jack_default_audio_sample_t* outputLeft1 = output_0_0.getBuffer();
+		jack_default_audio_sample_t* outputRight1 = output_0_1.getBuffer();
+		jack_default_audio_sample_t* outputLeft2 = output_1_0.getBuffer();
+		jack_default_audio_sample_t* outputRight2 = output_1_1.getBuffer();
+		jack_default_audio_sample_t* subOut = output_sub.getBuffer();
 
-		Array<sample_t> &input = manager.getInput();
-		const Array<sample_t> &output = manager.getOutput();
-		const Array<sample_t> &sub = manager.getSubWoofer();
+//		for (size_t frame = 0; frame < frameCount; frame++) {
+//			jack_default_audio_sample_t sub = 0.0;
+//			jack_default_audio_sample_t in;
+//
+//			in = *inputLeft1++;
+//			*outputLeft1++ = in;
+//			sub += in;
+//
+//			in = *inputRight1++;
+//			*outputRight1++ = in;
+//			sub += in;
+//
+//			in = *inputLeft2++;
+//			*outputLeft2++ = in;
+//			sub += in;
+//
+//			in = *inputRight2++;
+//			*outputRight2++ = in;
+//			sub += in;
+//
+//			*subOut++ = sub * 0.25;
+//		}
+//
+//		return true;
+
+		array<accurate_t, 4> &input = manager.getInput();
+		const array<accurate_t, 4> &output = manager.getOutput();
+		const array<accurate_t, 1> &sub = manager.getSubWoofer();
 
 		for (size_t frame = 0; frame < frameCount; frame++) {
 			input[0] = *inputLeft1++;
 			input[1] = *inputRight1++;
 			input[2] = *inputLeft2++;
 			input[3] = *inputRight2++;
-			input[4] = *inputLeft3++;
-			input[5] = *inputRight3++;
-			input[6] = *inputLeft4++;
-			input[7] = *inputRight4++;
 
 			manager.process();
 
@@ -96,44 +120,41 @@ protected:
 
 		return true;
 	}
-	virtual bool setSampleRate(jack_nframes_t sampleRate)
+	virtual bool setSamplerate(jack_nframes_t sampleRate)
 	{
-		Guard guard(mutex);
+		std::cerr << "Configuring samplerate: " << sampleRate << endl;
 		manager.configure(frequencies, sampleRate);
 		return true;
 	}
+	virtual void beforeShutdown()
+	{
+		std::cerr << "Before shutdown";
+	}
 
-	virtual void shutdownByServer()
+	virtual void afterShutdown()
 	{
-
+		std::cerr << "After shutdown";
 	}
-	virtual void prepareActivate()
-	{
-		std::cout << "Activate!" << std::endl;
-	}
-	virtual void prepareDeactivate()
-	{
-		std::cout << "De-activate!" << std::endl;
-	}
+	virtual void connectPortsOnActivate() { }
 
 public:
 	SumToAll(array<freq_t, CROSSOVERS> freqs) :
-		frequencies(freqs)
+		Client(9),
+		frequencies(freqs),
+		input_0_0(addPort(PortDirection::IN, "input_0_0")),
+		input_1_0(addPort(PortDirection::IN, "input_1_0")),
+		input_0_1(addPort(PortDirection::IN, "input_0_1")),
+		input_1_1(addPort(PortDirection::IN, "input_1_1")),
+		output_0_0(addPort(PortDirection::OUT, "output_0_0")),
+		output_1_0(addPort(PortDirection::OUT, "output_1_0")),
+		output_0_1(addPort(PortDirection::OUT, "output_0_1")),
+		output_1_1(addPort(PortDirection::OUT, "output_1_1")),
+		output_sub(addPort(PortDirection::OUT, "output_sub"))
 	{
-		addInput("left_in1");
-		addInput("right_in1");
-		addInput("left_in2");
-		addInput("right_in2");
-		addInput("left_in3");
-		addInput("right_in3");
-		addInput("left_in4");
-		addInput("right_in4");
-
-		addOutput("left_out1");
-		addOutput("right_out1");
-		addOutput("left_out2");
-		addOutput("right_out2");
-		addOutput("sub_out");
+		finishDefiningPorts();
+		for (size_t i = 0; i < CROSSOVERS; i++) {
+			cout <<  "- crossover[" << i << "]: " << frequencies[i] << endl;
+		}
 	};
 
 	~SumToAll()
@@ -143,11 +164,11 @@ public:
 
 class JackClientOwner
 {
-	std::recursive_mutex m;
-	JackClient * client = nullptr;
+	std::mutex m;
+	Client * client = nullptr;
 
-	void unsafeSet(JackClient *newClient) {
-		Guard guard(mutex);
+	void unsafeSet(Client *newClient) {
+		CriticalScope scope(mutex);
 		if (client) {
 			client->close();
 			delete client;
@@ -155,7 +176,7 @@ class JackClientOwner
 		client = newClient;
 	}
 public:
-	void set(JackClient *newClient) {
+	void set(Client *newClient) {
 		if (newClient) {
 			unsafeSet(newClient);
 		}
@@ -164,8 +185,8 @@ public:
 		}
 	}
 
-	JackClient &get() {
-		Guard guard(mutex);
+	Client &get() {
+		CriticalScope scope(mutex);
 		if (client) {
 			return *client;
 		}
@@ -195,17 +216,34 @@ int main(int count, char * arguments[]) {
 	signal(SIGABRT, signal_callback_handler);
 
 	array<freq_t, 1> frequencies;
-	frequencies[1] = 80;
+	frequencies[0] = 80;
 
 	SumToAll<1> processor(frequencies);
 
-	client.set(new JackClient("Speakerman", processor));
+	client.set(new SumToAll<1>(frequencies));
 
-	client.get().open(JackOptions::JackNullOption);
+	client.get().open("speakerman", JackOptions::JackNullOption);
+
+	PortNames *names = client.get().getPortNames(nullptr, nullptr, JackPortIsPhysical|JackPortIsInput);
+
+	cout << "Physical playback ports:" << endl;
+	for (size_t i = 0; i < names->length(); i++) {
+		cout << names->get(i) << endl;
+	}
+	delete names;
+	names = client.get().getPortNames(nullptr, nullptr, JackPortIsPhysical|JackPortIsOutput);
+
+	cout << "Physical capture ports:" << endl;
+	for (size_t i = 0; i < names->length(); i++) {
+		cout << names->get(i) << endl;
+	}
+	delete names;
+
 	client.get().activate();
 
 	std::chrono::milliseconds duration(1000);
-	while (true) {
+	bool running = true;
+	while (running) {
 		char cmnd;
 		std::this_thread::sleep_for( duration );
 		std::cin >> cmnd;
@@ -239,6 +277,11 @@ int main(int count, char * arguments[]) {
 		case 'D' :
 			std::cout << "Double filtering" << std::endl;
 			modus = Modus::DOUBLE;
+			break;
+		case 'q' :
+		case 'Q' :
+			std::cout << "Quiting..." << std::endl;
+			running=false;
 			break;
 		default:
 			std::cerr << "Unknown command " << cmnd << std::endl;

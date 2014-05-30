@@ -23,10 +23,13 @@
 #define SMS_SPEAKERMAN_MESSAGES_GUARD_H_
 
 #include <jack/jack.h>
+#include <string>
 
 namespace speakerman {
 
 namespace jack {
+
+	using namespace std;
 
 	inline string statusMessage(jack_status_t status)
 	{
@@ -80,7 +83,6 @@ namespace jack {
 
 		return message;
 	}
-
 
 } /* End of namespace jack */
 } /* End of namespace speakerman */
