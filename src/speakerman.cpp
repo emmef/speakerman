@@ -74,34 +74,10 @@ protected:
 		jack_default_audio_sample_t* outputRight2 = output_1_1.getBuffer();
 		jack_default_audio_sample_t* subOut = output_sub.getBuffer();
 
-//		for (size_t frame = 0; frame < frameCount; frame++) {
-//			jack_default_audio_sample_t sub = 0.0;
-//			jack_default_audio_sample_t in;
-//
-//			in = *inputLeft1++;
-//			*outputLeft1++ = in;
-//			sub += in;
-//
-//			in = *inputRight1++;
-//			*outputRight1++ = in;
-//			sub += in;
-//
-//			in = *inputLeft2++;
-//			*outputLeft2++ = in;
-//			sub += in;
-//
-//			in = *inputRight2++;
-//			*outputRight2++ = in;
-//			sub += in;
-//
-//			*subOut++ = sub * 0.25;
-//		}
-//
-//		return true;
 
-		array<accurate_t, 4> &input = manager.getInput();
-		const array<accurate_t, 4> &output = manager.getOutput();
-		const array<accurate_t, 1> &sub = manager.getSubWoofer();
+		ArrayVector<accurate_t, 4> &input = manager.getInput();
+		const ArrayVector<accurate_t, 4> &output = manager.getOutput();
+		const ArrayVector<accurate_t, 1> &sub = manager.getSubWoofer();
 
 		for (size_t frame = 0; frame < frameCount; frame++) {
 			input[0] = *inputLeft1++;
@@ -111,11 +87,12 @@ protected:
 
 			manager.process();
 
-			*outputLeft1++ = output[0];
-			*outputRight1++ = output[1];
-			*outputLeft2++ = output[2];
-			*outputRight2++ = output[3];
-			*subOut++ = sub[0];
+			*outputLeft1++ = output.get(0);
+			*outputRight1++ = output.get(1);
+			*outputLeft2++ = output.get(2);
+			*outputRight2++ = output.get(3);
+
+			*subOut++ = sub.get(0);
 		}
 
 		return true;
@@ -215,31 +192,15 @@ int main(int count, char * arguments[]) {
 	signal(SIGTERM, signal_callback_handler);
 	signal(SIGABRT, signal_callback_handler);
 
-	array<freq_t, 1> frequencies;
+	array<freq_t, 3> frequencies;
 	frequencies[0] = 80;
+	frequencies[1] = 800;
+	frequencies[2] = 8000;
 
-	SumToAll<1> processor(frequencies);
+	SumToAll<3> processor(frequencies);
 
-	client.set(new SumToAll<1>(frequencies));
-
-	client.get().open("speakerman", JackOptions::JackNullOption);
-
-	PortNames *names = client.get().getPortNames(nullptr, nullptr, JackPortIsPhysical|JackPortIsInput);
-
-	cout << "Physical playback ports:" << endl;
-	for (size_t i = 0; i < names->length(); i++) {
-		cout << names->get(i) << endl;
-	}
-	delete names;
-	names = client.get().getPortNames(nullptr, nullptr, JackPortIsPhysical|JackPortIsOutput);
-
-	cout << "Physical capture ports:" << endl;
-	for (size_t i = 0; i < names->length(); i++) {
-		cout << names->get(i) << endl;
-	}
-	delete names;
-
-	client.get().activate();
+	processor.open("speakerman", JackOptions::JackNullOption);
+	processor.activate();
 
 	std::chrono::milliseconds duration(1000);
 	bool running = true;

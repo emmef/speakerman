@@ -138,6 +138,7 @@ namespace jack {
 		void unsafeDeactivate();
 		bool unsafeClose();
 
+		bool setSamplerateFenced(jack_nframes_t frames);
 		bool prepareAndprocess(jack_nframes_t nframes);
 		static int rawProcess(jack_nframes_t nframes, void* arg);
 		static int rawSetSamplerate(jack_nframes_t nframes, void* arg);

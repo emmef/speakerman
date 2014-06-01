@@ -28,14 +28,14 @@ namespace speakerman {
 
 using namespace simpledsp;
 
-template<typename Sample, size_t ROWS, size_t COLUMNS> class VolumeMatrix
+template<typename T, size_t ROWS, size_t COLUMNS> class VolumeMatrix
 {
-	Matrix<Sample, ROWS, COLUMNS> matrix;
-	const Sample min, max;
+	Matrix<T, ROWS, COLUMNS> matrix;
+	const T min, max;
 
 
 public:
-	VolumeMatrix(Sample minimumValue, Sample maximumValue) :
+	VolumeMatrix(T minimumValue, T maximumValue) :
 		min(minimumValue < maximumValue ? minimumValue : maximumValue),
 		max(minimumValue < maximumValue ? maximumValue : minimumValue) {}
 
@@ -47,39 +47,29 @@ public:
 	{
 		return matrix.rows();
 	}
-	void set(size_t column, size_t row, Sample value)
+	void set(size_t column, size_t row, T value)
 	{
 		matrix(column, row) = value < min ? min : value > max ? max : value;
 	}
-	const Sample get(size_t column, size_t row) const
+	const T get(size_t column, size_t row) const
 	{
 		return matrix(column, row);
 	}
-	const Sample operator() (size_t column, size_t row) const
+	const T operator() (size_t column, size_t row) const
 	{
 		return matrix(column, row);
 	}
-	void multiply(const array<Sample, COLUMNS> &input, array<Sample, ROWS> &output) const
+
+	template<template<class X, size_t Y> class S1, template<class X, size_t Y> class S2>
+	void multiply(const Vector<T, COLUMNS, S1> &input,  Vector<T, ROWS, S2> &output)
 	{
 		matrix.multiply(input, output);
 	}
-	void multiply(const FixedBuffer<Sample, COLUMNS> &input, FixedBuffer<Sample, ROWS> &output) const
-	{
-		matrix.multiply(input, output);
-	}
-	void multiply(const vector<Sample> &input, vector<Sample> &output) const
-	{
-		matrix.multiply(input, output);
-	}
-	void multiply(const Array<Sample> &input, Array<Sample> &output) const
-	{
-		matrix.multiply(input, output);
-	}
-	Sample getMinimum() const
+	T getMinimum() const
 	{
 		return min;
 	}
-	Sample getMaximum() const
+	T getMaximum() const
 	{
 		return max;
 	}

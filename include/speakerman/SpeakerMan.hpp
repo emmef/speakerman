@@ -34,6 +34,7 @@
 #include <simpledsp/MultibandSplitter.hpp>
 #include <speakerman/VolumeMatrix.hpp>
 #include <speakerman/Frame.hpp>
+#include <simpledsp/MemoryFence.hpp>
 
 namespace speakerman {
 
@@ -48,17 +49,20 @@ template<size_t ORDER, size_t CROSSOVERS, size_t INS, size_t CHANNELS, size_t OU
 
 	Plan plan;
 	Splitter splitter;
+	ArrayVector<accurate_t, INS> input;
 	VolumeMatrix<accurate_t, CHANNELS, INS> inMatrix;
-	VolumeMatrix<accurate_t, OUTS, CHANNELS> outMatrix;
-	VolumeMatrix<accurate_t, SUBS, CHANNELS> subMatrix;
-	array<accurate_t, INS> input;
-	array<accurate_t, OUTS> output;
-	array<accurate_t, SUBS> subs;
-	array<accurate_t, CHANNELS> outInput;
-	array<accurate_t, CHANNELS> subInput;
+	ArrayVector<accurate_t, CHANNELS> afterInMatrix;
 
-	array<accurate_t, CHANNELS> afterInMatrix;
-	array<freq_t, CROSSOVERS> crossovers;
+	VolumeMatrix<accurate_t, OUTS, CHANNELS> outMatrix;
+	ArrayVector<accurate_t, OUTS> output;
+
+	VolumeMatrix<accurate_t, SUBS, CHANNELS> subMatrix;
+	ArrayVector<accurate_t, SUBS> subs;
+
+	ArrayVector<accurate_t, CHANNELS> outInput;
+	ArrayVector<accurate_t, CHANNELS> subInput;
+
+	ArrayVector<freq_t, CROSSOVERS> crossovers;
 
 	template <size_t C, size_t R> void connectDefaults(VolumeMatrix<accurate_t, C, R> &matrix, accurate_t scale)
 	{
@@ -74,8 +78,8 @@ public:
 	SpeakerManager() :
 		splitter(plan),
 		inMatrix(1e-6, 1.0 * CHANNELS / INS),
-		outMatrix(1e-6, 1.0 * OUTS / CHANNELS),
-		subMatrix(1e-6, 1.0 * SUBS / CHANNELS)
+		outMatrix(1e-6, 0.5),
+		subMatrix(1e-6, 1.0)
 	{
 		splitter.reload();
 
@@ -95,15 +99,15 @@ public:
 	{
 		return subMatrix;
 	}
-	array<accurate_t, INS> &getInput()
+	ArrayVector<accurate_t, INS> &getInput()
 	{
 		return input;
 	}
-	const array<accurate_t, OUTS> &getOutput()
+	const ArrayVector<accurate_t, OUTS> &getOutput()
 	{
 		return output;
 	}
-	const array<accurate_t, SUBS> &getSubWoofer()
+	const ArrayVector<accurate_t, SUBS> &getSubWoofer()
 	{
 		return subs;
 	}
@@ -114,13 +118,10 @@ public:
 
 		auto separated = splitter.process(afterInMatrix);
 
-		for (size_t i = 0; i < CHANNELS; i++) {
-			accurate_t highs = 0.0;
-			for (size_t i = 1; i <= CROSSOVERS; i++) {
-				highs += separated(1, i);
-			}
-			outInput[i] = highs;
-			subInput[i] = separated(0, i);
+		subInput = separated.getRow(0);
+		outInput.zero();
+		for (size_t band = 1; band <= CROSSOVERS; band++) {
+			outInput += separated.getRow(band);
 		}
 
 		outMatrix.multiply(outInput, output);
@@ -128,12 +129,14 @@ public:
 	}
 	void configure(array<freq_t, CROSSOVERS> frequencies, freq_t sampleRate)
 	{
+		MemoryFence fence;
 		for (size_t i = 0; i < CROSSOVERS; i++) {
 			plan.setCrossover(i, frequencies[i] / sampleRate);
 		}
 		splitter.reload();
 	}
 	void configure() {
+		MemoryFence fence;
 		for (size_t i = 0; i < splitter.size(); i++) {
 			splitter.get(i).configure();
 		}

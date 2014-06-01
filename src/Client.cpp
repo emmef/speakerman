@@ -24,6 +24,7 @@
 
 #include <simpledsp/Precondition.hpp>
 #include <simpledsp/Alloc.hpp>
+#include <simpledsp/MemoryFence.hpp>
 #include <speakerman/jack/Client.hpp>
 
 namespace speakerman {
@@ -188,6 +189,12 @@ bool Client::unsafeClose()
 	return true;
 }
 
+bool Client::setSamplerateFenced(jack_nframes_t frames)
+{
+	MemoryFence fence;
+
+	return setSamplerate(frames);
+}
 
 bool Client::prepareAndprocess(jack_nframes_t nframes)
 {
@@ -197,6 +204,7 @@ bool Client::prepareAndprocess(jack_nframes_t nframes)
 					(jack_default_audio_sample_t*) (jack_port_get_buffer(
 							port[id].port, nframes));
 		}
+		MemoryFence fence;
 		return process(nframes);
 	} catch (...) {
 		exceptionCount++;
@@ -211,7 +219,7 @@ int Client::rawProcess(jack_nframes_t nframes, void* arg)
 
 int Client::rawSetSamplerate(jack_nframes_t nframes, void* arg)
 {
-	return ((Client*) ((arg)))->setSamplerate(nframes) ? 0 : 1;
+	return ((Client*) ((arg)))->setSamplerateFenced(nframes) ? 0 : 1;
 }
 
 void Client::rawShutdown(void* arg)

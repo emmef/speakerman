@@ -1,12 +1,20 @@
 #!/bin/bash
 
-if test "x$1" = "x"
+if test "x$1" = "x" 
 then
-	echo "Must provide relative location of simpledsp project"
+	echo "Need to provide path to libsimpledsp source"
 	exit 1
 fi
 
-simpleDsp="$1"
+libSimpleDsp="$1"
+shift
+
+if test "x$1" = "xrun"
+then
+	doRun="yes"
+else
+	doRun=""
+fi 
 
 if ! test -f "src/speakerman.cpp"
 then
@@ -14,9 +22,9 @@ then
 	exit 1
 fi
 
-if ! cd "$simpleDsp"
+if ! cd "${libSimpleDsp}"
 then
-	echo "Couldn't change to simpledsp project: $simpleDsp"
+	echo "Couldn't change to ${libSimpleDsp}"
 	exit 1
 fi
 
@@ -37,10 +45,20 @@ fi
 
 cd - 
 
+if ! make clean
+then
+	echo "Couldn't clean speakerman"
+	exit 1
+fi
+
 if ! make -j
 then
 	echo "Couldn't build speakerman"
 	exit 1
 fi
 
+if test "x$doRun" = "xyes"
+then
+	src/speakerman
+fi
 
