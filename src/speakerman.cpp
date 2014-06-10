@@ -21,6 +21,7 @@
 
 #include <chrono>
 #include <thread>
+#include <atomic>
 #include <iostream>
 #include <mutex>
 #include <signal.h>
@@ -31,6 +32,7 @@
 #include <signal.h>
 #include <simpledsp/Precondition.hpp>
 #include <simpledsp/Butterworth.hpp>
+#include <simpledsp/Configuration.hpp>
 #include <simpledsp/Noise.hpp>
 #include <simpledsp/SingleReadDelay.hpp>
 #include <speakerman/jack/Client.hpp>
@@ -48,6 +50,8 @@ typedef SingleReadDelay<jack_default_audio_sample_t> Delay;
 
 template<size_t CROSSOVERS> class SumToAll : public Client
 {
+	typedef simpledsp::Iir::Fixed::MultiFixedChannelFilter<sample_t, accurate_t, 2, 4> Filter;
+
 	SpeakerManager<2,CROSSOVERS,4,4,4,1> manager;
 	array<freq_t,CROSSOVERS> frequencies;
 	ClientPort input_0_0;
@@ -59,10 +63,20 @@ template<size_t CROSSOVERS> class SumToAll : public Client
 	ClientPort output_1_0;
 	ClientPort output_1_1;
 	ClientPort output_sub;
+	// DEBUG
+
+	Configuration config;
+	ConfigValue<size_t> configVersion;
+	ConfigValue<CoefficientsBuilder> highPassCoefficients;
+	ConfigValue<CoefficientsBuilder> lowPassCoefficients;
+	size_t processConfigVersion = -1;
+	Filter hf;
+	Filter lf;
 
 protected:
 	virtual bool process(jack_nframes_t frameCount)
 	{
+		MemoryFence fence;
 		const jack_default_audio_sample_t* inputLeft1 = input_0_0.getBuffer();
 		const jack_default_audio_sample_t* inputRight1 = input_0_1.getBuffer();
 		const jack_default_audio_sample_t* inputLeft2 = input_1_0.getBuffer();
@@ -74,10 +88,18 @@ protected:
 		jack_default_audio_sample_t* outputRight2 = output_1_1.getBuffer();
 		jack_default_audio_sample_t* subOut = output_sub.getBuffer();
 
-
 		ArrayVector<accurate_t, 4> &input = manager.getInput();
 		const ArrayVector<accurate_t, 4> &output = manager.getOutput();
 		const ArrayVector<accurate_t, 1> &sub = manager.getSubWoofer();
+
+		jack_default_audio_sample_t samples[4];
+
+		config.load(true);
+		if (processConfigVersion != configVersion) {
+			hf.setCoefficients(highPassCoefficients.get());
+			lf.setCoefficients(lowPassCoefficients.get());
+			processConfigVersion != configVersion;
+		}
 
 		for (size_t frame = 0; frame < frameCount; frame++) {
 			input[0] = *inputLeft1++;
@@ -85,22 +107,46 @@ protected:
 			input[2] = *inputLeft2++;
 			input[3] = *inputRight2++;
 
-			manager.process();
+			accurate_t sub = 0.0;
+			for (size_t i = 0; i < 4; i++) {
+				simpledsp::accurate_t x = input[i];
+				samples[i] = hf.filter(i, x);
+				sub += lf.filter(i, x);
+			}
 
-			*outputLeft1++ = output.get(0);
-			*outputRight1++ = output.get(1);
+			*outputLeft1++ = samples[0];
+			*outputRight1++ = samples[1];
 			*outputLeft2++ = output.get(2);
 			*outputRight2++ = output.get(3);
+			*subOut++ = sub;
 
-			*subOut++ = sub.get(0);
+//			manager.process();
+//
+//			*outputLeft1++ = output.get(0);
+//			*outputRight1++ = output.get(1);
+//			*outputLeft2++ = output.get(2);
+//			*outputRight2++ = output.get(3);
+//
+//			*subOut++ = sub.get(0);
 		}
 
 		return true;
 	}
 	virtual bool setSamplerate(jack_nframes_t sampleRate)
 	{
+		MemoryFence fence;
 		std::cerr << "Configuring samplerate: " << sampleRate << endl;
 		manager.configure(frequencies, sampleRate);
+
+		CoefficientsBuilder builder(2);
+
+		simpledsp::Butterworth::createCoefficients(builder, sampleRate, 180, simpledsp::Butterworth::Pass::LOW, true);
+		lowPassCoefficients.write(builder);
+		simpledsp::Butterworth::createCoefficients(builder, sampleRate, 180, simpledsp::Butterworth::Pass::HIGH, true);
+		highPassCoefficients.write(builder);
+		configVersion.write(1 + configVersion.get());
+		config.store(1000);
+
 		return true;
 	}
 	virtual void beforeShutdown()
@@ -126,11 +172,19 @@ public:
 		output_1_0(addPort(PortDirection::OUT, "output_1_0")),
 		output_0_1(addPort(PortDirection::OUT, "output_0_1")),
 		output_1_1(addPort(PortDirection::OUT, "output_1_1")),
-		output_sub(addPort(PortDirection::OUT, "output_sub"))
+		output_sub(addPort(PortDirection::OUT, "output_sub")),
+		config(20480),
+		configVersion(config.add((size_t)0)),
+		highPassCoefficients(config.add(CoefficientsBuilder(2))),
+		lowPassCoefficients(config.add(CoefficientsBuilder(2)))
 	{
+		config.store(1000);
 		finishDefiningPorts();
+		CoefficientsBuilder x(2);
+		cout << "ORDER " << x.order() << endl;
+		config.load(false);
 		for (size_t i = 0; i < CROSSOVERS; i++) {
-			cout <<  "- crossover[" << i << "]: " << frequencies[i] << endl;
+			cout <<  "- crossover[" << i << "]: " << frequencies[i] << "; order=" << highPassCoefficients.get().order() << endl;
 		}
 	};
 

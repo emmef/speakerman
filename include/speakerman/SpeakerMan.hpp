@@ -23,13 +23,11 @@
 #define SMS_SPEAKERMAN_SPEAKERMAN_GUARD_H_
 
 #include <iostream>
-#include <vector>
-#include <array>
 #include <jack/jack.h>
 #include <simpledsp/Types.hpp>
 #include <simpledsp/Values.hpp>
 #include <simpledsp/Precondition.hpp>
-#include <simpledsp/Array.hpp>
+#include <simpledsp/Vector.hpp>
 #include <simpledsp/List.hpp>
 #include <simpledsp/MultibandSplitter.hpp>
 #include <speakerman/VolumeMatrix.hpp>

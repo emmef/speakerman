@@ -206,6 +206,9 @@ bool Client::prepareAndprocess(jack_nframes_t nframes)
 		}
 		MemoryFence fence;
 		return process(nframes);
+	} catch (std::exception &e) {
+		cerr << "Exception: " << e.what() << endl;
+		exceptionCount++;
 	} catch (...) {
 		exceptionCount++;
 	}
