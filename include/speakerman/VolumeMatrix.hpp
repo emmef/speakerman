@@ -60,8 +60,8 @@ public:
 		return matrix(column, row);
 	}
 
-	template<size_t SCALE1, size_t SCALE2>
-	void multiply(const Vector<T, COLUMNS, SCALE1> &input,  Vector<T, ROWS, SCALE2> &output)
+	template<size_t SCALE1, class D1, size_t SCALE2, class D2>
+	void multiply(const Vector<T, D1, COLUMNS, SCALE1> &input,  Vector<T, D2, ROWS, SCALE2> &output)
 	{
 		matrix.multiply(input, output);
 	}

@@ -32,7 +32,7 @@
 #include <signal.h>
 #include <simpledsp/Precondition.hpp>
 #include <simpledsp/Butterworth.hpp>
-#include <simpledsp/Configuration.hpp>
+#include <simpledsp/LockFreeConsumer.hpp>
 #include <simpledsp/Noise.hpp>
 #include <simpledsp/SingleReadDelay.hpp>
 #include <speakerman/jack/Client.hpp>
@@ -65,13 +65,31 @@ template<size_t CROSSOVERS> class SumToAll : public Client
 	ClientPort output_sub;
 	// DEBUG
 
-	Configuration config;
-	ConfigValue<size_t> configVersion;
-	ConfigValue<CoefficientsBuilder> highPassCoefficients;
-	ConfigValue<CoefficientsBuilder> lowPassCoefficients;
+
+	struct Configuration
+	{
+		CoefficientsBuilder highPassCoefficients;
+		CoefficientsBuilder lowPassCoefficients;
+
+		Configuration() :
+			highPassCoefficients(2),
+			lowPassCoefficients(2) { }
+	};
+	LockFreeConsumer<Configuration> consumer;
+	Configuration &readConfiguration;
+	Configuration &writeConfiguration;
 	size_t processConfigVersion = -1;
 	Filter hf;
 	Filter lf;
+
+	static void writeCoeffs(CoefficientsBuilder &builder, string name)
+	{
+		cout << "Write " << name;
+		for (size_t i = 0; i <= builder.order(); i++) {
+			cout << "; C[" << i << "]=" << builder.getC(i) << "; D[" << i << "]=" << builder.getD(i);
+		}
+		cout << endl;
+	}
 
 protected:
 	virtual bool process(jack_nframes_t frameCount)
@@ -94,11 +112,12 @@ protected:
 
 		jack_default_audio_sample_t samples[4];
 
-		config.load(true);
-		if (processConfigVersion != configVersion) {
-			hf.setCoefficients(highPassCoefficients.get());
-			lf.setCoefficients(lowPassCoefficients.get());
-			processConfigVersion != configVersion;
+		if (consumer.consume(true)) {
+			cout << "Read configuration" << endl;
+			writeCoeffs(writeConfiguration.highPassCoefficients, "High pass");
+			writeCoeffs(writeConfiguration.lowPassCoefficients, "Low pass");
+			hf.setCoefficients(readConfiguration.highPassCoefficients);
+			lf.setCoefficients(readConfiguration.lowPassCoefficients);
 		}
 
 		for (size_t frame = 0; frame < frameCount; frame++) {
@@ -116,8 +135,8 @@ protected:
 
 			*outputLeft1++ = samples[0];
 			*outputRight1++ = samples[1];
-			*outputLeft2++ = output.get(2);
-			*outputRight2++ = output.get(3);
+			*outputLeft2++ = samples[2];
+			*outputRight2++ = samples[3];
 			*subOut++ = sub;
 
 //			manager.process();
@@ -138,14 +157,20 @@ protected:
 		std::cerr << "Configuring samplerate: " << sampleRate << endl;
 		manager.configure(frequencies, sampleRate);
 
-		CoefficientsBuilder builder(2);
+		simpledsp::Butterworth::createRelativeFrequencyCoefficients(writeConfiguration.lowPassCoefficients, 180 / sampleRate, simpledsp::Butterworth::Pass::LOW, true);
+		simpledsp::Butterworth::createRelativeFrequencyCoefficients(writeConfiguration.highPassCoefficients, 180 / sampleRate, simpledsp::Butterworth::Pass::HIGH, true);
+		writeCoeffs(writeConfiguration.lowPassCoefficients, "Low pass");
+		writeCoeffs(writeConfiguration.highPassCoefficients, "High pass");
+		cout << endl;
 
-		simpledsp::Butterworth::createCoefficients(builder, sampleRate, 180, simpledsp::Butterworth::Pass::LOW, true);
-		lowPassCoefficients.write(builder);
-		simpledsp::Butterworth::createCoefficients(builder, sampleRate, 180, simpledsp::Butterworth::Pass::HIGH, true);
-		highPassCoefficients.write(builder);
-		configVersion.write(1 + configVersion.get());
-		config.store(1000);
+		simpledsp::Butterworth::createRelativeFrequencyCoefficients(writeConfiguration.highPassCoefficients, 180 / sampleRate, simpledsp::Butterworth::Pass::HIGH, true);
+		simpledsp::Butterworth::createRelativeFrequencyCoefficients(writeConfiguration.lowPassCoefficients, 180 / sampleRate, simpledsp::Butterworth::Pass::LOW, true);
+		writeCoeffs(writeConfiguration.lowPassCoefficients, "Low pass");
+		writeCoeffs(writeConfiguration.highPassCoefficients, "High pass");
+		cout << endl;
+
+		cout << "Wrote configuration" << endl;
+		consumer.produce();
 
 		return true;
 	}
@@ -173,18 +198,13 @@ public:
 		output_0_1(addPort(PortDirection::OUT, "output_0_1")),
 		output_1_1(addPort(PortDirection::OUT, "output_1_1")),
 		output_sub(addPort(PortDirection::OUT, "output_sub")),
-		config(20480),
-		configVersion(config.add((size_t)0)),
-		highPassCoefficients(config.add(CoefficientsBuilder(2))),
-		lowPassCoefficients(config.add(CoefficientsBuilder(2)))
+		readConfiguration(consumer.consumerValue()),
+		writeConfiguration(consumer.producerValue())
 	{
-		config.store(1000);
 		finishDefiningPorts();
 		CoefficientsBuilder x(2);
-		cout << "ORDER " << x.order() << endl;
-		config.load(false);
 		for (size_t i = 0; i < CROSSOVERS; i++) {
-			cout <<  "- crossover[" << i << "]: " << frequencies[i] << "; order=" << highPassCoefficients.get().order() << endl;
+			cout <<  "- crossover[" << i << "]: " << frequencies[i] << endl;
 		}
 	};
 
@@ -193,44 +213,6 @@ public:
 	}
 };
 
-class JackClientOwner
-{
-	std::mutex m;
-	Client * client = nullptr;
-
-	void unsafeSet(Client *newClient) {
-		CriticalScope scope(mutex);
-		if (client) {
-			client->close();
-			delete client;
-		}
-		client = newClient;
-	}
-public:
-	void set(Client *newClient) {
-		if (newClient) {
-			unsafeSet(newClient);
-		}
-		else {
-			throw invalid_argument("new client must not be NIL");
-		}
-	}
-
-	Client &get() {
-		CriticalScope scope(mutex);
-		if (client) {
-			return *client;
-		}
-		throw nullptr_error();
-	}
-
-	~JackClientOwner() {
-		std::cerr << "Closing jack client" << std::endl;
-		unsafeSet(nullptr);
-	}
-};
-
-static JackClientOwner client;
 
 extern "C" {
 	void signal_callback_handler(int signum)
