@@ -157,14 +157,14 @@ protected:
 		std::cerr << "Configuring samplerate: " << sampleRate << endl;
 		manager.configure(frequencies, sampleRate);
 
-		simpledsp::Butterworth::createRelativeFrequencyCoefficients(writeConfiguration.lowPassCoefficients, 180 / sampleRate, simpledsp::Butterworth::Pass::LOW, true);
-		simpledsp::Butterworth::createRelativeFrequencyCoefficients(writeConfiguration.highPassCoefficients, 180 / sampleRate, simpledsp::Butterworth::Pass::HIGH, true);
+		simpledsp::Butterworth::createCoefficients(writeConfiguration.lowPassCoefficients, sampleRate, 180, simpledsp::Butterworth::Pass::LOW, true);
+		simpledsp::Butterworth::createCoefficients(writeConfiguration.highPassCoefficients, sampleRate, 180, simpledsp::Butterworth::Pass::HIGH, true);
 		writeCoeffs(writeConfiguration.lowPassCoefficients, "Low pass");
 		writeCoeffs(writeConfiguration.highPassCoefficients, "High pass");
 		cout << endl;
 
-		simpledsp::Butterworth::createRelativeFrequencyCoefficients(writeConfiguration.highPassCoefficients, 180 / sampleRate, simpledsp::Butterworth::Pass::HIGH, true);
-		simpledsp::Butterworth::createRelativeFrequencyCoefficients(writeConfiguration.lowPassCoefficients, 180 / sampleRate, simpledsp::Butterworth::Pass::LOW, true);
+		simpledsp::Butterworth::createCoefficients(writeConfiguration.highPassCoefficients, sampleRate, 180, simpledsp::Butterworth::Pass::HIGH, true);
+		simpledsp::Butterworth::createCoefficients(writeConfiguration.lowPassCoefficients, sampleRate, 180, simpledsp::Butterworth::Pass::LOW, true);
 		writeCoeffs(writeConfiguration.lowPassCoefficients, "Low pass");
 		writeCoeffs(writeConfiguration.highPassCoefficients, "High pass");
 		cout << endl;
