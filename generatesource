@@ -100,16 +100,21 @@ do
 		then
 			directory=`echo "${tryDirectory}" | sed -r s/"sourcetemplates\/(.*)"/"\\1"/`
 			generatedFile="${directory}/${fileBaseName}.${fileExtension}"
-			echo "Generating \"${generatedFile}\" from template \"${templateFile}\"..."
-			cat "${templateFile}" |\
-				sed -r s/"TemplateFileNameLowerCase"/"${fileName}"/g |\
-				sed -r s/"TemplateProjectCopyrightNotice"/"${copyRightNotice}"/g |\
-				sed -r s/"TemplateProjectCopyrightContact"/"${projectCopyRightContact}"/g |\
-				sed -r s/"TemplateFileName"/"${fileBaseName}"/g |\
-				sed -r s/"TemplateProjectFileGuard"/"${fileGuardName}"/g |\
-				sed -r s/"TemplateProjectNameSpace"/"${projectTemplateProjectNameSpace}"/g |\
-				sed -r s/"TemplateProjectDescription"/"${projectTemplateProjectDescription}"/g \
-				> ${generatedFile}
+			if test -f "${generatedFile}"
+			then
+				echo "Generating of file skipped, because it already exists: ${generatedFile}"
+			else
+				echo "Generating \"${generatedFile}\" from template \"${templateFile}\"..."
+				cat "${templateFile}" |\
+					sed -r s/"TemplateFileNameLowerCase"/"${fileName}"/g |\
+					sed -r s/"TemplateProjectCopyrightNotice"/"${copyRightNotice}"/g |\
+					sed -r s/"TemplateProjectCopyrightContact"/"${projectCopyRightContact}"/g |\
+					sed -r s/"TemplateFileName"/"${fileBaseName}"/g |\
+					sed -r s/"TemplateProjectFileGuard"/"${fileGuardName}"/g |\
+					sed -r s/"TemplateProjectNameSpace"/"${projectTemplateProjectNameSpace}"/g |\
+					sed -r s/"TemplateProjectDescription"/"${projectTemplateProjectDescription}"/g \
+					> ${generatedFile}
+			fi
 		fi
 	done
 	if test -z "${directory}"
