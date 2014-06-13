@@ -30,7 +30,9 @@
 #include <math.h>
 #include <stdio.h>
 #include <signal.h>
+#include <simpledsp/CharacteristicSamples.hpp>
 #include <simpledsp/Precondition.hpp>
+#include <simpledsp/Biquad.hpp>
 #include <simpledsp/Butterworth.hpp>
 #include <simpledsp/LockFreeConsumer.hpp>
 #include <simpledsp/Noise.hpp>
@@ -48,12 +50,18 @@ jack_default_audio_sample_t lowOutputOne = 0;
 jack_default_audio_sample_t lowOutputOneNew;
 typedef SingleReadDelay<jack_default_audio_sample_t> Delay;
 
-template<size_t CROSSOVERS> class SumToAll : public Client
+class SumToAll : public Client
 {
-	typedef simpledsp::Iir::Fixed::MultiFixedChannelFilter<sample_t, accurate_t, 2, 4> Filter;
+	typedef speakerman::Dynamics<accurate_t, 4, 2, 3, 3> Dynamics;
+	typedef Dynamics::UserConfig UserConfig;
+	typedef Dynamics::Config Configuration;
+	typedef Dynamics::Processor<2> Processor;
 
-	SpeakerManager<2,CROSSOVERS,4,4,4,1> manager;
-	array<freq_t,CROSSOVERS> frequencies;
+	UserConfig userConfig;
+	LockFreeConsumer<Configuration, simpledsp::DefaultAssignableCheck> consumer;
+	Configuration &wConf = consumer.producerValue();
+	Processor processor;
+
 	ClientPort input_0_0;
 	ClientPort input_0_1;
 	ClientPort input_1_0;
@@ -63,33 +71,7 @@ template<size_t CROSSOVERS> class SumToAll : public Client
 	ClientPort output_1_0;
 	ClientPort output_1_1;
 	ClientPort output_sub;
-	// DEBUG
 
-
-	struct Configuration
-	{
-		CoefficientsBuilder highPassCoefficients;
-		CoefficientsBuilder lowPassCoefficients;
-
-		Configuration() :
-			highPassCoefficients(2),
-			lowPassCoefficients(2) { }
-	};
-	LockFreeConsumer<Configuration> consumer;
-	Configuration &readConfiguration;
-	Configuration &writeConfiguration;
-	size_t processConfigVersion = -1;
-	Filter hf;
-	Filter lf;
-
-	static void writeCoeffs(CoefficientsBuilder &builder, string name)
-	{
-		cout << "Write " << name;
-		for (size_t i = 0; i <= builder.order(); i++) {
-			cout << "; C[" << i << "]=" << builder.getC(i) << "; D[" << i << "]=" << builder.getD(i);
-		}
-		cout << endl;
-	}
 
 protected:
 	virtual bool process(jack_nframes_t frameCount)
@@ -106,72 +88,39 @@ protected:
 		jack_default_audio_sample_t* outputRight2 = output_1_1.getBuffer();
 		jack_default_audio_sample_t* subOut = output_sub.getBuffer();
 
-		ArrayVector<accurate_t, 4> &input = manager.getInput();
-		const ArrayVector<accurate_t, 4> &output = manager.getOutput();
-		const ArrayVector<accurate_t, 1> &sub = manager.getSubWoofer();
+		if (consumer.consume(true)) {
+			processor.checkFilterChanges();
+		}
 
 		jack_default_audio_sample_t samples[4];
 
-		if (consumer.consume(true)) {
-			cout << "Read configuration" << endl;
-			writeCoeffs(writeConfiguration.highPassCoefficients, "High pass");
-			writeCoeffs(writeConfiguration.lowPassCoefficients, "Low pass");
-			hf.setCoefficients(readConfiguration.highPassCoefficients);
-			lf.setCoefficients(readConfiguration.lowPassCoefficients);
-		}
-
 		for (size_t frame = 0; frame < frameCount; frame++) {
-			input[0] = *inputLeft1++;
-			input[1] = *inputRight1++;
-			input[2] = *inputLeft2++;
-			input[3] = *inputRight2++;
 
-			accurate_t sub = 0.0;
-			for (size_t i = 0; i < 4; i++) {
-				simpledsp::accurate_t x = input[i];
-				samples[i] = hf.filter(i, x);
-				sub += lf.filter(i, x);
-			}
+			processor.input[0] = *inputLeft1++;
+			processor.input[1] = *inputRight1++;
 
-			*outputLeft1++ = samples[0];
-			*outputRight1++ = samples[1];
-			*outputLeft2++ = samples[2];
-			*outputRight2++ = samples[3];
-			*subOut++ = sub;
+			processor.applyValueIntegration();
+			processor.process();
 
-//			manager.process();
-//
-//			*outputLeft1++ = output.get(0);
-//			*outputRight1++ = output.get(1);
-//			*outputLeft2++ = output.get(2);
-//			*outputRight2++ = output.get(3);
-//
-//			*subOut++ = sub.get(0);
+			*outputLeft1++ = processor.output[0];
+			*outputRight1++ = processor.output[1];
+			*outputLeft2++ = processor.output[0];
+			*outputRight2++ = processor.output[1];
+			*subOut++ = 0.0;
 		}
+
+		processor.displayIntegrations();
 
 		return true;
 	}
 	virtual bool setSamplerate(jack_nframes_t sampleRate)
 	{
-		MemoryFence fence;
-		std::cerr << "Configuring samplerate: " << sampleRate << endl;
-		manager.configure(frequencies, sampleRate);
+		wConf.configure(userConfig, sampleRate);
 
-		simpledsp::Butterworth::createCoefficients(writeConfiguration.lowPassCoefficients, sampleRate, 180, simpledsp::Butterworth::Pass::LOW, true);
-		simpledsp::Butterworth::createCoefficients(writeConfiguration.highPassCoefficients, sampleRate, 180, simpledsp::Butterworth::Pass::HIGH, true);
-		writeCoeffs(writeConfiguration.lowPassCoefficients, "Low pass");
-		writeCoeffs(writeConfiguration.highPassCoefficients, "High pass");
-		cout << endl;
-
-		simpledsp::Butterworth::createCoefficients(writeConfiguration.highPassCoefficients, sampleRate, 180, simpledsp::Butterworth::Pass::HIGH, true);
-		simpledsp::Butterworth::createCoefficients(writeConfiguration.lowPassCoefficients, sampleRate, 180, simpledsp::Butterworth::Pass::LOW, true);
-		writeCoeffs(writeConfiguration.lowPassCoefficients, "Low pass");
-		writeCoeffs(writeConfiguration.highPassCoefficients, "High pass");
-		cout << endl;
-
-		cout << "Wrote configuration" << endl;
+		std::cout << "Write config" << endl;
 		consumer.produce();
 
+		std::cout << "Written config" << endl;
 		return true;
 	}
 	virtual void beforeShutdown()
@@ -186,9 +135,14 @@ protected:
 	virtual void connectPortsOnActivate() { }
 
 public:
-	SumToAll(array<freq_t, CROSSOVERS> freqs) :
+	SumToAll(
+			ArrayVector<accurate_t, 4> &frequencies,
+			ArrayVector<accurate_t, 3> &allPassRcTimes,
+			ArrayVector<accurate_t, 3> &bandRcTimes,
+			ArrayVector<accurate_t, 5> &bandThreshold,
+			accurate_t threshold)
+:
 		Client(9),
-		frequencies(freqs),
 		input_0_0(addPort(PortDirection::IN, "input_0_0")),
 		input_1_0(addPort(PortDirection::IN, "input_1_0")),
 		input_0_1(addPort(PortDirection::IN, "input_0_1")),
@@ -198,14 +152,14 @@ public:
 		output_0_1(addPort(PortDirection::OUT, "output_0_1")),
 		output_1_1(addPort(PortDirection::OUT, "output_1_1")),
 		output_sub(addPort(PortDirection::OUT, "output_sub")),
-		readConfiguration(consumer.consumerValue()),
-		writeConfiguration(consumer.producerValue())
+		processor(consumer.consumerValue())
 	{
+		userConfig.frequencies.assign(frequencies);
+		userConfig.allPassRcs.assign(allPassRcTimes);
+		userConfig.bandRcs.assign(bandRcTimes);
+		userConfig.bandThreshold.assign(bandThreshold);
+		userConfig.threshold = threshold;
 		finishDefiningPorts();
-		CoefficientsBuilder x(2);
-		for (size_t i = 0; i < CROSSOVERS; i++) {
-			cout <<  "- crossover[" << i << "]: " << frequencies[i] << endl;
-		}
 	};
 
 	~SumToAll()
@@ -228,12 +182,32 @@ int main(int count, char * arguments[]) {
 	signal(SIGTERM, signal_callback_handler);
 	signal(SIGABRT, signal_callback_handler);
 
-	array<freq_t, 3> frequencies;
+	ArrayVector<accurate_t, 4> frequencies;
 	frequencies[0] = 80;
-	frequencies[1] = 800;
-	frequencies[2] = 8000;
+	frequencies[1] = 240;
+	frequencies[2] = 4500; // 1200
+	frequencies[3] = 6500;//3200
 
-	SumToAll<3> processor(frequencies);
+	ArrayVector<accurate_t, 3> allPassRcTimes;
+	allPassRcTimes[0] = 0.333;
+	allPassRcTimes[1] = 1.0;
+	allPassRcTimes[2] = 3.0;
+
+	ArrayVector<accurate_t, 3> bandRcTimes;
+	bandRcTimes[0] = 0.025;
+	bandRcTimes[1] = 0.3;
+	bandRcTimes[2] = 0.8;
+
+	ArrayVector<accurate_t, 5> bandThresholds;
+	bandThresholds[0] = 1.0;
+	bandThresholds[1] = 1.0;
+	bandThresholds[2] = 1.0;
+	bandThresholds[3] = 1.0;
+	bandThresholds[4] = 1.0;
+
+	accurate_t threshold = 0.1;
+
+	SumToAll processor(frequencies, allPassRcTimes, bandRcTimes, bandThresholds, threshold);
 
 	processor.open("speakerman", JackOptions::JackNullOption);
 	processor.activate();

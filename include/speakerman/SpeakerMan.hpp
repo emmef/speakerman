@@ -33,6 +33,7 @@
 #include <speakerman/VolumeMatrix.hpp>
 #include <speakerman/Frame.hpp>
 #include <simpledsp/MemoryFence.hpp>
+#include <speakerman/Dynamics.hpp>
 
 namespace speakerman {
 
@@ -116,10 +117,11 @@ public:
 
 		auto separated = splitter.process(afterInMatrix);
 
-		subInput = separated.getRow(0);
+		subInput.assign(separated[0]);
+
 		outInput.zero();
 		for (size_t band = 1; band <= CROSSOVERS; band++) {
-			outInput += separated.getRow(band);
+			outInput += separated[band];
 		}
 
 		outMatrix.multiply(outInput, output);

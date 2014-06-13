@@ -218,6 +218,7 @@ namespace jack {
 
 			unsafeClose();
 		}
+		virtual ~Client() = default;
 	};
 
 	typedef Client::Port ClientPort;
