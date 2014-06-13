@@ -68,6 +68,7 @@ struct Dynamics
 		// Characteristic times for fast and per band detection
 		ArrayVector<double, ALLPASS_RC_TIMES> bandRcs;
 
+		bool seperateSubChannel = true;
 	};
 
 	struct Coeff {
@@ -87,7 +88,6 @@ struct Dynamics
 	struct Config
 	{
 		// Last know sample rate, used for reconfigure.
-
 		double sampleRate = 0;
 		// Filter coefficients for each crossover.
 		ArrayVector<array<Sample, ORDER>, 3> a;
@@ -115,6 +115,8 @@ struct Dynamics
 
 		// Determines the speed at which changes in, say, threshold or other stuff are followed;
 		CharacteristicSamples valueRc;
+
+		bool seperateSubChannel = true;
 
 		void configure(const UserConfig &userConfig, double currentSampleRate)
 		{
@@ -191,6 +193,11 @@ struct Dynamics
 			}
 
 			valueRc.setCharacteristicSamples(0.1 * currentSampleRate);
+
+			seperateSubChannel = userConfig.seperateSubChannel;
+			if (seperateSubChannel) {
+				cout << "- Separating sub woofer channel" << endl;
+			}
 			sampleRate = currentSampleRate;
 		}
 
@@ -403,20 +410,29 @@ struct Dynamics
 
 		void sumFrequencyBands()
 		{
+			size_t start;
+			if (conf.seperateSubChannel) {
+				start = 1;
+				for (size_t channel = 0; channel < CHANNELS; channel++) {
+					subout[channel] = bands[0][channel];
+				}
+			}
+			else {
+				start = 0;
+				subout.zero();
+			}
 			for (size_t channel = 0; channel < CHANNELS; channel++) {
 				Sample sumOfFrequencyBands = 0.0;
-				for (size_t band = 0; band < BANDS; band++) {
+				for (size_t band = start; band < BANDS; band++) {
 					sumOfFrequencyBands += bands[band][channel];
 				}
 				output[channel] = sumOfFrequencyBands;
-			}
-			for (size_t channel = 0; channel < CHANNELS; channel++) {
-				subout[channel] = bands[0][channel];
 			}
 		}
 
 		void process()
 		{
+			applyValueIntegration();
 			frameCount++;
 			Sample allPassDetection = getAllPassDetection();
 
