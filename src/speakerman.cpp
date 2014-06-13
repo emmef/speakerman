@@ -57,10 +57,18 @@ class SumToAll : public Client
 	typedef Dynamics::Config Configuration;
 	typedef Dynamics::Processor<2> Processor;
 
-	UserConfig userConfig;
-	LockFreeConsumer<Configuration, simpledsp::DefaultAssignableCheck> consumer;
-	Configuration &wConf = consumer.producerValue();
-	Processor processor;
+	struct DoubleConfiguration {
+		Configuration configuration1;
+		Configuration configuration2;
+	};
+	UserConfig userConfig1;
+	UserConfig userConfig2;
+
+	LockFreeConsumer<DoubleConfiguration, simpledsp::DefaultAssignableCheck> consumer;
+	Configuration &wConf1 = consumer.producerValue().configuration1;
+	Configuration &wConf2 = consumer.producerValue().configuration2;
+	Processor processor1;
+	Processor processor2;
 
 	ClientPort input_0_0;
 	ClientPort input_0_1;
@@ -89,38 +97,49 @@ protected:
 		jack_default_audio_sample_t* subOut = output_sub.getBuffer();
 
 		if (consumer.consume(true)) {
-			processor.checkFilterChanges();
+			processor1.checkFilterChanges();
+			processor2.checkFilterChanges();
 		}
 
 		jack_default_audio_sample_t samples[4];
 
 		for (size_t frame = 0; frame < frameCount; frame++) {
 
-			processor.input[0] = *inputLeft1++;
-			processor.input[1] = *inputRight1++;
+			processor1.input[0] = *inputLeft1++;
+			processor1.input[1] = *inputRight1++;
+			processor2.input[0] = *inputLeft2++;
+			processor2.input[1] = *inputRight2++;
 
-			processor.applyValueIntegration();
-			processor.process();
+			processor1.process();
+			processor2.process();
 
-			*outputLeft1++ = processor.output[0];
-			*outputRight1++ = processor.output[1];
-			*outputLeft2++ = processor.output[0];
-			*outputRight2++ = processor.output[1];
+			*outputLeft1++ = processor1.output[0];
+			*outputRight1++ = processor1.output[1];
+			*outputLeft2++ = processor2.output[0];
+			*outputRight2++ = processor2.output[1];
 
 			sample_t sub = 0.0;
-			for (size_t channel = 0; channel < 2; channel++) {
-				sub += processor.subout[channel];
+			if (processor1.conf.seperateSubChannel) {
+				for (size_t channel = 0; channel < 2; channel++) {
+					sub += processor1.subout[channel];
+				}
+			}
+			if (processor2.conf.seperateSubChannel) {
+				for (size_t channel = 0; channel < 2; channel++) {
+					sub += processor2.subout[channel];
+				}
 			}
 			*subOut++ = sub;
 		}
 
-		processor.displayIntegrations();
+		processor1.displayIntegrations();
 
 		return true;
 	}
 	virtual bool setSamplerate(jack_nframes_t sampleRate)
 	{
-		wConf.configure(userConfig, sampleRate);
+		wConf1.configure(userConfig1, sampleRate);
+		wConf2.configure(userConfig2, sampleRate);
 
 		std::cout << "Write config" << endl;
 		consumer.produce();
@@ -144,8 +163,11 @@ public:
 			ArrayVector<accurate_t, 4> &frequencies,
 			ArrayVector<accurate_t, 3> &allPassRcTimes,
 			ArrayVector<accurate_t, 3> &bandRcTimes,
-			ArrayVector<accurate_t, 5> &bandThreshold,
-			accurate_t threshold)
+			accurate_t threshold1,
+			ArrayVector<accurate_t, 5> &bandThreshold1,
+			accurate_t threshold2,
+			ArrayVector<accurate_t, 5> &bandThreshold2
+			)
 :
 		Client(9),
 		input_0_0(addPort(PortDirection::IN, "input_0_0")),
@@ -157,13 +179,21 @@ public:
 		output_0_1(addPort(PortDirection::OUT, "output_0_1")),
 		output_1_1(addPort(PortDirection::OUT, "output_1_1")),
 		output_sub(addPort(PortDirection::OUT, "output_sub")),
-		processor(consumer.consumerValue())
+		processor1(consumer.consumerValue().configuration1),
+		processor2(consumer.consumerValue().configuration2)
 	{
-		userConfig.frequencies.assign(frequencies);
-		userConfig.allPassRcs.assign(allPassRcTimes);
-		userConfig.bandRcs.assign(bandRcTimes);
-		userConfig.bandThreshold.assign(bandThreshold);
-		userConfig.threshold = threshold;
+		userConfig1.frequencies.assign(frequencies);
+		userConfig1.allPassRcs.assign(allPassRcTimes);
+		userConfig1.bandRcs.assign(bandRcTimes);
+		userConfig1.bandThreshold.assign(bandThreshold1);
+		userConfig1.threshold = threshold1;
+
+		userConfig2.frequencies.assign(frequencies);
+		userConfig2.allPassRcs.assign(allPassRcTimes);
+		userConfig2.bandRcs.assign(bandRcTimes);
+		userConfig2.bandThreshold.assign(bandThreshold2);
+		userConfig2.threshold = threshold2;
+		userConfig2.seperateSubChannel = false;
 		finishDefiningPorts();
 	};
 
@@ -203,16 +233,24 @@ int main(int count, char * arguments[]) {
 	bandRcTimes[1] = 0.1;
 	bandRcTimes[2] = 0.330;
 
-	ArrayVector<accurate_t, 5> bandThresholds;
-	bandThresholds[0] = 0.15;
-	bandThresholds[1] = 0.25;
-	bandThresholds[2] = 0.25;
-	bandThresholds[3] = 0.2;
-	bandThresholds[4] = 0.05;
+	ArrayVector<accurate_t, 5> bandThresholds1;
+	bandThresholds1[0] = 0.20;
+	bandThresholds1[1] = 0.25;
+	bandThresholds1[2] = 0.25;
+	bandThresholds1[3] = 0.2;
+	bandThresholds1[4] = 0.05;
 
-	accurate_t threshold = 0.2;
+	ArrayVector<accurate_t, 5> bandThresholds2;
+	bandThresholds2[0] = 0.10;
+	bandThresholds2[1] = 0.25;
+	bandThresholds2[2] = 0.25;
+	bandThresholds2[3] = 0.2;
+	bandThresholds2[4] = 0.05;
 
-	SumToAll processor(frequencies, allPassRcTimes, bandRcTimes, bandThresholds, threshold);
+	accurate_t threshold1 = 0.2;
+	accurate_t threshold2 = 0.1;
+
+	SumToAll processor(frequencies, allPassRcTimes, bandRcTimes, threshold1, bandThresholds1, threshold2, bandThresholds2);
 
 	processor.open("speakerman", JackOptions::JackNullOption);
 	processor.activate();
