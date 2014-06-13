@@ -106,7 +106,12 @@ protected:
 			*outputRight1++ = processor.output[1];
 			*outputLeft2++ = processor.output[0];
 			*outputRight2++ = processor.output[1];
-			*subOut++ = 0.0;
+
+			sample_t sub = 0.0;
+			for (size_t channel = 0; channel < 2; channel++) {
+				sub += processor.subout[channel];
+			}
+			*subOut++ = sub;
 		}
 
 		processor.displayIntegrations();
@@ -189,23 +194,23 @@ int main(int count, char * arguments[]) {
 	frequencies[3] = 6500;//3200
 
 	ArrayVector<accurate_t, 3> allPassRcTimes;
-	allPassRcTimes[0] = 0.333;
-	allPassRcTimes[1] = 1.0;
-	allPassRcTimes[2] = 3.0;
+	allPassRcTimes[0] = 0.30;
+	allPassRcTimes[1] = 0.66;
+	allPassRcTimes[2] = 1.7;
 
 	ArrayVector<accurate_t, 3> bandRcTimes;
 	bandRcTimes[0] = 0.025;
-	bandRcTimes[1] = 0.3;
-	bandRcTimes[2] = 0.8;
+	bandRcTimes[1] = 0.1;
+	bandRcTimes[2] = 0.330;
 
 	ArrayVector<accurate_t, 5> bandThresholds;
-	bandThresholds[0] = 1.0;
-	bandThresholds[1] = 1.0;
-	bandThresholds[2] = 1.0;
-	bandThresholds[3] = 1.0;
-	bandThresholds[4] = 1.0;
+	bandThresholds[0] = 0.15;
+	bandThresholds[1] = 0.25;
+	bandThresholds[2] = 0.25;
+	bandThresholds[3] = 0.2;
+	bandThresholds[4] = 0.05;
 
-	accurate_t threshold = 0.1;
+	accurate_t threshold = 0.2;
 
 	SumToAll processor(frequencies, allPassRcTimes, bandRcTimes, bandThresholds, threshold);
 

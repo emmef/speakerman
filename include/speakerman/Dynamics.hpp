@@ -47,8 +47,6 @@ struct Dynamics
 		return max(MINIMUM_THRESHOLD, min(MAXIMUM_THRESHOLD, threshold));
 	}
 
-	// used for butterfly crossover filtering
-	const ArrayVector<size_t, 3 * CROSSOVERS> filterPlan;
 
 	/**
 	 * Describes the configuration that the user wants to have.
@@ -72,6 +70,12 @@ struct Dynamics
 
 	};
 
+	struct Coeff {
+		double frequency = 0;
+		Iir::Fixed::Coefficients<Sample, ORDER> highPass;
+		Iir::Fixed::Coefficients<Sample, ORDER> lowPass;
+	};
+
 	/**
 	 * Configuration used by the actual processing step. The
 	 * Dynamics contains two configurations: one to
@@ -86,11 +90,6 @@ struct Dynamics
 
 		double sampleRate = 0;
 		// Filter coefficients for each crossover.
-		struct Coeff {
-			double frequency = 0;
-			Iir::Fixed::Coefficients<Sample, ORDER> highPass;
-			Iir::Fixed::Coefficients<Sample, ORDER> lowPass;
-		};
 		ArrayVector<array<Sample, ORDER>, 3> a;
 		ArrayVector<Coeff, CROSSOVERS> coeffs;
 		bool updatedFiltersCoefficients = true;
@@ -206,6 +205,9 @@ struct Dynamics
 	struct Processor
 	{
 		Config &conf;
+		// used for butterfly crossover filtering
+		const ArrayVector<size_t, 3 * CROSSOVERS> ioPlan;
+
 		ArrayVector<Iir::Fixed::History<Sample, ORDER>, 4 * CHANNELS * CROSSOVERS> bandPassHistory;
 		struct Keying {
 			Iir::Fixed::MultiFixedChannelFilter<Sample, Sample, 1, CHANNELS> loCut;
@@ -215,18 +217,21 @@ struct Dynamics
 		keying;
 
 		ArrayVector<Sample, ALLPASS_RC_TIMES> allPassIntegrated;
-		ArrayVector<Sample, BAND_RC_TIMES> bandIntegrated;
+		ArrayVector<ArrayVector<Sample, BAND_RC_TIMES>, BANDS> bandIntegrated;
 
 		Sample thresholdMultiplier = 1.0;
 		ArrayVector<Sample, BANDS> bandMultiplier;
 		ArrayVector<Sample, CHANNELS> input;
 		ArrayVector<Sample, CHANNELS> output;
+		ArrayVector<Sample, CHANNELS> subout;
 		ArrayVector<ArrayVector<Sample, CHANNELS>, BANDS> bands;
 
 		Sample debugIntegratedForBlock = 0.0;
 		Sample debugIntegratedKeyedForBlock = 0.0;
 		Sample debugAllPassIntegratedForBlock = 0.0;
 		Sample debugMaxIntegratedForBlock = 0.0;
+		ArrayVector<Sample, BANDS> debugBandMultiplication;
+
 		size_t frameCount = 0;
 
 		void displayIntegrations() {
@@ -249,6 +254,12 @@ struct Dynamics
 						<< "; avg-max-integrated: " << averageMaxIntegratedForBlock
 						<< "; avg-detected: " << averageAllPass
 						<< ": processed in this block: " << frames << endl;
+				cout << "- Multiplication: ";
+				for (size_t i = 0; i < BANDS; i++) {
+					cout << " Band[" << i << "]: " << (debugBandMultiplication[i] / frames);
+				}
+				cout << endl;
+				debugBandMultiplication.zero();
 			}
 		}
 
@@ -306,7 +317,8 @@ struct Dynamics
 			keyedSquareSum *= thresholdMultiplier;
 			Sample maxIntegratedValue = 0.0;
 
-			// Integrate with all the
+			// Integrate with all characteristic times, except the fastest one, which
+			// is used for smoothing.
 			for (size_t i = 1; i < ALLPASS_RC_TIMES; i++) {
 				Sample integrated = conf.allPassRcs[i].integrate(keyedSquareSum, allPassIntegrated[i]);
 				allPassIntegrated[i] = integrated;
@@ -325,6 +337,84 @@ struct Dynamics
 			return smoothed;
 		}
 
+		void splitFrequencyBands()
+		{
+			size_t inputIdx = ioPlan(0);
+
+			for (size_t channel = 0; channel < CHANNELS; channel++) {
+				bands[inputIdx][channel] = input(channel);
+			}
+
+			for (size_t crossover = 0, ioIndex = 0, historyIndex = 0; crossover < CROSSOVERS; crossover++) {
+				inputIdx = ioPlan(ioIndex++);
+				size_t output1Idx = ioPlan(ioIndex++);
+				size_t output2Idx = ioPlan(ioIndex++);
+
+				const Coeff &coeff = conf.coeffs(inputIdx);
+
+				for (size_t channel = 0; channel < CHANNELS; channel++) {
+					Sample x = bands[inputIdx][channel];
+
+					Sample hi = Iir::Fixed::filter(coeff.highPass, bandPassHistory[historyIndex++], x);
+					hi = Iir::Fixed::filter(coeff.highPass, bandPassHistory[historyIndex++], hi);
+
+					Sample lo = Iir::Fixed::filter(coeff.lowPass, bandPassHistory[historyIndex++], x);
+					lo = Iir::Fixed::filter(coeff.lowPass, bandPassHistory[historyIndex++], lo);
+
+					bands[output1Idx][channel] = hi;
+					bands[output2Idx][channel] = lo;
+				}
+			}
+		}
+
+		void processFrequencyBands(Sample allPassDetection)
+		{
+			for (size_t band = 0; band < BANDS; band++) {
+				Sample squareSum = 0.0;
+				for (size_t channel = 0; channel < CHANNELS; channel++) {
+					Sample x = bands[band][channel];
+					squareSum += x * x;
+				}
+
+				Sample maxIntegrated = 0.0;
+				for (size_t rc = 1; rc < BAND_RC_TIMES; rc++) {
+					Sample &history = bandIntegrated[band][rc];
+					Sample integrated = conf.bandRcs[rc].integrate(squareSum, history);
+					history = integrated;
+					if (integrated > maxIntegrated) {
+						maxIntegrated = integrated;
+					}
+				}
+				// multiply for threshold = 1 and compare to the allPassdetection level
+				Sample detection = max(allPassDetection, conf.bandMultiplier[band] * maxIntegrated);
+				Sample &history = bandIntegrated[band][0];
+				Sample smoothed = conf.bandRcs[0].integrate(detection, history);
+				history = smoothed;
+
+				Sample multiplication = smoothed > 1.0 ? 1.0 / sqrt(smoothed) : 1.0;
+
+				debugBandMultiplication[band] += multiplication;
+
+				for (size_t channel = 0; channel < CHANNELS; channel++) {
+					bands[band][channel] *= multiplication;
+				}
+			}
+		}
+
+		void sumFrequencyBands()
+		{
+			for (size_t channel = 0; channel < CHANNELS; channel++) {
+				Sample sumOfFrequencyBands = 0.0;
+				for (size_t band = 0; band < BANDS; band++) {
+					sumOfFrequencyBands += bands[band][channel];
+				}
+				output[channel] = sumOfFrequencyBands;
+			}
+			for (size_t channel = 0; channel < CHANNELS; channel++) {
+				subout[channel] = bands[0][channel];
+			}
+		}
+
 		void process()
 		{
 			frameCount++;
@@ -332,24 +422,21 @@ struct Dynamics
 
 			debugAllPassIntegratedForBlock += allPassDetection;
 
-			Sample multiplication = 1.0 / sqrt(allPassDetection);
-			for (size_t channel = 0; channel < CHANNELS; channel++) {
-				output[channel] = input[channel] * multiplication;
-			}
+			splitFrequencyBands();
+
+			processFrequencyBands(allPassDetection);
+
+			sumFrequencyBands();
 		}
 
 		Processor(Config &config) :
-			conf(config)
+			conf(config),
+			ioPlan(createFilterPlan())
 		{
 
 		}
 	};
 
-	Dynamics() :
-		filterPlan(createFilterPlan())
-	{
-
-	}
 	// Utility methods
 	static const ArrayVector<size_t, 3 * CROSSOVERS> createFilterPlan()
 	{
