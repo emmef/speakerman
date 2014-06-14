@@ -21,6 +21,8 @@
 
 #include <regex>
 #include <iostream>
+#include <locale>
+#include <chrono>
 
 #include <simpledsp/Precondition.hpp>
 #include <simpledsp/Alloc.hpp>
@@ -30,19 +32,22 @@
 namespace speakerman {
 namespace jack {
 
+using namespace std::chrono;
+
 static string NONAME = "";
 
 static thread_local const char * lastErrorMessage = nullptr;
 static bool errorCallBackSet = false;
 
-static void errorMessageHandler(const char * message)
+void Client::errorMessageHandler(const char * message)
 {
 	lastErrorMessage = message;
+	cout << "Received error message from jack: " << message << endl;
 }
 
-void ensureJackErrorMessageHandler()
+void Client::ensureJackErrorMessageHandler()
 {
-	static mutex m;
+	static recursive_mutex m;
 
 	if (errorCallBackSet) {
 		return;
@@ -55,15 +60,15 @@ void ensureJackErrorMessageHandler()
 	}
 }
 
-const char * getAndResetErrorMessage()
+const char * Client::getAndResetErrorMessage()
 {
 	const char * message = lastErrorMessage;
 	lastErrorMessage = nullptr;
 	return message;
 }
 
-void throwOnErrorMessage(const char* description) {
-	const char* message = getAndResetErrorMessage();
+void Client::throwOnErrorMessage(const char* description) {
+	const char* message = Client::getAndResetErrorMessage();
 	if (message == nullptr) {
 		return;
 	}
@@ -75,6 +80,7 @@ void throwOnErrorMessage(const char* description) {
 	exceptionMessage += message;
 	throw runtime_error(exceptionMessage);
 }
+
 
 Client::PortEntry::PortEntry() :
 					givenName(NONAME),
@@ -124,9 +130,79 @@ PortNames::~PortNames()
 		jack_free(portNames);
 	}
 }
+
+//class MessageServer
+//{
+//	std::mutex lock;
+//	std::condition_variable condition;
+//	std::queue<Client::ClientMessage> queue;
+//	volatile bool shutdown = false;
+//
+//	void serveMessages();
+//
+//public:
+//	MessageServer();
+//
+//	void sendClientMessage(ClientMessage message);
+//	~MessageServer();
+//};
+
+
 PortNames * Client::getPortNames(const char * namePattern, const char * typePattern, unsigned long flags)
 {
 	return new PortNames(client, namePattern, typePattern, flags);
+}
+
+void Client::serveMessagesForClient(Client *client)
+{
+	client->serveMessages();
+}
+
+void Client::serveMessages()
+{
+	while (!messageShutdown) {
+		ClientMessageType type = ClientMessageType::NONE;
+		{
+			unique_lock<mutex> guard(messageMutex);
+			if (messageQueue.empty()) {
+				messageCondition.wait_for(guard, std::chrono::milliseconds{200});
+			}
+			else {
+				type = messageQueue.front();
+				messageQueue.pop();
+			}
+		}
+		if (type != ClientMessageType::NONE) {
+			executeMessage(type);
+		}
+	}
+}
+
+void Client::sendMessage(ClientMessageType type)
+{
+	if (type == ClientMessageType::DESTRUCTION) {
+		messageShutdown = true;
+	}
+	unique_lock<mutex> guard(messageMutex);
+	messageQueue.push(type);
+	messageCondition.notify_all();
+}
+
+void Client::executeMessage(ClientMessageType type)
+{
+	if (type == ClientMessageType::SERVER_SHUTDOWN) {
+		CriticalScope g(mutex);
+
+		unsafeClose();
+	}
+}
+
+Client::~Client()
+{
+	sendMessage(ClientMessageType::DESTRUCTION);
+	cout << "Awaiting end of message loop..." << endl;
+	messageThread.join();
+	cout << "Done waiting" << endl;
 }
 
 
@@ -134,6 +210,9 @@ Client::Client(size_t maximumNumberOfPorts) :
 		port(Alloc::allocatePositive<PortEntry>(maximumNumberOfPorts)),
 		portCapacity(maximumNumberOfPorts)
 {
+	thread t { Client::serveMessagesForClient, this };
+	messageThread.swap(t);
+
 	ensureJackErrorMessageHandler();
 }
 
@@ -148,7 +227,7 @@ bool Client::handleOpen(jack_status_t clientOpenStatus)
 		if ((jack_set_process_callback(client, rawProcess, this) == 0)
 				&& (jack_set_sample_rate_callback(client, rawSetSamplerate,
 						this) == 0)) {
-			jack_on_shutdown(client, rawShutdown, this);
+			jack_on_info_shutdown(client, rawShutdown, this);
 			state = ClientState::CLIENT;
 			return true;
 		}
@@ -191,10 +270,9 @@ bool Client::unsafeClose()
 
 bool Client::setSamplerateFenced(jack_nframes_t frames)
 {
-	MemoryFence fence;
-
 	return setSamplerate(frames);
 }
+
 
 bool Client::prepareAndprocess(jack_nframes_t nframes)
 {
@@ -204,7 +282,6 @@ bool Client::prepareAndprocess(jack_nframes_t nframes)
 					(jack_default_audio_sample_t*) (jack_port_get_buffer(
 							port[id].port, nframes));
 		}
-		MemoryFence fence;
 		return process(nframes);
 	} catch (std::exception &e) {
 		cerr << "Exception: " << e.what() << endl;
@@ -225,9 +302,11 @@ int Client::rawSetSamplerate(jack_nframes_t nframes, void* arg)
 	return ((Client*) ((arg)))->setSamplerateFenced(nframes) ? 0 : 1;
 }
 
-void Client::rawShutdown(void* arg)
+void Client::rawShutdown(jack_status_t status, const char *message, void* arg)
 {
-	((Client*) ((arg)))->shutdown();
+	cout << "Jack server shut down (expect further Server is not running messages):" << endl << "\t" << statusMessage(status) << endl << "\t" << message << endl;
+
+	((Client*)arg)->sendMessage(ClientMessageType::SERVER_SHUTDOWN); //	messageServer.sendClientMessage(ClientMessage(ClientMessageType::SHUTDOWN, (Client*)arg));
 }
 
 bool Client::isValidPortName(string name)

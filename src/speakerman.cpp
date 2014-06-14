@@ -42,6 +42,7 @@
 
 using namespace speakerman;
 using namespace speakerman::jack;
+using namespace std::chrono;
 
 enum class Modus { FILTER, BYPASS, ZERO, HIGH, LOW, DOUBLE };
 
@@ -49,6 +50,7 @@ Modus modus = Modus::FILTER;
 jack_default_audio_sample_t lowOutputOne = 0;
 jack_default_audio_sample_t lowOutputOneNew;
 typedef SingleReadDelay<jack_default_audio_sample_t> Delay;
+
 
 class SumToAll : public Client
 {
@@ -84,7 +86,6 @@ class SumToAll : public Client
 protected:
 	virtual bool process(jack_nframes_t frameCount)
 	{
-		static double noiseAmplitude = 1e-6 / RAND_MAX;
 		const jack_default_audio_sample_t* inputLeft1 = input_0_0.getBuffer();
 		const jack_default_audio_sample_t* inputRight1 = input_0_1.getBuffer();
 		const jack_default_audio_sample_t* inputLeft2 = input_1_0.getBuffer();
@@ -102,14 +103,13 @@ protected:
 		}
 
 		jack_default_audio_sample_t samples[4];
-		jack_default_audio_sample_t random = noiseAmplitude * rand();
 
 		for (size_t frame = 0; frame < frameCount; frame++) {
 
-			processor1.input[0] = random + *inputLeft1++;
-			processor1.input[1] = random + *inputRight1++;
-			processor2.input[0] = random + *inputLeft2++;
-			processor2.input[1] = random + *inputRight2++;
+			processor1.input[0] = *inputLeft1++;
+			processor1.input[1] = *inputRight1++;
+			processor2.input[0] = *inputLeft2++;
+			processor2.input[1] = *inputRight2++;
 
 			processor1.process();
 			processor2.process();
@@ -132,8 +132,6 @@ protected:
 			}
 			*subOut++ = sub;
 		}
-
-		processor1.displayIntegrations();
 
 		return true;
 	}
@@ -200,14 +198,47 @@ public:
 
 	~SumToAll()
 	{
+		cout << "Finishing up!" << endl;
 	}
 };
+
+class ClientOwner
+{
+	atomic<Client *> __client;
+
+
+public:
+	ClientOwner() {
+		__client.store(0);
+	}
+
+	void setClient(Client * client)
+	{
+		Client* previous = __client.exchange(client);
+		if (previous != nullptr) {
+			previous->close();
+			delete previous;
+		}
+	}
+
+	Client &get() const
+	{
+		return *__client;
+	}
+
+	~ClientOwner()
+	{
+		setClient(nullptr);
+	}
+} clientOwner;
 
 
 extern "C" {
 	void signal_callback_handler(int signum)
 	{
 	   std::cerr << std::endl << "Caught signal " << strsignal(signum) << std::endl;
+
+	   clientOwner.setClient(nullptr);
 
 	   exit(signum);
 	}
@@ -251,10 +282,10 @@ int main(int count, char * arguments[]) {
 	accurate_t threshold1 = 0.2;
 	accurate_t threshold2 = 0.1;
 
-	SumToAll processor(frequencies, allPassRcTimes, bandRcTimes, threshold1, bandThresholds1, threshold2, bandThresholds2);
+	clientOwner.setClient(new SumToAll(frequencies, allPassRcTimes, bandRcTimes, threshold1, bandThresholds1, threshold2, bandThresholds2));
 
-	processor.open("speakerman", JackOptions::JackNullOption);
-	processor.activate();
+	clientOwner.get().open("speakerman", JackOptions::JackNullOption);
+	clientOwner.get().activate();
 
 	std::chrono::milliseconds duration(1000);
 	bool running = true;

@@ -25,18 +25,17 @@
 #include <speakerman/jack/Messages.hpp>
 #include <string>
 #include <mutex>
+#include <queue>
+#include <condition_variable>
+#include <thread>
 #include <stdexcept>
+
 
 namespace speakerman {
 namespace jack {
 
 	using namespace std;
 	using namespace simpledsp;
-
-	static void ensureJackErrorMessageHandler();
-	static const char * getAndResetErrorMessage();
-
-	void throwOnErrorMessage(const char* description = nullptr);
 
 	enum class PortDirection
 	{
@@ -48,9 +47,9 @@ namespace jack {
 	};
 	class CriticalScope
 	{
-		mutex &m;
+		recursive_mutex &m;
 	public:
-		CriticalScope(mutex &mutex) : m(mutex)
+		CriticalScope(recursive_mutex &mutex) : m(mutex)
 		{
 			m.lock();
 		}
@@ -77,8 +76,30 @@ namespace jack {
 		~PortNames();
 	};
 
+	class Client
+	{
+		// Error message from jack (which are not tailored to a specific client
+		static void errorMessageHandler(const char * message);
+		static void ensureJackErrorMessageHandler();
+		static const char * getAndResetErrorMessage();
+		static void throwOnErrorMessage(const char* description = nullptr);
+		// Handling of messages in the that cannot be dealt with in the
+		// callback by jack (for instance: you cannot call close while
+		// in the call-back that jack is shutting doen)
+		enum class ClientMessageType
+		{
+			NONE, SERVER_SHUTDOWN, DESTRUCTION
+		};
+		static void serveMessagesForClient(Client *owner);
+		std::mutex messageMutex;
+		std::condition_variable messageCondition;
+		std::queue<ClientMessageType> messageQueue;
+		volatile bool messageShutdown = false;;
+		std::thread messageThread;
+		void serveMessages();
+		void sendMessage(ClientMessageType type);
+		void executeMessage(ClientMessageType type);
 
-	class Client {
 		struct PortEntry
 		{
 			string givenName;
@@ -89,11 +110,10 @@ namespace jack {
 
 			PortEntry();
 		};
-
 		PortEntry * const port;
 		const size_t portCapacity;
 		size_t ports = 0;
-		mutex m;
+		recursive_mutex m;
 		jack_client_t * client = nullptr;
 		ClientState state = ClientState::DISCONNECTED;
 		bool portsDefined = false;
@@ -142,7 +162,7 @@ namespace jack {
 		bool prepareAndprocess(jack_nframes_t nframes);
 		static int rawProcess(jack_nframes_t nframes, void* arg);
 		static int rawSetSamplerate(jack_nframes_t nframes, void* arg);
-		static void rawShutdown(void* arg);
+		static void rawShutdown(jack_status_t status, const char *message, void* arg);
 
 	public:
 
@@ -218,7 +238,7 @@ namespace jack {
 
 			unsafeClose();
 		}
-		virtual ~Client() = default;
+		virtual ~Client();
 	};
 
 	typedef Client::Port ClientPort;
@@ -229,87 +249,3 @@ namespace jack {
 
 #endif /* SMS_SPEAKERMAN_CLIENT_GUARD_H_ */
 
-
-/*
-	class Port {
-		const string portName;
-		string actualPortName;
-		const PortDirection dir;
-		jack_default_audio_sample_t *bufferPtr = nullptr;
-		jack_port_t *port = nullptr;
-
-		Port(string name, PortDirection direction) :
-			portName(name),
-			actualPortName(""),
-			dir(direction)
-		{
-			if (name.length() < 1) {
-				throw invalid_argument("Port must have a non-empty name");
-			}
-		}
-
-		bool registerPort(jack_client_t *client)
-		{
-			port = jack_port_register(client, portName.c_str(),
-					JACK_DEFAULT_AUDIO_TYPE,
-					dir == PortDirection::IN ? JackPortIsInput : JackPortIsOutput, 0);
-
-			if (port) {
-				actualPortName = jack_port_name(port);
-				return true;
-			}
-
-			actualPortName = "";
-			return false;
-		}
-
-		bool unregisterPort(jack_client_t *client)
-		{
-			if (port) {
-				jack_port_unregister(client, port);
-				port = nullptr;
-			}
-			actualPortName = "";
-		}
-
-		bool connectWith(jack_client_t *client, const char * portName) // privately accessed by ClientHandler
-		{
-			int connected;
-			if (dir == PortDirection::IN) {
-				connected = jack_connect(client, portName, actualPortName.c_str());
-			}
-			else {
-				connected = jack_connect(client, actualPortName.c_str(), portName);
-			}
-			if (connected == 0) {
-				return true;
-			}
-		}
-
-		bool getBuffer(jack_nframes_t samples) // privately accessed by ClientHandler
-		{
-			if (port) {
-				bufferPtr = (jack_default_audio_sample_t *)jack_port_get_buffer(port, samples);
-
-				return bufferPtr != nullptr;
-			}
-
-			return false;
-		}
-
-	public:
-		const string givenName() const { return portName; }
-		const string actualName() const { return actualPortName; }
-		PortDirection direction() const { return dir; }
-		jack_default_audio_sample_t * buffer() const { return bufferPtr; }
-
-		~Port() {
-		}
-
-		friend class ClientHandler;
-	};
-
-	class ClientHandler {
-
-	};
-*/
