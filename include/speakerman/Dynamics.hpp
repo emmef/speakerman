@@ -233,41 +233,41 @@ struct Dynamics
 		ArrayVector<Sample, CHANNELS> subout;
 		ArrayVector<ArrayVector<Sample, CHANNELS>, BANDS> bands;
 
-		Sample debugIntegratedForBlock = 0.0;
-		Sample debugIntegratedKeyedForBlock = 0.0;
-		Sample debugAllPassIntegratedForBlock = 0.0;
-		Sample debugMaxIntegratedForBlock = 0.0;
-		ArrayVector<Sample, BANDS> debugBandMultiplication;
-
-		size_t frameCount = 0;
+//		Sample debugIntegratedForBlock = 0.0;
+//		Sample debugIntegratedKeyedForBlock = 0.0;
+//		Sample debugAllPassIntegratedForBlock = 0.0;
+//		Sample debugMaxIntegratedForBlock = 0.0;
+//		ArrayVector<Sample, BANDS> debugBandMultiplication;
+//
+//		size_t frameCount = 0;
 
 		void displayIntegrations() {
-			if (frameCount >= conf.sampleRate) {
-				size_t frames = frameCount;
-				double averageIntegrated = sqrt(debugIntegratedForBlock / frameCount);
-				double averageKeyedIntegrated = sqrt(debugIntegratedKeyedForBlock / frameCount);
-				double averageMaxIntegratedForBlock = sqrt(debugMaxIntegratedForBlock/ frameCount);
-				double averageAllPass = sqrt(debugAllPassIntegratedForBlock / frameCount);
-
-				debugIntegratedForBlock = 0.0;
-				debugAllPassIntegratedForBlock = 0.0;
-				debugIntegratedKeyedForBlock = 0.0;
-				debugMaxIntegratedForBlock = 0.0;
-				frameCount = 0.0;
-
-				cout
-						<< "- avg-input: " << averageIntegrated
-						<< "; avg-keyed: " << averageKeyedIntegrated
-						<< "; avg-max-integrated: " << averageMaxIntegratedForBlock
-						<< "; avg-detected: " << averageAllPass
-						<< ": processed in this block: " << frames << endl;
-				cout << "- Multiplication: ";
-				for (size_t i = 0; i < BANDS; i++) {
-					cout << " Band[" << i << "]: " << (debugBandMultiplication[i] / frames);
-				}
-				cout << endl;
-				debugBandMultiplication.zero();
-			}
+//			if (frameCount >= conf.sampleRate) {
+//				size_t frames = frameCount;
+//				double averageIntegrated = sqrt(debugIntegratedForBlock / frameCount);
+//				double averageKeyedIntegrated = sqrt(debugIntegratedKeyedForBlock / frameCount);
+//				double averageMaxIntegratedForBlock = sqrt(debugMaxIntegratedForBlock/ frameCount);
+//				double averageAllPass = sqrt(debugAllPassIntegratedForBlock / frameCount);
+//
+//				debugIntegratedForBlock = 0.0;
+//				debugAllPassIntegratedForBlock = 0.0;
+//				debugIntegratedKeyedForBlock = 0.0;
+//				debugMaxIntegratedForBlock = 0.0;
+//				frameCount = 0.0;
+//
+//				cout
+//						<< "- avg-input: " << averageIntegrated
+//						<< "; avg-keyed: " << averageKeyedIntegrated
+//						<< "; avg-max-integrated: " << averageMaxIntegratedForBlock
+//						<< "; avg-detected: " << averageAllPass
+//						<< ": processed in this block: " << frames << endl;
+//				cout << "- Multiplication: ";
+//				for (size_t i = 0; i < BANDS; i++) {
+//					cout << " Band[" << i << "]: " << (debugBandMultiplication[i] / frames);
+//				}
+//				cout << endl;
+//				debugBandMultiplication.zero();
+//			}
 		}
 
 		void clearHistory()
@@ -318,8 +318,8 @@ struct Dynamics
 				Sample keyed = keying.hiCut.filter(channel, boostMid);
 				keyedSquareSum += keyed * keyed;
 			}
-			debugIntegratedForBlock += squareSum;
-			debugIntegratedKeyedForBlock += keyedSquareSum;
+//			debugIntegratedForBlock += squareSum;
+//			debugIntegratedKeyedForBlock += keyedSquareSum;
 
 			keyedSquareSum *= thresholdMultiplier;
 			Sample maxIntegratedValue = 0.0;
@@ -333,7 +333,7 @@ struct Dynamics
 					maxIntegratedValue = integrated;
 				}
 			}
-			debugMaxIntegratedForBlock += maxIntegratedValue;
+//			debugMaxIntegratedForBlock += maxIntegratedValue;
 			// Don't take any action when all-pass is below threshold
 			maxIntegratedValue = max(1.0, maxIntegratedValue);
 
@@ -400,7 +400,7 @@ struct Dynamics
 
 				Sample multiplication = smoothed > 1.0 ? 1.0 / sqrt(smoothed) : 1.0;
 
-				debugBandMultiplication[band] += multiplication;
+//				debugBandMultiplication[band] += multiplication;
 
 				for (size_t channel = 0; channel < CHANNELS; channel++) {
 					bands[band][channel] *= multiplication;
@@ -433,10 +433,10 @@ struct Dynamics
 		void process()
 		{
 			applyValueIntegration();
-			frameCount++;
+//			frameCount++;
 			Sample allPassDetection = getAllPassDetection();
 
-			debugAllPassIntegratedForBlock += allPassDetection;
+//			debugAllPassIntegratedForBlock += allPassDetection;
 
 			splitFrequencyBands();
 

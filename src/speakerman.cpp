@@ -84,7 +84,7 @@ class SumToAll : public Client
 protected:
 	virtual bool process(jack_nframes_t frameCount)
 	{
-		MemoryFence fence;
+		static double noiseAmplitude = 1e-6 / RAND_MAX;
 		const jack_default_audio_sample_t* inputLeft1 = input_0_0.getBuffer();
 		const jack_default_audio_sample_t* inputRight1 = input_0_1.getBuffer();
 		const jack_default_audio_sample_t* inputLeft2 = input_1_0.getBuffer();
@@ -102,13 +102,14 @@ protected:
 		}
 
 		jack_default_audio_sample_t samples[4];
+		jack_default_audio_sample_t random = noiseAmplitude * rand();
 
 		for (size_t frame = 0; frame < frameCount; frame++) {
 
-			processor1.input[0] = *inputLeft1++;
-			processor1.input[1] = *inputRight1++;
-			processor2.input[0] = *inputLeft2++;
-			processor2.input[1] = *inputRight2++;
+			processor1.input[0] = random + *inputLeft1++;
+			processor1.input[1] = random + *inputRight1++;
+			processor2.input[0] = random + *inputLeft2++;
+			processor2.input[1] = random + *inputRight2++;
 
 			processor1.process();
 			processor2.process();
