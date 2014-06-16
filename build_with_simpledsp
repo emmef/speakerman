@@ -26,13 +26,6 @@ do
 	shift
 done
 
-if test "x$1" = "xrun"
-then
-	doRun="yes"
-else
-	doRun=""
-fi 
-
 if ! test -f "src/speakerman.cpp"
 then
 	echo "In wrong directory!"
