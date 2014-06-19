@@ -30,6 +30,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <signal.h>
+#include <simpledsp/Limiter.hpp>
 #include <simpledsp/CharacteristicSamples.hpp>
 #include <simpledsp/Precondition.hpp>
 #include <simpledsp/Biquad.hpp>
@@ -43,6 +44,7 @@
 using namespace speakerman;
 using namespace speakerman::jack;
 using namespace std::chrono;
+using namespace simpledsp;
 
 enum class Modus { FILTER, BYPASS, ZERO, HIGH, LOW, DOUBLE };
 
@@ -51,26 +53,41 @@ jack_default_audio_sample_t lowOutputOne = 0;
 jack_default_audio_sample_t lowOutputOneNew;
 typedef SingleReadDelay<jack_default_audio_sample_t> Delay;
 
-
-class SumToAll : public Client
+struct SumToAll : public Client
 {
-	typedef speakerman::Dynamics<accurate_t, 4, 2, 3, 3> Dynamics;
-	typedef Dynamics::UserConfig UserConfig;
-	typedef Dynamics::Config Configuration;
-	typedef Dynamics::Processor<2> Processor;
+	static size_t constexpr CROSSOVERS = 5;
+	static size_t constexpr BANDS = CROSSOVERS + 1;
+	static size_t constexpr CHANNELS = 2;
+	static size_t constexpr FILTER_ORDER = 2;
+	static size_t constexpr ALLPASS_RC_TIMES = 3;
+	static size_t constexpr BAND_RC_TIMES = 4;
+
+private:
+	typedef speakerman::RmsLimiter<accurate_t, CROSSOVERS, FILTER_ORDER, ALLPASS_RC_TIMES, BAND_RC_TIMES> Dynamics;
 
 	struct DoubleConfiguration {
-		Configuration configuration1;
-		Configuration configuration2;
+		Dynamics::Config dynamicsConfig1;
+		Dynamics::Config dynamicsConfig2;
+		BrickWallLimiter::Config limitingConfig1;
+		BrickWallLimiter::Config limitingConfig2;
+		bool bypassLimiter = false;
 	};
-	UserConfig userConfig1;
-	UserConfig userConfig2;
+
+	Dynamics::UserConfig dynamicsUserConfig1;
+	Dynamics::UserConfig dynamicsUserConfig2;
+	BrickWallLimiter::UserConfig limitingUserConfig1;
+	BrickWallLimiter::UserConfig limitingUserConfig2;
 
 	LockFreeConsumer<DoubleConfiguration, simpledsp::DefaultAssignableCheck> consumer;
-	Configuration &wConf1 = consumer.producerValue().configuration1;
-	Configuration &wConf2 = consumer.producerValue().configuration2;
-	Processor processor1;
-	Processor processor2;
+	Dynamics::Config &wDynConf1 = consumer.producerValue().dynamicsConfig1;
+	Dynamics::Config &wDynConf2 = consumer.producerValue().dynamicsConfig2;
+	BrickWallLimiter::Config &wLimConf1 = consumer.producerValue().limitingConfig1;
+	BrickWallLimiter::Config &wLimConf2 = consumer.producerValue().limitingConfig2;
+
+	Dynamics::Processor<CHANNELS> dynamics1;
+	Dynamics::Processor<CHANNELS> dynamics2;
+	BrickWallLimiter::Processor<CHANNELS> limiter1;
+	BrickWallLimiter::Processor<CHANNELS> limiter2;
 
 	ClientPort input_0_0;
 	ClientPort input_0_1;
@@ -81,7 +98,6 @@ class SumToAll : public Client
 	ClientPort output_1_0;
 	ClientPort output_1_1;
 	ClientPort output_sub;
-
 
 protected:
 	virtual bool process(jack_nframes_t frameCount)
@@ -98,36 +114,42 @@ protected:
 		jack_default_audio_sample_t* subOut = output_sub.getBuffer();
 
 		if (consumer.consume(true)) {
-			processor1.checkFilterChanges();
-			processor2.checkFilterChanges();
+			dynamics1.checkFilterChanges();
+			dynamics2.checkFilterChanges();
+			limiter1.initConfigChange();
+			limiter2.initConfigChange();
 		}
 
 		jack_default_audio_sample_t samples[4];
 
 		for (size_t frame = 0; frame < frameCount; frame++) {
 
-			processor1.input[0] = *inputLeft1++;
-			processor1.input[1] = *inputRight1++;
-			processor2.input[0] = *inputLeft2++;
-			processor2.input[1] = *inputRight2++;
+			dynamics1.input[0] = *inputLeft1++;
+			dynamics1.input[1] = *inputRight1++;
+			dynamics2.input[0] = *inputLeft2++;
+			dynamics2.input[1] = *inputRight2++;
 
-			processor1.process();
-			processor2.process();
+			dynamics1.process();
+			dynamics2.process();
 
-			*outputLeft1++ = processor1.output[0];
-			*outputRight1++ = processor1.output[1];
-			*outputLeft2++ = processor2.output[0];
-			*outputRight2++ = processor2.output[1];
+			limiter1.process(dynamics1.output);
+			limiter2.process(dynamics2.output);
+
+			*outputLeft1++ = dynamics1.output[0];
+			*outputRight1++ = dynamics1.output[1];
+
+			*outputLeft2++ = dynamics2.output[0];
+			*outputRight2++ = dynamics2.output[1];
 
 			sample_t sub = 0.0;
-			if (processor1.conf.seperateSubChannel) {
+			if (dynamics1.conf.seperateSubChannel) {
 				for (size_t channel = 0; channel < 2; channel++) {
-					sub += processor1.subout[channel];
+					sub += dynamics1.subout[channel];
 				}
 			}
-			if (processor2.conf.seperateSubChannel) {
+			if (dynamics2.conf.seperateSubChannel) {
 				for (size_t channel = 0; channel < 2; channel++) {
-					sub += processor2.subout[channel];
+					sub += dynamics2.subout[channel];
 				}
 			}
 			*subOut++ = sub;
@@ -137,8 +159,12 @@ protected:
 	}
 	virtual bool setSamplerate(jack_nframes_t sampleRate)
 	{
-		wConf1.configure(userConfig1, sampleRate);
-		wConf2.configure(userConfig2, sampleRate);
+		wDynConf1.configure(dynamicsUserConfig1, sampleRate);
+		cout << "P" << limitingUserConfig1.getPredictionTime() << endl;
+		wLimConf1.configure(limitingUserConfig1, sampleRate);
+
+		wDynConf2.configure(dynamicsUserConfig2, sampleRate);
+		wLimConf2.configure(limitingUserConfig2, sampleRate);
 
 		std::cout << "Write config" << endl;
 		consumer.produce();
@@ -159,13 +185,13 @@ protected:
 
 public:
 	SumToAll(
-			ArrayVector<accurate_t, 4> &frequencies,
+			ArrayVector<accurate_t, 5> &frequencies,
 			ArrayVector<accurate_t, 3> &allPassRcTimes,
-			ArrayVector<accurate_t, 3> &bandRcTimes,
+			ArrayVector<accurate_t, 4> &bandRcTimes,
 			accurate_t threshold1,
-			ArrayVector<accurate_t, 5> &bandThreshold1,
+			ArrayVector<accurate_t, 6> &bandThreshold1,
 			accurate_t threshold2,
-			ArrayVector<accurate_t, 5> &bandThreshold2
+			ArrayVector<accurate_t, 6> &bandThreshold2
 			)
 :
 		Client(9),
@@ -178,21 +204,35 @@ public:
 		output_0_1(addPort(PortDirection::OUT, "output_0_1")),
 		output_1_1(addPort(PortDirection::OUT, "output_1_1")),
 		output_sub(addPort(PortDirection::OUT, "output_sub")),
-		processor1(consumer.consumerValue().configuration1),
-		processor2(consumer.consumerValue().configuration2)
+		dynamics1(consumer.consumerValue().dynamicsConfig1),
+		dynamics2(consumer.consumerValue().dynamicsConfig2),
+		limiter1(2048, consumer.consumerValue().limitingConfig1, consumer.consumerValue().dynamicsConfig1.valueRc),
+		limiter2(2048, consumer.consumerValue().limitingConfig1, consumer.consumerValue().dynamicsConfig2.valueRc)
 	{
-		userConfig1.frequencies.assign(frequencies);
-		userConfig1.allPassRcs.assign(allPassRcTimes);
-		userConfig1.bandRcs.assign(bandRcTimes);
-		userConfig1.bandThreshold.assign(bandThreshold1);
-		userConfig1.threshold = threshold1;
+		dynamicsUserConfig1.frequencies.assign(frequencies);
+		dynamicsUserConfig1.allPassRcs.assign(allPassRcTimes);
+		dynamicsUserConfig1.bandRcs.assign(bandRcTimes);
+		dynamicsUserConfig1.bandThreshold.assign(bandThreshold1);
+		dynamicsUserConfig1.threshold = threshold1;
 
-		userConfig2.frequencies.assign(frequencies);
-		userConfig2.allPassRcs.assign(allPassRcTimes);
-		userConfig2.bandRcs.assign(bandRcTimes);
-		userConfig2.bandThreshold.assign(bandThreshold2);
-		userConfig2.threshold = threshold2;
-		userConfig2.seperateSubChannel = false;
+		limitingUserConfig1.setThreshold(min(1.0, threshold1 * 2));
+		limitingUserConfig1.setAttackTime(0.003);
+		limitingUserConfig1.setSmoothingTime(0.001);
+		limitingUserConfig1.setPredictionTime(0.004);
+
+		dynamicsUserConfig2.frequencies.assign(frequencies);
+		dynamicsUserConfig2.allPassRcs.assign(allPassRcTimes);
+		dynamicsUserConfig2.bandRcs.assign(bandRcTimes);
+		dynamicsUserConfig2.bandThreshold.assign(bandThreshold2);
+		dynamicsUserConfig2.threshold = threshold2;
+		dynamicsUserConfig2.seperateSubChannel = false;
+
+		limitingUserConfig2.setThreshold(min(1.0, threshold2 * 2));
+		limitingUserConfig2.setAttackTime(0.003);
+		limitingUserConfig2.setAttackTime(0.003);
+		limitingUserConfig2.setSmoothingTime(0.001);
+		limitingUserConfig2.setPredictionTime(0.004);
+
 		finishDefiningPorts();
 	};
 
@@ -200,28 +240,33 @@ public:
 	{
 		cout << "Finishing up!" << endl;
 	}
+
+	void bypassLimiter() {
+		consumer.producerValue().bypassLimiter = !consumer.producerValue().bypassLimiter;
+		consumer.produce(1000);
+	}
 };
 
+template<class T>
 class ClientOwner
 {
-	atomic<Client *> __client;
-
+	atomic<T *> __client;
 
 public:
 	ClientOwner() {
 		__client.store(0);
 	}
 
-	void setClient(Client * client)
+	void setClient(T * client)
 	{
-		Client* previous = __client.exchange(client);
+		T* previous = __client.exchange(client);
 		if (previous != nullptr) {
 			previous->close();
 			delete previous;
 		}
 	}
 
-	Client &get() const
+	T &get() const
 	{
 		return *__client;
 	}
@@ -230,7 +275,8 @@ public:
 	{
 		setClient(nullptr);
 	}
-} clientOwner;
+};
+ClientOwner<SumToAll> clientOwner;
 
 
 extern "C" {
@@ -249,37 +295,51 @@ int main(int count, char * arguments[]) {
 	signal(SIGTERM, signal_callback_handler);
 	signal(SIGABRT, signal_callback_handler);
 
-	ArrayVector<accurate_t, 4> frequencies;
+	ArrayVector<accurate_t, SumToAll::CROSSOVERS> frequencies;
 	frequencies[0] = 80;
 	frequencies[1] = 240;
-	frequencies[2] = 4500; // 1200
-	frequencies[3] = 6500;//3200
+	frequencies[2] = 1566;
+	frequencies[3] = 4500; // 1200
+	frequencies[4] = 6500;//3200
 
-	ArrayVector<accurate_t, 3> allPassRcTimes;
-	allPassRcTimes[0] = 0.30;
+	ArrayVector<accurate_t, SumToAll::ALLPASS_RC_TIMES> allPassRcTimes;
+	allPassRcTimes[0] = 0.66;
 	allPassRcTimes[1] = 0.66;
-	allPassRcTimes[2] = 1.7;
+	allPassRcTimes[2] = 1.0;
 
-	ArrayVector<accurate_t, 3> bandRcTimes;
-	bandRcTimes[0] = 0.025;
-	bandRcTimes[1] = 0.1;
-	bandRcTimes[2] = 0.330;
+	ArrayVector<accurate_t, SumToAll::BAND_RC_TIMES> bandRcTimes;
+	bandRcTimes[0] = 0.050;
+	bandRcTimes[1] = 0.150;
+	bandRcTimes[2] = 0.225;
+	bandRcTimes[3] = 0.330;
 
-	ArrayVector<accurate_t, 5> bandThresholds1;
-	bandThresholds1[0] = 0.20;
-	bandThresholds1[1] = 0.25;
-	bandThresholds1[2] = 0.25;
-	bandThresholds1[3] = 0.2;
-	bandThresholds1[4] = 0.05;
+	// Equal log weight spread
+	accurate_t minimumFreq= 40;
+	accurate_t maximumFreq= 12000;
+	ArrayVector<accurate_t, SumToAll::BANDS> bandThresholds1;
+	bandThresholds1[0] = frequencies[0] / minimumFreq;
+	bandThresholds1[1] = frequencies[1] / frequencies[0];
+	bandThresholds1[2] = frequencies[2] / frequencies[1];
+	bandThresholds1[3] = frequencies[3] / frequencies[2];
+	bandThresholds1[4] = frequencies[4] / frequencies[3];
+	bandThresholds1[5] = maximumFreq / frequencies[4];
+	accurate_t scale = 0.0;
+	for (size_t i = 0; i < 6; i++) {
+		scale += bandThresholds1[i];
+	}
+	for (size_t i = 0; i < 6; i++) {
+		bandThresholds1[i] /= scale;
+	}
 
-	ArrayVector<accurate_t, 5> bandThresholds2;
+	ArrayVector<accurate_t, SumToAll::BANDS> bandThresholds2;
 	bandThresholds2[0] = 0.10;
 	bandThresholds2[1] = 0.25;
 	bandThresholds2[2] = 0.25;
-	bandThresholds2[3] = 0.2;
-	bandThresholds2[4] = 0.05;
+	bandThresholds2[3] = 0.25;
+	bandThresholds2[4] = 0.2;
+	bandThresholds2[5] = 0.05;
 
-	accurate_t threshold1 = 0.2;
+	accurate_t threshold1 = 0.25;
 	accurate_t threshold2 = 0.1;
 
 	clientOwner.setClient(new SumToAll(frequencies, allPassRcTimes, bandRcTimes, threshold1, bandThresholds1, threshold2, bandThresholds2));
@@ -311,7 +371,8 @@ int main(int count, char * arguments[]) {
 			break;
 		case 'l':
 		case 'L':
-			std::cout << "Low-pass" << std::endl;
+			std::cout << "Limiter" << std::endl;
+			clientOwner.get().bypassLimiter();
 			modus = Modus::LOW;
 			break;
 		case 'h':

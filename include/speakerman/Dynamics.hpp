@@ -28,7 +28,6 @@
 #include <simpledsp/IirFixed.hpp>
 #include <simpledsp/Size.hpp>
 #include <simpledsp/Types.hpp>
-#include <simpledsp/TimeMeasurement.hpp>
 #include <simpledsp/Values.hpp>
 #include <simpledsp/Vector.hpp>
 
@@ -38,13 +37,14 @@ using namespace simpledsp;
 
 
 template <typename Sample, size_t CROSSOVERS, size_t ORDER, size_t ALLPASS_RC_TIMES, size_t BAND_RC_TIMES>
-struct Dynamics
+struct RmsLimiter
 {
 	static_assert(is_floating_point<Sample>::value, "Sample should be a floating-point type");
 
 	static constexpr size_t BANDS = CROSSOVERS + 1;
 	static constexpr Sample MINIMUM_THRESHOLD = 0.01;
 	static constexpr Sample MAXIMUM_THRESHOLD = 1.0;
+	static constexpr Sample SQUARE_INTEGRATE_ROOT_RC_CORRECTION = 0.5;
 	static const Sample clampedThreshold(const Sample threshold) {
 		return max(MINIMUM_THRESHOLD, min(MAXIMUM_THRESHOLD, threshold));
 	}
@@ -68,7 +68,7 @@ struct Dynamics
 		// Characteristic times for all-pass slow detection
 		ArrayVector<double, ALLPASS_RC_TIMES> allPassRcs;
 		// Characteristic times for fast and per band detection
-		ArrayVector<double, ALLPASS_RC_TIMES> bandRcs;
+		ArrayVector<double, BAND_RC_TIMES> bandRcs;
 
 		bool seperateSubChannel = true;
 	};
@@ -156,7 +156,7 @@ struct Dynamics
 
 			cout << "- RCs for keyed full-bandwidth follower:" << endl;
 			for (size_t rc = 0; rc < ALLPASS_RC_TIMES; rc++) {
-				allPassRcs[rc].setCharacteristicSamples(currentSampleRate * userConfig.allPassRcs(rc));
+				allPassRcs[rc].setCharacteristicSamples(currentSampleRate * SQUARE_INTEGRATE_ROOT_RC_CORRECTION * userConfig.allPassRcs(rc));
 
 				cout << "  - rc[" << rc << "] t: " << userConfig.allPassRcs(rc) << "; i: " <<
 						allPassRcs[rc].inputMultiplier() << "; h: " << allPassRcs[rc].historyMultiplier() << endl;
@@ -188,7 +188,7 @@ struct Dynamics
 
 			cout << "- RCs for each frequency band:" << endl;
 			for (size_t rc = 0; rc < BAND_RC_TIMES; rc++) {
-				bandRcs[rc].setCharacteristicSamples(currentSampleRate * userConfig.bandRcs(rc));
+				bandRcs[rc].setCharacteristicSamples(currentSampleRate * SQUARE_INTEGRATE_ROOT_RC_CORRECTION * userConfig.bandRcs(rc));
 
 				cout << "  - rc[" << rc << "] t: " << userConfig.bandRcs(rc) << "; i: " <<
 						bandRcs[rc].inputMultiplier() << "; h: " << bandRcs[rc].historyMultiplier() << endl;
@@ -425,94 +425,5 @@ struct Dynamics
 
 } /* End of namespace speakerman */
 
-
-/**
- 		ArrayVector<accurate_t, 4> lowSub;
-		ArrayVector<accurate_t, 4> low;
-		ArrayVector<accurate_t, 4> midLow;
-		ArrayVector<accurate_t, 4> midHigh;
-		ArrayVector<accurate_t, 4> high;
-
-		if (consumer.consume(true)) {
-			hf0.setCoefficients(rConf.high0);
-			lf0.setCoefficients(rConf.low0);
-			hf1.setCoefficients(rConf.high1);
-			lf1.setCoefficients(rConf.low1);
-			hf2.setCoefficients(rConf.high2);
-			lf2.setCoefficients(rConf.low2);
-			hf3.setCoefficients(rConf.high3);
-			lf3.setCoefficients(rConf.low3);
-			cout << "RC samples " << rConf.rmsTimeConfig1.rct.characteristicSamples() << endl;
-		}
-
-		for (size_t frame = 0; frame < frameCount; frame++) {
-			samples[0] = *inputLeft1++;
-			samples[1] = *inputRight1++;
-			samples[2] = *inputLeft2++;
-			samples[3] = *inputRight2++;
-
-			for (size_t i = 0, j = 0; i < 4; i++, j += 2) {
-				simpledsp::accurate_t x = samples[i];
-
-				accurate_t l2 = lf2.filter(j + 1, lf2.filter(j, x)); //NO
-				accurate_t h2 = hf2.filter(j + 1, hf2.filter(j, x)); // NO
-
-				accurate_t l3 = lf3.filter(j + 1, lf3.filter(j, h2));
-				accurate_t h3 = hf3.filter(j + 1, hf3.filter(j, h2));
-
-				accurate_t l1 = lf1.filter(j + 1, lf1.filter(j, l2));
-				accurate_t h1 = hf1.filter(j + 1, hf1.filter(j, l2));
-
-				low[i] = l1;
-				midLow[i] = h1;
-				midHigh[i] = l3;
-				high[i] = h3;
-			}
-
-			// process
-			for (size_t i = 0; i < 4; i++) {
-				// square detection
-				accurate_t l = low.squaredMagnitude();
-				accurate_t ml = midLow.squaredMagnitude();
-				accurate_t mh = midHigh.squaredMagnitude();
-				accurate_t h = high.squaredMagnitude();
-
-				// integration
-				historyValue2[1] = rConf.rmsTimeConfig2.rct.integrate(rConf.rmsTimeConfig2.scale * l, historyValue2[1]);
-				historyValue2[2] = rConf.rmsTimeConfig2.rct.integrate(rConf.rmsTimeConfig2.scale * ml, historyValue2[2]);
-				historyValue2[3] = rConf.rmsTimeConfig2.rct.integrate(rConf.rmsTimeConfig2.scale * mh, historyValue2[3]);
-				historyValue2[4] = rConf.rmsTimeConfig2.rct.integrate(rConf.rmsTimeConfig2.scale * h, historyValue2[4]);
-
-				l = historyValue3[1] = sqrt(historyValue2[1]);
-				ml = historyValue3[2] = sqrt(historyValue2[2]);
-				mh = historyValue3[3] = sqrt(historyValue2[3]);
-				h = historyValue3[4] = sqrt(historyValue2[4]);
-
-				// Limit level
-				l = historyValueN[1] = rConf.rmsTimeConfig1.rct.integrate(l <= rConf.lowLevel ? 1 : rConf.lowLevel / l, historyValueN[1]);
-				ml = historyValueN[2] = rConf.rmsTimeConfig1.rct.integrate(ml <= rConf.midLowLevel ? 1 : rConf.midLowLevel / ml, historyValueN[2]);
-				mh = historyValueN[3] = rConf.rmsTimeConfig1.rct.integrate(mh <= rConf.midHighLevel ? 1 : rConf.midHighLevel / mh, historyValueN[3]);
-				h = historyValueN[4] = rConf.rmsTimeConfig1.rct.integrate(h <= rConf.highLevel ? 1 : rConf.highLevel / h, historyValueN[4]);
-
-				low.multiply(l);
-				midLow.multiply(ml);
-				midHigh.multiply(mh);
-				high.multiply(h);
-			}
-			// Sum up
-			accurate_t sub = 0.0;
-			for (size_t i = 0, j = 0; i < 4; i++, j += 2) {
-				accurate_t limited = low[i] + midLow[i] + midHigh[i] + high[i];
-				samples[i] =  hf0.filter(j + 1, hf0.filter(j, limited));
-				sub += lf0.filter(j + 1, lf0.filter(j, limited));
-			}
-			accurate_t subSquare = sub * sub;
-			historyValue2[0] = rConf.rmsTimeConfig2.rct.integrate(subSquare, historyValue2[0]);
-			accurate_t ls = historyValue3[0] = sqrt(historyValue2[0]);
-			ls = historyValueN[0] = rConf.rmsTimeConfig1.rct.integrate(ls <= rConf.lowSubLevel ? 1 : rConf.lowSubLevel / ls, historyValueN[0]);
-
-			sub *= ls;
-
- */
 
 #endif /* SMS_SPEAKERMAN_DYNAMICS_GUARD_H_ */
