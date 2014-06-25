@@ -110,7 +110,7 @@ struct RmsLimiter
 		// This simulates a kind-of ear-curve with some practical twists
 
 		struct Key {
-			Iir::Fixed::Coefficients<Sample, 1> loCut;
+			Iir::Fixed::Coefficients<Sample, 2> loCut;
 			Iir::Fixed::Coefficients<Sample, 2> midBoost;
 			Iir::Fixed::Coefficients<Sample, 1> hiCut;
 		} keying;
@@ -219,7 +219,7 @@ struct RmsLimiter
 
 		ArrayVector<Iir::Fixed::History<Sample, ORDER>, 4 * CHANNELS * CROSSOVERS> bandPassHistory;
 		struct Keying {
-			Iir::Fixed::MultiFixedChannelFilter<Sample, Sample, 1, CHANNELS> loCut;
+			Iir::Fixed::MultiFixedChannelFilter<Sample, Sample, 2, CHANNELS> loCut;
 			Iir::Fixed::MultiFixedChannelFilter<Sample, Sample, 2, CHANNELS> mdBoost;
 			Iir::Fixed::MultiFixedChannelFilter<Sample, Sample, 1, CHANNELS> hiCut;
 		}

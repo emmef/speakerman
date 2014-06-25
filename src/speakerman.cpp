@@ -23,6 +23,7 @@
 #include <thread>
 #include <atomic>
 #include <iostream>
+#include <cfenv>
 #include <mutex>
 #include <signal.h>
 #include <string.h>
@@ -339,7 +340,7 @@ int main(int count, char * arguments[]) {
 	bandThresholds2[4] = 0.2;
 	bandThresholds2[5] = 0.05;
 
-	accurate_t threshold1 = 0.25;
+	accurate_t threshold1 = 0.1;
 	accurate_t threshold2 = 0.1;
 
 	clientOwner.setClient(new SumToAll(frequencies, allPassRcTimes, bandRcTimes, threshold1, bandThresholds1, threshold2, bandThresholds2));

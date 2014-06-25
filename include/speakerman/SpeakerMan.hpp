@@ -40,7 +40,6 @@ namespace speakerman {
 static constexpr size_t MAX_CHANNELS = 16;
 static constexpr size_t SUB_FILTER_ORDER = 2;
 
-
 template<size_t ORDER, size_t CROSSOVERS, size_t INS, size_t CHANNELS, size_t OUTS, size_t SUBS> class SpeakerManager
 {
 	typedef Multiband::Splitter<accurate_t, ORDER, CROSSOVERS, CHANNELS> Splitter;
