@@ -61,7 +61,7 @@ struct SumToAll : public Client
 	static size_t constexpr CHANNELS = 2;
 	static size_t constexpr FILTER_ORDER = 2;
 	static size_t constexpr ALLPASS_RC_TIMES = 3;
-	static size_t constexpr BAND_RC_TIMES = 4;
+	static size_t constexpr BAND_RC_TIMES = 5;
 
 private:
 	typedef speakerman::RmsLimiter<accurate_t, CROSSOVERS, FILTER_ORDER, ALLPASS_RC_TIMES, BAND_RC_TIMES> Dynamics;
@@ -186,13 +186,13 @@ protected:
 
 public:
 	SumToAll(
-			ArrayVector<accurate_t, 5> &frequencies,
-			ArrayVector<accurate_t, 3> &allPassRcTimes,
-			ArrayVector<accurate_t, 4> &bandRcTimes,
+			ArrayVector<accurate_t, CROSSOVERS> &frequencies,
+			ArrayVector<accurate_t, ALLPASS_RC_TIMES> &allPassRcTimes,
+			ArrayVector<accurate_t, BAND_RC_TIMES> &bandRcTimes,
 			accurate_t threshold1,
-			ArrayVector<accurate_t, 6> &bandThreshold1,
+			ArrayVector<accurate_t, BANDS> &bandThreshold1,
 			accurate_t threshold2,
-			ArrayVector<accurate_t, 6> &bandThreshold2
+			ArrayVector<accurate_t, BANDS> &bandThreshold2
 			)
 :
 		Client(9),
@@ -313,6 +313,7 @@ int main(int count, char * arguments[]) {
 	bandRcTimes[1] = 0.150;
 	bandRcTimes[2] = 0.225;
 	bandRcTimes[3] = 0.330;
+	bandRcTimes[4] = 1.0;
 
 	// Equal log weight spread
 	accurate_t minimumFreq= 40;
@@ -333,14 +334,9 @@ int main(int count, char * arguments[]) {
 	}
 
 	ArrayVector<accurate_t, SumToAll::BANDS> bandThresholds2;
-	bandThresholds2[0] = 0.10;
-	bandThresholds2[1] = 0.25;
-	bandThresholds2[2] = 0.25;
-	bandThresholds2[3] = 0.25;
-	bandThresholds2[4] = 0.2;
-	bandThresholds2[5] = 0.05;
+	bandThresholds2 = bandThresholds1;
 
-	accurate_t threshold1 = 0.1;
+	accurate_t threshold1 = 0.25;
 	accurate_t threshold2 = 0.1;
 
 	clientOwner.setClient(new SumToAll(frequencies, allPassRcTimes, bandRcTimes, threshold1, bandThresholds1, threshold2, bandThresholds2));

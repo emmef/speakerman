@@ -26,6 +26,7 @@
 #include <simpledsp/Butterfly.hpp>
 #include <simpledsp/CharacteristicSamples.hpp>
 #include <simpledsp/IirFixed.hpp>
+#include <simpledsp/Noise.hpp>
 #include <simpledsp/Size.hpp>
 #include <simpledsp/Types.hpp>
 #include <simpledsp/Values.hpp>
@@ -234,6 +235,8 @@ struct RmsLimiter
 		ArrayVector<Sample, CHANNELS> output;
 		ArrayVector<Sample, CHANNELS> subout;
 		ArrayVector<ArrayVector<Sample, CHANNELS>, BANDS> bands;
+		simpledsp::RandomNoise<Sample,std::minstd_rand> allBandNoise;
+		simpledsp::RandomNoise<Sample,std::minstd_rand0> singleBandNoise;
 
 		void clearHistory()
 		{
@@ -268,6 +271,14 @@ struct RmsLimiter
 			thresholdMultiplier = conf.valueRc.integrate(conf.thresholdMultiplier, thresholdMultiplier);
 			for (size_t band = 0; band < BANDS; band++) {
 				bandMultiplier[band] = conf.valueRc.integrate(conf.bandMultiplier[band], bandMultiplier[band]);
+			}
+		}
+
+		void addNoise()
+		{
+			Sample noise = allBandNoise();
+			for (size_t channel = 0; channel < CHANNELS; channel++)	{
+				input[channel] += noise;
 			}
 		}
 
@@ -310,9 +321,12 @@ struct RmsLimiter
 		{
 			size_t inputIdx = ioPlan(0);
 
+
 			for (size_t channel = 0; channel < CHANNELS; channel++) {
 				bands[inputIdx][channel] = input(channel);
 			}
+
+			Sample noise = singleBandNoise();
 
 			for (size_t crossover = 0, ioIndex = 0, historyIndex = 0; crossover < CROSSOVERS; crossover++) {
 				inputIdx = ioPlan(ioIndex++);
@@ -324,14 +338,14 @@ struct RmsLimiter
 				for (size_t channel = 0; channel < CHANNELS; channel++) {
 					Sample x = bands[inputIdx][channel];
 
-					Sample hi = Iir::Fixed::filter(coeff.highPass, bandPassHistory[historyIndex++], x);
-					hi = Iir::Fixed::filter(coeff.highPass, bandPassHistory[historyIndex++], hi);
+					Sample hi = Iir::Fixed::filter<Sample, accurate_t, ORDER, false>(coeff.highPass, bandPassHistory[historyIndex++], x);
+					hi = Iir::Fixed::filter<Sample, accurate_t, ORDER, false>(coeff.highPass, bandPassHistory[historyIndex++], hi);
 
-					Sample lo = Iir::Fixed::filter(coeff.lowPass, bandPassHistory[historyIndex++], x);
-					lo = Iir::Fixed::filter(coeff.lowPass, bandPassHistory[historyIndex++], lo);
+					Sample lo = Iir::Fixed::filter<Sample, accurate_t, ORDER, false>(coeff.lowPass, bandPassHistory[historyIndex++], x);
+					lo = Iir::Fixed::filter<Sample, accurate_t, ORDER, false>(coeff.lowPass, bandPassHistory[historyIndex++], lo);
 
-					bands[output1Idx][channel] = hi;
-					bands[output2Idx][channel] = lo;
+					bands[output1Idx][channel] = hi + noise;
+					bands[output2Idx][channel] = lo + noise;
 				}
 			}
 		}
@@ -392,6 +406,7 @@ struct RmsLimiter
 
 		void process()
 		{
+			addNoise();
 			applyValueIntegration();
 			splitFrequencyBands();
 			processFrequencyBands(getAllPassDetection());
@@ -400,8 +415,11 @@ struct RmsLimiter
 
 		Processor(Config &config) :
 			conf(config),
-			ioPlan(createFilterPlan())
+			ioPlan(createFilterPlan()),
+			allBandNoise(0.0, 1e-10),
+			singleBandNoise(0.0, 1e-10)
 		{
+
 
 		}
 	};
