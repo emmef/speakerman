@@ -35,7 +35,6 @@ namespace speakerman {
 namespace jack {
 
 	using namespace std;
-	using namespace simpledsp;
 
 	enum class PortDirection
 	{

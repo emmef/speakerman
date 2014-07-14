@@ -24,9 +24,8 @@
 #include <locale>
 #include <chrono>
 
-#include <simpledsp/Precondition.hpp>
-#include <simpledsp/Alloc.hpp>
-#include <simpledsp/MemoryFence.hpp>
+#include <saaspl/MemoryFence.hpp>
+#include <saaspl/Count.hpp>
 #include <speakerman/jack/Client.hpp>
 
 namespace speakerman {
@@ -207,7 +206,7 @@ Client::~Client()
 
 
 Client::Client(size_t maximumNumberOfPorts) :
-		port(Alloc::allocatePositive<PortEntry>(maximumNumberOfPorts)),
+		port(new PortEntry[saaspl::Count<PortEntry>::valid(maximumNumberOfPorts)]),
 		portCapacity(maximumNumberOfPorts)
 {
 	thread t { Client::serveMessagesForClient, this };
