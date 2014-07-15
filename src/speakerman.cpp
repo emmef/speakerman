@@ -33,6 +33,7 @@
 #include <signal.h>
 #include <speakerman/jack/Client.hpp>
 
+#include <saaspl/CdHornCompensation.hpp>
 #include <saaspl/Delay.hpp>
 #include <saaspl/Limiter.hpp>
 #include <saaspl/RmsLimiter.hpp>
@@ -53,6 +54,13 @@ typedef saaspl::Delay<jack_default_audio_sample_t> Delay;
 typedef double sample_t;
 typedef double accurate_t;
 
+using CdHorn = CdHornCompensation<accurate_t>;
+using CdHornUserConfig = CdHorn::UserConfig;
+using CdHornConfig = CdHorn::Config;
+template<size_t CHANNELS>
+using CdHornProcessor = CdHorn::Processor<CHANNELS>;
+
+
 struct SumToAll : public Client
 {
 	static size_t constexpr CROSSOVERS = 5;
@@ -67,27 +75,46 @@ private:
 
 	struct DoubleConfiguration {
 		Dynamics::Config dynamicsConfig1;
-		Dynamics::Config dynamicsConfig2;
 		Limiter::Config limitingConfig1;
+		CdHornConfig cdHornCOnfig1;
+
+		Dynamics::Config dynamicsConfig2;
 		Limiter::Config limitingConfig2;
-		bool bypassLimiter = false;
+		CdHornConfig cdHornCOnfig2;
+
+		Limiter::Config limitingSubConfig;
 	};
 
 	Dynamics::UserConfig dynamicsUserConfig1;
-	Dynamics::UserConfig dynamicsUserConfig2;
 	Limiter::UserConfig limitingUserConfig1;
+	CdHornUserConfig cdHornUserConfig1;
+
+	Dynamics::UserConfig dynamicsUserConfig2;
 	Limiter::UserConfig limitingUserConfig2;
+	CdHornUserConfig cdHornUserConfig2;
+
+	Limiter::UserConfig limitingUserConfig3;
 
 	util::WriteLockFreeRead<DoubleConfiguration, TypeCheckCopyAssignableNonPolymorphic> consumer;
 	Dynamics::Config &wDynConf1 = consumer.writerValue().dynamicsConfig1;
-	Dynamics::Config &wDynConf2 = consumer.writerValue().dynamicsConfig2;
 	Limiter::Config &wLimConf1 = consumer.writerValue().limitingConfig1;
+	CdHornConfig &wCdHornConfig1 = consumer.writerValue().cdHornCOnfig1;
+
+	Dynamics::Config &wDynConf2 = consumer.writerValue().dynamicsConfig2;
 	Limiter::Config &wLimConf2 = consumer.writerValue().limitingConfig2;
+	CdHornConfig &wCdHornConfig2 = consumer.writerValue().cdHornCOnfig2;
+
+	Limiter::Config &wLimSubConf = consumer.writerValue().limitingSubConfig;
 
 	Dynamics::Processor<CHANNELS> dynamics1;
-	Dynamics::Processor<CHANNELS> dynamics2;
 	Limiter::Processor<CHANNELS> limiter1;
+	CdHornProcessor<CHANNELS> cdHorn1;
+
+	Dynamics::Processor<CHANNELS> dynamics2;
 	Limiter::Processor<CHANNELS> limiter2;
+	CdHornProcessor<CHANNELS> cdHorn2;
+
+	Limiter::Processor<1> subLimiter;
 
 	ClientPort input_0_0;
 	ClientPort input_0_1;
@@ -98,6 +125,8 @@ private:
 	ClientPort output_1_0;
 	ClientPort output_1_1;
 	ClientPort output_sub;
+
+	volatile jack_nframes_t lastSampleRate = -1;
 
 protected:
 	virtual bool process(jack_nframes_t frameCount)
@@ -118,9 +147,11 @@ protected:
 			dynamics2.checkFilterChanges();
 			limiter1.initConfigChange();
 			limiter2.initConfigChange();
+			subLimiter.initConfigChange();
 		}
 
 		jack_default_audio_sample_t samples[4];
+		ArrayVector<sample_t, 1> subLimitingVector;
 
 		for (size_t frame = 0; frame < frameCount; frame++) {
 
@@ -130,10 +161,12 @@ protected:
 			dynamics2.input[1] = *inputRight2++;
 
 			dynamics1.process();
-			dynamics2.process();
+			cdHorn1.process(dynamics1.output);
+			limiter1.processInPlace(dynamics1.output);
 
-			limiter1.process(dynamics1.output);
-			limiter2.process(dynamics2.output);
+			dynamics2.process();
+			cdHorn2.process(dynamics2.output);
+			limiter2.processInPlace(dynamics2.output);
 
 			*outputLeft1++ = dynamics1.output[0];
 			*outputRight1++ = dynamics1.output[1];
@@ -152,26 +185,46 @@ protected:
 					sub += dynamics2.subout[channel];
 				}
 			}
-			*subOut++ = sub;
+			subLimitingVector[0] = sub;
+			subLimiter.processInPlace(subLimitingVector);
+			*subOut++ = subLimitingVector[0];
 		}
 
 		return true;
 	}
+
 	virtual bool setSamplerate(jack_nframes_t sampleRate)
 	{
+		if (configure(sampleRate)) {
+			lastSampleRate = sampleRate;
+			return true;
+		}
+		return false;
+	}
+
+	bool configure(jack_nframes_t sampleRate)
+	{
 		wDynConf1.configure(dynamicsUserConfig1, sampleRate);
-		cout << "P" << limitingUserConfig1.getPredictionTime() << endl;
 		wLimConf1.configure(limitingUserConfig1, sampleRate);
+		wCdHornConfig1.configure(cdHornUserConfig1, sampleRate);
 
 		wDynConf2.configure(dynamicsUserConfig2, sampleRate);
 		wLimConf2.configure(limitingUserConfig2, sampleRate);
+		wCdHornConfig2.configure(cdHornUserConfig2, sampleRate);
 
-		std::cout << "Write config" << endl;
-		consumer.write();
+		wLimSubConf.configure(limitingUserConfig3, sampleRate);
 
-		std::cout << "Written config" << endl;
-		return true;
+		return consumer.write();
 	}
+
+	bool reconfigure()
+	{
+		if (lastSampleRate < 1) {
+			throw std::runtime_error("Cannot reconfigure if no initial config was done");
+		}
+		return configure(lastSampleRate);
+	}
+
 	virtual void beforeShutdown()
 	{
 		std::cerr << "Before shutdown";
@@ -205,9 +258,12 @@ public:
 		output_1_1(addPort(PortDirection::OUT, "output_1_1")),
 		output_sub(addPort(PortDirection::OUT, "output_sub")),
 		dynamics1(consumer.readerValue().dynamicsConfig1),
-		dynamics2(consumer.readerValue().dynamicsConfig2),
 		limiter1(2048, consumer.readerValue().limitingConfig1, consumer.readerValue().dynamicsConfig1.valueRc),
-		limiter2(2048, consumer.readerValue().limitingConfig2, consumer.readerValue().dynamicsConfig2.valueRc)
+		dynamics2(consumer.readerValue().dynamicsConfig2),
+		limiter2(2048, consumer.readerValue().limitingConfig2, consumer.readerValue().dynamicsConfig2.valueRc),
+		subLimiter(2048, consumer.readerValue().limitingSubConfig, consumer.readerValue().dynamicsConfig2.valueRc),
+		cdHorn1(consumer.readerValue().cdHornCOnfig1),
+		cdHorn2(consumer.readerValue().cdHornCOnfig2)
 	{
 		dynamicsUserConfig1.frequencies.assign(frequencies);
 		dynamicsUserConfig1.allPassRcs.assign(allPassRcTimes);
@@ -217,8 +273,11 @@ public:
 
 		limitingUserConfig1.setThreshold(saaspl::min(1.0, threshold1 * 2));
 		limitingUserConfig1.setAttackTime(0.003);
+		limitingUserConfig1.setReleaseTime(0.003);
 		limitingUserConfig1.setSmoothingTime(0.001);
 		limitingUserConfig1.setPredictionTime(0.004);
+
+		cdHornUserConfig1.setBypass(true);
 
 		dynamicsUserConfig2.frequencies.assign(frequencies);
 		dynamicsUserConfig2.allPassRcs.assign(allPassRcTimes);
@@ -229,21 +288,45 @@ public:
 
 		limitingUserConfig2.setThreshold(saaspl::min(1.0, threshold2 * 2));
 		limitingUserConfig2.setAttackTime(0.003);
-		limitingUserConfig2.setAttackTime(0.003);
+		limitingUserConfig2.setReleaseTime(0.003);
 		limitingUserConfig2.setSmoothingTime(0.001);
 		limitingUserConfig2.setPredictionTime(0.004);
+
+		cdHornUserConfig2.setBypass(true);
+
+		limitingUserConfig3.setThreshold(saaspl::max(saaspl::min(1.0, threshold1 * 2), saaspl::min(1.0, threshold2 * 2)));
+		limitingUserConfig3.setAttackTime(0.003);
+		limitingUserConfig3.setReleaseTime(0.003);
+		limitingUserConfig3.setSmoothingTime(0.001);
+		limitingUserConfig3.setPredictionTime(0.004);
 
 		finishDefiningPorts();
 	};
 
+	void toggleCdHorn()
+	{
+		cdHornUserConfig1.setBypass(!cdHornUserConfig1.getBypass());
+		cdHornUserConfig2.setBypass(!cdHornUserConfig2.getBypass());
+		reconfigure();
+	}
+
+	void rotateCdHornfrequency()
+	{
+		double f= cdHornUserConfig1.getTopFrequency();
+		if (f < 24000) {
+			f += 1000;
+		}
+		else {
+			f = 16000;
+		}
+		cdHornUserConfig1.setTopFrequency(f);
+		cdHornUserConfig2.setTopFrequency(f);
+		reconfigure();
+	}
+
 	virtual ~SumToAll()
 	{
 		cout << "Finishing up!" << endl;
-	}
-
-	void bypassLimiter() {
-		consumer.writerValue().bypassLimiter = !consumer.writerValue().bypassLimiter;
-		consumer.write(1000);
 	}
 };
 
@@ -359,26 +442,23 @@ int main(int count, char * arguments[]) {
 		std::this_thread::sleep_for( duration );
 		std::cin >> cmnd;
 		switch (cmnd) {
-		case 'b':
-		case 'B':
-			std::cout << "Bypass" << std::endl;
+		case 'c':
+		case 'C':
+			std::cout << "CD-Horn bypass toggle" << std::endl;
+			clientOwner.get().toggleCdHorn();
 			modus = Modus::BYPASS;
 			break;
 		case 'f':
 		case 'F':
-			std::cout << "Filter" << std::endl;
+			std::cout << "CD-Horn frequency change" << std::endl;
+			clientOwner.get().rotateCdHornfrequency();
 			modus = Modus::FILTER;
 			break;
-		case 'z':
-		case 'Z':
-			std::cout << "Zero" << std::endl;
+		case 's':
+		case 'S':
+			std::cout << "CD-Horn slope" << std::endl;
+			clientOwner.get().rotateCdHornfrequency();
 			modus = Modus::ZERO;
-			break;
-		case 'l':
-		case 'L':
-			std::cout << "Limiter" << std::endl;
-			clientOwner.get().bypassLimiter();
-			modus = Modus::LOW;
 			break;
 		case 'h':
 		case 'H':
