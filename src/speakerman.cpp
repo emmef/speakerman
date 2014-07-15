@@ -63,7 +63,7 @@ using CdHornProcessor = CdHorn::Processor<CHANNELS>;
 
 struct SumToAll : public Client
 {
-	static size_t constexpr CROSSOVERS = 5;
+	static size_t constexpr CROSSOVERS = 8;
 	static size_t constexpr BANDS = CROSSOVERS + 1;
 	static size_t constexpr CHANNELS = 2;
 	static size_t constexpr FILTER_ORDER = 2;
@@ -378,18 +378,27 @@ int main(int count, char * arguments[]) {
 	signal(SIGTERM, signal_callback_handler);
 	signal(SIGABRT, signal_callback_handler);
 
-	ArrayVector<accurate_t, SumToAll::CROSSOVERS> frequencies;
-	frequencies[0] = 80;
-	frequencies[1] = 180;
-	frequencies[2] = 1566;
-	frequencies[3] = 4500;//3200
-	frequencies[4] = 6500;
 //	ArrayVector<accurate_t, SumToAll::CROSSOVERS> frequencies;
 //	frequencies[0] = 80;
-//	frequencies[1] = 240;
+//	frequencies[1] = 180;
 //	frequencies[2] = 1566;
-//	frequencies[3] = 4500; // 1200
-//	frequencies[4] = 6500;//3200
+//	frequencies[3] = 4500;//3200
+//	frequencies[4] = 6500;
+	ArrayVector<accurate_t, SumToAll::CROSSOVERS> frequencies;
+	frequencies[0] = 83;
+	frequencies[1] = 166;
+//	frequencies[2] = 160 * sqrt(2);
+//	frequencies[3] = 320;
+//	frequencies[4] = 320 * sqrt(2);
+//	frequencies[5] = 640; // 1200
+//	frequencies[6] = 640 * sqrt(2);
+//	frequencies[7] = 1280;//3200
+	frequencies[2] = 1566;
+	frequencies[3] = 1566 * sqrt(2);//3200
+	frequencies[4] = 3132;
+	frequencies[5] = 3132 * sqrt(2);//3200
+	frequencies[6] = 6264;
+	frequencies[7] = 6264 * sqrt(2);//3200
 
 	ArrayVector<accurate_t, SumToAll::ALLPASS_RC_TIMES> allPassRcTimes;
 	allPassRcTimes[0] = 0.33;
@@ -398,21 +407,18 @@ int main(int count, char * arguments[]) {
 
 	ArrayVector<accurate_t, SumToAll::BAND_RC_TIMES> bandRcTimes;
 	bandRcTimes[0] = 0.033;
-	bandRcTimes[1] = 0.066;
-	bandRcTimes[2] = 0.100;
-	bandRcTimes[3] = 0.133;
-	bandRcTimes[4] = 0.200;
-	bandRcTimes[5] = 0.330;
-	bandRcTimes[6] = 0.500;
+	for (int i = 1; i < SumToAll::BAND_RC_TIMES; i++) {
+		bandRcTimes[i] = 0.050 * pow(0.167 / 0.05, 1.0 * (i - 1) / (SumToAll::BAND_RC_TIMES - 2));
+	}
 
 	// Equal log weight spread
-	accurate_t minimumFreq= 30;
-	accurate_t maximumFreq= 12000;
+	accurate_t minimumFreq= 20;
+	accurate_t maximumFreq= 15000;
 	ArrayVector<accurate_t, SumToAll::BANDS> bandThresholds1;
 	bandThresholds1[0] = frequencies[0] / minimumFreq;
 	for (size_t i = 1; i < SumToAll::CROSSOVERS; i++) {
 		double f = frequencies[i];
-		double warp = (frequencies[0] + 0.25 * f) / (frequencies[0] + 0.5 * f);
+		double warp = 1.0;//(frequencies[0] + 0.25 * f) / (frequencies[0] + 0.5 * f);
 		bandThresholds1[i] = warp * frequencies[i] / frequencies[i - 1];
 	}
 	bandThresholds1[SumToAll::CROSSOVERS] = maximumFreq / frequencies[SumToAll::CROSSOVERS - 1];
