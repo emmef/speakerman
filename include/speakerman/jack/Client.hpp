@@ -212,6 +212,7 @@ namespace jack {
 		void activate();
 		void deactivate();
 		PortNames * getPortNames(const char * namePattern, const char * typePattern, unsigned long flags);
+		bool disconnectPort(string readPort, string writePort);
 
 		template<typename... Args> bool open(string client_name, jack_options_t options, Args... args)
 		{

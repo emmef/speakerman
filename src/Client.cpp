@@ -450,6 +450,16 @@ bool Client::connectPort(size_t id, string otherPort)
 	return result == 0;
 }
 
+bool Client::disconnectPort(string readPort, string writePort)
+{
+	CriticalScope g(m);
+	unsafeCheckActivated();
+
+	int result = jack_disconnect(client, readPort.c_str(), writePort.c_str());
+
+	return result == 0;
+}
+
 bool Client::nameAlreadyUsed(string name)
 {
 	CriticalScope g(m);
