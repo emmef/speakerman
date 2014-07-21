@@ -20,6 +20,7 @@
  */
 
 #include <chrono>
+#include <memory>
 #include <thread>
 #include <atomic>
 #include <iostream>
@@ -68,7 +69,7 @@ struct SumToAll : public Client
 	static size_t constexpr CHANNELS = 2;
 	static size_t constexpr FILTER_ORDER = 2;
 	static size_t constexpr ALLPASS_RC_TIMES = 3;
-	static size_t constexpr BAND_RC_TIMES = 7;
+	static size_t constexpr BAND_RC_TIMES = 9;
 
 private:
 	typedef RmsLimiter<sample_t, accurate_t, CROSSOVERS, FILTER_ORDER, ALLPASS_RC_TIMES, BAND_RC_TIMES> Dynamics;
@@ -148,6 +149,26 @@ protected:
 			limiter1.initConfigChange();
 			limiter2.initConfigChange();
 			subLimiter.initConfigChange();
+		}
+
+		if (modus == Modus::BYPASS) {
+			for (size_t frame = 0; frame < frameCount; frame++) {
+
+				dynamics1.input[0] =
+				dynamics1.input[1] =
+				dynamics2.input[0] =
+				dynamics2.input[1] =
+
+				*outputLeft1++ = *inputLeft1++;
+				*outputRight1++ = *inputRight1++;
+
+				*outputLeft2++ = *inputLeft2++;
+				*outputRight2++ = *inputRight2++;
+
+				*subOut++ = 0;
+			}
+
+			return true;
 		}
 
 		jack_default_audio_sample_t samples[4];
@@ -234,7 +255,69 @@ protected:
 	{
 		std::cerr << "After shutdown";
 	}
-	virtual void connectPortsOnActivate() { }
+	virtual void connectPortsOnActivate() {
+		unique_ptr<PortNames> capturePorts(getPortNames(nullptr, nullptr, JackPortIsPhysical|JackPortIsOutput));
+
+		for (size_t i = 0; i < std::min((size_t)4, capturePorts->length()); i++) {
+			const char* portName = capturePorts->get(i);
+			switch (i % 4) {
+			case 0:
+				input_0_0.connect(portName);
+				break;
+			case 1:
+				input_0_1.connect(portName);
+				break;
+			case 2:
+				input_1_0.connect(portName);
+				break;
+			case 3:
+				input_1_1.connect(portName);
+				break;
+			}
+		}
+
+		unique_ptr<PortNames> playbackPorts(getPortNames(nullptr, nullptr, JackPortIsPhysical|JackPortIsInput));
+
+		if (playbackPorts->length() > 0) {
+			output_0_0.connect(playbackPorts->get(0));
+		}
+		if (playbackPorts->length() > 1) {
+			output_0_1.connect(playbackPorts->get(1));
+		}
+		if (playbackPorts->length() > 2) {
+			output_1_0.connect(playbackPorts->get(2));
+		}
+		if (playbackPorts->length() > 3) {
+			output_1_1.connect(playbackPorts->get(3));
+		}
+		if (playbackPorts->length() > 4) {
+			output_sub.connect(playbackPorts->get(4));
+		}
+
+		unique_ptr<PortNames> pulseAudioPorts(getPortNames("PulseAudio.*", nullptr, JackPortIsOutput));
+
+		for (size_t i = 0; i < pulseAudioPorts->length(); i++) {
+			const char* portName = pulseAudioPorts->get(i);
+			for (size_t j = 0; j < playbackPorts->length(); j++) {
+				disconnectPort(portName, playbackPorts->get(j));
+			}
+			switch (i % 4) {
+			case 0:
+				input_0_0.connect(portName);
+				break;
+			case 1:
+				input_0_1.connect(portName);
+				break;
+			case 2:
+				input_1_0.connect(portName);
+				break;
+			case 3:
+				input_1_1.connect(portName);
+				break;
+			}
+		}
+
+	}
 
 public:
 	SumToAll(
@@ -273,8 +356,8 @@ public:
 
 		limitingUserConfig1.setThreshold(saaspl::min(1.0, threshold1 * 2));
 		limitingUserConfig1.setAttackTime(0.003);
-		limitingUserConfig1.setReleaseTime(0.003);
-		limitingUserConfig1.setSmoothingTime(0.001);
+		limitingUserConfig1.setReleaseTime(0.006);
+		limitingUserConfig1.setSmoothingTime(0.003);
 		limitingUserConfig1.setPredictionTime(0.004);
 
 		cdHornUserConfig1.setBypass(true);
@@ -288,16 +371,16 @@ public:
 
 		limitingUserConfig2.setThreshold(saaspl::min(1.0, threshold2 * 2));
 		limitingUserConfig2.setAttackTime(0.003);
-		limitingUserConfig2.setReleaseTime(0.003);
-		limitingUserConfig2.setSmoothingTime(0.001);
+		limitingUserConfig2.setReleaseTime(0.006);
+		limitingUserConfig2.setSmoothingTime(0.003);
 		limitingUserConfig2.setPredictionTime(0.004);
 
 		cdHornUserConfig2.setBypass(true);
 
 		limitingUserConfig3.setThreshold(saaspl::max(saaspl::min(1.0, threshold1 * 2), saaspl::min(1.0, threshold2 * 2)));
 		limitingUserConfig3.setAttackTime(0.003);
-		limitingUserConfig3.setReleaseTime(0.003);
-		limitingUserConfig3.setSmoothingTime(0.001);
+		limitingUserConfig3.setReleaseTime(0.006);
+		limitingUserConfig3.setSmoothingTime(0.003);
 		limitingUserConfig3.setPredictionTime(0.004);
 
 		finishDefiningPorts();
@@ -322,6 +405,27 @@ public:
 		cdHornUserConfig1.setTopFrequency(f);
 		cdHornUserConfig2.setTopFrequency(f);
 		reconfigure();
+	}
+
+	void rotateThresholds()
+	{
+		rotateThreshold(limitingUserConfig1, wLimConf1);
+		rotateThreshold(limitingUserConfig2, wLimConf2);
+		rotateThreshold(limitingUserConfig3, wLimSubConf);
+		consumer.write(200);
+	}
+
+	void rotateThreshold(Limiter::UserConfig &userConfig, Limiter::Config &config)
+	{
+		double threshold = userConfig.getThreshold();
+		if (threshold > 0.5) {
+			threshold = 0.1;
+		}
+		else {
+			threshold *= pow(2, 0.25);
+		}
+		userConfig.setThreshold(threshold);
+		config.configure(userConfig, lastSampleRate);
 	}
 
 	virtual ~SumToAll()
@@ -408,7 +512,7 @@ int main(int count, char * arguments[]) {
 	ArrayVector<accurate_t, SumToAll::BAND_RC_TIMES> bandRcTimes;
 	bandRcTimes[0] = 0.033;
 	for (int i = 1; i < SumToAll::BAND_RC_TIMES; i++) {
-		bandRcTimes[i] = 0.050 * pow(0.167 / 0.05, 1.0 * (i - 1) / (SumToAll::BAND_RC_TIMES - 2));
+		bandRcTimes[i] = 0.050 * pow(0.333 / 0.05, 1.0 * (i - 1) / (SumToAll::BAND_RC_TIMES - 2));
 	}
 
 	// Equal log weight spread
@@ -434,7 +538,7 @@ int main(int count, char * arguments[]) {
 	bandThresholds2 = bandThresholds1;
 
 	accurate_t threshold1 = 0.25;
-	accurate_t threshold2 = 0.1;
+	accurate_t threshold2 = 0.25;
 
 	clientOwner.setClient(new SumToAll(frequencies, allPassRcTimes, bandRcTimes, threshold1, bandThresholds1, threshold2, bandThresholds2));
 
@@ -448,33 +552,41 @@ int main(int count, char * arguments[]) {
 		std::this_thread::sleep_for( duration );
 		std::cin >> cmnd;
 		switch (cmnd) {
+		case 'b':
+		case 'B':
+			if (modus == Modus::BYPASS) {
+				std::cout << "Bypass off" << std::endl;
+				modus = Modus::FILTER;
+			}
+			else {
+				std::cout << "Bypass on" << std::endl;
+				modus = Modus::BYPASS;
+			}
+			break;
 		case 'c':
 		case 'C':
 			std::cout << "CD-Horn bypass toggle" << std::endl;
 			clientOwner.get().toggleCdHorn();
-			modus = Modus::BYPASS;
 			break;
 		case 'f':
 		case 'F':
 			std::cout << "CD-Horn frequency change" << std::endl;
 			clientOwner.get().rotateCdHornfrequency();
-			modus = Modus::FILTER;
 			break;
 		case 's':
 		case 'S':
 			std::cout << "CD-Horn slope" << std::endl;
 			clientOwner.get().rotateCdHornfrequency();
-			modus = Modus::ZERO;
 			break;
 		case 'h':
 		case 'H':
 			std::cout << "High-pass" << std::endl;
 			modus = Modus::HIGH;
 			break;
-		case 'd' :
-		case 'D' :
-			std::cout << "Double filtering" << std::endl;
-			modus = Modus::DOUBLE;
+		case 't' :
+		case 'T' :
+			std::cout << "Adapting threshold" << std::endl;
+			clientOwner.get().rotateThresholds();
 			break;
 		case 'q' :
 		case 'Q' :
