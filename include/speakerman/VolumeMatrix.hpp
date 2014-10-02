@@ -22,15 +22,15 @@
 #ifndef SMS_SPEAKERMAN_VOLUMEMATRIX_GUARD_H_
 #define SMS_SPEAKERMAN_VOLUMEMATRIX_GUARD_H_
 
-#include <simpledsp/Matrix.hpp>
+#include <saaspl/Matrix.hpp>
 
 namespace speakerman {
 
-using namespace simpledsp;
+using namespace saaspl;
 
 template<typename T, size_t ROWS, size_t COLUMNS> class VolumeMatrix
 {
-	Matrix<T, ROWS, COLUMNS> matrix;
+	FixedSizeMatrix<T, ROWS, COLUMNS> matrix;
 	const T min, max;
 
 

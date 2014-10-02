@@ -35,6 +35,7 @@
 #include <speakerman/jack/Client.hpp>
 
 #include <saaspl/CdHornCompensation.hpp>
+#include <saaspl/Crossovers.hpp>
 #include <saaspl/Delay.hpp>
 #include <saaspl/Limiter.hpp>
 #include <saaspl/RmsLimiter.hpp>
@@ -64,7 +65,7 @@ using CdHornProcessor = CdHorn::Processor<CHANNELS>;
 
 struct SumToAll : public Client
 {
-	static size_t constexpr CROSSOVERS = 8;
+	static size_t constexpr CROSSOVERS = 4;
 	static size_t constexpr BANDS = CROSSOVERS + 1;
 	static size_t constexpr CHANNELS = 2;
 	static size_t constexpr FILTER_ORDER = 2;
@@ -262,15 +263,19 @@ protected:
 			const char* portName = capturePorts->get(i);
 			switch (i % 4) {
 			case 0:
+				std::cout << "Connecting " << portName << " -> input_0_0" << std::endl;
 				input_0_0.connect(portName);
 				break;
 			case 1:
+				std::cout << "Connecting " << portName << " -> input_0_1" << std::endl;
 				input_0_1.connect(portName);
 				break;
 			case 2:
+				std::cout << "Connecting " << portName << " -> input_1_0" << std::endl;
 				input_1_0.connect(portName);
 				break;
 			case 3:
+				std::cout << "Connecting " << portName << " -> input_1_1" << std::endl;
 				input_1_1.connect(portName);
 				break;
 			}
@@ -279,18 +284,23 @@ protected:
 		unique_ptr<PortNames> playbackPorts(getPortNames(nullptr, nullptr, JackPortIsPhysical|JackPortIsInput));
 
 		if (playbackPorts->length() > 0) {
+			std::cout << "Connecting output_0_0 -> " << playbackPorts->get(0) << std::endl;
 			output_0_0.connect(playbackPorts->get(0));
 		}
 		if (playbackPorts->length() > 1) {
+			std::cout << "Connecting output_0_0 -> " << playbackPorts->get(1) << std::endl;
 			output_0_1.connect(playbackPorts->get(1));
 		}
 		if (playbackPorts->length() > 2) {
+			std::cout << "Connecting output_0_0 -> " << playbackPorts->get(2) << std::endl;
 			output_1_0.connect(playbackPorts->get(2));
 		}
 		if (playbackPorts->length() > 3) {
+			std::cout << "Connecting output_0_0 -> " << playbackPorts->get(3) << std::endl;
 			output_1_1.connect(playbackPorts->get(3));
 		}
 		if (playbackPorts->length() > 4) {
+			std::cout << "Connecting output_sub -> " << playbackPorts->get(4) << std::endl;
 			output_sub.connect(playbackPorts->get(4));
 		}
 
@@ -299,19 +309,25 @@ protected:
 		for (size_t i = 0; i < pulseAudioPorts->length(); i++) {
 			const char* portName = pulseAudioPorts->get(i);
 			for (size_t j = 0; j < playbackPorts->length(); j++) {
-				disconnectPort(portName, playbackPorts->get(j));
+				if (disconnectPort(portName, playbackPorts->get(j))) {
+					std::cout << "Disconnected " << portName << " <-> " << playbackPorts->get(j) << std::endl;
+				}
 			}
 			switch (i % 4) {
 			case 0:
+				std::cout << "Connecting " << portName << " -> input_0_0" << std::endl;
 				input_0_0.connect(portName);
 				break;
 			case 1:
+				std::cout << "Connecting " << portName << " -> input_0_1" << std::endl;
 				input_0_1.connect(portName);
 				break;
 			case 2:
+				std::cout << "Connecting " << portName << " -> input_1_0" << std::endl;
 				input_1_0.connect(portName);
 				break;
 			case 3:
+				std::cout << "Connecting " << portName << " -> input_1_1" << std::endl;
 				input_1_1.connect(portName);
 				break;
 			}
@@ -418,11 +434,10 @@ public:
 	void rotateThreshold(Limiter::UserConfig &userConfig, Limiter::Config &config)
 	{
 		double threshold = userConfig.getThreshold();
-		if (threshold > 0.5) {
-			threshold = 0.1;
-		}
-		else {
-			threshold *= pow(2, 0.25);
+		threshold *= pow(2, 0.25);
+
+		if (threshold >= 1.0) {
+			threshold = 0.25;
 		}
 		userConfig.setThreshold(threshold);
 		config.configure(userConfig, lastSampleRate);
@@ -482,27 +497,21 @@ int main(int count, char * arguments[]) {
 	signal(SIGTERM, signal_callback_handler);
 	signal(SIGABRT, signal_callback_handler);
 
-//	ArrayVector<accurate_t, SumToAll::CROSSOVERS> frequencies;
-//	frequencies[0] = 80;
-//	frequencies[1] = 180;
-//	frequencies[2] = 1566;
-//	frequencies[3] = 4500;//3200
-//	frequencies[4] = 6500;
+	saaspl::Crossovers<accurate_t> crossovers(SumToAll::CROSSOVERS, SumToAll::FILTER_ORDER * 2, 20, 20000);
+
 	ArrayVector<accurate_t, SumToAll::CROSSOVERS> frequencies;
-	frequencies[0] = 83;
-	frequencies[1] = 166;
-//	frequencies[2] = 160 * sqrt(2);
-//	frequencies[3] = 320;
-//	frequencies[4] = 320 * sqrt(2);
-//	frequencies[5] = 640; // 1200
-//	frequencies[6] = 640 * sqrt(2);
-//	frequencies[7] = 1280;//3200
+//	frequencies[0] = 83;
+//	frequencies[1] = 166;
+//	frequencies[2] = 1566;
+//	frequencies[3] = 1566 * sqrt(2);//3200
+//	frequencies[4] = 3132;
+//	frequencies[5] = 3132 * sqrt(2);//3200
+//	frequencies[6] = 6264;
+//	frequencies[7] = 6264 * sqrt(2);//3200
+	frequencies[0] = 80;
+	frequencies[1] = 180;
 	frequencies[2] = 1566;
-	frequencies[3] = 1566 * sqrt(2);//3200
-	frequencies[4] = 3132;
-	frequencies[5] = 3132 * sqrt(2);//3200
-	frequencies[6] = 6264;
-	frequencies[7] = 6264 * sqrt(2);//3200
+	frequencies[3] = 4500;//3200
 
 	ArrayVector<accurate_t, SumToAll::ALLPASS_RC_TIMES> allPassRcTimes;
 	allPassRcTimes[0] = 0.33;
