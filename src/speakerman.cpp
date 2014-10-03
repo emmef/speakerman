@@ -69,8 +69,8 @@ struct SumToAll : public Client
 	static size_t constexpr BANDS = CROSSOVERS + 1;
 	static size_t constexpr CHANNELS = 2;
 	static size_t constexpr FILTER_ORDER = 2;
-	static size_t constexpr ALLPASS_RC_TIMES = 3;
 	static size_t constexpr BAND_RC_TIMES = 9;
+	static size_t constexpr ALLPASS_RC_TIMES = BAND_RC_TIMES;
 
 private:
 	typedef RmsLimiter<sample_t, accurate_t, CROSSOVERS, FILTER_ORDER, ALLPASS_RC_TIMES, BAND_RC_TIMES> Dynamics;
@@ -133,6 +133,8 @@ private:
 protected:
 	virtual bool process(jack_nframes_t frameCount)
 	{
+		static long totalFrames = 0;
+		totalFrames++;
 		const jack_default_audio_sample_t* inputLeft1 = input_0_0.getBuffer();
 		const jack_default_audio_sample_t* inputRight1 = input_0_1.getBuffer();
 		const jack_default_audio_sample_t* inputLeft2 = input_1_0.getBuffer();
@@ -211,7 +213,9 @@ protected:
 			subLimiter.processInPlace(subLimitingVector);
 			*subOut++ = subLimitingVector[0];
 		}
-
+//			double maxAllPass = dynamics1.maxAllPass;
+//			dynamics1.maxAllPass = 0.0;
+//			printf("MaxAllPass: %0.4lg\n", maxAllPass);
 		return true;
 	}
 
@@ -369,6 +373,7 @@ public:
 		dynamicsUserConfig1.bandRcs.assign(bandRcTimes);
 		dynamicsUserConfig1.bandThreshold.assign(bandThreshold1);
 		dynamicsUserConfig1.threshold = threshold1;
+		dynamicsUserConfig1.seperateSubChannel = true;
 
 		limitingUserConfig1.setThreshold(saaspl::min(1.0, threshold1 * 2));
 		limitingUserConfig1.setAttackTime(0.003);
@@ -383,9 +388,9 @@ public:
 		dynamicsUserConfig2.bandRcs.assign(bandRcTimes);
 		dynamicsUserConfig2.bandThreshold.assign(bandThreshold2);
 		dynamicsUserConfig2.threshold = threshold2;
-		dynamicsUserConfig2.seperateSubChannel = false;
+		dynamicsUserConfig2.seperateSubChannel = true;
 
-		limitingUserConfig2.setThreshold(saaspl::min(1.0, threshold2 * 2));
+		limitingUserConfig2.setThreshold(saaspl::min(1.0, threshold2 * 2.5));
 		limitingUserConfig2.setAttackTime(0.003);
 		limitingUserConfig2.setReleaseTime(0.006);
 		limitingUserConfig2.setSmoothingTime(0.003);
@@ -500,45 +505,55 @@ int main(int count, char * arguments[]) {
 	saaspl::Crossovers<accurate_t> crossovers(SumToAll::CROSSOVERS, SumToAll::FILTER_ORDER * 2, 20, 20000);
 
 	ArrayVector<accurate_t, SumToAll::CROSSOVERS> frequencies;
-//	frequencies[0] = 83;
-//	frequencies[1] = 166;
-//	frequencies[2] = 1566;
-//	frequencies[3] = 1566 * sqrt(2);//3200
-//	frequencies[4] = 3132;
-//	frequencies[5] = 3132 * sqrt(2);//3200
-//	frequencies[6] = 6264;
-//	frequencies[7] = 6264 * sqrt(2);//3200
 	frequencies[0] = 80;
-	frequencies[1] = 180;
+	frequencies[1] = 168;
 	frequencies[2] = 1566;
-	frequencies[3] = 4500;//3200
+	frequencies[3] = 6300;
 
+//	ArrayVector<accurate_t, SumToAll::CROSSOVERS> frequencies;
+//	frequencies[0] = 168;
+//	frequencies[1] = 1566;
+//	frequencies[2] = 6300;
+//
 	ArrayVector<accurate_t, SumToAll::ALLPASS_RC_TIMES> allPassRcTimes;
-	allPassRcTimes[0] = 0.33;
-	allPassRcTimes[1] = 0.33;
-	allPassRcTimes[2] = 0.66;
-
 	ArrayVector<accurate_t, SumToAll::BAND_RC_TIMES> bandRcTimes;
-	bandRcTimes[0] = 0.033;
+	bandRcTimes[0] = 0.050;
+	allPassRcTimes[0] = bandRcTimes[0];
+	double startTime = 0.010;
 	for (int i = 1; i < SumToAll::BAND_RC_TIMES; i++) {
-		bandRcTimes[i] = 0.050 * pow(0.333 / 0.05, 1.0 * (i - 1) / (SumToAll::BAND_RC_TIMES - 2));
+		bandRcTimes[i] = startTime * pow(0.700 / startTime, 1.0 * (i - 1) / (SumToAll::BAND_RC_TIMES - 2));
+		if (i < SumToAll::ALLPASS_RC_TIMES) {
+			allPassRcTimes[i] = bandRcTimes[i];
+		}
 	}
 
 	// Equal log weight spread
-	accurate_t minimumFreq= 20;
-	accurate_t maximumFreq= 15000;
+	accurate_t minimumFreq= 25;
+	accurate_t maximumFreq= 12500;
 	ArrayVector<accurate_t, SumToAll::BANDS> bandThresholds1;
 	bandThresholds1[0] = frequencies[0] / minimumFreq;
 	for (size_t i = 1; i < SumToAll::CROSSOVERS; i++) {
 		double f = frequencies[i];
-		double warp = 1.0;//(frequencies[0] + 0.25 * f) / (frequencies[0] + 0.5 * f);
-		bandThresholds1[i] = warp * frequencies[i] / frequencies[i - 1];
+		bandThresholds1[i] = f / frequencies[i - 1];
 	}
+
 	bandThresholds1[SumToAll::CROSSOVERS] = maximumFreq / frequencies[SumToAll::CROSSOVERS - 1];
+
+	for (size_t i = 0; i < SumToAll::CROSSOVERS; i++) {
+		double f2 = i > 0 ? frequencies[i -1] : minimumFreq;
+		double f1 = frequencies[i];
+		double f3 = sqrt(f1 * f2);
+		double boost = (f3 + 120) / (f3 + 20);
+		std::cout << "Boost[" << i << " @ " << f3 << "] = " << boost << std::endl;
+		bandThresholds1[i] *= boost;
+	}
+
+
 	accurate_t scale = 0.0;
 	for (size_t i = 0; i < SumToAll::BANDS; i++) {
 		scale += bandThresholds1[i];
 	}
+	scale *= 0.75;
 	for (size_t i = 0; i < SumToAll::BANDS; i++) {
 		bandThresholds1[i] /= scale;
 	}
