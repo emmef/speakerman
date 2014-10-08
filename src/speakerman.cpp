@@ -62,18 +62,28 @@ using CdHornConfig = CdHorn::Config;
 template<size_t CHANNELS>
 using CdHornProcessor = CdHorn::Processor<CHANNELS>;
 
+static accurate_t crossoverFrequencies[] = {
+		80, 168, 1566, 6300
+//		80, 80 * M_SQRT2,
+//		160, 160 * M_SQRT2,
+//		320, 320 * M_SQRT2,
+//		640, 640 * M_SQRT2,
+//		1280, 1280 * M_SQRT2,
+//		2560, 2560 * M_SQRT2,
+//		5120, 5120 * M_SQRT2,
+//		10240
+};
 
 struct SumToAll : public Client
 {
-	static size_t constexpr CROSSOVERS = 4;
+	static size_t constexpr CROSSOVERS = sizeof(crossoverFrequencies) / sizeof(accurate_t);
 	static size_t constexpr BANDS = CROSSOVERS + 1;
 	static size_t constexpr CHANNELS = 2;
 	static size_t constexpr FILTER_ORDER = 2;
-	static size_t constexpr BAND_RC_TIMES = 9;
-	static size_t constexpr ALLPASS_RC_TIMES = BAND_RC_TIMES;
+	static size_t constexpr RC_TIMES = 10;
 
 private:
-	typedef RmsLimiter<sample_t, accurate_t, CROSSOVERS, FILTER_ORDER, ALLPASS_RC_TIMES, BAND_RC_TIMES> Dynamics;
+	typedef RmsLimiter<sample_t, accurate_t, CROSSOVERS, FILTER_ORDER, RC_TIMES> Dynamics;
 
 	struct DoubleConfiguration {
 		Dynamics::Config dynamicsConfig1;
@@ -342,8 +352,7 @@ protected:
 public:
 	SumToAll(
 			ArrayVector<accurate_t, CROSSOVERS> &frequencies,
-			ArrayVector<accurate_t, ALLPASS_RC_TIMES> &allPassRcTimes,
-			ArrayVector<accurate_t, BAND_RC_TIMES> &bandRcTimes,
+			ArrayVector<accurate_t, RC_TIMES> &rcTimes,
 			accurate_t threshold1,
 			ArrayVector<accurate_t, BANDS> &bandThreshold1,
 			accurate_t threshold2,
@@ -369,8 +378,7 @@ public:
 		cdHorn2(consumer.readerValue().cdHornCOnfig2)
 	{
 		dynamicsUserConfig1.frequencies.assign(frequencies);
-		dynamicsUserConfig1.allPassRcs.assign(allPassRcTimes);
-		dynamicsUserConfig1.bandRcs.assign(bandRcTimes);
+		dynamicsUserConfig1.rcs.assign(rcTimes);
 		dynamicsUserConfig1.bandThreshold.assign(bandThreshold1);
 		dynamicsUserConfig1.threshold = threshold1;
 		dynamicsUserConfig1.seperateSubChannel = true;
@@ -384,8 +392,7 @@ public:
 		cdHornUserConfig1.setBypass(true);
 
 		dynamicsUserConfig2.frequencies.assign(frequencies);
-		dynamicsUserConfig2.allPassRcs.assign(allPassRcTimes);
-		dynamicsUserConfig2.bandRcs.assign(bandRcTimes);
+		dynamicsUserConfig2.rcs.assign(rcTimes);
 		dynamicsUserConfig2.bandThreshold.assign(bandThreshold2);
 		dynamicsUserConfig2.threshold = threshold2;
 		dynamicsUserConfig2.seperateSubChannel = true;
@@ -504,27 +511,27 @@ int main(int count, char * arguments[]) {
 
 	saaspl::Crossovers<accurate_t> crossovers(SumToAll::CROSSOVERS, SumToAll::FILTER_ORDER * 2, 20, 20000);
 
-	ArrayVector<accurate_t, SumToAll::CROSSOVERS> frequencies;
-	frequencies[0] = 80;
-	frequencies[1] = 168;
-	frequencies[2] = 1566;
-	frequencies[3] = 6300;
-
+//	// CROSSOVERS = 4
 //	ArrayVector<accurate_t, SumToAll::CROSSOVERS> frequencies;
-//	frequencies[0] = 168;
-//	frequencies[1] = 1566;
-//	frequencies[2] = 6300;
-//
-	ArrayVector<accurate_t, SumToAll::ALLPASS_RC_TIMES> allPassRcTimes;
-	ArrayVector<accurate_t, SumToAll::BAND_RC_TIMES> bandRcTimes;
+//	frequencies[0] = 80;
+//	frequencies[1] = 168;
+//	frequencies[2] = 1566;
+//	frequencies[3] = 6300;
+
+	// CROSSOVERS = 10
+	ArrayVector<accurate_t, SumToAll::CROSSOVERS> frequencies;
+	for (size_t i = 0; i < SumToAll::CROSSOVERS; i++) {
+		frequencies[i] = crossoverFrequencies[i];
+	}
+
+	ArrayVector<accurate_t, SumToAll::RC_TIMES> rcTimes;
+	ArrayVector<accurate_t, SumToAll::RC_TIMES> bandRcTimes;
 	bandRcTimes[0] = 0.050;
-	allPassRcTimes[0] = bandRcTimes[0];
+	rcTimes[0] = bandRcTimes[0];
 	double startTime = 0.010;
-	for (int i = 1; i < SumToAll::BAND_RC_TIMES; i++) {
-		bandRcTimes[i] = startTime * pow(0.700 / startTime, 1.0 * (i - 1) / (SumToAll::BAND_RC_TIMES - 2));
-		if (i < SumToAll::ALLPASS_RC_TIMES) {
-			allPassRcTimes[i] = bandRcTimes[i];
-		}
+	double endTime = 1.2;
+	for (int i = 1; i < SumToAll::RC_TIMES; i++) {
+		rcTimes[i] = startTime * pow(endTime / startTime, 1.0 * (i - 1) / (SumToAll::RC_TIMES - 2));
 	}
 
 	// Equal log weight spread
@@ -539,23 +546,20 @@ int main(int count, char * arguments[]) {
 
 	bandThresholds1[SumToAll::CROSSOVERS] = maximumFreq / frequencies[SumToAll::CROSSOVERS - 1];
 
-	for (size_t i = 0; i < SumToAll::CROSSOVERS; i++) {
-		double f2 = i > 0 ? frequencies[i -1] : minimumFreq;
-		double f1 = frequencies[i];
-		double f3 = sqrt(f1 * f2);
-		double boost = (f3 + 120) / (f3 + 20);
-		std::cout << "Boost[" << i << " @ " << f3 << "] = " << boost << std::endl;
-		bandThresholds1[i] *= boost;
-	}
-
+//	for (size_t i = 0; i < SumToAll::CROSSOVERS; i++) {
+//		double f2 = i > 0 ? frequencies[i -1] : minimumFreq;
+//		double f1 = frequencies[i];
+//		double f3 = sqrt(f1 * f2);
+//		double boost = (f3 + 120) / (f3 + 20);
+//		bandThresholds1[i] *= boost;
+//	}
 
 	accurate_t scale = 0.0;
 	for (size_t i = 0; i < SumToAll::BANDS; i++) {
 		scale += bandThresholds1[i];
 	}
-	scale *= 0.75;
 	for (size_t i = 0; i < SumToAll::BANDS; i++) {
-		bandThresholds1[i] /= scale;
+		bandThresholds1[i] = sqrt(bandThresholds1[i] / scale);
 	}
 
 	ArrayVector<accurate_t, SumToAll::BANDS> bandThresholds2;
@@ -564,7 +568,7 @@ int main(int count, char * arguments[]) {
 	accurate_t threshold1 = 0.25;
 	accurate_t threshold2 = 0.25;
 
-	clientOwner.setClient(new SumToAll(frequencies, allPassRcTimes, bandRcTimes, threshold1, bandThresholds1, threshold2, bandThresholds2));
+	clientOwner.setClient(new SumToAll(frequencies, rcTimes, threshold1, bandThresholds1, threshold2, bandThresholds2));
 
 	clientOwner.get().open("speakerman", JackOptions::JackNullOption);
 	clientOwner.get().activate();
