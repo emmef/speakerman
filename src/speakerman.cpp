@@ -119,14 +119,14 @@ private:
 	Limiter::Config &wLimSubConf = consumer.writerValue().limitingSubConfig;
 
 	Dynamics::Processor<CHANNELS> dynamics1;
-	Limiter::Processor<CHANNELS> limiter1;
+	Limiter::FixedChannelProcessor<accurate_t, CHANNELS> limiter1;
 	CdHornProcessor<CHANNELS> cdHorn1;
 
 	Dynamics::Processor<CHANNELS> dynamics2;
-	Limiter::Processor<CHANNELS> limiter2;
+	Limiter::FixedChannelProcessor<accurate_t, CHANNELS> limiter2;
 	CdHornProcessor<CHANNELS> cdHorn2;
 
-	Limiter::Processor<1> subLimiter;
+	Limiter::FixedChannelProcessor<accurate_t, 1> subLimiter;
 
 	ClientPort input_0_0;
 	ClientPort input_0_1;
