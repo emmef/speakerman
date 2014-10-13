@@ -63,7 +63,9 @@ template<size_t CHANNELS>
 using CdHornProcessor = CdHorn::Processor<CHANNELS>;
 
 static accurate_t crossoverFrequencies[] = {
+//		168, 1566, 2500, 6300
 		80, 168, 1566, 6300
+//		80, 168, 1000, 2700
 //		80, 80 * M_SQRT2,
 //		160, 160 * M_SQRT2,
 //		320, 320 * M_SQRT2,
@@ -80,7 +82,7 @@ struct SumToAll : public Client
 	static size_t constexpr BANDS = CROSSOVERS + 1;
 	static size_t constexpr CHANNELS = 2;
 	static size_t constexpr FILTER_ORDER = 2;
-	static size_t constexpr RC_TIMES = 10;
+	static size_t constexpr RC_TIMES = 20;
 
 private:
 	typedef RmsLimiter<sample_t, accurate_t, CROSSOVERS, FILTER_ORDER, RC_TIMES> Dynamics;
@@ -144,7 +146,6 @@ protected:
 	virtual bool process(jack_nframes_t frameCount)
 	{
 		static long totalFrames = 0;
-		totalFrames++;
 		const jack_default_audio_sample_t* inputLeft1 = input_0_0.getBuffer();
 		const jack_default_audio_sample_t* inputRight1 = input_0_1.getBuffer();
 		const jack_default_audio_sample_t* inputLeft2 = input_1_0.getBuffer();
@@ -223,9 +224,15 @@ protected:
 			subLimiter.processInPlace(subLimitingVector);
 			*subOut++ = subLimitingVector[0];
 		}
+
+//		totalFrames+= frameCount;
+//
+//		if (totalFrames >= 96000) {
 //			double maxAllPass = dynamics1.maxAllPass;
 //			dynamics1.maxAllPass = 0.0;
 //			printf("MaxAllPass: %0.4lg\n", maxAllPass);
+//			totalFrames = 0;
+//		}
 		return true;
 	}
 
@@ -504,6 +511,13 @@ extern "C" {
 	}
 }
 
+inline static accurate_t frequencyWeight(accurate_t f, accurate_t shelve1, accurate_t shelve2, accurate_t power)
+{
+		accurate_t fRel = pow(f / shelve1, power);
+		accurate_t fShelve2Corr = pow(1.0 / shelve2, power);
+		return (1 + fRel * fShelve2Corr) / (1.0 + fRel);
+}
+
 int main(int count, char * arguments[]) {
 	signal(SIGINT, signal_callback_handler);
 	signal(SIGTERM, signal_callback_handler);
@@ -511,14 +525,6 @@ int main(int count, char * arguments[]) {
 
 	saaspl::Crossovers<accurate_t> crossovers(SumToAll::CROSSOVERS, SumToAll::FILTER_ORDER * 2, 20, 20000);
 
-//	// CROSSOVERS = 4
-//	ArrayVector<accurate_t, SumToAll::CROSSOVERS> frequencies;
-//	frequencies[0] = 80;
-//	frequencies[1] = 168;
-//	frequencies[2] = 1566;
-//	frequencies[3] = 6300;
-
-	// CROSSOVERS = 10
 	ArrayVector<accurate_t, SumToAll::CROSSOVERS> frequencies;
 	for (size_t i = 0; i < SumToAll::CROSSOVERS; i++) {
 		frequencies[i] = crossoverFrequencies[i];
@@ -526,41 +532,61 @@ int main(int count, char * arguments[]) {
 
 	ArrayVector<accurate_t, SumToAll::RC_TIMES> rcTimes;
 	ArrayVector<accurate_t, SumToAll::RC_TIMES> bandRcTimes;
-	bandRcTimes[0] = 0.050;
+	bandRcTimes[0] = 0.010;
 	rcTimes[0] = bandRcTimes[0];
-	double startTime = 0.010;
-	double endTime = 1.2;
+	double startTime = 0.040;
+	double endTime = 0.60;
 	for (int i = 1; i < SumToAll::RC_TIMES; i++) {
 		rcTimes[i] = startTime * pow(endTime / startTime, 1.0 * (i - 1) / (SumToAll::RC_TIMES - 2));
 	}
 
 	// Equal log weight spread
-	accurate_t minimumFreq= 25;
+	accurate_t minimumFreq= 31.5;
 	accurate_t maximumFreq= 12500;
 	ArrayVector<accurate_t, SumToAll::BANDS> bandThresholds1;
-	bandThresholds1[0] = frequencies[0] / minimumFreq;
-	for (size_t i = 1; i < SumToAll::CROSSOVERS; i++) {
-		double f = frequencies[i];
-		bandThresholds1[i] = f / frequencies[i - 1];
+	
+	Array<accurate_t> freqs(SumToAll::CROSSOVERS + 2);
+	freqs[0] = minimumFreq;
+	for (size_t i = 0; i < SumToAll::CROSSOVERS; i++) {
+		freqs[i + 1] = crossoverFrequencies[i];
 	}
-
-	bandThresholds1[SumToAll::CROSSOVERS] = maximumFreq / frequencies[SumToAll::CROSSOVERS - 1];
-
-//	for (size_t i = 0; i < SumToAll::CROSSOVERS; i++) {
-//		double f2 = i > 0 ? frequencies[i -1] : minimumFreq;
-//		double f1 = frequencies[i];
-//		double f3 = sqrt(f1 * f2);
-//		double boost = (f3 + 120) / (f3 + 20);
-//		bandThresholds1[i] *= boost;
-//	}
-
-	accurate_t scale = 0.0;
+	freqs[SumToAll::CROSSOVERS + 1] = maximumFreq;
+	accurate_t warpPower = 1.3;
+	
+	for (size_t band = 0; band <= SumToAll::CROSSOVERS; band++) {
+		accurate_t weight = 0.0;
+		for (accurate_t f = freqs[band]; f < freqs[band + 1]; f += 1.0) {
+			accurate_t fWeight = frequencyWeight(f, minimumFreq, 5000, warpPower);
+			weight += fWeight;
+		}
+		bandThresholds1[band] = weight;
+	}
+	accurate_t scale;
+	accurate_t maxThreshold = 0.0;
+	for (size_t i = 0; i < SumToAll::BANDS; i++) {
+		if (bandThresholds1[i] > maxThreshold) {
+			maxThreshold = bandThresholds1[i];
+		}
+	}
+	scale = 0.0;
 	for (size_t i = 0; i < SumToAll::BANDS; i++) {
 		scale += bandThresholds1[i];
 	}
 	for (size_t i = 0; i < SumToAll::BANDS; i++) {
-		bandThresholds1[i] = sqrt(bandThresholds1[i] / scale);
+		bandThresholds1[i] = bandThresholds1[i] / scale;
 	}
+	scale = 0.0;
+	for (size_t i = 0; i < SumToAll::BANDS; i++) {
+		scale += bandThresholds1[i];
+	}
+	for (size_t i = 0; i < SumToAll::BANDS; i++) {
+		bandThresholds1[i] = bandThresholds1[i] / scale;
+	}
+//	for (size_t i = 0; i < SumToAll::CROSSOVERS; i++) {
+//		if (crossoverFrequencies[i] < 200) {
+//			bandThresholds1[i] = 0.8;
+//		}
+//	}
 
 	ArrayVector<accurate_t, SumToAll::BANDS> bandThresholds2;
 	bandThresholds2 = bandThresholds1;
