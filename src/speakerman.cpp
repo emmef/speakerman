@@ -34,13 +34,19 @@
 #include <signal.h>
 #include <speakerman/jack/Client.hpp>
 
-#include <saaspl/CdHornCompensation.hpp>
 #include <saaspl/Crossovers.hpp>
 #include <saaspl/Delay.hpp>
-#include <saaspl/Limiter.hpp>
 #include <saaspl/RmsLimiter.hpp>
 #include <saaspl/TypeCheck.hpp>
 #include <saaspl/WriteLockFreeRead.hpp>
+
+
+#include <saaspl/BandSummer.hpp>
+#include <saaspl/CdHornCompensation.hpp>
+#include <saaspl/Limiter.hpp>
+#include <saaspl/LinkwitzRileyCrossover.hpp>
+#include <saaspl/MultibandRmsLimiter.hpp>
+#include <saaspl/VolumeMatrix.hpp>
 
 using namespace speakerman;
 using namespace speakerman::jack;
@@ -85,50 +91,76 @@ struct SumToAll : public Client
 	static size_t constexpr RC_TIMES = 20;
 
 private:
+	using Volume = VolumeMatrix<jack_default_audio_sample_t, accurate_t, sample_t>;
+	using CrossoverConfig = CrossoverUserConfig<jack_nframes_t, 4>;
+	using Crossover = LinkwitzRiley<sample_t, accurate_t, accurate_t, 4>;
+	using CrossoverData = Crossover::ConfigData;
+	using CrossoverProcessor = Crossover::Crossover;
+	using RmsLimiterConfig = MultibandRmsLimiter::UserConfig<sample_t>;
+	using RmsLimiterData = MultibandRmsLimiter::ConfigData<sample_t, accurate_t, BANDS, RC_TIMES>;
+	using RmsLimiterProcessor = MultibandRmsLimiter::Processor<sample_t, accurate_t, BANDS, RC_TIMES, CHANNELS>;
+	using Summer = BandSummer::Processor<sample_t>;
+	using LimiterConfig = Limiter::UserConfig;
+	using LimiterData = Limiter::Config;
+	using LimiterProcessor = Limiter::Processor<sample_t>;
+	using CdHornConfig = CdHornCompensation<accurate_t>::UserConfig;
+	using CdHornData = CdHornCompensation<accurate_t>::Config;
+	using CdHornProcessor = CdHornCompensation<accurate_t>::Processor<CHANNELS * 2>;
+
 	typedef RmsLimiter<sample_t, accurate_t, CROSSOVERS, FILTER_ORDER, RC_TIMES> Dynamics;
 
-	struct DoubleConfiguration {
-		Dynamics::Config dynamicsConfig1;
-		Limiter::Config limitingConfig1;
-		CdHornConfig cdHornCOnfig1;
-
-		Dynamics::Config dynamicsConfig2;
-		Limiter::Config limitingConfig2;
-		CdHornConfig cdHornCOnfig2;
-
-		Limiter::Config limitingSubConfig;
+	struct GroupUserConfiguration
+	{
+		RmsLimiterConfig rms;
+		size_t summerSplitIndex;
+		bool summerSumSplitPart;
+		LimiterConfig limiter;
+		CdHornConfig cdHorn;
 	};
 
-	Dynamics::UserConfig dynamicsUserConfig1;
-	Limiter::UserConfig limitingUserConfig1;
-	CdHornUserConfig cdHornUserConfig1;
+	struct GroupConfiguration
+	{
+		RmsLimiterData rms;
+		size_t summerSplitIndex;
+		bool summerSumSplitPart;
+		LimiterData limiter;
+		CdHornData cdHorn;
+	};
 
-	Dynamics::UserConfig dynamicsUserConfig2;
-	Limiter::UserConfig limitingUserConfig2;
-	CdHornUserConfig cdHornUserConfig2;
+	struct GroupsUserConfiguration
+	{
+		CrossoverConfig crossover;
+		GroupUserConfiguration group1;
+		GroupUserConfiguration group2;
+		LimiterConfig limiterSub;
+	};
 
-	Limiter::UserConfig limitingUserConfig3;
+	struct GroupsConfiguration {
+		CrossoverData crossover;
+		GroupConfiguration group1;
+		GroupConfiguration group2;
+		LimiterData limiterDataSub;
+	};
 
-	util::WriteLockFreeRead<DoubleConfiguration, TypeCheckCopyAssignableNonPolymorphic> consumer;
-	Dynamics::Config &wDynConf1 = consumer.writerValue().dynamicsConfig1;
-	Limiter::Config &wLimConf1 = consumer.writerValue().limitingConfig1;
-	CdHornConfig &wCdHornConfig1 = consumer.writerValue().cdHornCOnfig1;
+	GroupsUserConfiguration userConfiguration;
 
-	Dynamics::Config &wDynConf2 = consumer.writerValue().dynamicsConfig2;
-	Limiter::Config &wLimConf2 = consumer.writerValue().limitingConfig2;
-	CdHornConfig &wCdHornConfig2 = consumer.writerValue().cdHornCOnfig2;
+	util::WriteLockFreeRead<GroupsConfiguration, TypeCheckCopyAssignableNonPolymorphic> consumer;
 
-	Limiter::Config &wLimSubConf = consumer.writerValue().limitingSubConfig;
+	GroupsConfiguration & writeConfiguration = consumer.writerValue();
+	GroupsConfiguration & readConfiguration = consumer.readerValue();
 
-	Dynamics::Processor<CHANNELS> dynamics1;
-	Limiter::FixedChannelProcessor<accurate_t, CHANNELS> limiter1;
-	CdHornProcessor<CHANNELS> cdHorn1;
+	CrossoverProcessor crossover;
+	RmsLimiterProcessor rmsLimiter1;
+	Summer summer1;
+	LimiterProcessor limiter1;
+	CdHornProcessor cdHorn1;
 
-	Dynamics::Processor<CHANNELS> dynamics2;
-	Limiter::FixedChannelProcessor<accurate_t, CHANNELS> limiter2;
-	CdHornProcessor<CHANNELS> cdHorn2;
+	RmsLimiterProcessor rmsLimiter2;
+	Summer summer2;
+	LimiterProcessor limiter2;
+	CdHornProcessor cdHorn2;
 
-	Limiter::FixedChannelProcessor<accurate_t, 1> subLimiter;
+	LimiterProcessor limiterSub;
 
 	ClientPort input_0_0;
 	ClientPort input_0_1;
@@ -145,7 +177,6 @@ private:
 protected:
 	virtual bool process(jack_nframes_t frameCount)
 	{
-		static long totalFrames = 0;
 		const jack_default_audio_sample_t* inputLeft1 = input_0_0.getBuffer();
 		const jack_default_audio_sample_t* inputRight1 = input_0_1.getBuffer();
 		const jack_default_audio_sample_t* inputLeft2 = input_1_0.getBuffer();
@@ -158,20 +189,11 @@ protected:
 		jack_default_audio_sample_t* subOut = output_sub.getBuffer();
 
 		if (consumer.read(true)) {
-			dynamics1.checkFilterChanges();
-			dynamics2.checkFilterChanges();
-			limiter1.initConfigChange();
-			limiter2.initConfigChange();
-			subLimiter.initConfigChange();
+			// update local config data
 		}
 
 		if (modus == Modus::BYPASS) {
 			for (size_t frame = 0; frame < frameCount; frame++) {
-
-				dynamics1.input[0] =
-				dynamics1.input[1] =
-				dynamics2.input[0] =
-				dynamics2.input[1] =
 
 				*outputLeft1++ = *inputLeft1++;
 				*outputRight1++ = *inputRight1++;
@@ -185,54 +207,8 @@ protected:
 			return true;
 		}
 
-		jack_default_audio_sample_t samples[4];
-		ArrayVector<sample_t, 1> subLimitingVector;
+		// Apply volumes, splitter, rms-limiter, summer, limiter and speaker correction
 
-		for (size_t frame = 0; frame < frameCount; frame++) {
-
-			dynamics1.input[0] = *inputLeft1++;
-			dynamics1.input[1] = *inputRight1++;
-			dynamics2.input[0] = *inputLeft2++;
-			dynamics2.input[1] = *inputRight2++;
-
-			dynamics1.process();
-			cdHorn1.process(dynamics1.output);
-			limiter1.processInPlace(dynamics1.output);
-
-			dynamics2.process();
-			cdHorn2.process(dynamics2.output);
-			limiter2.processInPlace(dynamics2.output);
-
-			*outputLeft1++ = dynamics1.output[0];
-			*outputRight1++ = dynamics1.output[1];
-
-			*outputLeft2++ = dynamics2.output[0];
-			*outputRight2++ = dynamics2.output[1];
-
-			sample_t sub = 0.0;
-			if (dynamics1.conf.seperateSubChannel) {
-				for (size_t channel = 0; channel < 2; channel++) {
-					sub += dynamics1.subout[channel];
-				}
-			}
-			if (dynamics2.conf.seperateSubChannel) {
-				for (size_t channel = 0; channel < 2; channel++) {
-					sub += dynamics2.subout[channel];
-				}
-			}
-			subLimitingVector[0] = sub;
-			subLimiter.processInPlace(subLimitingVector);
-			*subOut++ = subLimitingVector[0];
-		}
-
-//		totalFrames+= frameCount;
-//
-//		if (totalFrames >= 96000) {
-//			double maxAllPass = dynamics1.maxAllPass;
-//			dynamics1.maxAllPass = 0.0;
-//			printf("MaxAllPass: %0.4lg\n", maxAllPass);
-//			totalFrames = 0;
-//		}
 		return true;
 	}
 
