@@ -62,12 +62,6 @@ typedef saaspl::Delay<jack_default_audio_sample_t> Delay;
 typedef double sample_t;
 typedef double accurate_t;
 
-using CdHorn = CdHornCompensation<accurate_t>;
-using CdHornUserConfig = CdHorn::UserConfig;
-using CdHornConfig = CdHorn::Config;
-template<size_t CHANNELS>
-using CdHornProcessor = CdHorn::Processor<CHANNELS>;
-
 static accurate_t crossoverFrequencies[] = {
 //		168, 1566, 2500, 6300
 		80, 168, 1566, 6300
@@ -82,18 +76,23 @@ static accurate_t crossoverFrequencies[] = {
 //		10240
 };
 
+
 struct SumToAll : public Client
 {
 	static size_t constexpr CROSSOVERS = sizeof(crossoverFrequencies) / sizeof(accurate_t);
 	static size_t constexpr BANDS = CROSSOVERS + 1;
+	static size_t constexpr GROUPS = 2;
 	static size_t constexpr CHANNELS = 2;
 	static size_t constexpr FILTER_ORDER = 2;
 	static size_t constexpr RC_TIMES = 20;
+	static size_t constexpr MAX_SAMPLERATE = 192000;
+	static double constexpr MAX_PREDICTION_SECONDS = 0.01;
+	static size_t constexpr MAX_PREDICTION_SAMPLES = (size_t)MAX_SAMPLERATE * MAX_PREDICTION_SECONDS;
 
-private:
+public:
 	using Volume = VolumeMatrix<jack_default_audio_sample_t, accurate_t, sample_t>;
-	using CrossoverConfig = CrossoverUserConfig<jack_nframes_t, 4>;
-	using Crossover = LinkwitzRiley<sample_t, accurate_t, accurate_t, 4>;
+	using CrossoverConfig = CrossoverUserConfig<double, 4>;
+	using Crossover = LinkwitzRiley<sample_t, accurate_t, accurate_t, 4, CROSSOVERS, CHANNELS * 2>;
 	using CrossoverData = Crossover::ConfigData;
 	using CrossoverProcessor = Crossover::Crossover;
 	using RmsLimiterConfig = MultibandRmsLimiter::UserConfig<sample_t>;
@@ -102,9 +101,9 @@ private:
 	using Summer = BandSummer::Processor<sample_t>;
 	using LimiterConfig = Limiter::UserConfig;
 	using LimiterData = Limiter::Config;
-	using LimiterProcessor = Limiter::Processor<sample_t>;
+	using LimiterProcessor = Limiter::FixedChannelProcessor<sample_t, CHANNELS, MAX_PREDICTION_SAMPLES>;
 	using CdHornConfig = CdHornCompensation<accurate_t>::UserConfig;
-	using CdHornData = CdHornCompensation<accurate_t>::Config;
+	using CdHornData = CdHornCompensation<accurate_t>::Config<CHANNELS>;
 	using CdHornProcessor = CdHornCompensation<accurate_t>::Processor<CHANNELS * 2>;
 
 	typedef RmsLimiter<sample_t, accurate_t, CROSSOVERS, FILTER_ORDER, RC_TIMES> Dynamics;
@@ -116,6 +115,12 @@ private:
 		bool summerSumSplitPart;
 		LimiterConfig limiter;
 		CdHornConfig cdHorn;
+
+		GroupUserConfiguration(const Crossovers<double> &crossovers) :
+			rms(crossovers, RC_TIMES, true)
+		{
+
+		}
 	};
 
 	struct GroupConfiguration
@@ -125,22 +130,60 @@ private:
 		bool summerSumSplitPart;
 		LimiterData limiter;
 		CdHornData cdHorn;
+
+		void reconfigure(const GroupUserConfiguration &userConf, jack_nframes_t sampleRate)
+		{
+			rms.configure(userConf.rms, sampleRate);
+			summerSplitIndex = userConf.summerSplitIndex;
+			summerSumSplitPart = userConf.summerSumSplitPart;
+			limiter.configure(userConf.limiter, sampleRate);
+			cdHorn.configure(userConf.cdHorn, sampleRate);
+		}
 	};
 
 	struct GroupsUserConfiguration
 	{
 		CrossoverConfig crossover;
-		GroupUserConfiguration group1;
-		GroupUserConfiguration group2;
+		GroupUserConfiguration group[GROUPS];
 		LimiterConfig limiterSub;
+
+		GroupsUserConfiguration(const Crossovers<double> &crossovers) :
+			crossover(crossovers),
+			group({crossovers, crossovers})
+		{
+		}
 	};
 
 	struct GroupsConfiguration {
 		CrossoverData crossover;
-		GroupConfiguration group1;
+		GroupConfiguration group[GROUPS];
 		GroupConfiguration group2;
 		LimiterData limiterDataSub;
+
+		void reconfigure(const GroupsUserConfiguration &userConfig, jack_nframes_t sampleRate, jack_nframes_t frameSize)
+		{
+			const CrossoverContext<sample_t, double> context(frameSize, CHANNELS, sampleRate);
+			crossover = CrossoverData::createConfigurationData(userConfig.crossover, context);
+			for (size_t groupNumber = 0; groupNumber < GROUPS; groupNumber++) {
+				group[groupNumber].reconfigure(userConfig.group[groupNumber], sampleRate);
+			}
+			limiterDataSub.configure(userConfig.limiterSub, sampleRate);
+		}
 	};
+
+	struct GroupProcessor
+	{
+		CrossoverProcessor crossover;
+		RmsLimiterProcessor rmsLimiter;
+		Summer summer;
+		LimiterProcessor limiter;
+		CdHornProcessor cdHorn;
+
+		GroupProcessor() :
+			summer(1, true) { }
+	};
+
+private:
 
 	GroupsUserConfiguration userConfiguration;
 
@@ -149,16 +192,9 @@ private:
 	GroupsConfiguration & writeConfiguration = consumer.writerValue();
 	GroupsConfiguration & readConfiguration = consumer.readerValue();
 
-	CrossoverProcessor crossover;
-	RmsLimiterProcessor rmsLimiter1;
-	Summer summer1;
-	LimiterProcessor limiter1;
-	CdHornProcessor cdHorn1;
-
-	RmsLimiterProcessor rmsLimiter2;
-	Summer summer2;
-	LimiterProcessor limiter2;
-	CdHornProcessor cdHorn2;
+	Volume volume;
+	GroupProcessor processor1;
+	GroupProcessor processor2;
 
 	LimiterProcessor limiterSub;
 
@@ -172,76 +208,57 @@ private:
 	ClientPort output_1_1;
 	ClientPort output_sub;
 
-	volatile jack_nframes_t lastSampleRate = -1;
+	volatile jack_nframes_t lastSampleRate = 0;
+	volatile jack_nframes_t lastBufferSize = 0;
+
 
 protected:
-	virtual bool process(jack_nframes_t frameCount)
+	virtual bool process(jack_nframes_t frameCount) override
 	{
-		const jack_default_audio_sample_t* inputLeft1 = input_0_0.getBuffer();
-		const jack_default_audio_sample_t* inputRight1 = input_0_1.getBuffer();
-		const jack_default_audio_sample_t* inputLeft2 = input_1_0.getBuffer();
-		const jack_default_audio_sample_t* inputRight2 = input_1_1.getBuffer();
+		Array<RefArray<jack_default_audio_sample_t>> inputs(4);
+		Array<RefArray<jack_default_audio_sample_t>> outputs(5);
 
-		jack_default_audio_sample_t* outputLeft1 = output_0_0.getBuffer();
-		jack_default_audio_sample_t* outputRight1 = output_0_1.getBuffer();
-		jack_default_audio_sample_t* outputLeft2 = output_1_0.getBuffer();
-		jack_default_audio_sample_t* outputRight2 = output_1_1.getBuffer();
-		jack_default_audio_sample_t* subOut = output_sub.getBuffer();
+		inputs[0] = RefArray<jack_default_audio_sample_t>(frameCount, input_0_0.getBuffer());
+		inputs[1] = RefArray<jack_default_audio_sample_t>(frameCount, input_0_1.getBuffer());
+		inputs[2] = RefArray<jack_default_audio_sample_t>(frameCount, input_1_0.getBuffer());
+		inputs[3] = RefArray<jack_default_audio_sample_t>(frameCount, input_1_1.getBuffer());
+
+		outputs[0] = RefArray<jack_default_audio_sample_t>(frameCount, output_0_0.getBuffer());
+		outputs[1] = RefArray<jack_default_audio_sample_t>(frameCount, output_0_1.getBuffer());
+		outputs[2] = RefArray<jack_default_audio_sample_t>(frameCount, output_1_0.getBuffer());
+		outputs[3] = RefArray<jack_default_audio_sample_t>(frameCount, output_1_1.getBuffer());
+		outputs[4] = RefArray<jack_default_audio_sample_t>(frameCount, output_sub.getBuffer());
 
 		if (consumer.read(true)) {
 			// update local config data
 		}
 
-		if (modus == Modus::BYPASS) {
-			for (size_t frame = 0; frame < frameCount; frame++) {
-
-				*outputLeft1++ = *inputLeft1++;
-				*outputRight1++ = *inputRight1++;
-
-				*outputLeft2++ = *inputLeft2++;
-				*outputRight2++ = *inputRight2++;
-
-				*subOut++ = 0;
-			}
+		if (bufferSize() == 0 || sampleRate() == 0) {
+			return false;
+		}
+//		if (modus == Modus::BYPASS) {
+			outputs[0].copy(0, inputs[0], 0, frameCount);
+			outputs[1].copy(0, inputs[1], 0, frameCount);
+			outputs[2].copy(0, inputs[2], 0, frameCount);
+			outputs[3].copy(0, inputs[3], 0, frameCount);
+			outputs[4].zero();
 
 			return true;
-		}
-
-		// Apply volumes, splitter, rms-limiter, summer, limiter and speaker correction
+//		}
 
 		return true;
 	}
 
-	virtual bool setSamplerate(jack_nframes_t sampleRate)
+	virtual bool setContext(jack_nframes_t newBufferSize, jack_nframes_t newSampleRate) override
 	{
-		if (configure(sampleRate)) {
-			lastSampleRate = sampleRate;
-			return true;
-		}
-		return false;
+		return configure(newBufferSize, newSampleRate);
 	}
 
-	bool configure(jack_nframes_t sampleRate)
+	bool configure(jack_nframes_t newBufferSize, jack_nframes_t sampleRate)
 	{
-		wDynConf1.configure(dynamicsUserConfig1, sampleRate);
-		wLimConf1.configure(limitingUserConfig1, sampleRate);
-		wCdHornConfig1.configure(cdHornUserConfig1, sampleRate);
-
-		wDynConf2.configure(dynamicsUserConfig2, sampleRate);
-		wLimConf2.configure(limitingUserConfig2, sampleRate);
-		wCdHornConfig2.configure(cdHornUserConfig2, sampleRate);
-
-		wLimSubConf.configure(limitingUserConfig3, sampleRate);
+		writeConfiguration.reconfigure(userConfiguration, sampleRate, newBufferSize);
 
 		return consumer.write();
-	}
-
-	bool reconfigure()
-	{
-		if (lastSampleRate < 1) {
-			throw std::runtime_error("Cannot reconfigure if no initial config was done");
-		}
-		return configure(lastSampleRate);
 	}
 
 	virtual void beforeShutdown()
@@ -253,6 +270,7 @@ protected:
 	{
 		std::cerr << "After shutdown";
 	}
+
 	virtual void connectPortsOnActivate() {
 		unique_ptr<PortNames> capturePorts(getPortNames(nullptr, nullptr, JackPortIsPhysical|JackPortIsOutput));
 
@@ -334,14 +352,8 @@ protected:
 
 public:
 	SumToAll(
-			ArrayVector<accurate_t, CROSSOVERS> &frequencies,
-			ArrayVector<accurate_t, RC_TIMES> &rcTimes,
-			accurate_t threshold1,
-			ArrayVector<accurate_t, BANDS> &bandThreshold1,
-			accurate_t threshold2,
-			ArrayVector<accurate_t, BANDS> &bandThreshold2
-			)
-:
+			const Crossovers<accurate_t> &crossovers)
+	:
 		Client(9),
 		input_0_0(addPort(PortDirection::IN, "input_0_0")),
 		input_1_0(addPort(PortDirection::IN, "input_1_0")),
@@ -352,90 +364,31 @@ public:
 		output_0_1(addPort(PortDirection::OUT, "output_0_1")),
 		output_1_1(addPort(PortDirection::OUT, "output_1_1")),
 		output_sub(addPort(PortDirection::OUT, "output_sub")),
-		dynamics1(consumer.readerValue().dynamicsConfig1),
-		limiter1(2048, consumer.readerValue().limitingConfig1, consumer.readerValue().dynamicsConfig1.valueRc),
-		dynamics2(consumer.readerValue().dynamicsConfig2),
-		limiter2(2048, consumer.readerValue().limitingConfig2, consumer.readerValue().dynamicsConfig2.valueRc),
-		subLimiter(2048, consumer.readerValue().limitingSubConfig, consumer.readerValue().dynamicsConfig2.valueRc),
-		cdHorn1(consumer.readerValue().cdHornCOnfig1),
-		cdHorn2(consumer.readerValue().cdHornCOnfig2)
+		userConfiguration(crossovers),
+		volume(CHANNELS * GROUPS, CHANNELS * GROUPS)
 	{
-		dynamicsUserConfig1.frequencies.assign(frequencies);
-		dynamicsUserConfig1.rcs.assign(rcTimes);
-		dynamicsUserConfig1.bandThreshold.assign(bandThreshold1);
-		dynamicsUserConfig1.threshold = threshold1;
-		dynamicsUserConfig1.seperateSubChannel = true;
-
-		limitingUserConfig1.setThreshold(saaspl::min(1.0, threshold1 * 2));
-		limitingUserConfig1.setAttackTime(0.003);
-		limitingUserConfig1.setReleaseTime(0.006);
-		limitingUserConfig1.setSmoothingTime(0.003);
-		limitingUserConfig1.setPredictionTime(0.004);
-
-		cdHornUserConfig1.setBypass(true);
-
-		dynamicsUserConfig2.frequencies.assign(frequencies);
-		dynamicsUserConfig2.rcs.assign(rcTimes);
-		dynamicsUserConfig2.bandThreshold.assign(bandThreshold2);
-		dynamicsUserConfig2.threshold = threshold2;
-		dynamicsUserConfig2.seperateSubChannel = true;
-
-		limitingUserConfig2.setThreshold(saaspl::min(1.0, threshold2 * 2.5));
-		limitingUserConfig2.setAttackTime(0.003);
-		limitingUserConfig2.setReleaseTime(0.006);
-		limitingUserConfig2.setSmoothingTime(0.003);
-		limitingUserConfig2.setPredictionTime(0.004);
-
-		cdHornUserConfig2.setBypass(true);
-
-		limitingUserConfig3.setThreshold(saaspl::max(saaspl::min(1.0, threshold1 * 2), saaspl::min(1.0, threshold2 * 2)));
-		limitingUserConfig3.setAttackTime(0.003);
-		limitingUserConfig3.setReleaseTime(0.006);
-		limitingUserConfig3.setSmoothingTime(0.003);
-		limitingUserConfig3.setPredictionTime(0.004);
-
+		for (size_t ch = 0; ch < CHANNELS * GROUPS; ch++) {
+			volume(ch, ch) = 1;
+		}
 		finishDefiningPorts();
 	};
 
-	void toggleCdHorn()
+	bool reconfigure()
 	{
-		cdHornUserConfig1.setBypass(!cdHornUserConfig1.getBypass());
-		cdHornUserConfig2.setBypass(!cdHornUserConfig2.getBypass());
-		reconfigure();
+		if (sampleRate() > 0 && bufferSize() > 0) {
+			return configure(bufferSize(), sampleRate());
+		}
+		throw std::runtime_error("Cannot reconfigure if no initial config was done");
 	}
 
-	void rotateCdHornfrequency()
+	GroupsUserConfiguration &config()
 	{
-		double f= cdHornUserConfig1.getTopFrequency();
-		if (f < 24000) {
-			f += 1000;
-		}
-		else {
-			f = 16000;
-		}
-		cdHornUserConfig1.setTopFrequency(f);
-		cdHornUserConfig2.setTopFrequency(f);
-		reconfigure();
+		return userConfiguration;
 	}
 
-	void rotateThresholds()
+	const GroupsConfiguration &effectiveConfig()
 	{
-		rotateThreshold(limitingUserConfig1, wLimConf1);
-		rotateThreshold(limitingUserConfig2, wLimConf2);
-		rotateThreshold(limitingUserConfig3, wLimSubConf);
-		consumer.write(200);
-	}
-
-	void rotateThreshold(Limiter::UserConfig &userConfig, Limiter::Config &config)
-	{
-		double threshold = userConfig.getThreshold();
-		threshold *= pow(2, 0.25);
-
-		if (threshold >= 1.0) {
-			threshold = 0.25;
-		}
-		userConfig.setThreshold(threshold);
-		config.configure(userConfig, lastSampleRate);
+		return writeConfiguration;
 	}
 
 	virtual ~SumToAll()
@@ -494,6 +447,56 @@ inline static accurate_t frequencyWeight(accurate_t f, accurate_t shelve1, accur
 		return (1 + fRel * fShelve2Corr) / (1.0 + fRel);
 }
 
+void setRmsLimiterConfig(std::string identifier, SumToAll::RmsLimiterConfig &config)
+{
+	config.rcs().setSmoothingRc(0.010);
+	double startTime = 0.040;
+	double endTime = 0.60;
+	for (int i = 0; i < SumToAll::RC_TIMES; i++) {
+		double time = startTime * pow(endTime / startTime, 1.0 * (i - 1) / (SumToAll::RC_TIMES - 2));
+		config.rcs().setRc(i, time);
+	}
+	config.setMaxBandLevelDifference(4.0);
+	config.setThreshold(0.25);
+}
+
+void setLimiterConfig(std::string identifier, SumToAll::LimiterConfig &config)
+{
+	config.setAttackTime(0.003);
+	config.setReleaseTime(0.009);
+	config.setPredictionTime(0.004);
+	config.setSmoothingTime(0.002);
+	config.setThreshold(0.75);
+}
+
+void setCdHornConfig(std::string identifier, SumToAll::CdHornConfig &config)
+{
+	config.setStartFrequency(5000);
+	config.setTopFrequency(20000);
+	config.setSlope(3.0);
+	config.setBypass(true);
+}
+
+void setGroupDefaults(std::string identifier, SumToAll::GroupUserConfiguration &config)
+{
+	setRmsLimiterConfig(identifier + ".rms", config.rms);
+	setLimiterConfig(identifier + ".limiter", config.limiter);
+	setCdHornConfig(identifier + ".cdhorn", config.cdHorn);
+	config.summerSplitIndex = 1;
+	config.summerSumSplitPart = true;
+}
+
+void setDefaults(std::string identifier, SumToAll::GroupsUserConfiguration &config)
+{
+	static const char * groupNumbers[SumToAll::GROUPS] = { ".group1", ".group2" };
+	for (size_t grp = 0; grp < SumToAll::GROUPS; grp++) {
+		setGroupDefaults(identifier + groupNumbers[grp], config.group[grp]);
+	}
+	setLimiterConfig(identifier + ".sub.limiter", config.limiterSub);
+}
+
+
+
 int main(int count, char * arguments[]) {
 	signal(SIGINT, signal_callback_handler);
 	signal(SIGTERM, signal_callback_handler);
@@ -501,76 +504,15 @@ int main(int count, char * arguments[]) {
 
 	saaspl::Crossovers<accurate_t> crossovers(SumToAll::CROSSOVERS, SumToAll::FILTER_ORDER * 2, 20, 20000);
 
-	ArrayVector<accurate_t, SumToAll::CROSSOVERS> frequencies;
 	for (size_t i = 0; i < SumToAll::CROSSOVERS; i++) {
-		frequencies[i] = crossoverFrequencies[i];
+		crossovers.setCrossover(i, crossoverFrequencies[i]);
 	}
 
-	ArrayVector<accurate_t, SumToAll::RC_TIMES> rcTimes;
-	ArrayVector<accurate_t, SumToAll::RC_TIMES> bandRcTimes;
-	bandRcTimes[0] = 0.010;
-	rcTimes[0] = bandRcTimes[0];
-	double startTime = 0.040;
-	double endTime = 0.60;
-	for (int i = 1; i < SumToAll::RC_TIMES; i++) {
-		rcTimes[i] = startTime * pow(endTime / startTime, 1.0 * (i - 1) / (SumToAll::RC_TIMES - 2));
-	}
+	clientOwner.setClient(new SumToAll(crossovers));
 
-	// Equal log weight spread
-	accurate_t minimumFreq= 31.5;
-	accurate_t maximumFreq= 12500;
-	ArrayVector<accurate_t, SumToAll::BANDS> bandThresholds1;
-	
-	Array<accurate_t> freqs(SumToAll::CROSSOVERS + 2);
-	freqs[0] = minimumFreq;
-	for (size_t i = 0; i < SumToAll::CROSSOVERS; i++) {
-		freqs[i + 1] = crossoverFrequencies[i];
-	}
-	freqs[SumToAll::CROSSOVERS + 1] = maximumFreq;
-	accurate_t warpPower = 1.3;
-	
-	for (size_t band = 0; band <= SumToAll::CROSSOVERS; band++) {
-		accurate_t weight = 0.0;
-		for (accurate_t f = freqs[band]; f < freqs[band + 1]; f += 1.0) {
-			accurate_t fWeight = frequencyWeight(f, minimumFreq, 5000, warpPower);
-			weight += fWeight;
-		}
-		bandThresholds1[band] = weight;
-	}
-	accurate_t scale;
-	accurate_t maxThreshold = 0.0;
-	for (size_t i = 0; i < SumToAll::BANDS; i++) {
-		if (bandThresholds1[i] > maxThreshold) {
-			maxThreshold = bandThresholds1[i];
-		}
-	}
-	scale = 0.0;
-	for (size_t i = 0; i < SumToAll::BANDS; i++) {
-		scale += bandThresholds1[i];
-	}
-	for (size_t i = 0; i < SumToAll::BANDS; i++) {
-		bandThresholds1[i] = bandThresholds1[i] / scale;
-	}
-	scale = 0.0;
-	for (size_t i = 0; i < SumToAll::BANDS; i++) {
-		scale += bandThresholds1[i];
-	}
-	for (size_t i = 0; i < SumToAll::BANDS; i++) {
-		bandThresholds1[i] = bandThresholds1[i] / scale;
-	}
-//	for (size_t i = 0; i < SumToAll::CROSSOVERS; i++) {
-//		if (crossoverFrequencies[i] < 200) {
-//			bandThresholds1[i] = 0.8;
-//		}
-//	}
+	SumToAll::GroupsUserConfiguration &config = clientOwner.get().config();
 
-	ArrayVector<accurate_t, SumToAll::BANDS> bandThresholds2;
-	bandThresholds2 = bandThresholds1;
-
-	accurate_t threshold1 = 0.25;
-	accurate_t threshold2 = 0.25;
-
-	clientOwner.setClient(new SumToAll(frequencies, rcTimes, threshold1, bandThresholds1, threshold2, bandThresholds2));
+	setDefaults("default", config);
 
 	clientOwner.get().open("speakerman", JackOptions::JackNullOption);
 	clientOwner.get().activate();
@@ -593,30 +535,10 @@ int main(int count, char * arguments[]) {
 				modus = Modus::BYPASS;
 			}
 			break;
-		case 'c':
-		case 'C':
-			std::cout << "CD-Horn bypass toggle" << std::endl;
-			clientOwner.get().toggleCdHorn();
-			break;
-		case 'f':
-		case 'F':
-			std::cout << "CD-Horn frequency change" << std::endl;
-			clientOwner.get().rotateCdHornfrequency();
-			break;
-		case 's':
-		case 'S':
-			std::cout << "CD-Horn slope" << std::endl;
-			clientOwner.get().rotateCdHornfrequency();
-			break;
 		case 'h':
 		case 'H':
 			std::cout << "High-pass" << std::endl;
 			modus = Modus::HIGH;
-			break;
-		case 't' :
-		case 'T' :
-			std::cout << "Adapting threshold" << std::endl;
-			clientOwner.get().rotateThresholds();
 			break;
 		case 'q' :
 		case 'Q' :
