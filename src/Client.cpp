@@ -223,12 +223,14 @@ bool Client::handleOpen(jack_status_t clientOpenStatus)
 					<< statusMessage(clientOpenStatus) << endl;
 		}
 		shutdownByJack = false;
-		if ((jack_set_process_callback(client, rawProcess, this) == 0)
-				&& (jack_set_sample_rate_callback(client, rawSetSamplerate,
-						this) == 0)) {
+		if (
+				(jack_set_process_callback(client, rawProcess, this) == 0) &&
+				(jack_set_sample_rate_callback(client, rawSetSamplerate, this) == 0) &&
+				(jack_set_buffer_size_callback(client, rawSetBufferSize, this) == 0)) {
 			jack_on_info_shutdown(client, rawShutdown, this);
 			state = ClientState::CLIENT;
 			return true;
+
 		}
 		unsafeClose();
 		throw runtime_error("Unable to register necessary call-backs");
@@ -267,12 +269,6 @@ bool Client::unsafeClose()
 	return true;
 }
 
-bool Client::setSamplerateFenced(jack_nframes_t frames)
-{
-	return setSamplerate(frames);
-}
-
-
 bool Client::prepareAndprocess(jack_nframes_t nframes)
 {
 	try {
@@ -296,9 +292,55 @@ int Client::rawProcess(jack_nframes_t nframes, void* arg)
 	return ((Client*) ((arg)))->prepareAndprocess(nframes) ? 0 : 1;
 }
 
-int Client::rawSetSamplerate(jack_nframes_t nframes, void* arg)
+int Client::rawSetSamplerate(jack_nframes_t sampleRate, void* arg)
 {
-	return ((Client*) ((arg)))->setSamplerateFenced(nframes) ? 0 : 1;
+	return ((Client*) ((arg)))->updateSampleRate(sampleRate) ? 0 : 1;
+}
+
+int Client::rawSetBufferSize(jack_nframes_t bufferSize, void *arg)
+{
+	return ((Client*) ((arg)))->updateBufferSize(bufferSize) ? 0 : 1;
+}
+
+bool Client::updateBufferSize(jack_nframes_t newBufferSize)
+{
+	saaspl::util::MemoryFence fence;
+
+	if (bufferSize_ == newBufferSize) {
+		return true;
+	}
+
+	bufferSizeProposal = newBufferSize;
+
+	if (sampleRateProposal == 0) {
+		return true;
+	}
+	if (setContext(bufferSizeProposal, sampleRateProposal)) {
+		bufferSize_ = bufferSizeProposal;
+		return true;
+	}
+	return false;
+}
+
+bool Client::updateSampleRate(jack_nframes_t newSampleRate)
+{
+	saaspl::util::MemoryFence fence;
+
+	if (sampleRate_ == newSampleRate) {
+		return true;
+	}
+
+	sampleRateProposal = newSampleRate;
+
+	if (bufferSizeProposal == 0) {
+		return true;
+	}
+
+	if (setContext(bufferSizeProposal, sampleRateProposal)) {
+		sampleRate_ = newSampleRate;
+		return true;
+	}
+	return false;
 }
 
 void Client::rawShutdown(jack_status_t status, const char *message, void* arg)
@@ -516,6 +558,10 @@ void Client::unsafeDeactivate() {
 	if (jack_deactivate(client) != 0) {
 		cerr << "Could not deactivate jack client" << endl;
 	}
+	sampleRate_ = 0;
+	bufferSize_ = 0;
+	sampleRateProposal = 0;
+	bufferSizeProposal = 0;
 	unsafeUnRegisterPorts(-1);
 	state = ClientState::CLIENT;
 }
