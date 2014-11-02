@@ -306,6 +306,12 @@ bool Client::updateBufferSize(jack_nframes_t newBufferSize)
 {
 	saaspl::util::MemoryFence fence;
 
+	std::cout << "updateBufferSize(" << newBufferSize << "): " << std::endl
+			<< "\tbufferSize=" << bufferSize_
+			<< "; sampleRate=" << sampleRate_
+			<< "; sampleRateProposal=" << sampleRateProposal
+			<< "; bufferSizeProposal=" << bufferSizeProposal << std::endl;
+
 	if (bufferSize_ == newBufferSize) {
 		return true;
 	}
@@ -313,10 +319,14 @@ bool Client::updateBufferSize(jack_nframes_t newBufferSize)
 	bufferSizeProposal = newBufferSize;
 
 	if (sampleRateProposal == 0) {
+		std::cout << "Sample rate not proposed yet: wait" << std::endl;
 		return true;
 	}
+	std::cout << "try to apply proposal..." << std::endl;
 	if (setContext(bufferSizeProposal, sampleRateProposal)) {
+		sampleRate_ = sampleRateProposal;
 		bufferSize_ = bufferSizeProposal;
+		std::cout << "Applied: bufferSize=" << bufferSize_ << std::endl;
 		return true;
 	}
 	return false;
@@ -326,6 +336,12 @@ bool Client::updateSampleRate(jack_nframes_t newSampleRate)
 {
 	saaspl::util::MemoryFence fence;
 
+	std::cout << "updateSampleRate(" << newSampleRate << "): " << std::endl
+			<< "\tbufferSize=" << bufferSize_
+			<< "; sampleRate=" << sampleRate_
+			<< "; sampleRateProposal=" << sampleRateProposal
+			<< "; bufferSizeProposal=" << bufferSizeProposal << std::endl;
+
 	if (sampleRate_ == newSampleRate) {
 		return true;
 	}
@@ -333,11 +349,15 @@ bool Client::updateSampleRate(jack_nframes_t newSampleRate)
 	sampleRateProposal = newSampleRate;
 
 	if (bufferSizeProposal == 0) {
+		std::cout << "Buffer size not proposed yet: wait" << std::endl;
 		return true;
 	}
 
+	std::cout << "try to apply proposal..." << std::endl;
 	if (setContext(bufferSizeProposal, sampleRateProposal)) {
-		sampleRate_ = newSampleRate;
+		sampleRate_ = sampleRateProposal;
+		bufferSize_ = bufferSizeProposal;
+		std::cout << "Applied: sampleRate=" << sampleRate_ << std::endl;
 		return true;
 	}
 	return false;

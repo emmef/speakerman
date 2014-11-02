@@ -208,6 +208,7 @@ namespace jack {
 
 		jack_nframes_t sampleRate() { return sampleRate_; }
 		jack_nframes_t bufferSize() { return bufferSize_; }
+		ClientState clientState() { return state; }
 
 	public:
 
