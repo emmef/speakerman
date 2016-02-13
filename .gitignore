@@ -14,3 +14,28 @@
 
 # Backups
 *~
+
+
+# Uninteresting (IDE specific)
+.cproject
+.idea
+.kdev*
+.project
+.settings
+
+# Intermediate / generated files
+aclocal.m4
+compile
+config.*
+depcomp
+configure
+install-sh
+libtool
+ltmain.sh
+m4/
+Makefile
+Makefile.in
+missing
+src/.deps
+src/speakerman
+*.cache
