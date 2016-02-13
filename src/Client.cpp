@@ -24,8 +24,8 @@
 #include <locale>
 #include <chrono>
 
-#include <saaspl/MemoryFence.hpp>
-#include <saaspl/Count.hpp>
+#include <tdap/MemoryFence.hpp>
+#include <tdap/Count.hpp>
 #include <speakerman/jack/Client.hpp>
 
 namespace speakerman {
@@ -206,7 +206,7 @@ Client::~Client()
 
 
 Client::Client(size_t maximumNumberOfPorts) :
-		port(new PortEntry[saaspl::Count<PortEntry>::valid(maximumNumberOfPorts)]),
+		port(new PortEntry[tdap::Count<PortEntry>::valid(maximumNumberOfPorts)]),
 		portCapacity(maximumNumberOfPorts)
 {
 	thread t { Client::serveMessagesForClient, this };
@@ -304,7 +304,7 @@ int Client::rawSetBufferSize(jack_nframes_t bufferSize, void *arg)
 
 bool Client::updateBufferSize(jack_nframes_t newBufferSize)
 {
-	saaspl::util::MemoryFence fence;
+	tdap::MemoryFence fence;
 
 	std::cout << "updateBufferSize(" << newBufferSize << "): " << std::endl
 			<< "\tbufferSize=" << bufferSize_
@@ -334,7 +334,7 @@ bool Client::updateBufferSize(jack_nframes_t newBufferSize)
 
 bool Client::updateSampleRate(jack_nframes_t newSampleRate)
 {
-	saaspl::util::MemoryFence fence;
+	tdap::MemoryFence fence;
 
 	std::cout << "updateSampleRate(" << newSampleRate << "): " << std::endl
 			<< "\tbufferSize=" << bufferSize_

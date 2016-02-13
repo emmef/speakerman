@@ -30,7 +30,6 @@
 #include <thread>
 #include <stdexcept>
 
-
 namespace speakerman {
 namespace jack {
 

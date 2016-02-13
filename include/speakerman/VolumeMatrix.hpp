@@ -22,7 +22,7 @@
 #ifndef SMS_SPEAKERMAN_VOLUMEMATRIX_GUARD_H_
 #define SMS_SPEAKERMAN_VOLUMEMATRIX_GUARD_H_
 
-#include <saaspl/Matrix.hpp>
+#include <tdap/Matrix.hpp>
 
 namespace speakerman {
 
