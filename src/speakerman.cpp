@@ -26,6 +26,7 @@
 #include <signal.h>
 
 #include <tdap/Array.hpp>
+#include <speakerman/jack/JackClient.hpp>
 #include <speakerman/jack/Client.hpp>
 
 using namespace speakerman;
@@ -34,6 +35,8 @@ using namespace tdap;
 
 typedef double sample_t;
 typedef double accurate_t;
+
+
 
 //static accurate_t crossoverFrequencies[] = {
 ////		168, 1566, 2500, 6300

@@ -88,47 +88,6 @@ Client::PortEntry::PortEntry() :
 					port(nullptr),
 					buffer(nullptr) {}
 
-inline PortNames::PortNames(jack_client_t* client, const char* namePattern,
-		const char* typePattern, unsigned long flags) :
-		portNames(jack_get_ports(client, namePattern, typePattern, flags))
-{
-	count = 0;
-	if (portNames != nullptr) {
-		const char** name = portNames;
-		while (name[count] != nullptr) {
-			count++;
-		}
-	}
-}
-
-size_t PortNames::rangeCheck(size_t index) const
-{
-	if (index < count) {
-		return index;
-	}
-	throw out_of_range("Port name index out of range");
-}
-
-size_t PortNames::length() const
-{
-	return count;
-}
-
-const char* PortNames::get(size_t idx) const
-{
-	return portNames[rangeCheck(idx)];
-}
-
-const char* PortNames::operator [](size_t idx) const
-{
-	return get(idx);
-}
-PortNames::~PortNames()
-{
-	if (portNames != nullptr) {
-		jack_free(portNames);
-	}
-}
 
 //class MessageServer
 //{

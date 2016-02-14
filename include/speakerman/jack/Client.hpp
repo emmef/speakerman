@@ -23,6 +23,7 @@
 #define SMS_SPEAKERMAN_CLIENT_GUARD_H_
 
 #include <speakerman/jack/Messages.hpp>
+#include <speakerman/jack/JackClient.hpp>
 #include <string>
 #include <mutex>
 #include <queue>
@@ -30,15 +31,12 @@
 #include <thread>
 #include <stdexcept>
 
+
 namespace speakerman {
 namespace jack {
 
 	using namespace std;
 
-	enum class PortDirection
-	{
-		IN, OUT
-	};
 	enum class ClientState
 	{
 		DISCONNECTED, CLIENT, ACTIVE
@@ -55,23 +53,6 @@ namespace jack {
 		{
 			m.unlock();
 		}
-	};
-	class PortNames
-	{
-		const char** const portNames;
-		size_t count;
-		friend class Client;
-
-		PortNames(jack_client_t* client, const char* namePattern,
-				const char* typePattern, unsigned long flags);
-
-		size_t rangeCheck(size_t index) const;
-
-	public:
-		size_t length() const;
-		const char* get(size_t idx) const;
-		const char* operator [](size_t idx) const;
-		~PortNames();
 	};
 
 	class Client
