@@ -23,56 +23,25 @@
 #define SMS_SPEAKERMAN_PORT_GUARD_H_
 
 #include <string>
+#include <iostream>
 
 #include <jack/jack.h>
 #include <jack/types.h>
 
 #include <tdap/Array.hpp>
-
+#include <tdap/Value.hpp>
 #include "ErrorHandler.hpp"
+#include "Names.hpp"
+#include "PortDefinition.hpp"
 
 namespace speakerman {
-namespace jack {
 
 using namespace tdap;
 
-enum class PortDirection
-{
-	IN, OUT
-};
-
-static const char * const port_direction_name(PortDirection direction)
-{
-	switch (direction) {
-		case PortDirection::IN:
-			return "IN";
-		case PortDirection::OUT:
-			return "OUT";
-		default:
-			return "<INVALID>";
-	}
-}
-
 class PortNames;
 
-class Ports
+class Port
 {
-	static constexpr unsigned long FLAGS_INPUT = JackPortFlags::JackPortIsInput;
-	static constexpr unsigned long FLAGS_INPUT_TERMINAL = JackPortFlags::JackPortIsInput | JackPortFlags::JackPortIsTerminal;
-	static constexpr unsigned long FLAGS_OUTPUT = JackPortFlags::JackPortIsOutput;
-	static constexpr unsigned long FLAGS_OUTPUT_TERMINAL = JackPortFlags::JackPortIsOutput | JackPortFlags::JackPortIsTerminal;
-
-	static jack_port_t *
-	create_port(
-			jack_client_t *client,
-			const char * const name,
-			unsigned long int flags)
-	{
-		ErrorHandler::clear_ensure();
-		jack_port_t * port = jack_port_register(client, name, JACK_DEFAULT_AUDIO_TYPE, flags, 0);
-		return ErrorHandler::checkNotNullOrThrow(port, "Failed to register port");
-	}
-
 	static int disconnect_port_internal(jack_client_t *client, jack_port_t *port, const char *target, bool throw_if_disconnect_fails)
 	{
 		ErrorHandler::clear_ensure();
@@ -132,21 +101,21 @@ public:
 	}
 
 	static jack_port_t *
-	create_input_port(
+	create_port(
 			jack_client_t *client,
-			const char * const name,
-			bool is_terminal = false)
+			PortDefinition::Data definition)
 	{
-		return create_port(client, name, is_terminal ? FLAGS_INPUT_TERMINAL : FLAGS_INPUT);
+		ErrorHandler::clear_ensure();
+		jack_port_t * port = jack_port_register(client, definition.name, definition.type(), definition.flags(), 0);
+		return ErrorHandler::checkNotNullOrThrow(port, "Failed to register port");
 	}
 
 	static jack_port_t *
-	create_output_port(
+	create_port(
 			jack_client_t *client,
-			const char * const name,
-			bool is_terminal = false)
+			PortDefinition definition)
 	{
-		return create_port(client, name, is_terminal ? FLAGS_OUTPUT_TERMINAL : FLAGS_OUTPUT);
+		return create_port(client, definition.data);
 	}
 
 	static void connect_port(jack_client_t *client, jack_port_t * port, const char * target) {
@@ -204,170 +173,91 @@ public:
 	}
 };
 
-class Port
+class Ports;
+
+class Ports
 {
-	jack_client_t *client_ = 0;
-	jack_port_t *port_ = 0;
-	PortDirection direction_ = PortDirection::IN;
-
-	Port(jack_client_t *client, jack_port_t *port, PortDirection direction) : client_(client), port_(port), direction_(direction) {}
-
-public:
-	Port createInput(jack_client_t *client,
-			const char * const name,
-			bool is_terminal = false)
+	struct PortData
 	{
-		return Port(client, Ports::create_input_port(client, name, is_terminal), PortDirection::IN);
-	}
+		jack_port_t *port = nullptr;
+		RefArray<jack_default_audio_sample_t> buffer;
+	};
 
-	Port createOutput(jack_client_t *client,
-			const char * const name,
-			bool is_terminal = false)
+	PortDefinitions definitions_;
+	Array<PortData> ports_;
+
+	void unregister(jack_client_t * client, size_t limit)
 	{
-		return Port(client, Ports::create_output_port(client, name, is_terminal), PortDirection::OUT);
-	}
+		size_t bound = Value<size_t>::min(limit, ports_.size());
 
-	const char * getName()
-	{
-		return port_ ? jack_port_name(port_) : nullptr;
-	}
-
-	void rename(const char * name, bool is_terminal) {
-		jack_port_t *newPort;
-		if (direction_ == PortDirection::IN) {
-			newPort = ErrorHandler::checkNotNullOrThrow(Ports::create_input_port(client_, name, is_terminal), "Cannot register port");
-		}
-		else {
-			newPort = ErrorHandler::checkNotNullOrThrow(Ports::create_output_port(client_, name, is_terminal), "Cannot register port");
-		}
-		if (port_) {
-			ErrorHandler::setForceLogNext();
-			Ports::try_unregister_port(client_, port_);
-		}
-		port_ = newPort;
-	}
-
-	void connect(const char *target)
-	{
-		Ports::connect_port(client_, port_, target);
-	}
-
-	void tryConnect(const char *target, int * result = nullptr)
-	{
-		Ports::try_connect_port(client_, port_, target, result);
-	}
-
-	RefArray<jack_default_audio_sample_t> getBuffer(jack_nframes_t frames) const
-	{
-		return Ports::get_buffer(port_, frames);
-	}
-
-	bool connected() const
-	{
-		return port_ && jack_port_connected(port_) > 0;
-	}
-
-	bool connectedWith(const char * target) const
-	{
-		return port_ && jack_port_connected_to(port_, target) > 0;
-	}
-
-	int connectCount() const
-	{
-		return port_ ? jack_port_connected(port_) : 0;
-	}
-
-	void disconnectAll()
-	{
-		Ports::disconnect_port_all(client_, port_);
-	}
-
-	bool tryDisconnectAll(int *result = nullptr)
-	{
-		Ports::try_disconnect_port_all(client_, port_, result);
-	}
-
-	void disconnect(const char * target)
-	{
-		Ports::disconnect_port(client_, port_, target);
-	}
-
-	bool tryDisconnect(const char * target, int *result = nullptr)
-	{
-		Ports::try_disconnect_port(client_, port_, target, result);
-	}
-
-	void unregister()
-	{
-		Ports::unregister_port(client_, port_);
-		port_ = nullptr;
-	}
-
-	bool tryUnregister(int * result = nullptr)
-	{
-		if (Ports::try_unregister_port(client_, port_, result)) {
-			port_ = nullptr;
-			return true;
-		}
-		return false;
-	}
-
-	~Port()
-	{
-		if (client_) {
-			ErrorHandler::setForceLogNext();
-			tryUnregister();
-			client_ = nullptr;
-		}
-	}
-};
-
-class PortNames
-{
-	const char** const portNames;
-	size_t count;
-	friend class Ports;
-
-	size_t rangeCheck(size_t index) const {
-		if (index < count) {
-			return index;
-		}
-		throw out_of_range("Port name index out of range");
-	}
-
-public:
-	PortNames(jack_client_t* client, const char* namePattern,
-			const char* typePattern, unsigned long flags) :
-			portNames(jack_get_ports(client, namePattern, typePattern, flags))
-	{
-		count = 0;
-		if (portNames != nullptr) {
-			const char** name = portNames;
-			while (name[count] != nullptr) {
-				count++;
+		int i;
+		try {
+			for (i = 0; i < bound; i++) {
+				ErrorHandler::setForceLogNext();
+				jack_port_t *port = ports_[i].port;
+				ports_[i].port = nullptr;
+				Port::try_unregister_port(client, port);
 			}
 		}
+		catch (...) {
+			for (; i < bound; i++) {
+				ports_[i].port = nullptr;
+				ports_[i].buffer.reset();
+			}
+			throw;
+		}
 	}
 
-	size_t length() const {
-		return count;
+public:
+
+	Ports(const PortDefinitions &definitions) :
+		definitions_(definitions),
+		ports_(Value<size_t>::max(1, definitions_.portCount()), definitions_.portCount())
+	{
 	}
-	const char* get(size_t idx) const {
-		return portNames[rangeCheck(idx)];
+
+	const PortDefinitions &definitions() const
+	{
+		return definitions_;
 	}
-	const char* operator [](size_t idx) const {
-		return get(idx);
-	}
-	~PortNames() {
-		if (portNames != nullptr) {
-			jack_free(portNames);
+
+
+	void getBuffers(jack_nframes_t frames)
+	{
+		for (size_t i = 0; i < ports_.size(); i++) {
+			ports_[i].buffer = Port::get_buffer(ports_[i].port, frames);
 		}
+	}
+
+	RefArray<jack_default_audio_sample_t> getBuffer(size_t i) const
+	{
+		return ports_[i].buffer;
+	}
+
+	void registerPorts(jack_client_t *client)
+	{
+		size_t i;
+		try {
+			for (i = 0; i < ports_.size(); i++) {
+				PortDefinition::Data data = definitions_[i];
+				ports_[i].port = Port::create_port(client, data);
+			}
+		}
+		catch (const std::exception &e) {
+			unregister(client, i);
+			throw e;
+		}
+	}
+
+	void unregisterPorts(jack_client_t *client)
+	{
+		unregister(client, ports_.size());
 	}
 };
 
 
-} /* End of namespace jack */
 } /* End of namespace speakerman */
+
 
 #endif /* SMS_SPEAKERMAN_PORT_GUARD_H_ */
 

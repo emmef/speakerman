@@ -20,222 +20,22 @@
  */
 
 #include <atomic>
-#include <iostream>
 #include <cmath>
+#include <iostream>
+#include <cstdio>
+#include <thread>
+#include <chrono>
 
 #include <signal.h>
 
-#include <tdap/Array.hpp>
 #include <speakerman/jack/JackClient.hpp>
-#include <speakerman/jack/Client.hpp>
+#include <speakerman/SpeakerManager.hpp>
 
 using namespace speakerman;
-using namespace jack;
 using namespace tdap;
 
 typedef double sample_t;
 typedef double accurate_t;
-
-
-
-//static accurate_t crossoverFrequencies[] = {
-////		168, 1566, 2500, 6300
-//		80, 168, 1566, 6300
-////		80, 168, 1000, 2700
-////		80, 80 * M_SQRT2,
-////		160, 160 * M_SQRT2,
-////		320, 320 * M_SQRT2,
-////		640, 640 * M_SQRT2,
-////		1280, 1280 * M_SQRT2,
-////		2560, 2560 * M_SQRT2,
-////		5120, 5120 * M_SQRT2,
-////		10240
-//};
-
-
-struct SumToAll : public Client
-{
-	static size_t constexpr GROUPS = 2;
-	static size_t constexpr CHANNELS = 2;
-	static size_t constexpr FILTER_ORDER = 2;
-	static size_t constexpr RC_TIMES = 20;
-	static size_t constexpr MAX_SAMPLERATE = 192000;
-	static double constexpr MAX_PREDICTION_SECONDS = 0.01;
-	static size_t constexpr MAX_PREDICTION_SAMPLES = (MAX_SAMPLERATE * MAX_PREDICTION_SECONDS + 0.5);
-
-public:
-
-	ClientPort input_0_0;
-	ClientPort input_0_1;
-	ClientPort input_1_0;
-	ClientPort input_1_1;
-	ClientPort output_0_0;
-	ClientPort output_0_1;
-	ClientPort output_1_0;
-	ClientPort output_1_1;
-	ClientPort output_sub;
-
-	Array<RefArray<jack_default_audio_sample_t>> inputs;
-	Array<RefArray<jack_default_audio_sample_t>> outputs;
-
-
-protected:
-	virtual bool process(jack_nframes_t frameCount) override
-	{
-		inputs[0] = RefArray<jack_default_audio_sample_t>(input_0_0.getBuffer(), frameCount);
-		inputs[1] = RefArray<jack_default_audio_sample_t>(input_0_1.getBuffer(), frameCount);
-		inputs[2] = RefArray<jack_default_audio_sample_t>(input_1_0.getBuffer(), frameCount);
-		inputs[3] = RefArray<jack_default_audio_sample_t>(input_1_1.getBuffer(), frameCount);
-
-		outputs[0] = RefArray<jack_default_audio_sample_t>(output_0_0.getBuffer(), frameCount);
-		outputs[1] = RefArray<jack_default_audio_sample_t>(output_0_1.getBuffer(), frameCount);
-		outputs[2] = RefArray<jack_default_audio_sample_t>(output_1_0.getBuffer(), frameCount);
-		outputs[3] = RefArray<jack_default_audio_sample_t>(output_1_1.getBuffer(), frameCount);
-		outputs[4] = RefArray<jack_default_audio_sample_t>(output_sub.getBuffer(), frameCount);
-
-		outputs[0].copy(0, inputs[0], 0, frameCount);
-		outputs[1].copy(0, inputs[1], 0, frameCount);
-		outputs[2].copy(0, inputs[2], 0, frameCount);
-		outputs[3].copy(0, inputs[3], 0, frameCount);
-		outputs[4].zero();
-
-
-		return true;
-	}
-
-	virtual bool setContext(jack_nframes_t newBufferSize, jack_nframes_t newSampleRate) override
-	{
-		return configure(newBufferSize, newSampleRate);
-	}
-
-	bool configure(jack_nframes_t newBufferSize, jack_nframes_t sampleRate)
-	{
-//		processor.configure(userConfiguration, sampleRate, newBufferSize);
-
-		return true;
-	}
-
-	virtual void beforeShutdown()
-	{
-		std::cerr << "Before shutdown";
-	}
-
-	virtual void afterShutdown()
-	{
-		std::cerr << "After shutdown";
-	}
-
-	virtual void connectPortsOnActivate() {
-		unique_ptr<PortNames> capturePorts(getPortNames(nullptr, nullptr, JackPortIsPhysical|JackPortIsOutput));
-
-		for (size_t i = 0; i < std::min((size_t)4, capturePorts->length()); i++) {
-			const char* portName = capturePorts->get(i);
-			switch (i % 4) {
-			case 0:
-				std::cout << "Connecting " << portName << " -> input_0_0" << std::endl;
-				input_0_0.connect(portName);
-				break;
-			case 1:
-				std::cout << "Connecting " << portName << " -> input_0_1" << std::endl;
-				input_0_1.connect(portName);
-				break;
-			case 2:
-				std::cout << "Connecting " << portName << " -> input_1_0" << std::endl;
-				input_1_0.connect(portName);
-				break;
-			case 3:
-				std::cout << "Connecting " << portName << " -> input_1_1" << std::endl;
-				input_1_1.connect(portName);
-				break;
-			}
-		}
-
-		unique_ptr<PortNames> playbackPorts(getPortNames(nullptr, nullptr, JackPortIsPhysical|JackPortIsInput));
-
-		if (playbackPorts->length() > 0) {
-			std::cout << "Connecting output_0_0 -> " << playbackPorts->get(0) << std::endl;
-			output_0_0.connect(playbackPorts->get(0));
-		}
-		if (playbackPorts->length() > 1) {
-			std::cout << "Connecting output_0_0 -> " << playbackPorts->get(1) << std::endl;
-			output_0_1.connect(playbackPorts->get(1));
-		}
-		if (playbackPorts->length() > 2) {
-			std::cout << "Connecting output_0_0 -> " << playbackPorts->get(2) << std::endl;
-			output_1_0.connect(playbackPorts->get(2));
-		}
-		if (playbackPorts->length() > 3) {
-			std::cout << "Connecting output_0_0 -> " << playbackPorts->get(3) << std::endl;
-			output_1_1.connect(playbackPorts->get(3));
-		}
-		if (playbackPorts->length() > 4) {
-			std::cout << "Connecting output_sub -> " << playbackPorts->get(4) << std::endl;
-			output_sub.connect(playbackPorts->get(4));
-		}
-
-		unique_ptr<PortNames> pulseAudioPorts(getPortNames("PulseAudio.*", nullptr, JackPortIsOutput));
-
-		for (size_t i = 0; i < pulseAudioPorts->length(); i++) {
-			const char* portName = pulseAudioPorts->get(i);
-			for (size_t j = 0; j < playbackPorts->length(); j++) {
-				if (disconnectPort(portName, playbackPorts->get(j))) {
-					std::cout << "Disconnected " << portName << " <-> " << playbackPorts->get(j) << std::endl;
-				}
-			}
-			switch (i % 4) {
-			case 0:
-				std::cout << "Connecting " << portName << " -> input_0_0" << std::endl;
-				input_0_0.connect(portName);
-				break;
-			case 1:
-				std::cout << "Connecting " << portName << " -> input_0_1" << std::endl;
-				input_0_1.connect(portName);
-				break;
-			case 2:
-				std::cout << "Connecting " << portName << " -> input_1_0" << std::endl;
-				input_1_0.connect(portName);
-				break;
-			case 3:
-				std::cout << "Connecting " << portName << " -> input_1_1" << std::endl;
-				input_1_1.connect(portName);
-				break;
-			}
-		}
-
-	}
-
-public:
-	SumToAll()
-	:
-		Client(9),
-		input_0_0(addPort(PortDirection::IN, "input_0_0")),
-		input_1_0(addPort(PortDirection::IN, "input_1_0")),
-		input_0_1(addPort(PortDirection::IN, "input_0_1")),
-		input_1_1(addPort(PortDirection::IN, "input_1_1")),
-		output_0_0(addPort(PortDirection::OUT, "output_0_0")),
-		output_1_0(addPort(PortDirection::OUT, "output_1_0")),
-		output_0_1(addPort(PortDirection::OUT, "output_0_1")),
-		output_1_1(addPort(PortDirection::OUT, "output_1_1")),
-		output_sub(addPort(PortDirection::OUT, "output_sub")),
-		inputs(CHANNELS * GROUPS),
-		outputs(CHANNELS * GROUPS + 1)
-	{
-		finishDefiningPorts();
-	};
-
-	bool reconfigure()
-	{
-		if (sampleRate() > 0 && bufferSize() > 0) {
-			return configure(bufferSize(), sampleRate());
-		}
-		throw std::runtime_error("Cannot reconfigure if no initial config was done");
-	}
-
-	virtual ~SumToAll()
-	{
-		cout << "Finishing up!" << endl;
-	}
-};
 
 template<class T>
 class ClientOwner
@@ -251,7 +51,8 @@ public:
 	{
 		T* previous = __client.exchange(client);
 		if (previous != nullptr) {
-			previous->close();
+			cout << "Delete client" << endl;
+
 			delete previous;
 		}
 	}
@@ -266,17 +67,16 @@ public:
 		setClient(nullptr);
 	}
 };
-ClientOwner<SumToAll> clientOwner;
 
+static volatile int signalNumber = -1;
+static volatile int userInput;
 
 extern "C" {
 	void signal_callback_handler(int signum)
 	{
-	   std::cerr << std::endl << "Caught signal " << strsignal(signum) << std::endl;
+		std::cerr << std::endl << "Caught signal " << strsignal(signum) << std::endl;
 
-	   clientOwner.setClient(nullptr);
-
-	   exit(signum);
+		signalNumber = signum;
 	}
 }
 
@@ -287,35 +87,99 @@ inline static accurate_t frequencyWeight(accurate_t f, accurate_t shelve1, accur
 		return (1 + fRel * fShelve2Corr) / (1.0 + fRel);
 }
 
+static void charFetcher()
+{
+	std::chrono::milliseconds duration(101);
+	while (signalNumber == -1) {
+		char c;
+		cin >> c;
+		userInput = c;
+		cout << "User input " << c << endl;
+		while (userInput != EOF) {
+			std::this_thread::sleep_for(duration);
+		}
+	}
+	cout << "Ended user input" << endl;
+}
+
+static int getChar() {
+	int chr = userInput;
+	userInput = EOF;
+	return chr;
+}
+
+int mainLoop(ClientOwner<JackClient> &owner)
+{
+	std::thread fetchChars(charFetcher);
+	fetchChars.detach();
+	std::chrono::milliseconds duration(100);
+
+	try {
+		bool running = true;
+		while (running && signalNumber == -1) {
+			int cmnd = getChar();
+			if (cmnd == EOF) {
+				std:this_thread::sleep_for(duration);
+				continue;
+			}
+			std::cout << "User input" << cmnd << std::endl;
+			switch (cmnd) {
+			case 'a' :
+			case 'A' :
+				std::cout << "Activating..." << std::endl;
+				owner.get().setActive();
+				break;
+			case 'c' :
+			case 'C' :
+				std::cout << "Closing..." << std::endl;
+				owner.get().close();
+				running = false;
+				break;
+			case 'q' :
+			case 'Q' :
+				std::cout << "Quiting..." << std::endl;
+				running=false;
+				break;
+			default:
+				std::cerr << "Unknown command " << cmnd << std::endl;
+				break;
+			}
+		}
+	}
+	catch (const std::exception &e) {
+		std::cerr << "Exception caught: " << e.what();
+		return SIGABRT;
+	}
+	if (signalNumber == -1) {
+		signalNumber = 0;
+	}
+	cout << "Bye!";
+	if (signalNumber > 0) {
+		cout << " CODE " << signalNumber;
+	}
+	cout << endl;
+	return signalNumber;
+}
 
 int main(int count, char * arguments[]) {
+	SpeakerManager manager;
+	ClientOwner<JackClient> clientOwner;
+	clientOwner.setClient(JackClient::createDefault("Speaker Manager"));
+
+	if (!clientOwner.get().setProcessor(manager)) {
+		std::cerr << "Failed to set processor" << std::endl;
+		return 1;
+	}
+
 	signal(SIGINT, signal_callback_handler);
 	signal(SIGTERM, signal_callback_handler);
 	signal(SIGABRT, signal_callback_handler);
 
-	clientOwner.setClient(new SumToAll());
+	std::cout << "activate..." << std::endl;
+	clientOwner.get().setActive();
 
-	clientOwner.get().open("speakerman", JackOptions::JackNullOption);
-	clientOwner.get().activate();
-
-	std::chrono::milliseconds duration(1000);
-	bool running = true;
-	while (running) {
-		char cmnd;
-		std::this_thread::sleep_for( duration );
-		std::cin >> cmnd;
-		switch (cmnd) {
-		case 'q' :
-		case 'Q' :
-			std::cout << "Quiting..." << std::endl;
-			running=false;
-			break;
-		default:
-			std::cerr << "Unknown command " << cmnd << std::endl;
-			break;
-		}
-	}
-
+	std::cout << "activated..." << std::endl;
+	mainLoop(clientOwner);
 	return 0;
 }
 

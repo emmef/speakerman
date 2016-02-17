@@ -25,13 +25,13 @@
 #include <string>
 #include <iostream>
 #include <stdexcept>
+#include <atomic>
 
 #include <jack/jack.h>
 #include <jack/types.h>
 
 
 namespace speakerman {
-namespace jack {
 
 using namespace std;
 
@@ -39,7 +39,7 @@ class ErrorHandler
 {
 	static thread_local const char * message_;
 	static thread_local bool force_log_;
-	static std::atomic<bool> callback_installed_;
+	static atomic_bool callback_installed_;
 
 	static void error_callback(const char * message) {
 		message_ = message;
@@ -166,7 +166,6 @@ public:
 };
 
 
-} /* End of namespace jack */
 } /* End of namespace speakerman */
 
 #endif /* SMS_SPEAKERMAN_ERROR_HANDLER_GUARD_H_ */

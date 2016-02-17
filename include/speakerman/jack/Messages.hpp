@@ -27,7 +27,6 @@
 
 namespace speakerman {
 
-namespace jack {
 
 	using namespace std;
 
@@ -84,7 +83,6 @@ namespace jack {
 		return message;
 	}
 
-} /* End of namespace jack */
 } /* End of namespace speakerman */
 
 #endif /* SMS_SPEAKERMAN_MESSAGES_GUARD_H_ */
