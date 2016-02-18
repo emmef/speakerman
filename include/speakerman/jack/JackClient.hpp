@@ -315,12 +315,12 @@ public:
 			processor_ = &processor;
 		}
 		try {
-			if (processor_->needBufferSizeCallback()) {
+			if (processor_->needsBufferSize()) {
 				ErrorHandler::checkZeroOrThrow(
 						jack_set_buffer_size_callback(client_, jackBufferSizeCallback, this),
 						"Set buffer size callback");
 			}
-			if (processor_->needSampleRateCallback()) {
+			if (processor_->needsSampleRate()) {
 				ErrorHandler::checkZeroOrThrow(
 						jack_set_sample_rate_callback(client_, jackSampleRateCallback, this),
 						"Set sample rate callback");
