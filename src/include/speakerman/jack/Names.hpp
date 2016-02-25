@@ -255,37 +255,42 @@ public:
 
 class PortNames
 {
-	const char** const portNames;
-	size_t count;
-	friend class Port;
+	const char** const portNames_;
+	const size_t count_;
 
 	size_t rangeCheck(size_t index) const {
-		if (index < count) {
+		if (index < count_) {
 			return index;
 		}
 		throw out_of_range("Port name index out of range");
 	}
 
-public:
-	PortNames(jack_client_t* client, const char* namePattern,
-			const char* typePattern, unsigned long flags) :
-			portNames(jack_get_ports(client, namePattern, typePattern, flags))
+	static size_t countPorts(const char ** portNames)
 	{
-		count = 0;
+		size_t count = 0;
 		if (portNames != nullptr) {
 			const char** name = portNames;
 			while (name[count] != nullptr) {
 				count++;
 			}
 		}
-	}
-
-	size_t length() const {
 		return count;
 	}
 
+public:
+	PortNames(jack_client_t* client, const char* namePattern,
+			const char* typePattern, unsigned long flags) :
+			portNames_(jack_get_ports(client, namePattern, typePattern, flags)),
+			count_(countPorts(portNames_))
+	{
+	}
+
+	size_t count() const {
+		return count_;
+	}
+
 	const char* get(size_t idx) const {
-		return portNames[rangeCheck(idx)];
+		return portNames_[rangeCheck(idx)];
 	}
 
 	const char* operator [](size_t idx) const {
@@ -293,8 +298,8 @@ public:
 	}
 
 	~PortNames() {
-		if (portNames != nullptr) {
-			jack_free(portNames);
+		if (portNames_ != nullptr) {
+			jack_free(portNames_);
 		}
 	}
 };

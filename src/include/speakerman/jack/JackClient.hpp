@@ -83,7 +83,6 @@ static bool client_state_is_shutdown_state(ClientState state)
 
 }
 
-
 struct ShutDownInfo
 {
 	jack_status_t status;
@@ -105,9 +104,26 @@ struct ShutDownInfo
 	bool isEmpty() { return !isSet; }
 };
 
+class JackClient;
+struct CreateClientResult
+{
+	JackClient * client;
+	jack_status_t status;
+	const char * name;
+
+	bool success() { return (client); }
+
+	JackClient * getClient()
+	{
+		if (success()) {
+			return client;
+		}
+		throw std::runtime_error("No jack client created");
+	}
+};
+
 class JackClient
 {
-	static thread_local jack_status_t lastState;
 	ClientState state_ = ClientState::CLOSED;
 	mutex mutex_;
 	condition_variable awaitShutdownCondition_;
@@ -273,31 +289,24 @@ protected:
 public:
 
 	template<typename ...A>
-	static JackClient * create(const char *serverName, jack_options_t options, A... args)
+	static CreateClientResult create(const char *serverName, jack_options_t options, A... args)
 	{
-		lastState = (jack_status_t)0;
-		ErrorHandler::clear_ensure();
-		return new JackClient(
-				ErrorHandler::checkNotNullOrThrow(
-						jack_client_open(serverName, options, &lastState, args...),
-						"Create Jack Client"));
+		jack_status_t lastState;
+		jack_client_t *c = jack_client_open(serverName, options, &lastState, args...);
+		if (c) {
+			return { new JackClient(c), static_cast<JackStatus>(0), serverName };
+		}
+		return { nullptr, lastState, serverName};
 	}
 
-	static JackClient * createDefault(const char *serverName)
+	static CreateClientResult createDefault(const char *serverName)
 	{
-		lastState = (jack_status_t)0;
-		ErrorHandler::clear_ensure();
-		return new JackClient(
-				ErrorHandler::checkNotNullOrThrow(
-						jack_client_open(serverName, JackOptions::JackNullOption, &lastState),
-						"Create Jack client"));
-	}
-
-	static jack_status_t getLastStatus()
-	{
-		jack_status_t result = lastState;
-		lastState = (jack_status_t)0;
-		return result;
+		jack_status_t lastState;
+		jack_client_t *c = jack_client_open(serverName, JackOptions::JackNullOption, &lastState);
+		if (c) {
+			return { new JackClient(c), static_cast<JackStatus>(0), serverName };
+		}
+		return { nullptr, lastState, serverName};
 	}
 
 	const string &name() const

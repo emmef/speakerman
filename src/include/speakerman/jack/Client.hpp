@@ -33,7 +33,6 @@
 
 
 namespace speakerman {
-namespace jack {
 
 	using namespace std;
 
@@ -235,7 +234,6 @@ namespace jack {
 	typedef Client::Port ClientPort;
 
 
-} /* End of namespace jack */
 } /* End of namespace speakerman */
 
 #endif /* SMS_SPEAKERMAN_CLIENT_GUARD_H_ */

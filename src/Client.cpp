@@ -29,14 +29,16 @@
 #include <speakerman/jack/Client.hpp>
 
 namespace speakerman {
-namespace jack {
 
 using namespace std::chrono;
+
+thread_local jack_status_t JackClient::lastState;
 
 static string NONAME = "";
 
 static thread_local const char * lastErrorMessage = nullptr;
 static bool errorCallBackSet = false;
+
 
 void Client::errorMessageHandler(const char * message)
 {
@@ -549,5 +551,4 @@ void Client::deactivate() {
 	unsafeDeactivate();
 }
 
-} /* End of namespace jack */
 } /* End of namespace speakerman */

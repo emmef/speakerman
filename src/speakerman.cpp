@@ -59,7 +59,7 @@ public:
 
 	T &get() const
 	{
-		return *__client;
+		return *__client.load();
 	}
 
 	~ClientOwner()
@@ -68,6 +68,7 @@ public:
 	}
 };
 
+SpeakerManager<2> manager;
 static volatile int signalNumber = -1;
 static volatile int userInput;
 
@@ -140,6 +141,14 @@ int mainLoop(ClientOwner<JackClient> &owner)
 				std::cout << "Quiting..." << std::endl;
 				running=false;
 				break;
+			case '+' :
+				manager.setVolume(manager.volume() * 1.1);
+				std::cout << "Volume:" << manager.volume() << std::endl;
+				break;
+			case '-' :
+				manager.setVolume(manager.volume() / 1.1);
+				std::cout << "Volume:" << manager.volume() << std::endl;
+				break;
 			default:
 				std::cerr << "Unknown command " << cmnd << std::endl;
 				break;
@@ -162,10 +171,17 @@ int mainLoop(ClientOwner<JackClient> &owner)
 }
 
 int main(int count, char * arguments[]) {
-	SpeakerManager manager;
 	ClientOwner<JackClient> clientOwner;
-	clientOwner.setClient(JackClient::createDefault("Speaker Manager"));
+	auto result = JackClient::createDefault("Speaker Manager");
+	clientOwner.setClient(result.getClient());
 
+	SignalGroup<2, 2, 3> group;
+	FixedSizeArray<double, 3> crossovers;
+	crossovers[0] = 40;
+	crossovers[1] = 180;
+	crossovers[2] = 2500;
+
+	group.setSampleRate(96000, crossovers);
 	if (!clientOwner.get().setProcessor(manager)) {
 		std::cerr << "Failed to set processor" << std::endl;
 		return 1;
