@@ -36,18 +36,37 @@
 
 namespace speakerman {
 
-template<size_t CHANNELS>
+template<size_t CHANNELS_PER_GROUP, size_t GROUPS>
 class SpeakerManager : public JackProcessor
 {
-	static constexpr size_t GROUPS = CHANNELS / 2;
-	AdvancedRms::Detector<15> integrator;
-	Delay<double> rmsDelay ;
+	static constexpr size_t CROSSOVERS = 3;
 
-	HoldMaxDoubleIntegrated<double> limiter;
-	Delay<double> peakDelay ;
+	using Processor = SignalGroup<CHANNELS_PER_GROUP, GROUPS, CROSSOVERS>;
+	using CrossoverFrequencies = typename Processor::CrossoverFrequencies;
+	using ThresholdValues = typename Processor::ThresholdValues;
+
+	static constexpr size_t INPUTS = Processor::INPUTS;
+	static constexpr size_t OUTPUTS = Processor::OUTPUTS;
+
+	static CrossoverFrequencies crossovers()
+	{
+		CrossoverFrequencies cr;
+		cr[0] = 80;
+		cr[1] = 180;
+		cr[2] = 2500;
+		return cr;
+	};
+
+	static ThresholdValues thresholds()
+	{
+		ThresholdValues thres;
+		for (size_t i = 0; i < thres.size(); i++) {
+			thres[i] = 0.25;
+		}
+	}
+
 	PortDefinitions portDefinitions_;
-	ACurves::Filter<double, 2 * CHANNELS> weighting;
-	PinkNoise::Default pinkNoise;
+	Processor processor;
 
 	double volume_ = 20.0;
 
@@ -64,21 +83,8 @@ protected:
 	{
 		std::cout << "Updated metrics: {rate:" << metrics.sampleRate << ", bsize:" << metrics.bufferSize << "}" << std::endl;
 		AdvancedRms::UserConfig config = { 0.0005, 0.400, 0.5, 1.2 };
-		integrator.userConfigure(config, metrics.sampleRate);
-//		setTimes(
-//				metrics.sampleRate,
-//				0.4, minRc, threshold);
-		double limiterSamples = metrics.sampleRate * 0.0005;
-		size_t delaySamples = 0.5 + 3 * limiterSamples;
-		delaySamples *= 4; // (4 channels)
-		peakDelay.setDelay(delaySamples);
-		delaySamples = 0.5 + 3 * minRc;
-		delaySamples *= 4; // (4 channels)
-		rmsDelay.setDelay(delaySamples);
-		limiterThreshold = Value<double>::min(1.0, threshold * 4);
-		limiter = HoldMaxDoubleIntegrated<double>(3 * limiterSamples, limiterSamples, limiterThreshold);
-		weighting.setSampleRate(metrics.sampleRate);
-		pinkNoise.setScale(1e-5);
+		processor.setSampleRate(metrics.sampleRate, crossovers(), thresholds());
+
 		return true;
 	}
 
@@ -96,50 +102,32 @@ protected:
 
 	virtual bool process(jack_nframes_t frames, const Ports &ports) override
 	{
-		RefArray<jack_default_audio_sample_t> inputs[CHANNELS];
-		RefArray<jack_default_audio_sample_t> outputs[CHANNELS + 1];
+		RefArray<jack_default_audio_sample_t> inputs[Processor::INPUTS];
+		RefArray<jack_default_audio_sample_t> outputs[Processor::INPUTS];
 
 		size_t portNumber;
 		size_t index;
-		for (index = 0, portNumber = 0; index < CHANNELS; portNumber++, index++) {
+		for (index = 0, portNumber = 0; index < INPUTS; portNumber++, index++) {
 			inputs[index] = ports.getBuffer(portNumber);
 		}
-		for (index = 0; index <= CHANNELS; portNumber++, index++) {
+		for (index = 0; index <= INPUTS; portNumber++, index++) {
 			outputs[index] = ports.getBuffer(portNumber);
 		}
-		double x[CHANNELS];
-		double k[CHANNELS];
-		double square[CHANNELS];
+
+		FixedSizeArray<double, INPUTS> inFrame;
+		FixedSizeArray<double, OUTPUTS> outFrame;
 
 		for (size_t i = 0; i < frames; i++) {
-			double squareSum = 0.0;
-			double noise = pinkNoise();
-			for (size_t channel = 0; channel < CHANNELS; channel++) {
-				double X = volume_ * (noise + inputs[channel][i]);
-				double K = X;//weighting.filter(channel, X);
-				squareSum += K * K;
-				x[channel] = X;
+
+			for (size_t channel = 0; channel < Processor::INPUTS; channel++) {
+				inFrame[channel] = inputs[channel][i];
 			}
 
-			double rms = integrator.integrate(squareSum, threshold);
-			double gain = threshold / rms;
+			processor.process(inFrame, outFrame);
 
-			double peak = limiterThreshold;
-			for (size_t channel = 0; channel < CHANNELS; channel++) {
-				double y = gain * rmsDelay.setAndGet(x[channel]);
-				peak = Value<double>::max(peak, y);
-				x[channel] = y;
+			for (size_t channel = 0; channel < OUTPUTS; channel++) {
+				outputs[channel][i] = outFrame[channel];
 			}
-
-			double limiterGain = limiterThreshold / limiter.apply(peak);
-			double sub = 0.0;
-			for (size_t channel = 0; channel < CHANNELS; channel++) {
-				double y = limiterGain * peakDelay.setAndGet(x[channel]);
-				sub += y;
-				outputs[channel][i] = Value<double>::clamp(y, -limiterThreshold, limiterThreshold);
-			}
-
-			outputs[CHANNELS][i] = Value<double>::clamp(0.25 * sub, -limiterThreshold, limiterThreshold);
 		}
 		return true;
 	}
@@ -149,18 +137,17 @@ public:
 	virtual bool needsSampleRate() const override { return true; }
 
 	SpeakerManager() :
-		portDefinitions_(16, 32), peakDelay(10000), rmsDelay(10000), weighting(48000)
+		portDefinitions_(16, 32)
 	{
 		char name[1 + Names::get_port_size()];
-		bool left = true;
-		for (size_t channel = 0; channel < CHANNELS; channel++, left = !left) {
+		for (size_t channel = 0; channel < Processor::INPUTS; channel++) {
 			 snprintf(name, 1 + Names::get_port_size(),
-					 "in_%zu_%s", 1 + channel/2, left ? "left" : "right");
+					 "in_%zu_%zu", 1 + channel/CHANNELS_PER_GROUP, 1 + channel % CHANNELS_PER_GROUP);
 			 portDefinitions_.addInput(name);
 		}
-		for (size_t channel = 0; channel < CHANNELS; channel++, left = !left) {
+		for (size_t channel = 0; channel < Processor::INPUTS; channel++) {
 			snprintf(name, 1 + Names::get_port_size(),
-					 "out_%zu_%s", 1 + channel/2, left ? "left" : "right");
+					 "out_%zu_%zu", 1 + channel/CHANNELS_PER_GROUP, channel % CHANNELS_PER_GROUP);
 			portDefinitions_.addOutput(name);
 		}
 		portDefinitions_.addOutput("out_sub");

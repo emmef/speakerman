@@ -68,7 +68,7 @@ public:
 	}
 };
 
-SpeakerManager<2> manager;
+SpeakerManager<2, 1> manager;
 static volatile int signalNumber = -1;
 static volatile int userInput;
 
@@ -175,13 +175,6 @@ int main(int count, char * arguments[]) {
 	auto result = JackClient::createDefault("Speaker Manager");
 	clientOwner.setClient(result.getClient());
 
-	SignalGroup<2, 2, 3> group;
-	FixedSizeArray<double, 3> crossovers;
-	crossovers[0] = 40;
-	crossovers[1] = 180;
-	crossovers[2] = 2500;
-
-	group.setSampleRate(96000, crossovers);
 	if (!clientOwner.get().setProcessor(manager)) {
 		std::cerr << "Failed to set processor" << std::endl;
 		return 1;
