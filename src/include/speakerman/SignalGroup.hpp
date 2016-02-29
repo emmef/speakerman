@@ -77,10 +77,10 @@ struct VolumeControl
 		{
 			double v = validVolume(volume);
 
-			size_t in = input * CHANNELS_PER_GROUP;
-			size_t out = output * CHANNELS_PER_GROUP;
-			for (size_t channel = 0 ; channel < CHANNELS_PER_GROUP; channel++) {
-				volume_[out + channel][in + channel] = v;
+			size_t offset = output * CHANNELS_PER_GROUP;
+			size_t endOffset = offset + CHANNELS_PER_GROUP;
+			for ( ; offset < endOffset; offset++) {
+				volume_[offset][offset] = v;
 			}
 			return *this;
 		}
@@ -88,7 +88,7 @@ struct VolumeControl
 		void approach(const Matrix &source, const IntegrationCoefficients<double> &coefficients)
 		{
 			for (size_t i = 0; i < CHANNELS; i++) {
-				for (size_t j = 0; i < CHANNELS; i++) {
+				for (size_t j = 0; j < CHANNELS; j++) {
 					coefficients.integrate(source.volume_[i][j], volume_[i][j]);
 				}
 			}
@@ -145,7 +145,7 @@ public:
 	static constexpr size_t INPUTS = GROUPS * CHANNELS_PER_GROUP;
 	// bands are around crossovers
 	static constexpr size_t BANDS = CROSSOVERS + 1;
-	// multixplex by frequency bands
+	// multiplex by frequency bands
 	static constexpr size_t CROSSOVER_OUPUTS = INPUTS * BANDS;
 	// sub-woofer channels summed, so don't process CROSSOVER_OUPUTS channels
 	static constexpr size_t PROCESSING_CHANNELS = 1 + CROSSOVERS * INPUTS;
@@ -161,6 +161,7 @@ public:
 
 private:
 	PinkNoise::Default noise;
+	PinkNoise::Default subNoise;
 	FixedSizeArray<double, INPUTS> inputWithVolumeAndNoise;
 	FixedSizeArray<double, PROCESSING_CHANNELS> processInput;
 	FixedSizeArray<double, OUTPUTS> output;
@@ -181,10 +182,11 @@ private:
 	using Volume = VolumeControl<CHANNELS_PER_GROUP, GROUPS>;
 	using Matrix = typename Volume::Matrix;
 	Volume volumeControl;
+	bool bypass = true;
 
 	static AdvancedRms::UserConfig rmsUserConfig()
 	{
-		return { 0.0005, 0.4, 0.5, 1.2 };
+		return { 0.0005, 0.35, 0.5, 1.2 };
 	}
 
 public:
@@ -199,6 +201,7 @@ public:
 			const FixedSizeArray<double, LIMITERS> &thresholds)
 	{
 		noise.setScale(1e-5);
+		subNoise.setScale(1e-5);
 		aCurve.setSampleRate(sampleRate);
 		crossoverFilter.configure(sampleRate, crossovers);
 
@@ -226,15 +229,17 @@ public:
 
 		setThresholds(thresholds);
 		Matrix matrix;
+		matrix.setAll(0.0);
 		for (size_t group = 0; group < GROUPS; group++) {
 			matrix.setGroup(group, group, 1);
 		}
 		volumeControl.configure(sampleRate, 0.05, matrix);
 		sampleRate_ = sampleRate;
 	}
+
 	void process(
 			const FixedSizeArray<double, INPUTS> &input,
-			FixedSizeArray<double, INPUTS + 1> &output)
+			FixedSizeArray<double, INPUTS + 1> &target)
 	{
 		volumeControl.apply(input, inputWithVolumeAndNoise, noise());
 		moveToProcessingChannels(crossoverFilter.filter(inputWithVolumeAndNoise));
@@ -243,20 +248,29 @@ public:
 		mergeFrequencyBands();
 		processSubLimiter();
 		processChannelsLimiter();
+
+		target[INPUTS] = output[0];
+		for (size_t i = 0; i < INPUTS; i++) {
+			target[i] = output[i + 1];
+		}
+
 	}
 
 	void setThresholds(const FixedSizeArray<double, LIMITERS> &thresholds) {
 		detectorWeight[0] = thresholds[0] * relativeBandWeights[0];
-		for (size_t group = 0, i = 1; group < GROUPS; group++) {
+		std::cout << "SUB threshold=" << thresholds[0] << "; relative=" << relativeBandWeights[0] << std::endl;
+		for (size_t group = 1, i = 1; group <= GROUPS; group++) {
 			for (size_t band = 1; band <= CROSSOVERS; band++, i++) {
 				detectorWeight[i] = thresholds[group] * relativeBandWeights[band];
+				std::cout << "[" << group << "," << band << "]: threshold=" << thresholds[group] << "; relative=" << relativeBandWeights[band] << std::endl;
 			}
 		}
 		for (size_t i = 0; i < DETECTORS; i++) {
 			rmsDetector[i].setValue(detectorWeight[i]);
 		}
 		for (size_t i = 0; i < LIMITERS; i++) {
-			limiterThresholds[i] = Values::min(thresholds[i] / rmsUserConfig().peakWeight, 0.99);
+			limiterThresholds[i] = Values::min(1.5 * thresholds[i] / rmsUserConfig().peakWeight, 0.99);
+			std::cout << "Limiter[" << i << "] threshold=" << limiterThresholds[i] << std::endl;
 			limiter[i].setValue(limiterThresholds[i]);
 		}
 	}
@@ -279,7 +293,7 @@ private:
 
 	void processSubRms()
 	{
-		double x = processInput[0];
+		double x = processInput[0] + subNoise();
 		processInput[0] = rmsDelay.setAndGet(x);
 		double weight = detectorWeight[0];
 		double detect = rmsDetector[0].integrate(x * x, weight);
@@ -328,10 +342,10 @@ private:
 		double threshold = limiterThresholds[0];
 		double x = output[0];
 		output[0] = limiterDelay.setAndGet(x);
-		double detect = limiter[0].applyWithMinimum(x, threshold);
+		double detect = limiter[0].applyWithMinimum(fabs(x), threshold);
 
-		double gain = threshold / detect;
-		output[0] *= Values::clamp(gain * output[0], -threshold, threshold);
+		double gain = 1.0;
+		output[0] = Values::clamp(gain * output[0], -threshold, threshold);
 	}
 
 	void processChannelsLimiter()
@@ -348,7 +362,7 @@ private:
 			double detect = limiter[group].applyWithMinimum(peak, threshold);
 			double gain = threshold / detect;
 			for (size_t offset = channel; offset < max; offset++) {
-				output[offset] *= Values::clamp(gain * output[offset], -threshold, threshold);
+				output[offset] = Values::clamp(gain * output[offset], -threshold, threshold);
 			}
 		}
 	}

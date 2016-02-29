@@ -52,17 +52,20 @@ class SpeakerManager : public JackProcessor
 	{
 		CrossoverFrequencies cr;
 		cr[0] = 80;
-		cr[1] = 180;
-		cr[2] = 2500;
+		cr[1] = 160;
+		cr[2] = 4500;
 		return cr;
 	};
 
-	static ThresholdValues thresholds()
+	static ThresholdValues thresholds(double value = 0.2)
 	{
 		ThresholdValues thres;
-		for (size_t i = 0; i < thres.size(); i++) {
-			thres[i] = 0.25;
+		double t = Values::min(value, 1.0 / sqrt(INPUTS));
+		thres[0] = Values::min(0.9, t * INPUTS);
+		for (size_t i = 1; i < thres.size(); i++) {
+			thres[i] = t;
 		}
+		return thres;
 	}
 
 	PortDefinitions portDefinitions_;
@@ -102,8 +105,8 @@ protected:
 
 	virtual bool process(jack_nframes_t frames, const Ports &ports) override
 	{
-		RefArray<jack_default_audio_sample_t> inputs[Processor::INPUTS];
-		RefArray<jack_default_audio_sample_t> outputs[Processor::INPUTS];
+		RefArray<jack_default_audio_sample_t> inputs[INPUTS];
+		RefArray<jack_default_audio_sample_t> outputs[OUTPUTS];
 
 		size_t portNumber;
 		size_t index;
@@ -119,7 +122,7 @@ protected:
 
 		for (size_t i = 0; i < frames; i++) {
 
-			for (size_t channel = 0; channel < Processor::INPUTS; channel++) {
+			for (size_t channel = 0; channel < INPUTS; channel++) {
 				inFrame[channel] = inputs[channel][i];
 			}
 
