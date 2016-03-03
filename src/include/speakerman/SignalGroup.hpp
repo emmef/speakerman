@@ -147,7 +147,7 @@ public:
 	static constexpr size_t BANDS = CROSSOVERS + 1;
 	// multiplex by frequency bands
 	static constexpr size_t CROSSOVER_OUPUTS = INPUTS * BANDS;
-	// sub-woofer channels summed, so don't process CROSSOVER_OUPUTS channels
+	// sub-woofer groupChannels summed, so don't process CROSSOVER_OUPUTS groupChannels
 	static constexpr size_t PROCESSING_CHANNELS = 1 + CROSSOVERS * INPUTS;
 	// RMS detection are per group, not per channel (and only one for sub)
 	static constexpr size_t DETECTORS = 1 + CROSSOVERS * GROUPS;
@@ -231,7 +231,7 @@ public:
 		Matrix matrix;
 		matrix.setAll(0.0);
 		for (size_t group = 0; group < GROUPS; group++) {
-			matrix.setGroup(group, group, 1);
+			matrix.setGroup(group, group, 10.0);
 		}
 		volumeControl.configure(sampleRate, 0.05, matrix);
 		sampleRate_ = sampleRate;
@@ -285,7 +285,7 @@ private:
 			processInput[0] += multi[channel];
 		}
 
-		// copy rest of channels
+		// copy rest of groupChannels
 		for (size_t i = 1, channel = INPUTS; i < processInput.size(); i++, channel++) {
 			processInput[i] = multi[channel];
 		}
@@ -348,8 +348,7 @@ private:
 		output[0] = Values::clamp(gain * output[0], -threshold, threshold);
 	}
 
-	void processChannelsLimiter()
-	{
+	void processChannelsLimiter() {
 		for (size_t group = 1, channel = 1; group <= GROUPS; group++) {
 			double threshold = limiterThresholds[group];
 			size_t max = channel + CHANNELS_PER_GROUP;
@@ -366,7 +365,6 @@ private:
 			}
 		}
 	}
-
 
 };
 

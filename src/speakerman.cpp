@@ -22,13 +22,13 @@
 #include <atomic>
 #include <cmath>
 #include <iostream>
-#include <cstdio>
+#include <cstdlib>
 #include <thread>
-#include <chrono>
 
 #include <signal.h>
 
 #include <speakerman/jack/JackClient.hpp>
+#include <speakerman/SpeakermanConfig.hpp>
 #include <speakerman/SpeakerManager.hpp>
 
 using namespace speakerman;
@@ -170,10 +170,23 @@ int mainLoop(ClientOwner<JackClient> &owner)
 	return signalNumber;
 }
 
+
+speakerman::config::Reader configReader;
+
 int main(int count, char * arguments[]) {
+	SpeakermanConfig config = readSpeakermanConfig(true);
+
+	cout << "Dump config" << endl;
+	dumpSpeakermanConfig(config, cout);
+
 	ClientOwner<JackClient> clientOwner;
-	auto result = JackClient::createDefault("Speaker Manager");
+	auto result = JackClient::createDefault("Speaker manager");
 	clientOwner.setClient(result.getClient());
+
+
+	const char * all = ".*";
+	PortNames inputs = clientOwner.get().portNames(all, all, JackPortIsPhysical|JackPortIsOutput);
+	PortNames outputs = clientOwner.get().portNames(all, all, JackPortIsPhysical|JackPortIsOutput);
 
 	if (!clientOwner.get().setProcessor(manager)) {
 		std::cerr << "Failed to set processor" << std::endl;

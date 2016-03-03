@@ -382,6 +382,15 @@ public:
 		return shutdownInfo_;
 	}
 
+	PortNames portNames(const char* namePattern, const char* typePattern, unsigned long flags)
+	{
+		unique_lock<mutex> lock(mutex_);
+		if (state_ != ClientState::OPEN && state_ != ClientState::CONFIGURED) {
+			throw runtime_error("setProcessor: Not in OPEN or CONFIGURED state");
+		}
+		return PortNames(client_, namePattern, typePattern, flags);
+	}
+
 	ShutDownInfo close()
 	{
 		unique_lock<mutex> lock(mutex_);

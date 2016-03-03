@@ -32,7 +32,7 @@ template <typename T, size_t CAPACITY>
 class FixedCapArray : public ArrayTraits<T, FixedCapArray<T, CAPACITY>>
 {
 	static_assert(TriviallyCopyable<T>::value, "Type must be trivial to copy, move or destroy and have standard layout");
-	static_assert(Count<T>::canRoundUp(CAPACITY), "Size must be valid");
+	static_assert(CAPACITY > 0 && Power2::constant::next(CAPACITY - 1) >= CAPACITY, "Size must be valid");
 	static constexpr size_t MAXSIZE = Power2::constant::next(CAPACITY);
 	friend class ArrayTraits<T, FixedCapArray<T, CAPACITY>>;
 
