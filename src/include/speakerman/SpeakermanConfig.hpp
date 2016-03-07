@@ -27,7 +27,7 @@
 
 namespace speakerman {
 
-	struct ParametricConfig
+	struct EqualizerConfig
 	{
 		static constexpr double MIN_CENTER_FREQ = 40;
 		static constexpr double MAX_CENTER_FREQ = 22000;
@@ -65,7 +65,7 @@ namespace speakerman {
 		static constexpr size_t KEY_THRESHOLD = 1;
 		static constexpr size_t KEY_VOLUME = 2;
 
-		ParametricConfig eq[MAX_EQS];
+		EqualizerConfig eq[MAX_EQS];
 		size_t eqs;
 		double threshold;
 		double volume;
@@ -101,6 +101,7 @@ namespace speakerman {
 	SpeakermanConfig readSpeakermanConfig(const SpeakermanConfig &basedUpon, bool initial);
 	SpeakermanConfig getDefaultConfig();
 	void dumpSpeakermanConfig(const SpeakermanConfig& dump, std::ostream &output);
+
 } /* End of namespace speakerman */
 
 #endif /* SMS_SPEAKERMAN_SPEAKERMANCONFIG_GUARD_H_ */

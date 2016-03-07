@@ -30,9 +30,9 @@
 #include <tdap/Noise.hpp>
 #include <tdap/Weighting.hpp>
 #include <tdap/IirButterworth.hpp>
-#include <speakerman/SignalGroup.hpp>
 #include <speakerman/jack/JackProcessor.hpp>
 #include <speakerman/jack/Names.hpp>
+#include "DynamicsProcessor.hpp"
 
 namespace speakerman {
 
@@ -41,9 +41,11 @@ class SpeakerManager : public JackProcessor
 {
 	static constexpr size_t CROSSOVERS = 3;
 
-	using Processor = SignalGroup<CHANNELS_PER_GROUP, GROUPS, CROSSOVERS>;
+	using Processor = DynamicsProcessor<CHANNELS_PER_GROUP, GROUPS, CROSSOVERS>;
 	using CrossoverFrequencies = typename Processor::CrossoverFrequencies;
 	using ThresholdValues = typename Processor::ThresholdValues;
+	using Levels = DynamicProcessorLevels;
+	using ConfigData = typename Processor::ConfigData;
 
 	static constexpr size_t INPUTS = Processor::INPUTS;
 	static constexpr size_t OUTPUTS = Processor::OUTPUTS;
@@ -69,16 +71,22 @@ class SpeakerManager : public JackProcessor
 	}
 
 	PortDefinitions portDefinitions_;
+	SpeakermanConfig config_;
 	Processor processor;
 
-	double volume_ = 20.0;
-
-	double threshold = 0.2;
-	double limiterThreshold = 0.25;
-	double minRc = 0.0005;
-	double preGain = 1.0;
 	bool fewerInputs = false;
 	bool fewerOutputs = false;
+
+	struct TransportData
+	{
+		ConfigData configData;
+		Levels levels;
+
+		TransportData() : levels(GROUPS) {}
+	};
+
+	Transport<TransportData> transport;
+	TransportData preparedConfigData;
 
 protected:
 	virtual const PortDefinitions &getDefinitions() override { return portDefinitions_; }
@@ -86,8 +94,11 @@ protected:
 	{
 		std::cout << "Updated metrics: {rate:" << metrics.sampleRate << ", bsize:" << metrics.bufferSize << "}" << std::endl;
 		AdvancedRms::UserConfig config = { 0.0005, 0.400, 0.5, 1.2 };
-		processor.setSampleRate(metrics.sampleRate, crossovers(), thresholds());
-
+		processor.setSampleRate(metrics.sampleRate, crossovers(), config_);
+		Levels levels(GROUPS);
+		levels.reset();
+		preparedConfigData.configData = processor.getConfigData();
+		transport.init(preparedConfigData);
 		return true;
 	}
 
@@ -108,6 +119,13 @@ protected:
 		RefArray<jack_default_audio_sample_t> inputs[INPUTS];
 		RefArray<jack_default_audio_sample_t> outputs[OUTPUTS];
 
+		auto lockFreeData = transport.getLockFree();
+		bool modifiedTransport = lockFreeData.modified();
+
+		if (modifiedTransport) {
+			processor.levels.reset();
+			processor.updateConfig(lockFreeData.data().configData);
+		}
 		size_t portNumber;
 		size_t index;
 		for (index = 0, portNumber = 0; index < INPUTS; portNumber++, index++) {
@@ -128,10 +146,15 @@ protected:
 
 			processor.process(inFrame, outFrame);
 
-			for (size_t channel = 0; channel < OUTPUTS; channel++) {
-				outputs[channel][i] = outFrame[channel];
+			size_t channel;
+			for (channel = 0; channel < OUTPUTS - 1; channel++) {
+				outputs[channel][i] = outFrame[channel + 1];
 			}
+			outputs[channel][i] = outFrame[0];
 		}
+
+		lockFreeData.data().levels = processor.levels;
+
 		return true;
 	}
 
@@ -139,8 +162,9 @@ public:
 	virtual bool needsBufferSize() const override { return false; }
 	virtual bool needsSampleRate() const override { return true; }
 
-	SpeakerManager() :
-		portDefinitions_(16, 32)
+	SpeakerManager(const SpeakermanConfig &config) :
+		portDefinitions_(16, 32),
+		config_(config)
 	{
 		char name[1 + Names::get_port_size()];
 		for (size_t channel = 0; channel < Processor::INPUTS; channel++) {
@@ -156,8 +180,27 @@ public:
 		portDefinitions_.addOutput("out_sub");
 	}
 
-	double volume() const { MemoryFence m; return volume_; }
-	void setVolume(double newVolume) {MemoryFence m; volume_ = newVolume; }
+	const SpeakermanConfig &getConfig() const
+	{
+		return config_;
+	}
+
+	void setConfig(const SpeakermanConfig &config)
+	{
+		config_ = config;
+		preparedConfigData.configData = processor.createConfigData(config);
+	}
+
+	bool applyConfigAndGetLevels(Levels &levels, std::chrono::milliseconds duration)
+	{
+		TransportData result;
+		preparedConfigData.levels.reset();
+		if (transport.getAndSet(preparedConfigData, result, duration)) {
+			levels = result.levels;
+			return true;
+		}
+		return false;
+	}
 };
 
 } /* End of namespace speakerman */

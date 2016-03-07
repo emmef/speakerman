@@ -25,6 +25,7 @@
 #include <mutex>
 #include <iostream>
 #include <tdap/Value.hpp>
+#include <tdap/IndexPolicy.hpp>
 #include <tdap/Count.hpp>
 #include <speakerman/SpeakermanConfig.hpp>
 #include <speakerman/utils/Config.hpp>
@@ -145,13 +146,13 @@ namespace speakerman {
 				eqKey += ('0' + eq);
 				key = eqKey;
 				key += "/center";
-				strings[getOffset(group, eq, ParametricConfig::KEY_CENTER)] = key;
+				strings[getOffset(group, eq, EqualizerConfig::KEY_CENTER)] = key;
 				key = eqKey;
 				key += "/gain";
-				strings[getOffset(group, eq, ParametricConfig::KEY_GAIN)] = key;
+				strings[getOffset(group, eq, EqualizerConfig::KEY_GAIN)] = key;
 				key = eqKey;
 				key += "/bandwidth";
-				strings[getOffset(group, eq, ParametricConfig::KEY_BANDWIDTH)] = key;
+				strings[getOffset(group, eq, EqualizerConfig::KEY_BANDWIDTH)] = key;
 			}
 		}
 
@@ -288,7 +289,7 @@ namespace speakerman {
 			groupConfig.threshold = GroupConfig::DEFAULT_THRESHOLD;
 			groupConfig.volume = GroupConfig::DEFAULT_VOLUME;
 			for (size_t eq = 0; eq < GroupConfig::MAX_EQS; eq++) {
-				ParametricConfig &eqConfig = groupConfig.eq[eq];
+				EqualizerConfig &eqConfig = groupConfig.eq[eq];
 				eqConfig.center = 20000;
 				eqConfig.gain = 10;
 				eqConfig.bandwidth = 2;
@@ -332,7 +333,7 @@ namespace speakerman {
 	} GroupConfigCallbackData;
 
 	typedef struct {
-		ParametricConfig &config;
+		EqualizerConfig &config;
 		size_t groupId;
 		size_t eqId;
 		bool initial;
@@ -374,14 +375,14 @@ namespace speakerman {
 	{
 		EqConfigCallbackData *config = static_cast<EqConfigCallbackData *>(data);
 
-		if (isKey(key, config->initial, config->groupId, config->eqId, ParametricConfig::KEY_CENTER)) {
-			readNumber(config->config.center, key, value, ParametricConfig::MIN_CENTER_FREQ, ParametricConfig::MAX_CENTER_FREQ);
+		if (isKey(key, config->initial, config->groupId, config->eqId, EqualizerConfig::KEY_CENTER)) {
+			readNumber(config->config.center, key, value, EqualizerConfig::MIN_CENTER_FREQ, EqualizerConfig::MAX_CENTER_FREQ);
 		}
-		else if (isKey(key, config->initial, config->groupId, config->eqId, ParametricConfig::KEY_GAIN)) {
-			readNumber(config->config.gain, key, value, ParametricConfig::MIN_GAIN, ParametricConfig::MAX_GAIN, true);
+		else if (isKey(key, config->initial, config->groupId, config->eqId, EqualizerConfig::KEY_GAIN)) {
+			readNumber(config->config.gain, key, value, EqualizerConfig::MIN_GAIN, EqualizerConfig::MAX_GAIN, true);
 		}
-		else if (isKey(key, config->initial, config->groupId, config->eqId, ParametricConfig::KEY_BANDWIDTH)) {
-			readNumber(config->config.bandwidth, key, value, ParametricConfig::MIN_BANDWIDTH, ParametricConfig::MAX_BANDWIDTH, true);
+		else if (isKey(key, config->initial, config->groupId, config->eqId, EqualizerConfig::KEY_BANDWIDTH)) {
+			readNumber(config->config.bandwidth, key, value, EqualizerConfig::MIN_BANDWIDTH, EqualizerConfig::MAX_BANDWIDTH, true);
 		}
 		return speakerman::config::CallbackResult::CONTINUE;
 	}
@@ -392,7 +393,7 @@ namespace speakerman {
 			return;
 		}
 		resetStream(stream);
-		ParametricConfig &config = data.config;
+		EqualizerConfig &config = data.config;
 		config.center = UNSET_FLOAT;
 		config.gain = UNSET_FLOAT;
 		config.bandwidth = UNSET_FLOAT;
@@ -402,10 +403,10 @@ namespace speakerman {
 			throw runtime_error("Parse error");
 		}
 
-		const ParametricConfig &defaulConfig = basedUpon.group[data.groupId].eq[data.eqId];
-		setDefault(config.center, UNSET_FLOAT, defaulConfig.center, getConfigKey(data.groupId, data.eqId, ParametricConfig::KEY_CENTER));
-		setDefault(config.gain, UNSET_FLOAT, defaulConfig.gain, getConfigKey(data.groupId, data.eqId, ParametricConfig::KEY_GAIN));
-		setDefault(config.bandwidth, UNSET_FLOAT, defaulConfig.bandwidth, getConfigKey(data.groupId, data.eqId, ParametricConfig::KEY_BANDWIDTH));
+		const EqualizerConfig &defaulConfig = basedUpon.group[data.groupId].eq[data.eqId];
+		setDefault(config.center, UNSET_FLOAT, defaulConfig.center, getConfigKey(data.groupId, data.eqId, EqualizerConfig::KEY_CENTER));
+		setDefault(config.gain, UNSET_FLOAT, defaulConfig.gain, getConfigKey(data.groupId, data.eqId, EqualizerConfig::KEY_GAIN));
+		setDefault(config.bandwidth, UNSET_FLOAT, defaulConfig.bandwidth, getConfigKey(data.groupId, data.eqId, EqualizerConfig::KEY_BANDWIDTH));
 	}
 
 	static void readGroup(GroupConfigCallbackData &data, istream &stream, config::Reader &reader, const SpeakermanConfig &basedUpon)
@@ -506,8 +507,6 @@ namespace speakerman {
 	void dumpSpeakermanConfig(const SpeakermanConfig& dump, ostream &output)
 	{
 		const char *assgn = " = ";
-		const char *indent1 = "  ";
-		const char *indent2 = "    ";
 		output << "# Speakerman configuration dump" << endl << endl;
 		output << "# Global" << endl;
 		output << getConfigKey(-1, -1, SpeakermanConfig::KEY_GROUP_COUNT) << assgn << dump.groups << endl;
@@ -516,17 +515,15 @@ namespace speakerman {
 
 		for (size_t group = 0; group < dump.groups; group++) {
 			const GroupConfig &groupConfig = dump.group[group];
+			output << getConfigKey(group, -1, GroupConfig::KEY_EQ_COUNT) << assgn << groupConfig.eqs << endl;
+			output << getConfigKey(group, -1, GroupConfig::KEY_THRESHOLD) << assgn << groupConfig.threshold << endl;
+			output << getConfigKey(group, -1, GroupConfig::KEY_VOLUME) << assgn << groupConfig.volume << endl;
 
-			output << endl << indent1 << "# Group " << group << " configuration" << endl;
-			output << indent1 << getConfigKey(group, -1, GroupConfig::KEY_EQ_COUNT) << assgn << groupConfig.eqs << endl;
-			output << indent1 << getConfigKey(group, -1, GroupConfig::KEY_THRESHOLD) << assgn << groupConfig.threshold << endl;
-			output << indent1 << getConfigKey(group, -1, GroupConfig::KEY_VOLUME) << assgn << groupConfig.volume << endl;
 			for (size_t eq = 0; eq < GroupConfig::MAX_EQS; eq++) {
-				const ParametricConfig &eqConfig = groupConfig.eq[eq];
-				output << endl << indent2 << "# Equalizer " << eq << " of group " << group << " configuration" << endl;
-				output << indent2 << getConfigKey(group, eq, ParametricConfig::KEY_CENTER) << assgn << eqConfig.center << endl;
-				output << indent2 << getConfigKey(group, eq, ParametricConfig::KEY_GAIN) << assgn << eqConfig.gain << endl;
-				output << indent2 << getConfigKey(group, eq, ParametricConfig::KEY_BANDWIDTH) << assgn << eqConfig.bandwidth << endl;
+				const EqualizerConfig &eqConfig = groupConfig.eq[eq];
+				output << getConfigKey(group, eq, EqualizerConfig::KEY_CENTER) << assgn << eqConfig.center << endl;
+				output << getConfigKey(group, eq, EqualizerConfig::KEY_GAIN) << assgn << eqConfig.gain << endl;
+				output << getConfigKey(group, eq, EqualizerConfig::KEY_BANDWIDTH) << assgn << eqConfig.bandwidth << endl;
 			}
 		}
 	}

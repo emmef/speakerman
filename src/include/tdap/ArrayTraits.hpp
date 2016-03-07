@@ -25,8 +25,9 @@
 
 #include <cstring>
 
-#include "Count.hpp"
-#include "Value.hpp"
+#include <tdap/Count.hpp>
+#include <tdap/Value.hpp>
+#include <tdap/IndexPolicy.hpp>
 
 namespace tdap {
 
@@ -239,14 +240,35 @@ private:
 	}
 };
 
-template<typename T, size_t SIZE, class Sub>
-struct FixedSizeArrayTraits : public ArrayTraits<T, Sub>
-{
-	constexpr size_t size() const
+	template<typename T, size_t SIZE, class Sub>
+	struct FixedSizeArrayTraits : public ArrayTraits<T, Sub>
 	{
-		return SIZE;
-	}
-};
+		constexpr size_t size() const
+		{
+			return SIZE;
+		}
+	};
+
+	template<typename T, class Sub>
+	struct FixedCapArrayTraits : public ArrayTraits<T, Sub>
+	{
+		void setSize(size_t newSize)
+		{
+			static_cast<Sub *>(this)->_traitSetSize(validSize(newSize));
+		}
+
+		size_t validSize(size_t size)
+		{
+			if (size == 0) {
+				throw std::invalid_argument("Array: size must be positive");
+			}
+			if (size <= ArrayTraits<T, Sub>::capacity()) {
+				return size;
+			}
+			throw std::invalid_argument("Array: invalid size ");
+		}
+
+	};
 
 enum class ConstructionPolicy
 {

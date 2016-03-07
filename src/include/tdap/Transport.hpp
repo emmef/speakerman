@@ -45,7 +45,7 @@ using namespace std;
 		mutex m_;
 		volatile bool read_ = false;
 		volatile bool write_ = false;
-		volatile shutdown_ = false;
+		volatile bool shutdown_ = false;
 		Data data_[2];
 
 	public:
@@ -65,13 +65,13 @@ using namespace std;
 				fenced_ = useFence;
 			}
 
+		public:
 			LockFreeData(LockFreeData && source) :
 					data_(source.data_), write_(source.write_), read_(source.read_), fenced_(source.fenced_)
 			{
 				source.data_ = nullptr;
 			}
 
-		public:
 			static LockFreeData create(Data &data, const bool write, volatile bool &read, bool useFence)
 			{
 				if (useFence) {
@@ -106,7 +106,17 @@ using namespace std;
 		/**
 		 * Creates a transport and initialized the data with an original value.
 		 */
-		Transport(Data original) : 	data_({original, original}) { }
+		Transport() { }
+		/**
+		 * Creates a transport and initialized the data with an original value.
+		 */
+		Transport(const Data original) : 	data_({original, original}) { }
+
+		void init(const Data original)
+		{
+			data_[0] = original;
+			data_[1] = original;
+		}
 
 		/**
 		 * Obtain lock-free data, that will bre "released" on destruction.
@@ -116,7 +126,7 @@ using namespace std;
 		 */
 		LockFreeData getLockFree()
 		{
-			LockFreeData::create(write_ ? data_[1] : data_[0], write_, read_, true);
+			return LockFreeData::create(write_ ? data_[1] : data_[0], write_, read_, true);
 		}
 
 		/**
@@ -127,7 +137,7 @@ using namespace std;
 		 */
 		LockFreeData getLockFreeNoFence()
 		{
-			LockFreeData::create(write_ ? data_[1] : data_[0], write_, read_, false);
+			return LockFreeData::create(write_ ? data_[1] : data_[0], write_, read_, false);
 		}
 
 		/**
@@ -139,10 +149,10 @@ using namespace std;
 		 * The method returns true if the information was written and false
 		 * if not (duration exceeded).
 		 */
-		bool getAndSet(Data set, Data &get, chrono::duration duration)
+		bool getAndSet(Data set, Data &get, chrono::milliseconds duration)
 		{
-			const chrono::duration sleep = duration / 10;
-			const chrono::time_point expire = chrono::steady_clock::now() + duration;
+			const chrono::microseconds sleep = duration / 10;
+			const auto expire = chrono::steady_clock::now() + duration;
 			unique_lock<mutex> lock(m_);
 
 			while (write_ != read_ && chrono::steady_clock::now() < expire && !shutdown_) {

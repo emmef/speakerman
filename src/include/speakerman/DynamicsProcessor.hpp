@@ -29,117 +29,73 @@
 #include <tdap/Weighting.hpp>
 #include <tdap/Noise.hpp>
 #include <tdap/Crossovers.hpp>
+#include <tdap/Transport.hpp>
+#include <speakerman/SpeakermanRuntimeData.hpp>
 
 namespace speakerman {
 
 using namespace tdap;
 
-template<size_t CHANNELS_PER_GROUP, size_t GROUPS>
-struct VolumeControl
+
+class DynamicProcessorLevels
 {
-	static constexpr size_t CHANNELS = GROUPS * CHANNELS_PER_GROUP;
+	double gains_[SpeakermanConfig::MAX_GROUPS + 1];
+	double signal_[SpeakermanConfig::MAX_GROUPS];
+	size_t groups_;
 
-	class Matrix {
-		double volume_[CHANNELS][CHANNELS];
+public:
+	DynamicProcessorLevels(size_t groups) : groups_(groups) {}
 
-	public:
-		Matrix(double value) {
-			setAll(value);
-		}
+	size_t groups() const { return groups_; }
+	size_t signals() const { return groups_ + 1; }
 
-		Matrix() : Matrix(0) { }
-
-		double validVolume(double volume) {
-			if (volume >= -1e-5 && volume <= 1e-5) {
-				return 0;
-			}
-			return Values::force_between(volume, -10.0, 10.0);
-		}
-
-		Matrix &set(size_t output, size_t input, double volume) {
-			volume_[IndexPolicy::array(output, CHANNELS)][IndexPolicy::array(input, CHANNELS)] =
-					validVolume(volume);
-			return *this;
-		}
-
-		Matrix &setAll(double volume) {
-			double v = validVolume(volume);
-
-			for (size_t i = 0; i < CHANNELS; i++) {
-				for (size_t j = 0; i < CHANNELS; i++) {
-					volume_[i][j] = v;
-				}
-			}
-			return *this;
-		}
-
-		Matrix &setGroup(size_t output, size_t input, double volume)
-		{
-			double v = validVolume(volume);
-
-			size_t offset = output * CHANNELS_PER_GROUP;
-			size_t endOffset = offset + CHANNELS_PER_GROUP;
-			for ( ; offset < endOffset; offset++) {
-				volume_[offset][offset] = v;
-			}
-			return *this;
-		}
-
-		void approach(const Matrix &source, const IntegrationCoefficients<double> &coefficients)
-		{
-			for (size_t i = 0; i < CHANNELS; i++) {
-				for (size_t j = 0; j < CHANNELS; j++) {
-					coefficients.integrate(source.volume_[i][j], volume_[i][j]);
-				}
-			}
-		}
-
-		template<typename...A>
-		void apply(const ArrayTraits<double, A...> &input, ArrayTraits<double, A...> &output, double noise)
-		{
-			for (size_t o = 0; o < CHANNELS; o++) {
-				double sum = noise;
-				for (size_t i = 0; i < CHANNELS; i++) {
-					sum += volume_[o][i] * input[i];
-				}
-				output[o] = sum;
-			}
-		}
-	};
-
-	IntegrationCoefficients<double>	integration;
-	Matrix userVolume;
-	Matrix actualVolume;
-
-	VolumeControl()
+	void reset()
 	{
-		userVolume.setAll(0);
-		actualVolume.setAll(0);
-		integration.setCharacteristicSamples(96000 * 0.05);
+		for (size_t limiter = 0; limiter <= groups_; limiter++) {
+			gains_[limiter] = 0.0;
+		}
+		for (size_t group = 0; group < groups_; group++) {
+			signal_[group] = 0.0;
+		}
 	}
 
-	void configure(double sampleRate, double rc, Matrix initialVolumes)
+	void setGroupGain(size_t group, double gain)
 	{
-		integration.setCharacteristicSamples(sampleRate * rc);
-		userVolume = initialVolumes;
-		actualVolume.setAll(0);
+		double &g = gains_[1 + IndexPolicy::array(group, groups_)];
+		g = Values::min(g, gain);
 	}
 
-	void setVolume(Matrix newVolumes)
+	double getGroupGain(size_t group) const
 	{
-		userVolume = newVolumes;
+		return gains_[1 + IndexPolicy::array(group, groups_)];
 	}
 
-	template<typename...A>
-	void apply(const ArrayTraits<double, A...> &input, ArrayTraits<double, A...> &output, double noise)
+	void setSubGain(double gain)
 	{
-		actualVolume.approach(userVolume, integration);
-		actualVolume.apply(input, output, noise);
+		double &g = gains_[0];
+		g = Values::min(g, gain);
+	}
+
+	double getGroupGain() const
+	{
+		return gains_[0];
+	}
+
+	void setSignal(size_t group, double signal)
+	{
+		double &s = signal_[IndexPolicy::array(group, groups_)];
+		s = Values::max(s, signal);
+	}
+
+	double getSignal(size_t group) const
+	{
+		return signal_[IndexPolicy::array(group, groups_)];
 	}
 };
 
+
 template<size_t CHANNELS_PER_GROUP, size_t GROUPS, size_t CROSSOVERS>
-class SignalGroup
+class DynamicsProcessor
 {
 public:
 	static constexpr size_t INPUTS = GROUPS * CHANNELS_PER_GROUP;
@@ -158,6 +114,9 @@ public:
 
 	using CrossoverFrequencies = FixedSizeArray<double, CROSSOVERS>;
 	using ThresholdValues = FixedSizeArray<double, LIMITERS>;
+	using Configurable = SpeakermanRuntimeConfigurable<double, GROUPS, BANDS, CHANNELS_PER_GROUP>;
+	using ConfigData = SpeakermanRuntimeData<double, GROUPS, BANDS>;
+
 
 private:
 	PinkNoise::Default noise;
@@ -165,23 +124,20 @@ private:
 	FixedSizeArray<double, INPUTS> inputWithVolumeAndNoise;
 	FixedSizeArray<double, PROCESSING_CHANNELS> processInput;
 	FixedSizeArray<double, OUTPUTS> output;
+	FixedSizeArray<double, BANDS> relativeBandWeights;
 
 	Crossovers::Filter<double, INPUTS, CROSSOVERS>  crossoverFilter;
-	FixedSizeArray<double, DETECTORS> limiterThresholds;
 	ACurves::Filter<double, PROCESSING_CHANNELS> aCurve;
 
-	FixedSizeArray<double, BANDS> relativeBandWeights;
 	FixedSizeArray<AdvancedRms::Detector<15>, DETECTORS> rmsDetector;
-	FixedSizeArray<double, DETECTORS> detectorWeight;
 
 	FixedSizeArray<HoldMaxDoubleIntegrated<double>, LIMITERS> limiter;
 	Delay<double> rmsDelay;
 	Delay<double> limiterDelay;
+	Configurable runtime;
+	IntegrationCoefficients<double> signalIntegrator;
 
 	double sampleRate_;
-	using Volume = VolumeControl<CHANNELS_PER_GROUP, GROUPS>;
-	using Matrix = typename Volume::Matrix;
-	Volume volumeControl;
 	bool bypass = true;
 
 	static AdvancedRms::UserConfig rmsUserConfig()
@@ -190,20 +146,23 @@ private:
 	}
 
 public:
-	SignalGroup() : rmsDelay(96000), limiterDelay(96000), sampleRate_(0)
-	{
+	DynamicProcessorLevels levels;
 
+	DynamicsProcessor() : rmsDelay(96000), limiterDelay(96000), sampleRate_(0), levels(GROUPS)
+	{
+		levels.reset();
 	}
 
 	void setSampleRate(
 			double sampleRate,
 			const FixedSizeArray<double, CROSSOVERS> &crossovers,
-			const FixedSizeArray<double, LIMITERS> &thresholds)
+			const SpeakermanConfig &config)
 	{
 		noise.setScale(1e-5);
 		subNoise.setScale(1e-5);
 		aCurve.setSampleRate(sampleRate);
 		crossoverFilter.configure(sampleRate, crossovers);
+		signalIntegrator.setCharacteristicSamples(0.1 * sampleRate);
 
 		// Rms detector confiuration
 		AdvancedRms::UserConfig rmsConfig = rmsUserConfig();
@@ -227,55 +186,57 @@ public:
 			relativeBandWeights[band] = weights[2 * band + 1];
 		}
 
-		setThresholds(thresholds);
-		Matrix matrix;
-		matrix.setAll(0.0);
-		for (size_t group = 0; group < GROUPS; group++) {
-			matrix.setGroup(group, group, 10.0);
-		}
-		volumeControl.configure(sampleRate, 0.05, matrix);
 		sampleRate_ = sampleRate;
+		runtime.init(createConfigData(config));
+	}
+
+	const ConfigData &getConfigData() const
+	{
+		return runtime.data();
+	}
+
+	ConfigData createConfigData(const SpeakermanConfig &config)
+	{
+		ConfigData data;
+		data.configure(config, sampleRate_, relativeBandWeights, rmsUserConfig().peakWeight / 1.5);
+		return data;
+	}
+
+	void updateConfig(const ConfigData &data)
+	{
+		runtime.modify(data);
 	}
 
 	void process(
 			const FixedSizeArray<double, INPUTS> &input,
-			FixedSizeArray<double, INPUTS + 1> &target)
+			FixedSizeArray<double, OUTPUTS> &target)
 	{
-		volumeControl.apply(input, inputWithVolumeAndNoise, noise());
+		runtime.approach();
+		applyVolumeAddNoise(input);
 		moveToProcessingChannels(crossoverFilter.filter(inputWithVolumeAndNoise));
 		processSubRms();
 		processChannelsRms();
 		mergeFrequencyBands();
 		processSubLimiter();
 		processChannelsLimiter();
-
-		target[INPUTS] = output[0];
-		for (size_t i = 0; i < INPUTS; i++) {
-			target[i] = output[i + 1];
-		}
-
-	}
-
-	void setThresholds(const FixedSizeArray<double, LIMITERS> &thresholds) {
-		detectorWeight[0] = thresholds[0] * relativeBandWeights[0];
-		std::cout << "SUB threshold=" << thresholds[0] << "; relative=" << relativeBandWeights[0] << std::endl;
-		for (size_t group = 1, i = 1; group <= GROUPS; group++) {
-			for (size_t band = 1; band <= CROSSOVERS; band++, i++) {
-				detectorWeight[i] = thresholds[group] * relativeBandWeights[band];
-				std::cout << "[" << group << "," << band << "]: threshold=" << thresholds[group] << "; relative=" << relativeBandWeights[band] << std::endl;
-			}
-		}
-		for (size_t i = 0; i < DETECTORS; i++) {
-			rmsDetector[i].setValue(detectorWeight[i]);
-		}
-		for (size_t i = 0; i < LIMITERS; i++) {
-			limiterThresholds[i] = Values::min(1.5 * thresholds[i] / rmsUserConfig().peakWeight, 0.99);
-			std::cout << "Limiter[" << i << "] threshold=" << limiterThresholds[i] << std::endl;
-			limiter[i].setValue(limiterThresholds[i]);
-		}
 	}
 
 private:
+	void applyVolumeAddNoise(const FixedSizeArray<double, INPUTS> &input)
+	{
+		double ns = noise();
+		for (size_t group = 0, offs = 0; group < GROUPS; group++) {
+			double signal = 0;
+			double volume = runtime.data().groupConfig(group).volume();
+			for (size_t channel = 0; channel < CHANNELS_PER_GROUP; channel++, offs++) {
+				double x = input[offs];
+				signal += x * x;
+				inputWithVolumeAndNoise[offs] = x * volume + ns;
+			}
+			levels.setSignal(group, sqrt(signal));
+		}
+	}
+
 
 	void moveToProcessingChannels(const FixedSizeArray<double, CROSSOVER_OUPUTS> &multi)
 	{
@@ -295,9 +256,11 @@ private:
 	{
 		double x = processInput[0] + subNoise();
 		processInput[0] = rmsDelay.setAndGet(x);
-		double weight = detectorWeight[0];
-		double detect = rmsDetector[0].integrate(x * x, weight);
-		double gain = weight / detect;
+		double scaleForUnity = runtime.data().subRmsScale();
+		double detectionWeight = runtime.data().subRmsThreshold();
+		double detect = scaleForUnity * rmsDetector[0].integrate(x * x, detectionWeight);
+		double gain = 1.0 / detect;
+		levels.setSubGain(gain);
 		processInput[0] *= gain;
 	}
 
@@ -313,9 +276,11 @@ private:
 					double y = aCurve.filter(offset, x);
 					squareSum += y * y;
 				}
-				double weight = detectorWeight[detector];
-				double detect = rmsDetector[detector].integrate(squareSum, weight);
-				double gain = weight / detect;
+				double detectionWeight = runtime.data().groupConfig(group).bandRmsThreshold(band);
+				double scaleForUnity = runtime.data().groupConfig(group).bandRmsScale(band);
+				double detect = scaleForUnity * rmsDetector[detector].integrate(squareSum, detectionWeight);
+				double gain = 1.0 / detect;
+				levels.setGroupGain(group, gain);
 				for (size_t offset = baseOffset; offset < nextOffset; offset++) {
 					processInput[offset] *= gain;
 				}
@@ -339,18 +304,18 @@ private:
 
 	void processSubLimiter()
 	{
-		double threshold = limiterThresholds[0];
+		double scale = runtime.data().subLimiterScale();
+		double threshold = runtime.data().subLimiterThreshold();
 		double x = output[0];
 		output[0] = limiterDelay.setAndGet(x);
 		double detect = limiter[0].applyWithMinimum(fabs(x), threshold);
-
-		double gain = 1.0;
+		double gain = 1.0 / detect;
+		levels.setSubGain(gain);
 		output[0] = Values::clamp(gain * output[0], -threshold, threshold);
 	}
 
 	void processChannelsLimiter() {
 		for (size_t group = 1, channel = 1; group <= GROUPS; group++) {
-			double threshold = limiterThresholds[group];
 			size_t max = channel + CHANNELS_PER_GROUP;
 			double peak = 0.0;
 			for (size_t offset = channel; offset < max; offset++) {
@@ -358,8 +323,11 @@ private:
 				output[offset] = limiterDelay.setAndGet(x);
 				peak = Values::max(peak, fabs(output[offset]));
 			}
-			double detect = limiter[group].applyWithMinimum(peak, threshold);
-			double gain = threshold / detect;
+			double threshold = runtime.data().groupConfig(group).limiterThreshold();
+			double scale = runtime.data().groupConfig(group).limiterScale();
+			double detect = scale * limiter[group].applyWithMinimum(peak, threshold);
+			double gain = 1.0 / detect;
+			levels.setGroupGain(group, gain);
 			for (size_t offset = channel; offset < max; offset++) {
 				output[offset] = Values::clamp(gain * output[offset], -threshold, threshold);
 			}

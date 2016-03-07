@@ -136,13 +136,14 @@ template <typename COEFFICIENT, size_t ORDER>
 class FixedSizeIirCoefficients
 {
 	static_assert(std::is_floating_point<COEFFICIENT>::value, "Coefficient type should be floating-point");
+public:
 	static constexpr size_t COEFFS = IirCoefficients<COEFFICIENT>::coefficientsForOrder(ORDER);
 	static constexpr size_t TOTAL_COEEFS = IirCoefficients<COEFFICIENT>::totalCoefficientsForOrder(ORDER);
 	static constexpr size_t C_OFFSET = 0;
 	static constexpr size_t D_OFFSET = COEFFS;
 	static constexpr size_t HISTORY = IirCoefficients<COEFFICIENT>::historyForOrder(ORDER);
 	static constexpr size_t TOTAL_HISTORY = IirCoefficients<COEFFICIENT>::totalHistoryForOrder(ORDER);
-
+private:
 	constexpr size_t getCOffset(size_t idx) const { return Value<size_t>::valid_below(idx, COEFFS) + C_OFFSET; }
 	constexpr size_t getDOffset(size_t idx) const { return Value<size_t>::valid_below(idx, COEFFS) + D_OFFSET; }
 
@@ -165,6 +166,14 @@ public:
 	void setD(size_t idx, const COEFFICIENT coefficient) { D(idx) = coefficient; }
 	COEFFICIENT getC(size_t idx) const { return C(idx); }
 	COEFFICIENT getD(size_t idx) const { return D(idx); }
+
+	void setTransparent()
+	{
+		for (size_t i = 0; i < TOTAL_COEEFS; i++) {
+			data[i] = 0.0;
+		}
+		C(0) = 1;
+	}
 
 	template<typename T>
 	void assign(const IirCoefficients<T> &source)

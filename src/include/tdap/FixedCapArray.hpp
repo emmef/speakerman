@@ -29,26 +29,16 @@
 namespace tdap {
 
 template <typename T, size_t CAPACITY>
-class FixedCapArray : public ArrayTraits<T, FixedCapArray<T, CAPACITY>>
+class FixedCapArray : public FixedCapArrayTraits<T, FixedCapArray<T, CAPACITY>>
 {
 	static_assert(TriviallyCopyable<T>::value, "Type must be trivial to copy, move or destroy and have standard layout");
 	static_assert(CAPACITY > 0 && Power2::constant::next(CAPACITY - 1) >= CAPACITY, "Size must be valid");
 	static constexpr size_t MAXSIZE = Power2::constant::next(CAPACITY);
 	friend class ArrayTraits<T, FixedCapArray<T, CAPACITY>>;
+	friend class FixedCapArrayTraits<T, FixedCapArray<T, CAPACITY>>;
 
 	size_t size_ = 0;
 	T data_[MAXSIZE];
-
-	static size_t validSize(size_t size)
-	{
-		if (size > 0 && size <= MAXSIZE) {
-			return size;
-		}
-		if (size == 0) {
-			throw std::invalid_argument("FixedCapArray: size must be positive");
-		}
-		throw std::invalid_argument("FixedCapArray: size too big");
-	}
 
 	size_t _traitGetSize() const { return size_; }
 	size_t _traitGetCapacity() const { return MAXSIZE; }
@@ -76,6 +66,12 @@ class FixedCapArray : public ArrayTraits<T, FixedCapArray<T, CAPACITY>>
 	T * _traitPlus(size_t i) const
 	{
 		return data_ + i;
+	}
+
+
+	void _traitSetSize(size_t newSize)
+	{
+		size_ = newSize;
 	}
 
 	static constexpr bool _traitHasTrivialAddressing() { return true; }

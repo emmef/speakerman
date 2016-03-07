@@ -45,10 +45,12 @@ template <typename T>
 class RefArray;
 
 template <typename T>
-class Array : public ArrayTraits<T, Array<T>>
+class Array : public FixedCapArrayTraits<T, Array<T>>
 {
 	static_assert(TriviallyCopyable<T>::value, "Type must be trivial to copy, move or destroy and have standard layout");
+	friend class FixedCapArrayTraits<T, Array<T>>;
 	friend class ArrayTraits<T, Array<T>>;
+	using Parent = FixedCapArrayTraits<T, Array<T>>;
 
 	size_t capacity_;
 	size_t size_;
@@ -60,14 +62,6 @@ class Array : public ArrayTraits<T, Array<T>>
 			return size;
 		}
 		throw std::invalid_argument("Array: invalid capacity");
-	}
-
-	size_t validSize(size_t size)
-	{
-		if (size <= capacity_) {
-			return size;
-		}
-		throw std::invalid_argument("Array: invalid size ");
 	}
 
 	size_t _traitGetSize() const { return size_; }
@@ -98,6 +92,11 @@ class Array : public ArrayTraits<T, Array<T>>
 		return data_ + i;
 	}
 
+	void _traitSetSize(size_t newSize)
+	{
+		size_ = newSize;
+	}
+
 	static constexpr bool _traitHasTrivialAddressing() { return true; }
 
 	static T * const nonNull(T * const ptr)
@@ -112,7 +111,7 @@ public:
 	using ArrayTraits<T, Array<T>>::copy;
 
 	Array(size_t capacity) : capacity_(validCapacity(capacity)), size_(capacity_), data_(new T[capacity_]) { }
-	Array(size_t capacity, size_t size) : capacity_(validCapacity(capacity)), size_(validSize(size)), data_(new T[capacity_]) { }
+	Array(size_t capacity, size_t size) : capacity_(validCapacity(capacity)), size_(Parent::validSize(size)), data_(new T[capacity_]) { }
 
 	Array(Array<T> &&source) : capacity_(source.capacity_), size_(source.size_), data_(source.data_)
 	{
@@ -135,10 +134,10 @@ public:
 
 	Array(const Array<T> &source) : Array(source, ConstructionPolicy::SIZE_BECOMES_CAPACITY) {}
 
-	void setSize(size_t newSize)
-	{
-		size_ = validSize(newSize);
-	}
+//	void setSize(size_t newSize)
+//	{
+//		size_ = validSize(newSize);
+//	}
 
 	template<typename ...A>
 	void operator = (const ArrayTraits<T, A...> &source)

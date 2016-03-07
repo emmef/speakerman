@@ -28,43 +28,6 @@
 
 namespace tdap {
 
-#ifndef TDAP_INDEX_POLICY_METHODS_CHECKED
-	static constexpr bool defaultMethodIndexPolicy = true;
-#elif TDAP_INDEX_POLICY_METHODS_CHECKED == 0
-	static constexpr bool defaultMethodIndexPolicy = false;
-#else
-	static constexpr bool defaultMethodIndexPolicy = true;
-#endif
-
-#ifndef TDAP_INDEX_POLICY_OPERATORS_CHECKED
-	static constexpr bool defaultOperatorIndexPolicy = true;
-#elif TDAP_INDEX_POLICY_OPERATORS_CHECKED == 0
-	static constexpr bool defaultOperatorIndexPolicy = false;
-#else
-	static constexpr bool defaultOperatorIndexPolicy = true;
-#endif
-
-struct IndexPolicy
-{
-	static inline size_t force(size_t index, size_t size)
-	{
-		if (index < size) {
-			return index;
-		}
-		throw std::out_of_range("Index out of range");
-	}
-
-	static inline size_t array(size_t index, size_t size)
-	{
-		return defaultOperatorIndexPolicy ? force(index, size) : index;
-	}
-
-	static size_t method(size_t index, size_t size)
-	{
-		return defaultMethodIndexPolicy ? force(index, size) : index;
-	}
-};
-
 static constexpr size_t max_size_t()
 {
 	return std::numeric_limits<size_t>::max();

@@ -38,12 +38,12 @@ typedef double sample_t;
 typedef double accurate_t;
 
 template<class T>
-class ClientOwner
+class Owner
 {
 	atomic<T *> __client;
 
 public:
-	ClientOwner() {
+	Owner() {
 		__client.store(0);
 	}
 
@@ -62,13 +62,13 @@ public:
 		return *__client.load();
 	}
 
-	~ClientOwner()
+	~Owner()
 	{
 		setClient(nullptr);
 	}
 };
 
-SpeakerManager<2, 1> manager;
+Owner<SpeakerManager<2, 1>> manager;
 static volatile int signalNumber = -1;
 static volatile int userInput;
 
@@ -109,7 +109,7 @@ static int getChar() {
 	return chr;
 }
 
-int mainLoop(ClientOwner<JackClient> &owner)
+int mainLoop(Owner<JackClient> &owner)
 {
 	std::thread fetchChars(charFetcher);
 	fetchChars.detach();
@@ -142,12 +142,8 @@ int mainLoop(ClientOwner<JackClient> &owner)
 				running=false;
 				break;
 			case '+' :
-				manager.setVolume(manager.volume() * 1.1);
-				std::cout << "Volume:" << manager.volume() << std::endl;
 				break;
 			case '-' :
-				manager.setVolume(manager.volume() / 1.1);
-				std::cout << "Volume:" << manager.volume() << std::endl;
 				break;
 			default:
 				std::cerr << "Unknown command " << cmnd << std::endl;
@@ -179,7 +175,9 @@ int main(int count, char * arguments[]) {
 	cout << "Dump config" << endl;
 	dumpSpeakermanConfig(config, cout);
 
-	ClientOwner<JackClient> clientOwner;
+	manager.setClient(new SpeakerManager<2, 1>(config));
+
+	Owner<JackClient> clientOwner;
 	auto result = JackClient::createDefault("Speaker manager");
 	clientOwner.setClient(result.getClient());
 
@@ -188,7 +186,7 @@ int main(int count, char * arguments[]) {
 	PortNames inputs = clientOwner.get().portNames(all, all, JackPortIsPhysical|JackPortIsOutput);
 	PortNames outputs = clientOwner.get().portNames(all, all, JackPortIsPhysical|JackPortIsOutput);
 
-	if (!clientOwner.get().setProcessor(manager)) {
+	if (!clientOwner.get().setProcessor(manager.get())) {
 		std::cerr << "Failed to set processor" << std::endl;
 		return 1;
 	}
