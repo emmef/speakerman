@@ -116,17 +116,18 @@ static void configUpdater()
 	while (signalNumber == -1) {
 		this_thread::sleep_for(sleeper);
 		auto stamp = getConfigFileTimeStamp();
+		DynamicProcessorLevels levels(1);
 		if (stamp != configFileConfig.timeStamp) {
-			std::cout << "I: configuration update!" << std::endl;
 			configFileConfig = readSpeakermanConfig(configFileConfig, false);
-			manager.get().setConfig(configFileConfig);
-			DynamicProcessorLevels levels(1);
-			manager.get().applyConfigAndGetLevels(&levels, sleeper);
-			for (size_t i = 0; i < levels.groups(); i++) {
-				std::cout << "GROUP " << i << " SIGNAL=" << levels.getSignal(i) << "; GAIN=" << levels.getGroupGain(i) << std::endl;
-			}
-			std::cout << std::endl << "SUB-GAIN: " << levels.getSubGain() << std::endl;
+			manager.get().applyConfigAndGetLevels(configFileConfig, &levels, sleeper);
 		}
+//		else {
+//			manager.get().getLevels(&levels, sleeper);
+//		}
+//		for (size_t i = 0; i < levels.groups(); i++) {
+//			std::cout << "GROUP " << i << " SIGNAL=" << levels.getSignal(i) << "; GAIN=" << levels.getGroupGain(i) << std::endl;
+//		}
+//		std::cout << "SUB-GAIN: " << levels.getSubGain() << std::endl;
 	}
 }
 

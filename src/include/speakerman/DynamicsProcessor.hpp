@@ -52,7 +52,7 @@ public:
 	void reset()
 	{
 		for (size_t limiter = 0; limiter <= groups_; limiter++) {
-			gains_[limiter] = 0.0;
+			gains_[limiter] = 1.0;
 		}
 		for (size_t group = 0; group < groups_; group++) {
 			signal_[group] = 0.0;
@@ -138,7 +138,7 @@ private:
 	Crossovers::Filter<double, T, INPUTS, CROSSOVERS>  crossoverFilter;
 	ACurves::Filter<T, PROCESSING_CHANNELS> aCurve;
 
-	FixedSizeArray<AdvancedRms::Detector<10>, DETECTORS> rmsDetector;
+	FixedSizeArray<AdvancedRms::Detector<T, 12>, DETECTORS> rmsDetector;
 
 	FixedSizeArray<HoldMaxDoubleIntegrated<T>, LIMITERS> limiter;
 	Delay<T> rmsDelay;
@@ -154,7 +154,7 @@ private:
 
 	static AdvancedRms::UserConfig rmsUserConfig()
 	{
-		return { 0.0005, 0.35, 0.5, 1.2 };
+		return { 0.0005, 0.4, 0.5, 1.1 };
 	}
 
 public:
@@ -245,6 +245,7 @@ private:
 	void applyVolumeAddNoise(const FixedSizeArray<T, INPUTS> &input)
 	{
 		T ns = noise();
+		T channelScale = 1.0 / CHANNELS_PER_GROUP;
 		for (size_t group = 0, offs = 0; group < GROUPS; group++) {
 			T signal = 0;
 			T volume = runtime.data().groupConfig(group).volume();
@@ -253,7 +254,7 @@ private:
 				signal += x * x;
 				inputWithVolumeAndNoise[offs] = x * volume + ns;
 			}
-			levels.setSignal(group, sqrt(signal));
+			levels.setSignal(group, sqrt(channelScale * signal));
 		}
 	}
 

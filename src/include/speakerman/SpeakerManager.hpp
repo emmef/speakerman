@@ -42,8 +42,8 @@ class SpeakerManagerControl : public JackProcessor
 public:
 
 	virtual const SpeakermanConfig &getConfig() const = 0;
-	virtual void setConfig(const SpeakermanConfig &config) = 0;
-	virtual bool applyConfigAndGetLevels(DynamicProcessorLevels *levels, std::chrono::milliseconds duration) = 0;
+	virtual bool applyConfigAndGetLevels(const SpeakermanConfig &config, DynamicProcessorLevels *levels, std::chrono::milliseconds duration) = 0;
+	virtual bool getLevels(DynamicProcessorLevels *levels, std::chrono::milliseconds duration) = 0;
 };
 
 template<typename T, size_t CHANNELS_PER_GROUP, size_t GROUPS>
@@ -84,6 +84,7 @@ class SpeakerManager : public SpeakerManagerControl
 	PortDefinitions portDefinitions_;
 	SpeakermanConfig config_;
 	Processor processor;
+	std::mutex mutex_;
 
 	bool fewerInputs = false;
 	bool fewerOutputs = false;
@@ -202,17 +203,28 @@ public:
 		return config_;
 	}
 
-	virtual void setConfig(const SpeakermanConfig &config) override
+	virtual bool getLevels(DynamicProcessorLevels *levels, std::chrono::milliseconds duration) override
 	{
-		config_ = config;
-		preparedConfigData.configData = processor.createConfigData(config);
-		preparedConfigData.configChanged = true;
-	}
-
-	virtual bool applyConfigAndGetLevels(DynamicProcessorLevels *levels, std::chrono::milliseconds duration) override
-	{
+		std::unique_lock<std::mutex> lock(mutex_);
 		TransportData result;
 		preparedConfigData.levels.reset();
+		if (transport.getAndSet(preparedConfigData, result, duration)) {
+			if (levels) {
+				*levels = result.levels;
+			}
+			return true;
+		}
+		return false;
+	}
+
+	virtual bool applyConfigAndGetLevels(const SpeakermanConfig &config, DynamicProcessorLevels *levels, std::chrono::milliseconds duration) override
+	{
+		std::unique_lock<std::mutex> lock(mutex_);
+		TransportData result;
+		config_ = config;
+		preparedConfigData.configData = processor.createConfigData(config);
+		preparedConfigData.levels.reset();
+		preparedConfigData.configChanged = true;
 		if (transport.getAndSet(preparedConfigData, result, duration)) {
 			if (levels) {
 				*levels = result.levels;
