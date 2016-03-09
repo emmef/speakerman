@@ -67,7 +67,7 @@ namespace speakerman {
 		return
 			eqId >= 0 ? true :
 			groupId >= 0 ? true :
-			fieldId == SpeakermanConfig::KEY_SUB_THRESHOLD;
+			(fieldId == SpeakermanConfig::KEY_SUB_THRESHOLD || fieldId == SpeakermanConfig::KEY_SUB_DELAY);
 	}
 
 	static constexpr size_t GROUP_CONFIG_SIZE =
