@@ -33,24 +33,27 @@
 
 namespace tdap {
 
-template <typename COEFFICIENT, size_t ORDER, bool flushToZero = false>
-inline static COEFFICIENT iir_filter_fixed(
-		const COEFFICIENT * const c,  // (ORDER + 1) C-coefficients
-		const COEFFICIENT * const d,  // (ORDER + 1) D-coefficients
-		COEFFICIENT * const xHistory, // (ORDER) x value history
-		COEFFICIENT * const yHistory, // (ORDER) y value history
-		const COEFFICIENT input)      // input sample value
+using namespace std;
+
+template <typename C, typename S, size_t ORDER, bool FLUSH = false>
+inline static S iir_filter_fixed(
+		const C * const c,  // (ORDER + 1) C-coefficients
+		const C * const d,  // (ORDER + 1) D-coefficients
+		S * const xHistory, // (ORDER) x value history
+		S * const yHistory, // (ORDER) y value history
+		const S input)      // input sample value
 {
-	static_assert(std::is_floating_point<COEFFICIENT>::value, "Coefficient type should be floating-point");
+	static_assert(is_floating_point<C>::value, "Coefficient type should be floating-point");
+	static_assert(is_arithmetic<S>::value, "Sample type should be arithmetic");
 	static_assert(ORDER > 0, "ORDER of filter must be positive");
 
-	COEFFICIENT Y = 0;
-	COEFFICIENT X = input; // input is xN0
-	COEFFICIENT yN0 = 0.0;
+	C Y = 0;
+	C X = input; // input is xN0
+	C yN0 = 0.0;
 	size_t i, j;
 	for (i = 0, j = 1; i < ORDER; i++, j++) {
-		const COEFFICIENT xN1 = xHistory[i];
-		const COEFFICIENT yN1 = yHistory[i];
+		const C xN1 = xHistory[i];
+		const C yN1 = yHistory[i];
 		xHistory[i] = X;
 		X = xN1;
 		yHistory[i] = Y;
@@ -59,7 +62,7 @@ inline static COEFFICIENT iir_filter_fixed(
 	}
 	yN0 += c[0] * input;
 
-	if (flushToZero) {
+	if (FLUSH) {
 		Denormal::flush(yN0);
 	}
 	yHistory[0] = yN0;
@@ -67,24 +70,25 @@ inline static COEFFICIENT iir_filter_fixed(
 	return yN0;
 }
 
-template <typename COEFFICIENT, bool flushToZero = false>
-inline static COEFFICIENT iir_filter(
+template <typename C, typename S, bool FLUSH = false>
+inline static S iir_filter(
 		int order,
-		const COEFFICIENT * const c,  // (order + 1) C-coefficients
-		const COEFFICIENT * const d,  // (order + 1) D-coefficients
-		COEFFICIENT * const xHistory, // (order) x value history
-		COEFFICIENT * const yHistory, // (order) y value history
-		const COEFFICIENT input)      // input sample value
+		const C * const c,  // (order + 1) C-coefficients
+		const C * const d,  // (order + 1) D-coefficients
+		S * const xHistory, // (order) x value history
+		S * const yHistory, // (order) y value history
+		const S input)      // input sample value
 {
-	static_assert(std::is_floating_point<COEFFICIENT>::value, "Coefficient type should be floating-point");
+	static_assert(is_floating_point<C>::value, "Coefficient type should be floating-point");
+	static_assert(is_arithmetic<S>::value, "Sample type should be arithmetic");
 
-	COEFFICIENT Y = 0;
-	COEFFICIENT X = input; // input is xN0
-	COEFFICIENT yN0 = 0.0;
+	C Y = 0;
+	C X = input; // input is xN0
+	C yN0 = 0.0;
 	int i, j;
 	for (i = 0, j = 1; i < order; i++, j++) {
-		const COEFFICIENT xN1 = xHistory[i];
-		const COEFFICIENT yN1 = yHistory[i];
+		const C xN1 = xHistory[i];
+		const C yN1 = yHistory[i];
 		xHistory[i] = X;
 		X = xN1;
 		yHistory[i] = Y;
@@ -93,7 +97,7 @@ inline static COEFFICIENT iir_filter(
 	}
 	yN0 += c[0] * input;
 
-	if (flushToZero) {
+	if (FLUSH) {
 		Denormal::flush(yN0);
 	}
 	yHistory[0] = yN0;
@@ -101,11 +105,8 @@ inline static COEFFICIENT iir_filter(
 	return yN0;
 }
 
-template <typename COEFFICIENT>
-class IirCoefficients
+struct IirCoefficients
 {
-	static_assert(std::is_floating_point<COEFFICIENT>::value, "Type T must be a floating-point type");
-public:
 	static constexpr size_t coefficientsForOrder(size_t order) { return order + 1; }
 	static constexpr size_t totalCoefficientsForOrder(size_t order) { return 2 * coefficientsForOrder(order); }
 	static constexpr size_t historyForOrder(size_t order) { return order; }
@@ -115,11 +116,10 @@ public:
 	virtual size_t maxOrder() const = 0;
 	virtual bool hasFixedOrder() const = 0;
 	virtual void setOrder(size_t newOrder) = 0;
-	virtual void setC(size_t idx, const COEFFICIENT coefficient) = 0;
-	virtual void setD(size_t idx, const COEFFICIENT coefficient) = 0;
-	virtual COEFFICIENT getC(size_t idx) const = 0;
-	virtual COEFFICIENT getD(size_t idx) const = 0;
-	virtual COEFFICIENT filter(COEFFICIENT * const xHistory, COEFFICIENT * const yHistory, const COEFFICIENT input) const = 0;
+	virtual void setC(size_t idx, const double coefficient) = 0;
+	virtual void setD(size_t idx, const double coefficient) = 0;
+	virtual double getC(size_t idx) const = 0;
+	virtual double getD(size_t idx) const = 0;
 
 	size_t coefficientCount() const { return coefficientsForOrder(order()); }
 	size_t totalCoefficientsCount() const { return totalCoefficientsForOrder(order()); }
@@ -129,31 +129,35 @@ public:
 	virtual ~IirCoefficients() = default;
 };
 
-template <typename COEFFICIENT, typename COEFFICIENT_CLASS>
+template <typename C, typename COEFFICIENT_CLASS>
 class WrappedIirCoefficients;
 
-template <typename COEFFICIENT, size_t ORDER>
+
+template <typename C>
+class VariableSizedIirCoefficients;
+
+template <typename C, size_t ORDER>
 class FixedSizeIirCoefficients
 {
-	static_assert(std::is_floating_point<COEFFICIENT>::value, "Coefficient type should be floating-point");
+	static_assert(is_floating_point<C>::value, "Coefficient type should be floating-point");
 public:
-	static constexpr size_t COEFFS = IirCoefficients<COEFFICIENT>::coefficientsForOrder(ORDER);
-	static constexpr size_t TOTAL_COEEFS = IirCoefficients<COEFFICIENT>::totalCoefficientsForOrder(ORDER);
+	static constexpr size_t COEFFS = IirCoefficients::coefficientsForOrder(ORDER);
+	static constexpr size_t TOTAL_COEEFS = IirCoefficients::totalCoefficientsForOrder(ORDER);
 	static constexpr size_t C_OFFSET = 0;
 	static constexpr size_t D_OFFSET = COEFFS;
-	static constexpr size_t HISTORY = IirCoefficients<COEFFICIENT>::historyForOrder(ORDER);
-	static constexpr size_t TOTAL_HISTORY = IirCoefficients<COEFFICIENT>::totalHistoryForOrder(ORDER);
+	static constexpr size_t HISTORY = IirCoefficients::historyForOrder(ORDER);
+	static constexpr size_t TOTAL_HISTORY = IirCoefficients::totalHistoryForOrder(ORDER);
 private:
 	constexpr size_t getCOffset(size_t idx) const { return Value<size_t>::valid_below(idx, COEFFS) + C_OFFSET; }
 	constexpr size_t getDOffset(size_t idx) const { return Value<size_t>::valid_below(idx, COEFFS) + D_OFFSET; }
 
-	COEFFICIENT &C(size_t idx) { return data[getCOffset(idx)]; }
-	COEFFICIENT &D(size_t idx) { return data[getDOffset(idx)]; }
-	const COEFFICIENT &C(size_t idx) const { return data[getCOffset(idx)]; }
-	const COEFFICIENT &D(size_t idx) const { return data[getDOffset(idx)]; }
+	C &C_(size_t idx) { return data[getCOffset(idx)]; }
+	C &D_(size_t idx) { return data[getDOffset(idx)]; }
+	const C &C_(size_t idx) const { return data[getCOffset(idx)]; }
+	const C &D_(size_t idx) const { return data[getDOffset(idx)]; }
 
-	const COEFFICIENT * const unsafeC() const { return data + C_OFFSET; }
-	const COEFFICIENT * const unsafeD() const { return data + D_OFFSET; }
+	const C * const unsafeC() const { return data + C_OFFSET; }
+	const C * const unsafeD() const { return data + D_OFFSET; }
 
 
 public:
@@ -162,39 +166,76 @@ public:
 	bool hasFixedOrder() const { return true; }
 	void setOrder(size_t newOrder) { };
 
-	void setC(size_t idx, const COEFFICIENT coefficient) { C(idx) = coefficient; }
-	void setD(size_t idx, const COEFFICIENT coefficient) { D(idx) = coefficient; }
-	COEFFICIENT getC(size_t idx) const { return C(idx); }
-	COEFFICIENT getD(size_t idx) const { return D(idx); }
+	void setC(size_t idx, const C coefficient) { C_(idx) = coefficient; }
+	void setD(size_t idx, const C coefficient) { D_(idx) = coefficient; }
+	C getC(size_t idx) const { return C_(idx); }
+	C getD(size_t idx) const { return D_(idx); }
 
 	void setTransparent()
 	{
 		for (size_t i = 0; i < TOTAL_COEEFS; i++) {
 			data[i] = 0.0;
 		}
-		C(0) = 1;
+		C_(0) = 1;
 	}
 
-	template<typename T>
-	void assign(const IirCoefficients<T> &source)
+	void assign(const IirCoefficients &source)
 	{
 		if (source.order() == ORDER) {
 			for (size_t i = 0; i < COEFFS; i++) {
-				C(i) = source.getC(i);
-				D(i) = source.getD(i);
+				C_(i) = source.getC(i);
+				D_(i) = source.getD(i);
 			}
 			return;
 		}
-		throw std::invalid_argument("Value not below threshold");
+		throw invalid_argument("Value not below threshold");
 	}
 
-	template<bool flushToZero>
-	COEFFICIENT do_filter(
-			COEFFICIENT * const xHistory, // (ORDER) x value history
-			COEFFICIENT * const yHistory, // (ORDER) y value history
-			COEFFICIENT input) const
+	void operator = (const IirCoefficients &source)
 	{
-		return iir_filter_fixed<COEFFICIENT, ORDER, flushToZero>(
+		assign(source);
+	}
+
+	template <typename S>
+	void assign(const FixedSizeIirCoefficients<S, ORDER> &coeffs)
+	{
+		for (size_t i = 0; i < COEFFS; i++) {
+			setC(i, coeffs.getC(i));
+			setD(i, coeffs.getD(i));
+		}
+	}
+
+	template <typename S>
+	void operator = (const FixedSizeIirCoefficients<S, ORDER> &coeffs)
+	{
+		assign(coeffs);
+	}
+
+	template <typename S>
+	void assign(const VariableSizedIirCoefficients<S> &coeffs)
+	{
+		if (coeffs.order() != ORDER) {
+			throw invalid_argument("FixedSizeIirCoefficients: Source coefficients must be of same order");
+		}
+		for (size_t i = 0; i < COEFFS; i++) {
+			setC(i, coeffs.getC(i));
+			setD(i, coeffs.getD(i));
+		}
+	}
+
+	template <typename S>
+	void operator = (const VariableSizedIirCoefficients<S> &coeffs)
+	{
+		assign(coeffs);
+	}
+
+	template<typename S, bool flushToZero>
+	S do_filter(
+			S * const xHistory, // (ORDER) x value history
+			S * const yHistory, // (ORDER) y value history
+			S input) const
+	{
+		return iir_filter_fixed<C, S, ORDER, flushToZero>(
 				unsafeC(),
 				unsafeD(),
 				xHistory,
@@ -202,27 +243,28 @@ public:
 				input);
 	}
 
-	COEFFICIENT filter(COEFFICIENT * const xHistory, COEFFICIENT * const yHistory, const COEFFICIENT input) const
+	template<typename S>
+	S filter(S * const xHistory, S * const yHistory, const S input) const
 	{
-		return do_filter<false>(xHistory, yHistory, input);
+		return do_filter<S, false>(xHistory, yHistory, input);
 	}
 
-	WrappedIirCoefficients<COEFFICIENT, FixedSizeIirCoefficients<COEFFICIENT, ORDER>> wrap()
+	WrappedIirCoefficients<C, FixedSizeIirCoefficients<C, ORDER>> wrap()
 	{
-		return WrappedIirCoefficients<COEFFICIENT, FixedSizeIirCoefficients<COEFFICIENT, ORDER>>(*this);
+		return WrappedIirCoefficients<C, FixedSizeIirCoefficients<C, ORDER>>(*this);
 	}
 
 private:
-	COEFFICIENT data[TOTAL_COEEFS];
+	C data[TOTAL_COEEFS];
 };
 
 
-template <typename COEFFICIENT>
+template <typename C>
 class VariableSizedIirCoefficients
 {
 	const size_t maxOrder_;
 	size_t order_;
-	COEFFICIENT * data_;
+	C * data_;
 
 	const size_t getCBaseOffset() const { return 0; }
 	const size_t getDBaseOffset() const { return maxOrder_ + 1; }
@@ -230,52 +272,88 @@ class VariableSizedIirCoefficients
 	const size_t getCOffset(size_t i) const { return getCBaseOffset() + Value<size_t>::valid_below_or_same(i, order_); }
 	const size_t getDOffset(size_t i) const { return getDBaseOffset() + Value<size_t>::valid_below_or_same(i, order_); }
 
-	COEFFICIENT &C(size_t i) { return data_[getCOffset(i)]; }
-	COEFFICIENT &D(size_t i) { return data_[getDOffset(i)]; }
-	const COEFFICIENT &C(size_t i) const { return data_[getCOffset(i)]; }
-	const COEFFICIENT &D(size_t i) const { return data_[getDOffset(i)]; }
+	C &C_(size_t i) { return data_[getCOffset(i)]; }
+	C &D_(size_t i) { return data_[getDOffset(i)]; }
+	const C &C_(size_t i) const { return data_[getCOffset(i)]; }
+	const C &D_(size_t i) const { return data_[getDOffset(i)]; }
 
-	const COEFFICIENT * const unsafeC() const { return data_ + getCBaseOffset(); }
-	const COEFFICIENT * const unsafeD() const { return data_ + getDBaseOffset(); }
+	const C * const unsafeC() const { return data_ + getCBaseOffset(); }
+	const C * const unsafeD() const { return data_ + getDBaseOffset(); }
 
 public:
 	VariableSizedIirCoefficients(size_t maxOrder) :
 		maxOrder_(Value<size_t>::valid_between(maxOrder,1,64)),
 		order_(maxOrder_),
-		data_(new COEFFICIENT[IirCoefficients<COEFFICIENT>::totalCoefficientsForOrder(maxOrder_)]) { }
+		data_(new C[IirCoefficients::totalCoefficientsForOrder(maxOrder_)]) { }
 
 	VariableSizedIirCoefficients(size_t maxOrder, size_t order) :
 		maxOrder_(Value<size_t>::valid_between(maxOrder,1,64)),
 		order_(Value<size_t>::valid_between(order, 1, maxOrder_)),
-		data_(new COEFFICIENT[IirCoefficients<COEFFICIENT>::totalCoefficientsForOrder(maxOrder_)]) { }
+		data_(new C[IirCoefficients::totalCoefficientsForOrder(maxOrder_)]) { }
 
 	size_t order() const override { return order_; }
 	size_t maxOrder() const override { return maxOrder_; }
 	bool hasFixedOrder() { return false; }
 	void setOrder(size_t order) { order_ = Value<size_t>::valid_between(order, 1, maxOrder_); }
 
-	void setC(size_t idx, const COEFFICIENT coefficient) override { C(idx) = coefficient; }
-	void setD(size_t idx, const COEFFICIENT coefficient) override { D(idx) = coefficient; }
-	COEFFICIENT getC(size_t idx) const override { return C(idx); }
-	COEFFICIENT getD(size_t idx) const override { return D(idx); }
+	void setC(size_t idx, const C coefficient) override { C_(idx) = coefficient; }
+	void setD(size_t idx, const C coefficient) override { D_(idx) = coefficient; }
+	C getC(size_t idx) const override { return C_(idx); }
+	C getD(size_t idx) const override { return D_(idx); }
 
-	template<typename T>
-	void assign(const IirCoefficients<T> &source)
+	void assign(const IirCoefficients &source)
 	{
 		setOrder(source.order());
 		for (size_t i = 0; i <= order_; i++) {
-			C(i) = source.getC(i);
-			D(i) = source.getD(i);
+			C_(i) = source.getC(i);
+			D_(i) = source.getD(i);
+		}
+	}
+	template <typename S, size_t ORDER>
+	void assign(const FixedSizeIirCoefficients<S, ORDER> &coeffs)
+	{
+		if (ORDER > maxOrder()) {
+			throw invalid_argument("VariableSizedIirCoefficients: order of source exceeds my max order");
+		}
+		setOrder(ORDER);
+		for (size_t i = 0; i < IirCoefficients::totalCoefficientsForOrder(order_); i++) {
+			setC(i, coeffs.getC(i));
+			setD(i, coeffs.getD(i));
 		}
 	}
 
-	template<bool flushToZero = false>
-	COEFFICIENT do_filter(
-			COEFFICIENT * const xHistory, // (ORDER) x value history
-			COEFFICIENT * const yHistory, // (ORDER) y value history
-			COEFFICIENT input) const
+	template <typename S, size_t ORDER>
+	void operator = (const FixedSizeIirCoefficients<S, ORDER> &coeffs)
 	{
-		return iir_filter<COEFFICIENT, flushToZero>(
+		assign(coeffs);
+	}
+
+	template <typename S, size_t ORDER>
+	void assign(const VariableSizedIirCoefficients<S> &coeffs)
+	{
+		if (coeffs.order() > maxOrder()) {
+			throw invalid_argument("VariableSizedIirCoefficients: order of source exceeds my max order");
+		}
+		setOrder(coeffs.order());
+		for (size_t i = 0; i < IirCoefficients::totalCoefficientsForOrder(order_); i++) {
+			setC(i, coeffs.getC(i));
+			setD(i, coeffs.getD(i));
+		}
+	}
+
+	template <typename S, size_t ORDER>
+	void operator = (const VariableSizedIirCoefficients<S> &coeffs)
+	{
+		assign(coeffs);
+	}
+
+	template<typename S, bool flushToZero = false>
+	S do_filter(
+			S * const xHistory, // (ORDER) x value history
+			S * const yHistory, // (ORDER) y value history
+			S input) const
+	{
+		return iir_filter<C, S, flushToZero>(
 				order_,
 				unsafeC(),
 				unsafeD(),
@@ -284,14 +362,18 @@ public:
 				input);
 	}
 
-	COEFFICIENT filter(COEFFICIENT * const xHistory, COEFFICIENT * const yHistory, const COEFFICIENT input) const
+	template<typename S>
+	S filter(
+			S * const xHistory, // (ORDER) x value history
+			S * const yHistory, // (ORDER) y value history
+			S input) const
 	{
-		return do_filter<false>(xHistory, yHistory, input);
+		return do_filter<S, false>(xHistory, yHistory, input);
 	}
 
-	WrappedIirCoefficients<COEFFICIENT, VariableSizedIirCoefficients<COEFFICIENT>> wrap()
+	WrappedIirCoefficients<C, VariableSizedIirCoefficients<C>> wrap()
 	{
-		return WrappedIirCoefficients<COEFFICIENT, VariableSizedIirCoefficients<COEFFICIENT>>(*this);
+		return WrappedIirCoefficients<C, VariableSizedIirCoefficients<C>>(*this);
 	}
 
 	~VariableSizedIirCoefficients()
@@ -301,8 +383,8 @@ public:
 };
 
 
-template <typename COEFFICIENT, typename COEFFICIENT_CLASS>
-class WrappedIirCoefficients : public IirCoefficients<COEFFICIENT>
+template <typename C, typename COEFFICIENT_CLASS>
+class WrappedIirCoefficients : public IirCoefficients
 {
 	COEFFICIENT_CLASS &coefficients_;
 
@@ -314,67 +396,70 @@ public:
 	virtual bool hasFixedOrder() const override { return coefficients_.hasFixedOrder(); }
 	virtual void setOrder(size_t newOrder) override { coefficients_.setOrder(newOrder); }
 
-	virtual void setC(size_t idx, const COEFFICIENT coefficient) override { coefficients_.setC(idx, coefficient); }
-	virtual void setD(size_t idx, const COEFFICIENT coefficient) override { coefficients_.setD(idx, coefficient); }
-	virtual COEFFICIENT getC(size_t idx) const override { return coefficients_.getC(idx); }
-	virtual COEFFICIENT getD(size_t idx) const override { return coefficients_.getD(idx); }
+	virtual void setC(size_t idx, const double coefficient) override { coefficients_.setC(idx, coefficient); }
+	virtual void setD(size_t idx, const double coefficient) override { coefficients_.setD(idx, coefficient); }
+	virtual double getC(size_t idx) const override { return coefficients_.getC(idx); }
+	virtual double getD(size_t idx) const override { return coefficients_.getD(idx); }
 
 	template<typename T>
-	void assign(const IirCoefficients<T> &source)
+	void assign(const IirCoefficients &source)
 	{
 		coefficients_.assign(source);
 	}
 
-	template<bool flushToZero = false>
-	COEFFICIENT do_filter(
-			COEFFICIENT * const xHistory, // (ORDER) x value history
-			COEFFICIENT * const yHistory, // (ORDER) y value history
-			COEFFICIENT input) const
+
+	template<typename S, bool flushToZero = false>
+	S do_filter(
+			S * const xHistory, // (ORDER) x value history
+			S * const yHistory, // (ORDER) y value history
+			S input) const
 	{
-		coefficients_.do_filter<flushToZero>(xHistory, yHistory, input);
+		coefficients_.do_filter<S, flushToZero>(xHistory, yHistory, input);
 	}
 
-	virtual COEFFICIENT filter(COEFFICIENT * const xHistory, COEFFICIENT * const yHistory, const COEFFICIENT input) const
+	template<typename S>
+	S filter(S * const xHistory, S * const yHistory, const S input) const
 	{
-		return coefficients_.filter(xHistory, yHistory, input);
+		return do_filter<S, false>(xHistory, yHistory, input);
 	}
 
 	virtual ~WrappedIirCoefficients() = default;
 };
 
-template<typename COEFFICIENT, size_t CHANNELS, size_t ORDER>
+template<typename C, size_t CHANNELS, size_t ORDER>
 struct FixedSizeIirCoefficientFilter
 {
-	using Coefficients = FixedSizeIirCoefficients<COEFFICIENT, ORDER>;
-	static constexpr size_t historySize() { return IirCoefficients<COEFFICIENT>::historyForOrder(ORDER); }
+	using Coefficients = FixedSizeIirCoefficients<C, ORDER>;
+	static constexpr size_t historySize() { return IirCoefficients::historyForOrder(ORDER); }
+	static constexpr size_t coefficientSize() { return IirCoefficients::coefficientsForOrder(ORDER); }
 
 	struct History
 	{
-		COEFFICIENT x[historySize()];
-		COEFFICIENT y[historySize()];
+		C x[historySize()];
+		C y[historySize()];
 	};
 
-	struct SingleChannelFilter: public tdap::Filter<COEFFICIENT>
+	struct SingleChannelFilter: public tdap::Filter<C>
 	{
-		FixedSizeIirCoefficientFilter<COEFFICIENT, CHANNELS, ORDER> &wrapped_;
+		FixedSizeIirCoefficientFilter<C, CHANNELS, ORDER> &wrapped_;
 
 		virtual void reset() { wrapped_.reset(); }
-		virtual COEFFICIENT filter(COEFFICIENT input)
+		virtual C filter(C input)
 		{
 			return wrapped_.filter(0, input);
 		}
 
-		SingleChannelFilter(FixedSizeIirCoefficientFilter<COEFFICIENT, CHANNELS, ORDER> &wrapped) :
+		SingleChannelFilter(FixedSizeIirCoefficientFilter<C, CHANNELS, ORDER> &wrapped) :
 			wrapped_(wrapped) {}
 	};
 
-	struct MultiChannelFilter: public tdap::MultiFilter<COEFFICIENT>
+	struct MultiChannelFilter: public tdap::MultiFilter<C>
 	{
-		FixedSizeIirCoefficientFilter<COEFFICIENT, CHANNELS, ORDER> &wrapped_;
+		FixedSizeIirCoefficientFilter<C, CHANNELS, ORDER> &wrapped_;
 
 		virtual size_t channels() const override { return CHANNELS; }
 		virtual void reset() override { wrapped_.reset(); }
-		virtual COEFFICIENT filter(size_t idx, COEFFICIENT input) override
+		virtual C filter(size_t idx, C input) override
 		{
 			return wrapped_.filter(idx, input);
 		}
@@ -400,19 +485,19 @@ struct FixedSizeIirCoefficientFilter
 	}
 
 	template <bool flushToZero>
-	COEFFICIENT do_filter(size_t channel, COEFFICIENT input)
+	C do_filter(size_t channel, C input)
 	{
 		IndexPolicy::array(channel, CHANNELS);
-		return coefficients_.do_filter<flushToZero>(history[channel].x, history[channel].y, input);
+		return coefficients_.do_filter<C, flushToZero>(history[channel].x, history[channel].y, input);
 	}
 
-	COEFFICIENT filter(size_t channel, COEFFICIENT input)
+	C filter(size_t channel, C input)
 	{
 		return do_filter<false>(channel, input);
 	}
 
 	template<size_t N, typename ...A>
-	void filterArray(const FixedSizeArrayTraits<COEFFICIENT, N, A...> &input, FixedSizeArrayTraits<COEFFICIENT, N, A...> &output)
+	void filterArray(const FixedSizeArrayTraits<C, N, A...> &input, FixedSizeArrayTraits<C, N, A...> &output)
 	{
 		for (size_t channel = 0; channel < Value<size_t>::min(CHANNELS, N); channel++) {
 			output[channel] = filter(channel, input[channel]);
@@ -420,7 +505,7 @@ struct FixedSizeIirCoefficientFilter
 	}
 
 	template<typename ...A>
-	void filterArray(const ArrayTraits<COEFFICIENT, A...> &input, ArrayTraits<COEFFICIENT, A...> &output)
+	void filterArray(const ArrayTraits<C, A...> &input, ArrayTraits<C, A...> &output)
 	{
 		for (size_t channel = 0; channel < Value<size_t>::min(CHANNELS, input.size(), output.size()); channel++) {
 			output[channel] = filter(channel, input[channel]);
@@ -437,12 +522,12 @@ struct FixedSizeIirCoefficientFilter
 		return MultiChannelFilter(*this);
 	}
 
-	Filter<COEFFICIENT> * createFilter()
+	Filter<C> * createFilter()
 	{
 		return new SingleChannelFilter(*this);
 	}
 
-	MultiFilter<COEFFICIENT> * createMultiFilter()
+	MultiFilter<C> * createMultiFilter()
 	{
 		return new MultiChannelFilter(*this);
 	}

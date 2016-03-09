@@ -26,10 +26,10 @@
 #include <thread>
 
 #include <signal.h>
-
 #include <speakerman/jack/JackClient.hpp>
 #include <speakerman/SpeakermanConfig.hpp>
 #include <speakerman/SpeakerManager.hpp>
+
 
 using namespace speakerman;
 using namespace tdap;
@@ -47,7 +47,7 @@ public:
 		__client.store(0);
 	}
 
-	void setClient(T * client)
+	void set(T * client)
 	{
 		T* previous = __client.exchange(client);
 		if (previous != nullptr) {
@@ -64,11 +64,12 @@ public:
 
 	~Owner()
 	{
-		setClient(nullptr);
+		set(nullptr);
 	}
 };
 
-Owner<SpeakerManager<2, 1>> manager;
+Owner<SpeakerManagerControl> manager;
+SpeakermanConfig configFileConfig;
 static volatile int signalNumber = -1;
 static volatile int userInput;
 
@@ -109,10 +110,32 @@ static int getChar() {
 	return chr;
 }
 
+static void configUpdater()
+{
+	std::chrono::milliseconds sleeper(1001);
+	while (signalNumber == -1) {
+		this_thread::sleep_for(sleeper);
+		auto stamp = getConfigFileTimeStamp();
+		if (stamp != configFileConfig.timeStamp) {
+			std::cout << "I: configuration update!" << std::endl;
+			configFileConfig = readSpeakermanConfig(configFileConfig, false);
+			manager.get().setConfig(configFileConfig);
+			DynamicProcessorLevels levels(1);
+			manager.get().applyConfigAndGetLevels(&levels, sleeper);
+			for (size_t i = 0; i < levels.groups(); i++) {
+				std::cout << "GROUP " << i << " SIGNAL=" << levels.getSignal(i) << "; GAIN=" << levels.getGroupGain(i) << std::endl;
+			}
+			std::cout << std::endl << "SUB-GAIN: " << levels.getSubGain() << std::endl;
+		}
+	}
+}
+
 int mainLoop(Owner<JackClient> &owner)
 {
 	std::thread fetchChars(charFetcher);
 	fetchChars.detach();
+	std::thread checkConfigUpdates(configUpdater);
+	checkConfigUpdates.detach();
 	std::chrono::milliseconds duration(100);
 
 	try {
@@ -169,17 +192,53 @@ int mainLoop(Owner<JackClient> &owner)
 
 speakerman::config::Reader configReader;
 
+template<typename F, size_t GROUPS>
+SpeakerManagerControl *createManagerGr(const SpeakermanConfig & config)
+{
+	static_assert(is_floating_point<F>::value, "Sample type must be floating point");
+
+	switch (config.groupChannels) {
+	case 1:
+		return new SpeakerManager<F, 1, GROUPS>(config);
+	case 2:
+		return new SpeakerManager<F, 2, GROUPS>(config);
+	case 3:
+		return new SpeakerManager<F, 3, GROUPS>(config);
+	case 4:
+		return new SpeakerManager<F, 4, GROUPS>(config);
+	case 5:
+		return new SpeakerManager<F, 5, GROUPS>(config);
+	}
+	throw invalid_argument("Number of channels per group must be between 1 and 5");
+}
+
+template <typename F>
+static SpeakerManagerControl *createManager(const SpeakermanConfig & config)
+{
+
+	switch (config.groups) {
+	case 1:
+		return createManagerGr<F, 1>(config);
+	case 2:
+		return createManagerGr<F, 2>(config);
+	case 3:
+		return createManagerGr<F, 3>(config);
+	case 4:
+		return createManagerGr<F, 4>(config);
+	}
+	throw invalid_argument("Number of groups must be between 1 and 4");
+}
+
+using namespace std;
 int main(int count, char * arguments[]) {
-	SpeakermanConfig config = readSpeakermanConfig(true);
+	configFileConfig = readSpeakermanConfig(true);
 
-	cout << "Dump config" << endl;
-	dumpSpeakermanConfig(config, cout);
-
-	manager.setClient(new SpeakerManager<2, 1>(config));
+	dumpSpeakermanConfig(configFileConfig, cout);
+	manager.set(createManager<float>(configFileConfig));
 
 	Owner<JackClient> clientOwner;
 	auto result = JackClient::createDefault("Speaker manager");
-	clientOwner.setClient(result.getClient());
+	clientOwner.set(result.getClient());
 
 
 	const char * all = ".*";

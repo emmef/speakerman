@@ -24,6 +24,7 @@
 #include <cmath>
 #include <mutex>
 #include <iostream>
+#include <sys/stat.h>
 #include <tdap/Value.hpp>
 #include <tdap/IndexPolicy.hpp>
 #include <tdap/Count.hpp>
@@ -49,8 +50,8 @@ namespace speakerman {
 	};
 
 
-	static constexpr size_t ID_GLOBAL_CNT = 3;
-	static constexpr size_t ID_GROUP_CNT = 3;
+	static constexpr size_t ID_GLOBAL_CNT = 4;
+	static constexpr size_t ID_GROUP_CNT = 4;
 	static constexpr size_t ID_EQ_CNT = 3;
 
 	static constexpr bool isUserAllowed(ssize_t groupId, ssize_t eqId, size_t fieldId)
@@ -123,35 +124,47 @@ namespace speakerman {
 			return strings[idx].c_str();
 		}
 
-		strings[getOffset(-1, -1, SpeakermanConfig::KEY_GROUP_COUNT)] = "groups";
-		strings[getOffset(-1, -1, SpeakermanConfig::KEY_CHANNELS)] = "group-channels";
-		strings[getOffset(-1, -1, SpeakermanConfig::KEY_SUB_THRESHOLD)] = "sub-relative-threshold";
+		strings[getOffset(-1, -1, SpeakermanConfig::KEY_GROUP_COUNT)] = SpeakermanConfig::KEY_SNIPPET_GROUP_COUNT;
+		strings[getOffset(-1, -1, SpeakermanConfig::KEY_CHANNELS)] = SpeakermanConfig::KEY_SNIPPET_CHANNELS;
+		strings[getOffset(-1, -1, SpeakermanConfig::KEY_SUB_THRESHOLD)] = SpeakermanConfig::KEY_SNIPPET_SUB_THRESHOLD;
+		strings[getOffset(-1, -1, SpeakermanConfig::KEY_SUB_DELAY)] = SpeakermanConfig::KEY_SNIPPET_SUB_DELAY;
+
 		string key;
 		for (size_t group = 0; group < SpeakermanConfig::MAX_GROUPS; group++) {
-			string groupKey = "group/";
+			string groupKey = GroupConfig::KEY_SNIPPET_GROUP;
+			groupKey += "/";
 			groupKey += ('0' + group);
+			groupKey += "/";
+
 			key = groupKey;
-			key += "/equalizers";
+			key += GroupConfig::KEY_SNIPPET_EQ_COUNT;
 			strings[getOffset(group, -1, GroupConfig::KEY_EQ_COUNT)] = key;
 			key = groupKey;
-			key += "/threshold";
+			key += GroupConfig::KEY_SNIPPET_THRESHOLD;
 			strings[getOffset(group, -1, GroupConfig::KEY_THRESHOLD)] = key;
 			key = groupKey;
-			key += "/volume";
+			key += GroupConfig::KEY_SNIPPET_VOLUME;
 			strings[getOffset(group, -1, GroupConfig::KEY_VOLUME)] = key;
+			key = groupKey;
+			key += GroupConfig::KEY_SNIPPET_DELAY;
+			strings[getOffset(group, -1, GroupConfig::KEY_DELAY)] = key;
+
 			string eqBase = groupKey;
-			eqBase += "/equalizer/";
+			eqBase += EqualizerConfig::KEY_SNIPPET_EQUALIZER;
+			eqBase += "/";
 			for (size_t eq = 0; eq < GroupConfig::MAX_EQS; eq++) {
 				string eqKey = eqBase;
 				eqKey += ('0' + eq);
+				eqKey += "/";
+
 				key = eqKey;
-				key += "/center";
+				key += EqualizerConfig::KEY_SNIPPET_CENTER;
 				strings[getOffset(group, eq, EqualizerConfig::KEY_CENTER)] = key;
 				key = eqKey;
-				key += "/gain";
+				key += EqualizerConfig::KEY_SNIPPET_GAIN;
 				strings[getOffset(group, eq, EqualizerConfig::KEY_GAIN)] = key;
 				key = eqKey;
-				key += "/bandwidth";
+				key += EqualizerConfig::KEY_SNIPPET_BANDWIDTH;
 				strings[getOffset(group, eq, EqualizerConfig::KEY_BANDWIDTH)] = key;
 			}
 		}
@@ -264,7 +277,6 @@ namespace speakerman {
 			return;
 		}
 		value = defaultValue;
-		cout << "I: Set unset \"" << key << "\" to default value " << defaultValue << endl;
 	}
 
 	static bool isKey(const char *key, bool initial, ssize_t groupId, ssize_t eqId, size_t fieldId)
@@ -352,6 +364,9 @@ namespace speakerman {
 		else if (isKey(key, config->initial, -1, -1, SpeakermanConfig::KEY_SUB_THRESHOLD)) {
 			readNumber(config->config.relativeSubThreshold, key, value, SpeakermanConfig::MIN_REL_SUB_THRESHOLD, SpeakermanConfig::MAX_REL_SUB_THRESHOLD, true);
 		}
+		else if (isKey(key, config->initial, -1, -1, SpeakermanConfig::KEY_SUB_DELAY)) {
+			readNumber(config->config.subDelay, key, value, SpeakermanConfig::MIN_SUB_DELAY, SpeakermanConfig::MAX_SUB_DELAY, true);
+		}
 		return speakerman::config::CallbackResult::CONTINUE;
 	}
 
@@ -367,6 +382,9 @@ namespace speakerman {
 		}
 		else if (isKey(key, config->initial, config->groupId, -1, GroupConfig::KEY_VOLUME)) {
 			readNumber(config->config.volume, key, value, GroupConfig::MIN_VOLUME, GroupConfig::MAX_VOLUME, true);
+		}
+		else if (isKey(key, config->initial, config->groupId, -1, GroupConfig::KEY_DELAY)) {
+			readNumber(config->config.delay, key, value, GroupConfig::MIN_DELAY, GroupConfig::MAX_DELAY, true);
 		}
 		return speakerman::config::CallbackResult::CONTINUE;
 	}
@@ -419,6 +437,7 @@ namespace speakerman {
 		config.eqs = UNSET_SIZE;
 		config.threshold = UNSET_FLOAT;
 		config.volume = UNSET_FLOAT;
+		config.delay = UNSET_FLOAT;
 
 		auto result = reader.read(stream, readGroupCallback, &data);
 		if (result != config::ReadResult::SUCCESS && result != config::ReadResult::STOPPED) {
@@ -429,6 +448,7 @@ namespace speakerman {
 		setDefault(config.eqs, UNSET_SIZE, defaultConfig.eqs, getConfigKey(data.groupId, -1, GroupConfig::KEY_EQ_COUNT));
 		setDefault(config.threshold, UNSET_FLOAT, defaultConfig.threshold, getConfigKey(data.groupId, -1, GroupConfig::KEY_THRESHOLD));
 		setDefault(config.volume, UNSET_FLOAT, defaultConfig.volume, getConfigKey(data.groupId, -1, GroupConfig::KEY_VOLUME));
+		setDefault(config.delay, UNSET_FLOAT, defaultConfig.delay, getConfigKey(data.groupId, -1, GroupConfig::KEY_DELAY));
 
 		for (size_t eq = 0; eq < GroupConfig::MAX_EQS; eq++) {
 			EqConfigCallbackData info { config.eq[eq], data.groupId, eq, data.initial };
@@ -442,6 +462,7 @@ namespace speakerman {
 		config.groups = UNSET_SIZE;
 		config.groupChannels = UNSET_SIZE;
 		config.relativeSubThreshold = UNSET_FLOAT;
+		config.subDelay = UNSET_FLOAT;
 
 		SpeakermanConfigCallbackData data { config, initial };
 		auto result = reader.read(stream, readGlobalCallback, &data);
@@ -452,6 +473,7 @@ namespace speakerman {
 		setDefault(config.groups, UNSET_SIZE, basedUpon.groups, getConfigKey(-1, -1, SpeakermanConfig::KEY_GROUP_COUNT));
 		setDefault(config.groupChannels, UNSET_SIZE, basedUpon.groupChannels, getConfigKey(-1, -1, SpeakermanConfig::KEY_CHANNELS));
 		setDefault(config.relativeSubThreshold, UNSET_FLOAT, basedUpon.relativeSubThreshold, getConfigKey(-1, -1, SpeakermanConfig::KEY_SUB_THRESHOLD));
+		setDefault(config.subDelay, UNSET_FLOAT, basedUpon.subDelay, getConfigKey(-1, -1, SpeakermanConfig::KEY_SUB_DELAY));
 
 		for (size_t g = 0; g < config.groups; g++) {
 			GroupConfigCallbackData data { config.group[g], g, initial };
@@ -479,11 +501,29 @@ namespace speakerman {
 			}
 		}
 	};
+
+	long long getFileTimeStamp(const char * fileName)
+	{
+		struct stat stats;
+		long long stamp = 0;
+		if (stat(fileName, &stats) == 0) {
+			return stats.st_mtim.tv_sec;
+		}
+		return -1;
+	}
+
+	long long getConfigFileTimeStamp()
+	{
+		return getFileTimeStamp(configFileName());
+	}
+
 	SpeakermanConfig readSpeakermanConfig(const SpeakermanConfig &basedUpon, bool initial)
 	{
 		SpeakermanConfig result;
 		ifstream stream;
 		stream.open(configFileName());
+		long long stamp = getFileTimeStamp(configFileName());
+
 		StreamOwner owner(stream);
 		if (!stream.is_open()) {
 			return basedUpon;
@@ -495,6 +535,7 @@ namespace speakerman {
 			cerr << "E: " << e.what() << endl;
 			return basedUpon;
 		}
+		result.timeStamp = stamp;
 		return result;
 	}
 
@@ -512,12 +553,14 @@ namespace speakerman {
 		output << getConfigKey(-1, -1, SpeakermanConfig::KEY_GROUP_COUNT) << assgn << dump.groups << endl;
 		output << getConfigKey(-1, -1, SpeakermanConfig::KEY_CHANNELS) << assgn << dump.groupChannels << endl;
 		output << getConfigKey(-1, -1, SpeakermanConfig::KEY_SUB_THRESHOLD) << assgn << dump.relativeSubThreshold << endl;
+		output << getConfigKey(-1, -1, SpeakermanConfig::KEY_SUB_DELAY) << assgn << dump.subDelay << endl;
 
 		for (size_t group = 0; group < dump.groups; group++) {
 			const GroupConfig &groupConfig = dump.group[group];
 			output << getConfigKey(group, -1, GroupConfig::KEY_EQ_COUNT) << assgn << groupConfig.eqs << endl;
 			output << getConfigKey(group, -1, GroupConfig::KEY_THRESHOLD) << assgn << groupConfig.threshold << endl;
 			output << getConfigKey(group, -1, GroupConfig::KEY_VOLUME) << assgn << groupConfig.volume << endl;
+			output << getConfigKey(group, -1, GroupConfig::KEY_DELAY) << assgn << groupConfig.delay << endl;
 
 			for (size_t eq = 0; eq < GroupConfig::MAX_EQS; eq++) {
 				const EqualizerConfig &eqConfig = groupConfig.eq[eq];
@@ -526,6 +569,7 @@ namespace speakerman {
 				output << getConfigKey(group, eq, EqualizerConfig::KEY_BANDWIDTH) << assgn << eqConfig.bandwidth << endl;
 			}
 		}
+		output << "Timestamp: " << dump.timeStamp << endl;
 	}
 
 } /* End of namespace speakerman */

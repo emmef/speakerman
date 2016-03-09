@@ -77,7 +77,8 @@ class JackProcessor
 			try {
 				return static_cast<JackProcessor *>(data)->realtimeProcessWrapper(frames);
 			}
-			catch (const std::exception e) {
+			catch (const std::exception &e) {
+				cerr << "Exception in processing thread: " << e.what() << endl;
 				return 1;
 			}
 		}

@@ -259,9 +259,6 @@ private:
 
 		size_t validSize(size_t size)
 		{
-			if (size == 0) {
-				throw std::invalid_argument("Array: size must be positive");
-			}
 			if (size <= ArrayTraits<T, Sub>::capacity()) {
 				return size;
 			}

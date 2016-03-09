@@ -33,17 +33,17 @@ namespace tdap {
 
 	struct Crossovers
 	{
-		template<typename T, size_t CROSSOVERS, typename ...A>
+		template<typename T, size_t CROSSOVERS, typename S, typename ...A>
 		static FixedSizeArray<T, CROSSOVERS>
-		validatedCrossoverFrequencies(const FixedSizeArrayTraits<T, CROSSOVERS, A...> &crossovers)
+		validatedCrossoverFrequencies(const ArrayTraits<S, A...> &crossovers)
 		{
 			FixedSizeArray<T, CROSSOVERS> result;
-			result[0] = Values::max(crossovers[0], 40.0);
-			T max = Values::min(crossovers[CROSSOVERS - 1], 10000.0);
+			result[0] = Value<T>::max(crossovers[0], 40.0);
+			T max = Value<T>::min(crossovers[CROSSOVERS - 1], 10000.0);
 			result[CROSSOVERS - 1] = max;
 			for (size_t i = 1; i < CROSSOVERS - 1; i++)
 			{
-				T c1 = Values::max(crossovers[i], crossovers[i - 1] * 1.5);
+				T c1 = Value<T>::max(crossovers[i], crossovers[i - 1] * 1.5);
 				if (c1 * 1.5 >= max) {
 					throw std::invalid_argument("Too many crossovers for range");
 				}
@@ -78,10 +78,10 @@ namespace tdap {
 		template<typename T, size_t CHANNELS>
 		struct CrossoverExecutor<T, CHANNELS, 1>
 		{
-			template<typename... A>
+			template<typename S, typename... A>
 			static void filter(
-					const FixedSizeArrayTraits<T, CHANNELS, A...> &input,
-					FixedSizeArray<T, 2 * CHANNELS> &output,
+					const FixedSizeArrayTraits<S, CHANNELS, A...> &input,
+					FixedSizeArray<S, 2 * CHANNELS> &output,
 					FixedSizeArray<LinkwitzRiley<T, CHANNELS>, 1> &filter)
 			{
 				for (size_t channel = 0, idx = 0; channel < CHANNELS; channel++, idx += 2)
@@ -98,10 +98,10 @@ namespace tdap {
 		template<typename T, size_t CHANNELS>
 		struct CrossoverExecutor<T, CHANNELS, 2>
 		{
-			template<typename... A>
+			template<typename S, typename... A>
 			static void filter(
-					const FixedSizeArrayTraits<T, CHANNELS, A...> &input,
-					FixedSizeArray<T, 3 * CHANNELS> &output,
+					const FixedSizeArrayTraits<S, CHANNELS, A...> &input,
+					FixedSizeArray<S, 3 * CHANNELS> &output,
 					FixedSizeArray<LinkwitzRiley<T, CHANNELS>, 2> &filter)
 			{
 				for (size_t channel = 0, idx = 0; channel < CHANNELS; channel++, idx += 2)
@@ -122,10 +122,10 @@ namespace tdap {
 		template<typename T, size_t CHANNELS>
 		struct CrossoverExecutor<T, CHANNELS, 3>
 		{
-			template<typename... A>
+			template<typename S, typename... A>
 			static void filter(
-					const FixedSizeArrayTraits<T, CHANNELS, A...> &input,
-					FixedSizeArray<T, 4 * CHANNELS> &output,
+					const FixedSizeArrayTraits<S, CHANNELS, A...> &input,
+					FixedSizeArray<S, 4 * CHANNELS> &output,
 					FixedSizeArray<LinkwitzRiley<T, CHANNELS>, 3> &filter)
 			{
 				for (size_t channel = 0, idx = 0; channel < CHANNELS; channel++, idx += 2)
@@ -148,21 +148,21 @@ namespace tdap {
 			}
 		};
 
-		template<typename T, size_t CHANNELS, size_t CROSSOVERS>
+		template<typename T, typename S, size_t CHANNELS, size_t CROSSOVERS>
 		class Filter
 		{
 			static constexpr size_t NODES = CHANNELS * (CROSSOVERS + 1);
 			using Executor = CrossoverExecutor<T, CHANNELS, CROSSOVERS>;
 
 			FixedSizeArray<LinkwitzRiley<T, CHANNELS>, CROSSOVERS> filter_;
-			FixedSizeArray<T, NODES> output_;
+			FixedSizeArray<S, NODES> output_;
 
 		public:
 
-			template<typename ...A>
-			void configure(T sampleRate, const FixedSizeArrayTraits<T, CROSSOVERS, A...> &crossovers)
+			template<typename S1, typename S2, typename ...A>
+			void configure(S1 sampleRate, const ArrayTraits<S2, A...> &crossovers)
 			{
-				FixedSizeArray<T, CROSSOVERS> frequencies = validatedCrossoverFrequencies(crossovers);
+				FixedSizeArray<T, CROSSOVERS> frequencies = validatedCrossoverFrequencies<T, CROSSOVERS, S2, A...>(crossovers);
 
 				for (size_t crossover = 0; crossover < CROSSOVERS; crossover++) {
 					filter_[crossover].configure(sampleRate, frequencies[crossover]);
@@ -170,7 +170,7 @@ namespace tdap {
 			}
 
 			template<typename ...A>
-			const FixedSizeArray<T, NODES> &filter(const FixedSizeArrayTraits<T, CHANNELS, A...> &input)
+			const FixedSizeArray<S, NODES> &filter(const FixedSizeArrayTraits<S, CHANNELS, A...> &input)
 			{
 				Executor::filter(input, output_, filter_);
 				return output_;
@@ -185,7 +185,7 @@ namespace tdap {
 			size_t samples = 2 * sampleRate;
 			FixedSizeArray<T, 2 * CROSSOVERS + 2> y;
 			PinkNoise::Default noise(1.0);
-			Filter<T, 2, CROSSOVERS> crossover;
+			Filter<T, double, 2, CROSSOVERS> crossover;
 			crossover.configure(sampleRate, crossovers);
 			ACurves::Filter<T, 1> curves;
 			curves.setSampleRate(sampleRate);
@@ -202,13 +202,13 @@ namespace tdap {
 			for (size_t band = 0; band <= CROSSOVERS; band++) {
 				y[band] = 0.0;
 			}
-			FixedSizeArray<T, 2> filtered;
+			FixedSizeArray<double, 2> filtered;
 			for (size_t sample = 0; sample < samples; sample++) {
 				T input = cutoff.filter(0, noise());       // bandwidth limited pink noise
 				unweightedTotal += input * input;          // unweighted full-range measurement
 				filtered[0] = input;// apply keying filter
 				filtered[1] = curves.filter(0, input);// apply keying filter
-				const FixedSizeArray<T, 2 * CROSSOVERS + 2> &w = crossover.filter(filtered);
+				const FixedSizeArray<double, 2 * CROSSOVERS + 2> &w = crossover.filter(filtered);
 				for (size_t band = 0; band < 2 * CROSSOVERS + 2; band++) {
 					y[band] += w[band] * w[band];          // weighted-keyed measurement per band
 				}

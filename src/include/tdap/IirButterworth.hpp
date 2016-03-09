@@ -77,7 +77,7 @@ struct Butterworth {
 
 	template<typename Coefficient, typename Freq>
 	static void create(
-			IirCoefficients<Coefficient> &coefficients,
+			IirCoefficients &coefficients,
 			Freq sampleRate, Freq frequency, Pass pass, Coefficient scale = 1.0)
 	{
 		create(coefficients, Frequency<Freq>::relativeNycquistLimited(frequency, sampleRate), pass, scale);
@@ -85,7 +85,7 @@ struct Butterworth {
 
 	template<typename Coefficient>
 	static void create(
-			IirCoefficients<Coefficient> &coefficients, const double relativeFrequency,
+			IirCoefficients &coefficients, const double relativeFrequency,
 			Pass pass, Coefficient scale = 1.0)
 	{
 		switch (pass) {
@@ -102,12 +102,12 @@ struct Butterworth {
 
 	template<typename Coefficient>
 	static void getLowPassCoefficients(
-			IirCoefficients<Coefficient> &coefficients,
+			IirCoefficients &coefficients,
 			double relativeFrequency, Coefficient scale = 1.0)
 	{
 		size_t order = coefficients.order();
 		checkValidOrder(order);
-		int unscaledCCoefficients[IirCoefficients<Coefficient>::coefficientsForOrder(order)];
+		int unscaledCCoefficients[IirCoefficients::coefficientsForOrder(order)];
 
 		fill_with_zero(unscaledCCoefficients, sizeof(unscaledCCoefficients));
 
@@ -124,12 +124,12 @@ struct Butterworth {
 
 	template<typename Coefficient>
 	static void getHighPassCoefficients(
-			IirCoefficients<Coefficient> &coefficients,
+			IirCoefficients &coefficients,
 			double relativeFrequency, Coefficient scale = 1.0)
 	{
 		size_t order = coefficients.order();
 		checkValidOrder(order);
-		int unscaledCCoefficients[IirCoefficients<Coefficient>::coefficientsForOrder(order)];
+		int unscaledCCoefficients[IirCoefficients::coefficientsForOrder(order)];
 		fill_with_zero(unscaledCCoefficients, sizeof(unscaledCCoefficients));
 
 		getDCoefficients(order, relativeFrequency, coefficients);
@@ -152,8 +152,7 @@ private:
 		}
 	}
 
-	template<typename Coefficient>
-	static void getDCoefficients(int order, double relativeFrequency, IirCoefficients<Coefficient> &d_coefficients) {
+	static void getDCoefficients(int order, double relativeFrequency, IirCoefficients &d_coefficients) {
 		double theta; // M_PI * relativeFrequency / 2.0
 		double st; // sine of theta
 		double ct; // cosine of theta

@@ -110,12 +110,18 @@ using namespace std;
 		/**
 		 * Creates a transport and initialized the data with an original value.
 		 */
-		Transport(const Data original) : 	data_({original, original}) { }
+		Transport(const Data original, bool startModified)
+		{
+			init(original, startModified);
+		}
 
-		void init(const Data original)
+		void init(const Data original, bool startModified)
 		{
 			data_[0] = original;
 			data_[1] = original;
+			if (startModified) {
+				read_ = !write_;
+			}
 		}
 
 		/**

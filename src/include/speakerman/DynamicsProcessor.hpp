@@ -76,7 +76,7 @@ public:
 		g = Values::min(g, gain);
 	}
 
-	double getGroupGain() const
+	double getSubGain() const
 	{
 		return gains_[0];
 	}
@@ -94,9 +94,10 @@ public:
 };
 
 
-template<size_t CHANNELS_PER_GROUP, size_t GROUPS, size_t CROSSOVERS>
+template<typename T, size_t CHANNELS_PER_GROUP, size_t GROUPS, size_t CROSSOVERS>
 class DynamicsProcessor
 {
+	static_assert(is_floating_point<T>::value, "expected floating-point value parameter");
 public:
 	static constexpr size_t INPUTS = GROUPS * CHANNELS_PER_GROUP;
 	// bands are around crossovers
@@ -112,32 +113,43 @@ public:
 	// OUTPUTS
 	static constexpr size_t OUTPUTS = INPUTS + 1;
 
-	using CrossoverFrequencies = FixedSizeArray<double, CROSSOVERS>;
-	using ThresholdValues = FixedSizeArray<double, LIMITERS>;
-	using Configurable = SpeakermanRuntimeConfigurable<double, GROUPS, BANDS, CHANNELS_PER_GROUP>;
-	using ConfigData = SpeakermanRuntimeData<double, GROUPS, BANDS>;
+	static constexpr size_t CHANNEL_DELAY_SIZE =
+			SpeakermanConfig::MAX_GROUP_CHANNELS * (2 + 192000 * GroupConfig::MAX_DELAY);
 
+	using CrossoverFrequencies = FixedSizeArray<T, CROSSOVERS>;
+	using ThresholdValues = FixedSizeArray<T, LIMITERS>;
+	using Configurable = SpeakermanRuntimeConfigurable<T, GROUPS, BANDS, CHANNELS_PER_GROUP>;
+	using ConfigData = SpeakermanRuntimeData<T, GROUPS, BANDS>;
+
+	class ChannelDelay : public Delay<T>
+	{
+	public:
+		ChannelDelay() : Delay<T>(CHANNEL_DELAY_SIZE) {}
+	};
 
 private:
 	PinkNoise::Default noise;
 	PinkNoise::Default subNoise;
-	FixedSizeArray<double, INPUTS> inputWithVolumeAndNoise;
-	FixedSizeArray<double, PROCESSING_CHANNELS> processInput;
-	FixedSizeArray<double, OUTPUTS> output;
-	FixedSizeArray<double, BANDS> relativeBandWeights;
+	FixedSizeArray<T, INPUTS> inputWithVolumeAndNoise;
+	FixedSizeArray<T, PROCESSING_CHANNELS> processInput;
+	FixedSizeArray<T, OUTPUTS> output;
+	FixedSizeArray<T, BANDS> relativeBandWeights;
 
-	Crossovers::Filter<double, INPUTS, CROSSOVERS>  crossoverFilter;
-	ACurves::Filter<double, PROCESSING_CHANNELS> aCurve;
+	Crossovers::Filter<double, T, INPUTS, CROSSOVERS>  crossoverFilter;
+	ACurves::Filter<T, PROCESSING_CHANNELS> aCurve;
 
-	FixedSizeArray<AdvancedRms::Detector<15>, DETECTORS> rmsDetector;
+	FixedSizeArray<AdvancedRms::Detector<10>, DETECTORS> rmsDetector;
 
-	FixedSizeArray<HoldMaxDoubleIntegrated<double>, LIMITERS> limiter;
-	Delay<double> rmsDelay;
-	Delay<double> limiterDelay;
+	FixedSizeArray<HoldMaxDoubleIntegrated<T>, LIMITERS> limiter;
+	Delay<T> rmsDelay;
+	Delay<T> limiterDelay;
+	ChannelDelay channelDelay[LIMITERS];
+	EqualizerFilter<double, CHANNELS_PER_GROUP> filters_[GROUPS];
+
 	Configurable runtime;
-	IntegrationCoefficients<double> signalIntegrator;
+	IntegrationCoefficients<T> signalIntegrator;
 
-	double sampleRate_;
+	T sampleRate_;
 	bool bypass = true;
 
 	static AdvancedRms::UserConfig rmsUserConfig()
@@ -154,8 +166,8 @@ public:
 	}
 
 	void setSampleRate(
-			double sampleRate,
-			const FixedSizeArray<double, CROSSOVERS> &crossovers,
+			T sampleRate,
+			const FixedSizeArray<T, CROSSOVERS> &crossovers,
 			const SpeakermanConfig &config)
 	{
 		noise.setScale(1e-5);
@@ -170,7 +182,7 @@ public:
 		rmsDelay.setDelay(PROCESSING_CHANNELS * rmsDelaySamples);
 
 		// Limiter delay and integration constants
-		double limiterIntegrationSamples = 0.0005 * sampleRate;
+		T limiterIntegrationSamples = 0.0005 * sampleRate;
 		size_t limiterHoldSamples = 0.5 + 4 * limiterIntegrationSamples;
 		for (size_t i = 0; i < LIMITERS; i++) {
 			limiter[i].setMetrics(limiterIntegrationSamples, limiterHoldSamples);
@@ -192,24 +204,31 @@ public:
 
 	const ConfigData &getConfigData() const
 	{
-		return runtime.data();
+		return runtime.userSet();
 	}
 
 	ConfigData createConfigData(const SpeakermanConfig &config)
 	{
 		ConfigData data;
 		data.configure(config, sampleRate_, relativeBandWeights, rmsUserConfig().peakWeight / 1.5);
+		data.dump();
 		return data;
 	}
 
 	void updateConfig(const ConfigData &data)
 	{
 		runtime.modify(data);
+		channelDelay[0].setDelay(data.subDelay());
+		for (size_t group = 0; group < GROUPS; group++) {
+			filters_[group].configure(data.groupConfig(group).filterConfig());
+			channelDelay[1 + group].setDelay(CHANNELS_PER_GROUP * data.groupConfig(group).delay());
+		}
+
 	}
 
 	void process(
-			const FixedSizeArray<double, INPUTS> &input,
-			FixedSizeArray<double, OUTPUTS> &target)
+			const FixedSizeArray<T, INPUTS> &input,
+			FixedSizeArray<T, OUTPUTS> &target)
 	{
 		runtime.approach();
 		applyVolumeAddNoise(input);
@@ -217,19 +236,20 @@ public:
 		processSubRms();
 		processChannelsRms();
 		mergeFrequencyBands();
-		processSubLimiter();
-		processChannelsLimiter();
+		processChannelsFilters();
+		processSubLimiter(target);
+		processChannelsLimiter(target);
 	}
 
 private:
-	void applyVolumeAddNoise(const FixedSizeArray<double, INPUTS> &input)
+	void applyVolumeAddNoise(const FixedSizeArray<T, INPUTS> &input)
 	{
-		double ns = noise();
+		T ns = noise();
 		for (size_t group = 0, offs = 0; group < GROUPS; group++) {
-			double signal = 0;
-			double volume = runtime.data().groupConfig(group).volume();
+			T signal = 0;
+			T volume = runtime.data().groupConfig(group).volume();
 			for (size_t channel = 0; channel < CHANNELS_PER_GROUP; channel++, offs++) {
-				double x = input[offs];
+				T x = input[offs];
 				signal += x * x;
 				inputWithVolumeAndNoise[offs] = x * volume + ns;
 			}
@@ -238,7 +258,7 @@ private:
 	}
 
 
-	void moveToProcessingChannels(const FixedSizeArray<double, CROSSOVER_OUPUTS> &multi)
+	void moveToProcessingChannels(const FixedSizeArray<T, CROSSOVER_OUPUTS> &multi)
 	{
 		// Sum all lowest frequency bands
 		processInput[0] = 0.0;
@@ -254,12 +274,11 @@ private:
 
 	void processSubRms()
 	{
-		double x = processInput[0] + subNoise();
+		T x = processInput[0] + subNoise();
 		processInput[0] = rmsDelay.setAndGet(x);
-		double scaleForUnity = runtime.data().subRmsScale();
-		double detectionWeight = runtime.data().subRmsThreshold();
-		double detect = scaleForUnity * rmsDetector[0].integrate(x * x, detectionWeight);
-		double gain = 1.0 / detect;
+		x *= runtime.data().subRmsScale();
+		T detect = rmsDetector[0].integrate(x * x, 1.0);
+		T gain = 1.0 / detect;
 		levels.setSubGain(gain);
 		processInput[0] *= gain;
 	}
@@ -268,18 +287,18 @@ private:
 	{
 		for (size_t band = 0, baseOffset = 1, detector = 1; band < CROSSOVERS; band++) {
 			for (size_t group = 0; group < GROUPS; group++, detector++) {
-				double squareSum = 0.0;
+				T squareSum = 0.0;
+				T scaleForUnity = runtime.data().groupConfig(group).bandRmsScale(1 + band);
 				size_t nextOffset = baseOffset + CHANNELS_PER_GROUP;
 				for (size_t offset = baseOffset; offset < nextOffset; offset++) {
-					double x = processInput[offset];
+					T x = processInput[offset];
 					processInput[offset] = rmsDelay.setAndGet(x);
-					double y = aCurve.filter(offset, x);
+					T y = aCurve.filter(offset, x);
+					y *= scaleForUnity;
 					squareSum += y * y;
 				}
-				double detectionWeight = runtime.data().groupConfig(group).bandRmsThreshold(band);
-				double scaleForUnity = runtime.data().groupConfig(group).bandRmsScale(band);
-				double detect = scaleForUnity * rmsDetector[detector].integrate(squareSum, detectionWeight);
-				double gain = 1.0 / detect;
+				T detect = rmsDetector[detector].integrate(squareSum, 1.0);
+				T gain = 1.0 / detect;
 				levels.setGroupGain(group, gain);
 				for (size_t offset = baseOffset; offset < nextOffset; offset++) {
 					processInput[offset] *= gain;
@@ -293,7 +312,7 @@ private:
 	{
 		output[0] = processInput[0];
 		for (size_t channel = 1; channel <= INPUTS; channel++) {
-			double sum = 0.0;
+			T sum = 0.0;
 			size_t max = channel + INPUTS * CROSSOVERS;
 			for (size_t offset = channel; offset < max; offset += INPUTS) {
 				sum += processInput[offset];
@@ -302,38 +321,50 @@ private:
 		}
 	}
 
-	void processSubLimiter()
+	void processChannelsFilters()
 	{
-		double scale = runtime.data().subLimiterScale();
-		double threshold = runtime.data().subLimiterThreshold();
-		double x = output[0];
-		output[0] = limiterDelay.setAndGet(x);
-		double detect = limiter[0].applyWithMinimum(fabs(x), threshold);
-		double gain = 1.0 / detect;
-		levels.setSubGain(gain);
-		output[0] = Values::clamp(gain * output[0], -threshold, threshold);
-	}
-
-	void processChannelsLimiter() {
-		for (size_t group = 1, channel = 1; group <= GROUPS; group++) {
-			size_t max = channel + CHANNELS_PER_GROUP;
-			double peak = 0.0;
-			for (size_t offset = channel; offset < max; offset++) {
-				double x = output[offset];
-				output[offset] = limiterDelay.setAndGet(x);
-				peak = Values::max(peak, fabs(output[offset]));
-			}
-			double threshold = runtime.data().groupConfig(group).limiterThreshold();
-			double scale = runtime.data().groupConfig(group).limiterScale();
-			double detect = scale * limiter[group].applyWithMinimum(peak, threshold);
-			double gain = 1.0 / detect;
-			levels.setGroupGain(group, gain);
-			for (size_t offset = channel; offset < max; offset++) {
-				output[offset] = Values::clamp(gain * output[offset], -threshold, threshold);
+		for (size_t group = 0, offs = 1; group < GROUPS; group++) {
+			auto filter = filters_[group].filter();
+			for (size_t channel = 0; channel < CHANNELS_PER_GROUP; channel++, offs++) {
+				output[offs] = filter->filter(channel, output[offs]);
 			}
 		}
 	}
 
+	void processSubLimiter(FixedSizeArray<T, OUTPUTS> &target)
+	{
+		T scale = runtime.data().subLimiterScale();
+		T threshold = runtime.data().subLimiterThreshold();
+		T x = output[0];
+		output[0] = limiterDelay.setAndGet(x);
+		x *= scale;
+		T detect = limiter[0].applyWithMinimum(fabs(x), 1.0);
+		T gain = 1.0 / detect;
+		T out = Values::clamp(gain * output[0], -threshold, threshold);
+		target[0] = channelDelay[0].setAndGet(out);
+	}
+
+	void processChannelsLimiter(FixedSizeArray<T, OUTPUTS> &target)
+	{
+		for (size_t group = 0, channel = 1; group < GROUPS; group++) {
+			size_t max = channel + CHANNELS_PER_GROUP;
+			T peak = 0.0;
+			for (size_t offset = channel; offset < max; offset++) {
+				T x = output[offset];
+				output[offset] = limiterDelay.setAndGet(x);
+				peak = Values::max(peak, fabs(x));
+			}
+			T scale = runtime.data().groupConfig(group).limiterScale();
+			T threshold = runtime.data().groupConfig(group).limiterThreshold();
+			peak *= scale;
+			T detect = limiter[group + 1].applyWithMinimum(peak, 1.0);
+			T gain = 1.0 / detect;
+			for (size_t offset = channel; offset < max; offset++) {
+				T out = Values::clamp(gain * output[offset], -threshold, threshold);
+				target[offset] = channelDelay[group + 1].setAndGet(out);
+			}
+		}
+	}
 };
 
 

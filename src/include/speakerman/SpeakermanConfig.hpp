@@ -42,6 +42,11 @@ namespace speakerman {
 		static constexpr size_t KEY_GAIN = 1;
 		static constexpr size_t KEY_BANDWIDTH = 2;
 
+		static constexpr const char * KEY_SNIPPET_EQUALIZER = "equalizer";
+		static constexpr const char * KEY_SNIPPET_CENTER = "center";
+		static constexpr const char * KEY_SNIPPET_GAIN = "gain";
+		static constexpr const char * KEY_SNIPPET_BANDWIDTH = "bandwidth";
+
 		double center;
 		double gain;
 		double bandwidth;
@@ -61,14 +66,28 @@ namespace speakerman {
 		static constexpr double DEFAULT_VOLUME = 1.0;
 		static constexpr double MAX_VOLUME = 20.0;
 
+		static constexpr double MIN_DELAY = 0;
+		static constexpr double DEFAULT_DELAY = 0;
+		static constexpr double MAX_DELAY = 0.010;
+
 		static constexpr size_t KEY_EQ_COUNT = 0;
 		static constexpr size_t KEY_THRESHOLD = 1;
 		static constexpr size_t KEY_VOLUME = 2;
+		static constexpr size_t KEY_DELAY = 3;
+
+
+		static constexpr const char * KEY_SNIPPET_GROUP = "group";
+		static constexpr const char * KEY_SNIPPET_EQ_COUNT = "equalizers";
+		static constexpr const char * KEY_SNIPPET_THRESHOLD = "threshold";
+		static constexpr const char * KEY_SNIPPET_VOLUME = "volume";
+		static constexpr const char * KEY_SNIPPET_DELAY = "delay";
+
 
 		EqualizerConfig eq[MAX_EQS];
 		size_t eqs;
 		double threshold;
 		double volume;
+		double delay;
 	};
 
 	struct SpeakermanConfig
@@ -85,15 +104,26 @@ namespace speakerman {
 		static constexpr double DEFAULT_REL_SUB_THRESHOLD = 1.0;
 		static constexpr double MAX_REL_SUB_THRESHOLD = 2.0;
 
+		static constexpr double MIN_SUB_DELAY = GroupConfig::MIN_DELAY;
+		static constexpr double DEFAULT_SUB_DELAY = GroupConfig::DEFAULT_DELAY;
+		static constexpr double MAX_SUB_DELAY = GroupConfig::MAX_DELAY;
+
 		static constexpr size_t KEY_GROUP_COUNT = 0;
 		static constexpr size_t KEY_CHANNELS = 1;
 		static constexpr size_t KEY_SUB_THRESHOLD = 2;
+		static constexpr size_t KEY_SUB_DELAY = 3;
+
+		static constexpr const char * KEY_SNIPPET_GROUP_COUNT = "groups";
+		static constexpr const char * KEY_SNIPPET_CHANNELS = "group-channels";
+		static constexpr const char * KEY_SNIPPET_SUB_THRESHOLD = "sub-relative-threshold";
+		static constexpr const char * KEY_SNIPPET_SUB_DELAY = "sub-delay";
 
 		GroupConfig group[MAX_GROUPS];
 		size_t groups;
 		size_t groupChannels;
 		double relativeSubThreshold;
-
+		double subDelay;
+		long long timeStamp;
 	};
 
 	const char * configFileName();
@@ -101,6 +131,8 @@ namespace speakerman {
 	SpeakermanConfig readSpeakermanConfig(const SpeakermanConfig &basedUpon, bool initial);
 	SpeakermanConfig getDefaultConfig();
 	void dumpSpeakermanConfig(const SpeakermanConfig& dump, std::ostream &output);
+	long long getFileTimeStamp(const char * fileName);
+	long long getConfigFileTimeStamp();
 
 } /* End of namespace speakerman */
 

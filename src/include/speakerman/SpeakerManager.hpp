@@ -36,12 +36,23 @@
 
 namespace speakerman {
 
-template<size_t CHANNELS_PER_GROUP, size_t GROUPS>
-class SpeakerManager : public JackProcessor
+
+class SpeakerManagerControl : public JackProcessor
 {
+public:
+
+	virtual const SpeakermanConfig &getConfig() const = 0;
+	virtual void setConfig(const SpeakermanConfig &config) = 0;
+	virtual bool applyConfigAndGetLevels(DynamicProcessorLevels *levels, std::chrono::milliseconds duration) = 0;
+};
+
+template<typename T, size_t CHANNELS_PER_GROUP, size_t GROUPS>
+class SpeakerManager : public SpeakerManagerControl
+{
+	static_assert(is_floating_point<T>::value, "expected floating-point value parameter");
 	static constexpr size_t CROSSOVERS = 3;
 
-	using Processor = DynamicsProcessor<CHANNELS_PER_GROUP, GROUPS, CROSSOVERS>;
+	using Processor = DynamicsProcessor<T, CHANNELS_PER_GROUP, GROUPS, CROSSOVERS>;
 	using CrossoverFrequencies = typename Processor::CrossoverFrequencies;
 	using ThresholdValues = typename Processor::ThresholdValues;
 	using Levels = DynamicProcessorLevels;
@@ -81,8 +92,9 @@ class SpeakerManager : public JackProcessor
 	{
 		ConfigData configData;
 		Levels levels;
+		bool configChanged;
 
-		TransportData() : levels(GROUPS) {}
+		TransportData() : levels(GROUPS), configChanged(false) {}
 	};
 
 	Transport<TransportData> transport;
@@ -98,7 +110,9 @@ protected:
 		Levels levels(GROUPS);
 		levels.reset();
 		preparedConfigData.configData = processor.getConfigData();
-		transport.init(preparedConfigData);
+		preparedConfigData.configChanged = true; // force to reload equalizer filters
+		transport.init(preparedConfigData, true);
+		preparedConfigData.configChanged = false;
 		return true;
 	}
 
@@ -109,6 +123,7 @@ protected:
 		PortNames inputs(client, unspecified, unspecified, JackPortIsPhysical|JackPortIsOutput);
 		PortNames outputs(client, unspecified, unspecified, JackPortIsPhysical|JackPortIsOutput);
 	}
+
 	virtual void onReset() override
 	{
 		std::cout << "No action on reset" << std::endl;
@@ -124,7 +139,9 @@ protected:
 
 		if (modifiedTransport) {
 			processor.levels.reset();
-			processor.updateConfig(lockFreeData.data().configData);
+			if (lockFreeData.data().configChanged) {
+				processor.updateConfig(lockFreeData.data().configData);
+			}
 		}
 		size_t portNumber;
 		size_t index;
@@ -135,8 +152,8 @@ protected:
 			outputs[index] = ports.getBuffer(portNumber);
 		}
 
-		FixedSizeArray<double, INPUTS> inFrame;
-		FixedSizeArray<double, OUTPUTS> outFrame;
+		FixedSizeArray<T, INPUTS> inFrame;
+		FixedSizeArray<T, OUTPUTS> outFrame;
 
 		for (size_t i = 0; i < frames; i++) {
 
@@ -174,33 +191,37 @@ public:
 		}
 		for (size_t channel = 0; channel < Processor::INPUTS; channel++) {
 			snprintf(name, 1 + Names::get_port_size(),
-					 "out_%zu_%zu", 1 + channel/CHANNELS_PER_GROUP, channel % CHANNELS_PER_GROUP);
+					 "out_%zu_%zu", 1 + channel/CHANNELS_PER_GROUP, 1 + channel % CHANNELS_PER_GROUP);
 			portDefinitions_.addOutput(name);
 		}
 		portDefinitions_.addOutput("out_sub");
 	}
 
-	const SpeakermanConfig &getConfig() const
+	virtual const SpeakermanConfig &getConfig() const override
 	{
 		return config_;
 	}
 
-	void setConfig(const SpeakermanConfig &config)
+	virtual void setConfig(const SpeakermanConfig &config) override
 	{
 		config_ = config;
 		preparedConfigData.configData = processor.createConfigData(config);
+		preparedConfigData.configChanged = true;
 	}
 
-	bool applyConfigAndGetLevels(Levels &levels, std::chrono::milliseconds duration)
+	virtual bool applyConfigAndGetLevels(DynamicProcessorLevels *levels, std::chrono::milliseconds duration) override
 	{
 		TransportData result;
 		preparedConfigData.levels.reset();
 		if (transport.getAndSet(preparedConfigData, result, duration)) {
-			levels = result.levels;
+			if (levels) {
+				*levels = result.levels;
+			}
 			return true;
 		}
 		return false;
 	}
+
 };
 
 } /* End of namespace speakerman */

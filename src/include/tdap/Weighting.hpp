@@ -60,8 +60,7 @@ struct ACurves
 	static constexpr WeightPoint hz_top { 2516.0, 1.15213 };
 	static constexpr WeightPoint hz_high { 10000, 0.7674 };
 
-	template<typename COEFFICIENT>
-	static void setFirstOrder(IirCoefficients<COEFFICIENT> &coeffs)
+	static void setFirstOrder(IirCoefficients &coeffs)
 	{
 		if (coeffs.order() != 1) {
 			if (coeffs.hasFixedOrder()) {
@@ -71,21 +70,18 @@ struct ACurves
 		}
 	}
 
-	template<typename COEFFICIENT>
-	static void setCurveParameters(IirCoefficients<COEFFICIENT> &coeffs, double sampleRate)
+	static void setCurveParameters(IirCoefficients &coeffs, double sampleRate)
 	{
 		BiQuad::setParametric(coeffs, sampleRate, PARAM_CENTER, PARAM_GAIN, PARAM_BANDWIDTH);
 	}
 
-	template<typename COEFFICIENT>
-	static void setLowPassParameters(IirCoefficients<COEFFICIENT> &coeffs, double sampleRate)
+	static void setLowPassParameters(IirCoefficients &coeffs, double sampleRate)
 	{
 		setFirstOrder(coeffs);
 		Butterworth::create(coeffs, sampleRate, LOW_PASS_FREQUENCY, Butterworth::Pass::LOW, 1.0);
 	}
 
-	template<typename COEFFICIENT>
-	static void setHighPassParameters(IirCoefficients<COEFFICIENT> &coeffs, double sampleRate)
+	static void setHighPassParameters(IirCoefficients &coeffs, double sampleRate)
 	{
 		setFirstOrder(coeffs);
 		Butterworth::create(coeffs, sampleRate, HIGH_PASS_FREQUENCY, Butterworth::Pass::HIGH, 1.0);
@@ -132,20 +128,20 @@ struct ACurves
 		Coefficients<SAMPLE> coefficients_;
 		struct History
 		{
-			SAMPLE curveX[IirCoefficients<SAMPLE>::historyForOrder(2)];
-			SAMPLE curveY[IirCoefficients<SAMPLE>::historyForOrder(2)];
-			SAMPLE lowX[IirCoefficients<SAMPLE>::historyForOrder(1)];
-			SAMPLE lowY[IirCoefficients<SAMPLE>::historyForOrder(1)];
-			SAMPLE highX[IirCoefficients<SAMPLE>::historyForOrder(1)];
-			SAMPLE highY[IirCoefficients<SAMPLE>::historyForOrder(1)];
+			SAMPLE curveX[IirCoefficients::historyForOrder(2)];
+			SAMPLE curveY[IirCoefficients::historyForOrder(2)];
+			SAMPLE lowX[IirCoefficients::historyForOrder(1)];
+			SAMPLE lowY[IirCoefficients::historyForOrder(1)];
+			SAMPLE highX[IirCoefficients::historyForOrder(1)];
+			SAMPLE highY[IirCoefficients::historyForOrder(1)];
 
 			void reset()
 			{
-				for (size_t i = 0; i < IirCoefficients<SAMPLE>::historyForOrder(2); i++) {
+				for (size_t i = 0; i < IirCoefficients::historyForOrder(2); i++) {
 					curveX[i] = 0;
 					curveY[i] = 0;
 				}
-				for (size_t i = 0; i < IirCoefficients<SAMPLE>::historyForOrder(1); i++) {
+				for (size_t i = 0; i < IirCoefficients::historyForOrder(1); i++) {
 					lowX[i] = 0;
 					lowY[i] = 0;
 					highX[i] = 0;
@@ -208,9 +204,9 @@ struct ACurves
 		{
 			IndexPolicy::array(channel, CHANNELS);
 			SAMPLE y = input;
-			y = coefficients_.curve().do_filter<flushToZero>(history_[channel].curveX, history_[channel].curveY, y);
-			y = coefficients_.lowPass().do_filter<flushToZero>(history_[channel].lowX, history_[channel].lowY, y);
-			y = coefficients_.highPass().do_filter<flushToZero>(history_[channel].highX, history_[channel].highY, y);
+			y = coefficients_.curve().do_filter<SAMPLE, flushToZero>(history_[channel].curveX, history_[channel].curveY, y);
+			y = coefficients_.lowPass().do_filter<SAMPLE, flushToZero>(history_[channel].lowX, history_[channel].lowY, y);
+			y = coefficients_.highPass().do_filter<SAMPLE, flushToZero>(history_[channel].highX, history_[channel].highY, y);
 			return OVERALL_GAIN * y;
 		}
 

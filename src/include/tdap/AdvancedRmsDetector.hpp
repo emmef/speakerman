@@ -120,7 +120,7 @@ struct AdvancedRms
 				double rcForScale = Value<double>::min(PERCEPTIVE_SLOW_WINDOWSIZE, rc);
 				double rcPowerForScale = rc > PERCEPTIVE_FAST_WINDOWSIZE ? slowScalePower : fastScalePower;
 				scale[i] = pow(rcForScale / PERCEPTIVE_FAST_WINDOWSIZE, rcPowerForScale);
-				std::cout << "RC " << (1000 * characteristicSamples[i] / sampleRate) << " ms. level=" << scale[i] << std::endl;
+//				std::cout << "RC " << (1000 * characteristicSamples[i] / sampleRate) << " ms. level=" << scale[i] << std::endl;
 			}
 		}
 	};

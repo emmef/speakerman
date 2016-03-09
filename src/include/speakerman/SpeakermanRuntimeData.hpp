@@ -30,7 +30,7 @@ namespace speakerman {
 	{
 		static constexpr double getThreshold(double threshold)
 		{
-			return Values::force_between(threshold, 0.001, 0.999);
+			return Values::force_between(threshold, GroupConfig::MIN_THRESHOLD, GroupConfig::MAX_THRESHOLD);
 		}
 
 		static constexpr double getLimiterThreshold(double threshold, double sloppyFactor)
@@ -72,7 +72,7 @@ namespace speakerman {
 				BiQuad::setParametric(w1, sampleRate, config.eq[0].center, config.eq[0].gain, config.eq[0].bandwidth);
 				if (config.eqs > 1) {
 					auto w2 = biquad2_.wrap();
-					BiQuad::setParametric(w1, sampleRate, config.eq[1].center, config.eq[1].gain, config.eq[1].bandwidth);
+					BiQuad::setParametric(w2, sampleRate, config.eq[1].center, config.eq[1].gain, config.eq[1].bandwidth);
 				}
 			}
 		}
@@ -89,8 +89,8 @@ namespace speakerman {
 	class GroupRuntimeData
 	{
 		T volume_;
+		size_t delay_;
 		T bandRmsScale_[BANDS];
-		T bandRmsThreshold_[BANDS];
 		T limiterScale_;
 		T limiterThreshold_;
 		EqualizerFilterData<T> filterConfig_;
@@ -98,18 +98,18 @@ namespace speakerman {
 	public:
 		T volume() const { return volume_; }
 		T bandRmsScale(size_t i) const { return bandRmsScale_[IndexPolicy::array(i, BANDS)]; }
-		T bandRmsThreshold(size_t i) const { return bandRmsThreshold_[IndexPolicy::array(i, BANDS)]; }
 		T limiterScale() const { return limiterScale_; }
 		T limiterThreshold() const { return limiterThreshold_; }
+		size_t delay() const { return delay_; }
 		const EqualizerFilterData<T> &filterConfig() const { return filterConfig_; }
 
 		void reset()
 		{
 			volume_ = 0;
+			delay_ = 0;
 			limiterScale_ = 1;
 			limiterThreshold_ = 1;
 			for (size_t band = 0; band < BANDS; band++) {
-				bandRmsThreshold_[band] = 1.0 / BANDS;
 				bandRmsScale_[band] = BANDS;
 			}
 			filterConfig_.reset();
@@ -117,18 +117,23 @@ namespace speakerman {
 
 		void setFilterConfig(const EqualizerFilterData<T> &source) { filterConfig_ = source; }
 		template<typename...A>
-		void setLevels(double volume, double threshold, double sloppyFactor, const ArrayTraits<A...> &relativeBandWeights)
+		void setLevels(double volume, double threshold, double sloppyFactor, size_t delay, const ArrayTraits<A...> &relativeBandWeights)
 		{
-			volume_ = Values::force_between(volume, 0.0, 10.0);
-			if (volume < 1e-6) {
+			volume_ = Values::force_between(volume, GroupConfig::MIN_VOLUME, GroupConfig::MAX_VOLUME);
+			if (volume_ < 1e-6) {
 				volume_ = 0;
 			}
+			delay_ = delay;
 			limiterThreshold_ = SpeakerManLevels::getLimiterThreshold(threshold, sloppyFactor);
 			limiterScale_ = 1.0 / limiterThreshold_;
 			for (size_t band = 0; band < BANDS; band++) {
-				bandRmsThreshold_[band] = SpeakerManLevels::getRmsThreshold(threshold, relativeBandWeights[band]);
-				bandRmsScale_[band] = 1.0 / bandRmsThreshold_[band];
+				bandRmsScale_[band] = 1.0 / SpeakerManLevels::getRmsThreshold(threshold, relativeBandWeights[band]);
 			}
+		}
+
+		void adjustDelay(size_t delay)
+		{
+			delay_ = delay > delay_ ? 0 : delay_ - delay;
 		}
 
 		void init(const GroupRuntimeData<T, BANDS> &source)
@@ -143,7 +148,6 @@ namespace speakerman {
 			integrator.integrate(target.limiterThreshold_, limiterThreshold_);
 			integrator.integrate(target.limiterScale_, limiterScale_);
 			for (size_t band = 0; band < BANDS; band++) {
-				integrator.integrate(target.bandRmsThreshold_[band], bandRmsThreshold_[band]);
 				integrator.integrate(target.bandRmsScale_[band], bandRmsScale_[band]);
 			}
 		}
@@ -158,8 +162,21 @@ namespace speakerman {
 		T subLimiterThreshold_;
 		T subRmsThreshold_;
 		T subRmsScale_;
+		size_t subDelay_;
 		IntegrationCoefficients<T> controlSpeed_;
 
+		void compensateDelays()
+		{
+			size_t minDelay = subDelay_;
+			for (size_t group = 0; group < GROUPS; group++) {
+				minDelay = Values::min(minDelay, groupConfig_[group].delay());
+			}
+			subDelay_ -= minDelay;
+			for (size_t group = 0; group < GROUPS; group++) {
+				groupConfig_[group].adjustDelay(minDelay);
+			}
+
+		}
 
 	public:
 		GroupRuntimeData<T, BANDS> &groupConfig(size_t i) { return groupConfig_[i]; }
@@ -168,6 +185,10 @@ namespace speakerman {
 		T subLimiterThreshold() const { return subLimiterThreshold_; }
 		T subRmsThreshold() const { return subRmsThreshold_; }
 		T subRmsScale() const { return subRmsScale_; }
+		size_t subDelay() const { return subDelay_; }
+
+		static constexpr size_t groups() { return GROUPS; }
+		static constexpr size_t bands() { return BANDS; }
 
 		void reset()
 		{
@@ -175,6 +196,7 @@ namespace speakerman {
 			subLimiterScale_ = 1;
 			subRmsThreshold_ = 1;
 			subRmsScale_ = 1;
+			subDelay_ = 0;
 			for (size_t group = 0; group < GROUPS; group++) {
 				groupConfig_[group].reset();
 			}
@@ -212,6 +234,9 @@ namespace speakerman {
 			}
 			double sumOfGroupThresholds = 0.0;
 			double peakWeight = Values::force_between(fastestPeakWeight, 0.1, 1.0);
+			for (size_t i = 0; i < bandWeights.size(); i++) {
+				std::cout << "Band weight[" << i << "]=" << bandWeights[i] << std::endl;
+			}
 
 			for (size_t group = 0; group < config.groups; group++) {
 				const speakerman::GroupConfig &sourceConf = config.group[group];
@@ -219,17 +244,45 @@ namespace speakerman {
 				targetConf.setFilterConfig(EqualizerFilterData<T>::createConfigured(sourceConf, sampleRate));
 
 				double groupThreshold = sourceConf.threshold;
-				targetConf.setLevels(sourceConf.volume, groupThreshold, fastestPeakWeight, bandWeights);
+				size_t delay = 0.5 + sampleRate *
+						Values::force_between(sourceConf.delay, GroupConfig::MIN_DELAY, GroupConfig::MAX_DELAY);
+				targetConf.setLevels(sourceConf.volume, groupThreshold, fastestPeakWeight, delay, bandWeights);
 
 				sumOfGroupThresholds += groupThreshold;
 			}
-			double threshold = config.relativeSubThreshold * sumOfGroupThresholds;
-			subLimiterScale_ = SpeakerManLevels::getLimiterThreshold(threshold, peakWeight);
-			subLimiterThreshold_ = 1.0 / subLimiterScale_;
+			double threshold =
+					Values::force_between(config.relativeSubThreshold, SpeakermanConfig::MIN_REL_SUB_THRESHOLD, SpeakermanConfig::MAX_REL_SUB_THRESHOLD) *
+					sumOfGroupThresholds;
+			subLimiterThreshold_ = SpeakerManLevels::getLimiterThreshold(threshold, peakWeight);
+			subLimiterScale_ = 1.0 / subLimiterThreshold_;
 			subRmsThreshold_ = SpeakerManLevels::getRmsThreshold(threshold, bandWeights[0]);
 			subRmsScale_ = 1.0 / subRmsThreshold_;
+			subDelay_ = 0.5 + sampleRate *
+					Values::force_between(config.subDelay, SpeakermanConfig::MIN_SUB_DELAY, SpeakermanConfig::MAX_SUB_DELAY);
 			controlSpeed_.setCharacteristicSamples(0.05 * sampleRate);
+
+			compensateDelays();
 		}
+
+		void dump() const
+		{
+			std:cout << "Runtime Configuration dump" << std::endl;
+			std::cout << " sub-limiter: scale=" << subLimiterScale() << "; threshold=" << subLimiterThreshold() << std::endl;
+			std::cout << " sub-RMS: scale=" << subRmsScale() << "; threshold=" << subRmsThreshold() << std::endl;
+			std::cout << " sub-delay=" << subDelay() << std::endl;
+			for (size_t group = 0; group < GROUPS; group++) {
+				const GroupRuntimeData<T, bands()> &grpConfig = groupConfig(group);
+				std::cout << " group " << group << std::endl;
+				std::cout << "  volume=" << grpConfig.volume() << std::endl;
+				std::cout << "  delay=" << grpConfig.delay() << std::endl;
+				std::cout << "  equalizers=" << grpConfig.filterConfig().count() << std::endl;
+				std::cout << "  limiter: scale=" << grpConfig.limiterScale() << "; threshold=" << grpConfig.limiterThreshold() << std::endl;
+				for (size_t band = 0; band < bands(); band++) {
+					std::cout << "   band " << band << " RMS: scale=" << grpConfig.bandRmsScale(band) << std::endl;
+				}
+			}
+		}
+
 	};
 
 	template<typename T, size_t CHANNELS_PER_GROUP>
@@ -270,7 +323,8 @@ namespace speakerman {
 			return &filter;
 		}
 
-		MultiFilter<T> * configuredFilter(EqualizerFilterData<T> config)
+		template<typename S>
+		MultiFilter<T> * configuredFilter(EqualizerFilterData<S> config)
 		{
 			if (config.count() == 0) {
 				return noFilter();
@@ -289,7 +343,8 @@ namespace speakerman {
 			singleBiQuad(filter1),
 			doubleBiQuad(filter1, filter2) {}
 
-		void configure(EqualizerFilterData<T> config)
+		template<typename S>
+		void configure(EqualizerFilterData<S> config)
 		{
 			filter_ = configuredFilter(config);
 		}
@@ -302,50 +357,44 @@ namespace speakerman {
 	{
 		using Data = SpeakermanRuntimeData<T, GROUPS, BANDS>;
 
-		Data active;
-		Data middle;
-		Data userSet;
+		Data active_;
+		Data middle_;
+		Data userSet_;
 
-		EqualizerFilter<T, CHANNELS_PER_GROUP> filters_[GROUPS];
 
 	public:
-		EqualizerFilter<T, CHANNELS_PER_GROUP> &filter(size_t index)
-		{
-			return filters_[IndexPolicy::array(index, GROUPS)];
-		}
-
-		const Data &data() const { return active; }
+		const Data &data() const { return active_; }
+		const Data &userSet() const { return userSet_; }
 
 		size_t groups() const { return GROUPS; }
 		size_t channelsPerGroup() const { return CHANNELS_PER_GROUP; }
 
 		SpeakermanRuntimeConfigurable()
 		{
-			active.reset();
-			middle.reset();
-			userSet.reset();
+			active_.reset();
+			middle_.reset();
+			userSet_.reset();
 		}
 
 		void modify(const Data &source)
 		{
-			userSet = source;
+			userSet_ = source;
 			for (size_t group = 0; group < GROUPS; group++) {
-				active.groupConfig(group).setFilterConfig(source.groupConfig(group).filterConfig());
-				filters_[group].configure(source.groupConfig(group).filterConfig());
+				active_.groupConfig(group).setFilterConfig(source.groupConfig(group).filterConfig());
 			}
 		}
 
 		void init(const Data &source)
 		{
-			userSet = source;
-			middle.init(userSet);
-			active.init(middle);
+			userSet_ = source;
+			middle_.init(userSet_);
+			active_.init(middle_);
 		}
 
 		void approach()
 		{
-			middle.approach(userSet);
-			active.approach(middle);
+			middle_.approach(userSet_);
+			active_.approach(middle_);
 		}
 	};
 

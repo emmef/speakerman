@@ -47,8 +47,7 @@ struct BiQuad
 		return Value<double>::force_between(bandwidth, PARAMETRIC_BANDWIDTH_MINIMUM, PARAMETRIC_BANDWIDTH_MAXIMUM);
 	}
 
-	template<typename Coefficient>
-	static void setParametric(IirCoefficients<Coefficient> &coefficients, double sampleRate, double centerFrequency, double gain, double bandwidth)
+	static void setParametric(IirCoefficients &coefficients, double sampleRate, double centerFrequency, double gain, double bandwidth)
 	{
 
 		setCoefficients(coefficients, getParametricParameters(
@@ -56,40 +55,35 @@ struct BiQuad
 				gain, limitedBandwidth(bandwidth)));
 	}
 
-	template<typename Coefficient>
-	static void setLowShelve(IirCoefficients<Coefficient> &coefficients, double sampleRate, double centerFrequency, double gain, double slope)
+	static void setLowShelve(IirCoefficients &coefficients, double sampleRate, double centerFrequency, double gain, double slope)
 	{
 		setCoefficients(coefficients, getLowShelveParameters(
 				Frequency<double>::relativeNycquistLimited(centerFrequency, sampleRate),
 				gain, limitedSlope(slope)));
 	}
 
-	template<typename Coefficient>
-	static void setHighShelve(IirCoefficients<Coefficient> &coefficients, double sampleRate, double centerFrequency, double gain, double slope)
+	static void setHighShelve(IirCoefficients &coefficients, double sampleRate, double centerFrequency, double gain, double slope)
 	{
 		setCoefficients(coefficients, getHighShelveParameters(
 				Frequency<double>::relativeNycquistLimited(centerFrequency, sampleRate),
 				gain, limitedSlope(slope)));
 	}
 
-	template<typename Coefficient>
-	static void setLowPass(IirCoefficients<Coefficient> &coefficients, double sampleRate, double centerFrequency, double bandwidth)
+	static void setLowPass(IirCoefficients &coefficients, double sampleRate, double centerFrequency, double bandwidth)
 	{
 		setCoefficients(coefficients, getLowPassParameters(
 				Frequency<double>::relativeNycquistLimited(centerFrequency, sampleRate),
 				limitedBandwidth(bandwidth)));
 	}
 
-	template<typename Coefficient>
-	static void setHighPass(IirCoefficients<Coefficient> &coefficients, double sampleRate, double centerFrequency, double bandwidth)
+	static void setHighPass(IirCoefficients &coefficients, double sampleRate, double centerFrequency, double bandwidth)
 	{
 		setCoefficients(coefficients, getHighPassParameters(
 				Frequency<double>::relativeNycquistLimited(centerFrequency, sampleRate),
 				limitedBandwidth(bandwidth)));
 	}
 
-	template<typename Coefficient>
-	static void setBandPass(IirCoefficients<Coefficient> &coefficients, double sampleRate, double centerFrequency, double bandwidth)
+	static void setBandPass(IirCoefficients &coefficients, double sampleRate, double centerFrequency, double bandwidth)
 	{
 		setCoefficients(coefficients, getBandPassParameters(
 				Frequency<double>::relativeNycquistLimited(centerFrequency, sampleRate),
@@ -105,8 +99,7 @@ private:
 		double D2;
 	};
 
-	template<typename Coefficient>
-	static void setCoefficients(IirCoefficients<Coefficient> &builder, BiQuadCoefficients bqc)
+	static void setCoefficients(IirCoefficients &builder, const BiQuadCoefficients bqc)
 	{
 		if (builder.order() != 2) {
 			if (builder.hasFixedOrder()) {
@@ -246,15 +239,6 @@ template<typename Coefficient, size_t CHANNELS>
 struct BiquadFilter : public FixedSizeIirCoefficientFilter<Coefficient, CHANNELS, 2>
 {
 	using Coefficients = typename FixedSizeIirCoefficientFilter<Coefficient, CHANNELS, 2>::Coefficients;
-
-//	using FixedSizeIirCoefficientFilter<Coefficient, CHANNELS_PER_GROUP, 2>::do_filter;
-//	using FixedSizeIirCoefficientFilter<Coefficient, CHANNELS_PER_GROUP, 2>::filter;
-//	using FixedSizeIirCoefficientFilter<Coefficient, CHANNELS_PER_GROUP, 2>::reset;
-//	using FixedSizeIirCoefficientFilter<Coefficient, CHANNELS_PER_GROUP, 2>::wrapSingle;
-//	using FixedSizeIirCoefficientFilter<Coefficient, CHANNELS_PER_GROUP, 2>::wrapMulti;
-//	using FixedSizeIirCoefficientFilter<Coefficient, CHANNELS_PER_GROUP, 2>::createFilter;
-//	using FixedSizeIirCoefficientFilter<Coefficient, CHANNELS_PER_GROUP, 2>::createMultiFilter;
-//	using FixedSizeIirCoefficientFilter<Coefficient, CHANNELS_PER_GROUP, 2>::coefficients_;
 
 	BiquadFilter() = default;
 	BiquadFilter(const Coefficients &coeffs) : FixedSizeIirCoefficientFilter<Coefficient, CHANNELS, 2>(coeffs) {}
