@@ -235,7 +235,7 @@ int main(int count, char * arguments[]) {
 	configFileConfig = readSpeakermanConfig(true);
 
 	dumpSpeakermanConfig(configFileConfig, cout);
-	manager.set(createManager<float>(configFileConfig));
+	manager.set(createManager<double>(configFileConfig));
 
 	Owner<JackClient> clientOwner;
 	auto result = JackClient::createDefault("Speaker manager");
