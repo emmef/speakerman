@@ -167,6 +167,11 @@ class JackClient
 		return client ? static_cast<JackClient*>(client)->onSampleRateChange(rate) : 1;
 	}
 
+	static int jackXrunCallback(void * client)
+	{
+		return client ? static_cast<JackClient*>(client)->onXRun() : 1;
+	}
+
 	void registerCallbacks()
 	{
 		jack_on_shutdown(client_, jackShutdownCallback, this);
@@ -288,6 +293,13 @@ protected:
 
 public:
 
+	virtual int onXRun()
+	{
+		notifyShutdown("XRUN occured!");
+		cerr << "XRUN occurred!" << endl;
+		return 1;
+	}
+
 	template<typename ...A>
 	static CreateClientResult create(const char *serverName, jack_options_t options, A... args)
 	{
@@ -334,6 +346,9 @@ public:
 						jack_set_sample_rate_callback(client_, jackSampleRateCallback, this),
 						"Set sample rate callback");
 			}
+			ErrorHandler::checkZeroOrThrow(
+					jack_set_xrun_callback(client_, jackXrunCallback, this),
+					"Set sample rate callback");
 			{
 				unique_lock<mutex> lock(mutex_);
 				state_ = ClientState::CONFIGURED;
@@ -409,7 +424,7 @@ public:
 		}
 	}
 
-	~JackClient()
+	virtual ~JackClient()
 	{
 		cout << "destructor" << endl;
 		close();
