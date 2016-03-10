@@ -93,6 +93,7 @@ namespace speakerman {
 		T bandRmsScale_[BANDS];
 		T limiterScale_;
 		T limiterThreshold_;
+		T signalMeasureFactor_;
 		EqualizerFilterData<T> filterConfig_;
 
 	public:
@@ -100,6 +101,7 @@ namespace speakerman {
 		T bandRmsScale(size_t i) const { return bandRmsScale_[IndexPolicy::array(i, BANDS)]; }
 		T limiterScale() const { return limiterScale_; }
 		T limiterThreshold() const { return limiterThreshold_; }
+		T signalMeasureFactor() const { return signalMeasureFactor_; }
 		size_t delay() const { return delay_; }
 		const EqualizerFilterData<T> &filterConfig() const { return filterConfig_; }
 
@@ -117,18 +119,19 @@ namespace speakerman {
 
 		void setFilterConfig(const EqualizerFilterData<T> &source) { filterConfig_ = source; }
 		template<typename...A>
-		void setLevels(double volume, double threshold, double sloppyFactor, size_t delay, const ArrayTraits<A...> &relativeBandWeights)
+		void setLevels(const GroupConfig &conf, size_t channels, double sloppyFactor, size_t delay, const ArrayTraits<A...> &relativeBandWeights)
 		{
-			volume_ = Values::force_between(volume, GroupConfig::MIN_VOLUME, GroupConfig::MAX_VOLUME);
+			volume_ = Values::force_between(conf.volume, GroupConfig::MIN_VOLUME, GroupConfig::MAX_VOLUME);
 			if (volume_ < 1e-6) {
 				volume_ = 0;
 			}
 			delay_ = delay;
-			limiterThreshold_ = SpeakerManLevels::getLimiterThreshold(threshold, sloppyFactor);
+			limiterThreshold_ = SpeakerManLevels::getLimiterThreshold(conf.threshold, sloppyFactor);
 			limiterScale_ = 1.0 / limiterThreshold_;
 			for (size_t band = 0; band < BANDS; band++) {
-				bandRmsScale_[band] = 1.0 / SpeakerManLevels::getRmsThreshold(threshold, relativeBandWeights[band]);
+				bandRmsScale_[band] = 1.0 / SpeakerManLevels::getRmsThreshold(conf.threshold, relativeBandWeights[band]);
 			}
+			signalMeasureFactor_ = 1.0 / (sqrt(channels) * conf.threshold);
 		}
 
 		void adjustDelay(size_t delay)
@@ -246,7 +249,7 @@ namespace speakerman {
 				double groupThreshold = sourceConf.threshold;
 				size_t delay = 0.5 + sampleRate *
 						Values::force_between(sourceConf.delay, GroupConfig::MIN_DELAY, GroupConfig::MAX_DELAY);
-				targetConf.setLevels(sourceConf.volume, groupThreshold, fastestPeakWeight, delay, bandWeights);
+				targetConf.setLevels(sourceConf, config.groupChannels, fastestPeakWeight, delay, bandWeights);
 
 				sumOfGroupThresholds += groupThreshold;
 			}

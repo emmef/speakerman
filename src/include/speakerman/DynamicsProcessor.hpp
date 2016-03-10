@@ -245,16 +245,16 @@ private:
 	void applyVolumeAddNoise(const FixedSizeArray<T, INPUTS> &input)
 	{
 		T ns = noise();
-		T channelScale = 1.0 / CHANNELS_PER_GROUP;
 		for (size_t group = 0, offs = 0; group < GROUPS; group++) {
 			T signal = 0;
-			T volume = runtime.data().groupConfig(group).volume();
+			const GroupRuntimeData<T, BANDS> &conf = runtime.data().groupConfig(group);
+			T volume = conf.volume();
 			for (size_t channel = 0; channel < CHANNELS_PER_GROUP; channel++, offs++) {
 				T x = input[offs];
 				signal += x * x;
 				inputWithVolumeAndNoise[offs] = x * volume + ns;
 			}
-			levels.setSignal(group, sqrt(channelScale * signal));
+			levels.setSignal(group, sqrt(signal) * conf.signalMeasureFactor());
 		}
 	}
 
