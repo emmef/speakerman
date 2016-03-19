@@ -76,6 +76,7 @@ public:
 		g = Values::min(g, gain);
 	}
 
+
 	double getSubGain() const
 	{
 		return gains_[0];
@@ -147,7 +148,7 @@ private:
 	EqualizerFilter<double, CHANNELS_PER_GROUP> filters_[GROUPS];
 
 	Configurable runtime;
-	IntegrationCoefficients<T> signalIntegrator;
+	FixedSizeArray<IntegratorFilter<T>, LIMITERS> signalIntegrator;
 
 	T sampleRate_;
 	bool bypass = true;
@@ -174,7 +175,9 @@ public:
 		subNoise.setScale(1e-5);
 		aCurve.setSampleRate(sampleRate);
 		crossoverFilter.configure(sampleRate, crossovers);
-		signalIntegrator.setCharacteristicSamples(0.1 * sampleRate);
+		for (size_t i = 0; i < GROUPS; i++) {
+			signalIntegrator[i].coefficients.setCharacteristicSamples(AdvancedRms::PERCEPTIVE_FAST_WINDOWSIZE * sampleRate);
+		}
 
 		// Rms detector confiuration
 		AdvancedRms::UserConfig rmsConfig = rmsUserConfig();
@@ -254,7 +257,7 @@ private:
 				signal += x * x;
 				inputWithVolumeAndNoise[offs] = x * volume + ns;
 			}
-			levels.setSignal(group, sqrt(signal) * conf.signalMeasureFactor());
+			levels.setSignal(group, sqrt(signalIntegrator[group].integrate(signal)) * conf.signalMeasureFactor());
 		}
 	}
 

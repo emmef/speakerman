@@ -163,7 +163,7 @@ struct AdvancedRms
 		}
 		struct Filter
 		{
-			BucketIntegratedRms<double, 4, 4> integrator;
+			BucketIntegratedRms<double, 4, 8> integrator;
 			double scale;
 		};
 		FixedSizeArray<Filter, RC_TIMES> filters_;

@@ -185,6 +185,13 @@ class Ports
 
 	PortDefinitions definitions_;
 	Array<PortData> ports_;
+	volatile bool registered_;
+
+	static NameListPolicy &nameListPolicy()
+	{
+		static NameListPolicy policy;
+		return policy;
+	}
 
 	void unregister(jack_client_t * client, size_t limit)
 	{
@@ -208,11 +215,48 @@ class Ports
 		}
 	}
 
+	size_t portCountInDirection(PortDirection dir) const
+	{
+		size_t count = 0;
+		for (size_t i = 0; i < portCount(); i++) {
+			if (definitions_[i].direction == dir) {
+				count++;
+			}
+		}
+		return count;
+
+	}
+
+	size_t totalPortNameLengthInDirection(PortDirection dir) const
+	{
+		size_t count = 0;
+		for (size_t i = 0; i < portCount(); i++) {
+			if (definitions_[i].direction == dir) {
+				count += strlen(portName(i));
+			}
+		}
+
+		return count;
+	}
+
+	NameList portsInDirection(PortDirection dir) const
+	{
+		size_t nameLength = totalPortNameLengthInDirection(dir);
+		size_t count = portCountInDirection(dir);
+		NameList list(nameListPolicy(), count, nameLength + count);
+		for (size_t i = 0; i < portCount(); i++) {
+			if (definitions_[i].direction == dir) {
+				list.add(portName(i));
+			}
+		}
+		return list;
+	}
+
 public:
 
 	Ports(const PortDefinitions &definitions) :
 		definitions_(definitions),
-		ports_(Value<size_t>::max(1, definitions_.portCount()), definitions_.portCount())
+		ports_(Value<size_t>::max(1, definitions_.portCount()), definitions_.portCount()), registered_(false)
 	{
 	}
 
@@ -221,6 +265,43 @@ public:
 		return definitions_;
 	}
 
+	size_t portCount() const
+	{
+		return ports_.size();
+	}
+
+	size_t inputCount() const
+	{
+		return portCountInDirection(PortDirection::IN);
+	}
+
+	size_t outputCount() const
+	{
+		return portCountInDirection(PortDirection::OUT);
+	}
+
+	NameList inputNames() const
+	{
+		return portsInDirection(PortDirection::IN);
+	}
+
+	NameList outputNames() const
+	{
+		return portsInDirection(PortDirection::OUT);
+	}
+
+	const char * portName(size_t i) const
+	{
+		if (i < portCount()) {
+			if (registered_) {
+				return jack_port_name(ports_[i].port);
+			}
+			else {
+				return definitions_[i].name;
+			}
+		}
+		throw std::invalid_argument("Port name index too high");
+	}
 
 	void getBuffers(jack_nframes_t frames)
 	{
@@ -242,6 +323,7 @@ public:
 				PortDefinition::Data data = definitions_[i];
 				ports_[i].port = Port::create_port(client, data);
 			}
+			registered_ = true;
 		}
 		catch (const std::exception &e) {
 			unregister(client, i);
@@ -251,6 +333,7 @@ public:
 
 	void unregisterPorts(jack_client_t *client)
 	{
+		registered_ = false;
 		unregister(client, ports_.size());
 	}
 };

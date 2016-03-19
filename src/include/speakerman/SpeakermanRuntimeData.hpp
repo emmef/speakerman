@@ -235,7 +235,7 @@ namespace speakerman {
 			if (config.groups != GROUPS) {
 				throw std::invalid_argument("Cannot change number of groups run-time");
 			}
-			double sumOfGroupThresholds = 0.0;
+			double subBaseThreshold = GroupConfig::MAX_THRESHOLD;
 			double peakWeight = Values::force_between(fastestPeakWeight, 0.1, 1.0);
 			for (size_t i = 0; i < bandWeights.size(); i++) {
 				std::cout << "Band weight[" << i << "]=" << bandWeights[i] << std::endl;
@@ -251,11 +251,11 @@ namespace speakerman {
 						Values::force_between(sourceConf.delay, GroupConfig::MIN_DELAY, GroupConfig::MAX_DELAY);
 				targetConf.setLevels(sourceConf, config.groupChannels, fastestPeakWeight, delay, bandWeights);
 
-				sumOfGroupThresholds += groupThreshold;
+				subBaseThreshold = Values::min(subBaseThreshold, groupThreshold);
 			}
 			double threshold =
 					Values::force_between(config.relativeSubThreshold, SpeakermanConfig::MIN_REL_SUB_THRESHOLD, SpeakermanConfig::MAX_REL_SUB_THRESHOLD) *
-					sumOfGroupThresholds;
+					subBaseThreshold;
 			subLimiterThreshold_ = SpeakerManLevels::getLimiterThreshold(threshold, peakWeight);
 			subLimiterScale_ = 1.0 / subLimiterThreshold_;
 			subRmsThreshold_ = SpeakerManLevels::getRmsThreshold(threshold, bandWeights[0]);

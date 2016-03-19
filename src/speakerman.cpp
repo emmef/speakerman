@@ -121,13 +121,13 @@ static void configUpdater()
 			configFileConfig = readSpeakermanConfig(configFileConfig, false);
 			manager.get().applyConfigAndGetLevels(configFileConfig, &levels, sleeper);
 		}
-//		else {
-//			manager.get().getLevels(&levels, sleeper);
-//		}
-//		for (size_t i = 0; i < levels.groups(); i++) {
-//			std::cout << "GROUP " << i << " SIGNAL=" << levels.getSignal(i) << "; GAIN=" << levels.getGroupGain(i) << std::endl;
-//		}
-//		std::cout << "SUB-GAIN: " << levels.getSubGain() << std::endl;
+		else {
+			manager.get().getLevels(&levels, sleeper);
+		}
+		for (size_t i = 0; i < levels.groups(); i++) {
+			std::cout << "GROUP " << i << " SIGNAL=" << levels.getSignal(i) << "; GAIN=" << levels.getGroupGain(i) << std::endl;
+		}
+		std::cout << "SUB-GAIN: " << levels.getSubGain() << std::endl;
 	}
 }
 

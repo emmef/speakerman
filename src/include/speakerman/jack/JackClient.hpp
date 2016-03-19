@@ -250,6 +250,8 @@ class JackClient
 		cout << "closeUnsafe(): end" << endl;
 	}
 
+	static void jack_portnames_free(const char ** names) { jack_free(names); }
+
 protected:
 	virtual void registerAdditionalCallbacks(jack_client_t *client) {}
 
@@ -374,6 +376,8 @@ public:
 
 		ErrorHandler::checkZeroOrThrow(jack_activate(client_), "Activating");
 		state_ = ClientState::ACTIVE;
+
+		processor_->onActivate(client_);
 	}
 
 	ClientState getState()
@@ -397,13 +401,20 @@ public:
 		return shutdownInfo_;
 	}
 
+	static PortNames portNames(jack_client_t * client, const char* namePattern, const char* typePattern, unsigned long flags)
+	{
+		const char ** names = jack_get_ports(client, namePattern, typePattern, flags);
+
+		return PortNames(names, jack_portnames_free, 1024);
+	}
+
 	PortNames portNames(const char* namePattern, const char* typePattern, unsigned long flags)
 	{
 		unique_lock<mutex> lock(mutex_);
 		if (state_ != ClientState::OPEN && state_ != ClientState::CONFIGURED) {
 			throw runtime_error("setProcessor: Not in OPEN or CONFIGURED state");
 		}
-		return PortNames(client_, namePattern, typePattern, flags);
+		return portNames(client_, namePattern, typePattern, flags);
 	}
 
 	ShutDownInfo close()

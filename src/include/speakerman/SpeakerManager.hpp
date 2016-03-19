@@ -117,12 +117,38 @@ protected:
 		return true;
 	}
 
-	virtual void onPortsRegistered(jack_client_t *client, const Ports &) override
+	virtual void onPortsEnabled(jack_client_t *client, const Ports &ports) override
 	{
-		std::cout << "No action on ports registered" << std::endl;
 		const char * unspecified = ".*";
-		PortNames inputs(client, unspecified, unspecified, JackPortIsPhysical|JackPortIsOutput);
-		PortNames outputs(client, unspecified, unspecified, JackPortIsPhysical|JackPortIsOutput);
+		PortNames playbackPortNames = JackClient::portNames(client, "^system", unspecified, JackPortIsPhysical|JackPortIsInput);
+		PortNames capturePortNames = JackClient::portNames(client, "^system", unspecified, JackPortIsPhysical|JackPortIsOutput);
+ 		NameList inputs = ports.inputNames();
+ 		NameList outputs = ports.outputNames();
+
+ 		size_t inputWrap = Values::min(inputs.count(), capturePortNames.count());
+ 		size_t inputCount = Values::max(inputs.count(), capturePortNames.count());
+
+ 		size_t outputWrap = Values::min(outputs.count(), playbackPortNames.count());
+ 		size_t outputCount = Values::max(outputs.count(), playbackPortNames.count());
+
+ 		std::cout << "Inputs: capture " << capturePortNames.count() << " in " << inputs.count() << std::endl;
+ 		for (size_t i = 0; i < inputs.count(); i++) {
+ 			size_t capture = i % capturePortNames.count();
+ 			size_t input = i % inputs.count();
+
+ 			if (!Port::try_connect_ports(client, capturePortNames.get(capture), inputs.get(input))) {
+ 				std::cout << "Could not connect \"" << capturePortNames.get(capture) << "\" with \"" << inputs.get(input) << "\"" << std::endl;
+ 			}
+ 		}
+ 		std::cout << "Inputs: playback " << playbackPortNames.count() << " out " << outputs.count() << std::endl;
+ 		for (size_t i = 0; i < outputs.count(); i++) {
+ 			size_t playback = i % playbackPortNames.count();
+ 			size_t output = i % outputs.count();
+
+ 			if (!Port::try_connect_ports(client, outputs.get(i), playbackPortNames.get(i))) {
+ 				std::cout << "Could not connect \"" << outputs.get(output) << "\" with \"" << playbackPortNames.get(playback) << "\"" << std::endl;
+ 			}
+ 		}
 	}
 
 	virtual void onReset() override

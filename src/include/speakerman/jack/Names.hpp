@@ -28,6 +28,7 @@
 
 #include <jack/jack.h>
 #include <tdap/Array.hpp>
+#include <tdap/CapacityPolicy.hpp>
 
 namespace speakerman {
 
@@ -252,11 +253,170 @@ public:
 	}
 };
 
+class NameList;
+class NameListPolicy : public CapacityPolicy
+{
+public:
+	virtual size_t checkAndGetlength(const NameList &list, const char *name) const
+	{
+		return strlen(name);
+	}
+	virtual size_t maxNames() const
+	{
+		return Count<const char *>::max();
+	}
+	virtual size_t maxCharacters() const
+	{
+		return Count<char>::max();
+	}
+};
+
+
+class NameList
+{
+	size_t nameCount_;
+	size_t nameCapacity_;
+	const char ** names_ = nullptr;
+	size_t characterCount_;
+	size_t characterCapacity_;
+	char * characters_ = nullptr;
+	const NameListPolicy &policy_;
+
+	void ensureCapacity(size_t length)
+	{
+		const char *oldCharacters = characters_;
+		policy_.ensureCapacity(
+				characters_, characterCapacity_, characterCount_,
+				characterCount_ + length + 1, policy_.maxCharacters());
+		if (oldCharacters != characters_) {
+			correctNames(oldCharacters, characters_);
+		}
+		policy_.ensureCapacity(names_, nameCapacity_, nameCount_,
+				nameCount_ + 1, policy_.maxNames());
+	}
+
+	void correctNames(const char *oldChars, const char * newChars)
+	{
+		ptrdiff_t offset = newChars - oldChars;
+		for (size_t i = 0; i < nameCount_; i++) {
+			names_[i] += offset;
+		}
+	}
+
+public:
+	NameList(const NameListPolicy &policy, size_t initialNameCapacity, size_t initialCharacterCapacity) :
+		nameCount_(0),
+		nameCapacity_(initialNameCapacity),
+		names_(initialNameCapacity > 0 ? new const char *[initialNameCapacity] : nullptr),
+		characterCount_(0),
+		characterCapacity_(initialCharacterCapacity),
+		characters_(initialCharacterCapacity > 0 ? new char [initialCharacterCapacity] : nullptr),
+		policy_(policy) {}
+
+	NameList(const NameListPolicy &policy) : NameList(policy, 16, 1024) {}
+
+	NameList(NameList &&source) :
+		nameCount_(source.nameCount_),
+		nameCapacity_(source.nameCapacity_),
+		names_(source.names_),
+		characterCount_(source.characterCount_),
+		characterCapacity_(source.characterCapacity_),
+		characters_(source.characters_),
+		policy_(source.policy_)
+	{
+		source.removeAll();
+		source.characters_ = nullptr;
+		source.names_ = nullptr;
+	}
+
+	NameList(const NameList &source) :
+		nameCount_(source.nameCount_),
+		nameCapacity_(source.nameCapacity_),
+		names_(nameCapacity_ > 0 ? new const char *[nameCapacity_] : nullptr),
+		characterCount_(source.characterCount_),
+		characterCapacity_(source.characterCapacity_),
+		characters_(characterCapacity_ > 0 ? new char [characterCapacity_] : nullptr),
+		policy_(source.policy_)
+	{
+		memmove(characters_, source.characters_, characterCount_);
+		// NOT same as correctNames()
+		ptrdiff_t offset = characters_ - source.characters_;
+		for (size_t i = 0; i < nameCount_; i++) {
+			names_[i] = source.names_[i] + offset;
+		}
+	}
+
+	void add(const char * name)
+	{
+		size_t length = policy_.checkAndGetlength(*this, name);
+		ensureCapacity(length);
+		char * addedName = characters_ + characterCount_;
+		strncpy(addedName, name, length);
+		addedName[length] = '\0';
+		characterCount_ += length + 1;
+		names_[nameCount_++] = addedName;
+	}
+
+	const char * get(size_t i) const
+	{
+		if (i < nameCount_) {
+			return names_[i];
+		}
+		throw std::invalid_argument("Name index out of bounds");
+	}
+
+	const char * operator[](size_t i) const
+	{
+		return get(i);
+	}
+
+	size_t count() const { return nameCount_; }
+
+	size_t characters() const { return characterCount_; }
+
+	/**
+	 * Remove all names, but don't free any memory
+	 */
+	void removeAll()
+	{
+		characterCount_ = 0;
+		nameCount_ = 0;
+	}
+
+	void free()
+	{
+		if (names_) {
+			delete [] names_;
+		}
+		if (characters_) {
+			delete [] characters_;
+		}
+		removeAll();
+	}
+
+	~NameList()
+	{
+		free();
+	}
+};
+
+
+class PortNamesProvider
+{
+public:
+	virtual const char ** createNames() = 0;
+	virtual void destroyNames(const char **names) = 0;
+	~PortNamesProvider() = default;
+};
 
 class PortNames
 {
-	const char** const portNames_;
-	const size_t count_;
+public:
+	typedef void (*FreeNames)(const char **names);
+	const char** portNames_;
+	size_t count_;
+	FreeNames free_;
+
 
 	size_t rangeCheck(size_t index) const {
 		if (index < count_) {
@@ -265,24 +425,32 @@ class PortNames
 		throw out_of_range("Port name index out of range");
 	}
 
-	static size_t countPorts(const char ** portNames)
+	static size_t countPorts(const char ** portNames, size_t maxSensibleNames)
 	{
+		if (!portNames) {
+			return 0;
+		}
+		const char** name = portNames;
 		size_t count = 0;
-		if (portNames != nullptr) {
-			const char** name = portNames;
-			while (name[count] != nullptr) {
-				count++;
-			}
+		while (name[count] != nullptr && count <= maxSensibleNames) {
+			count++;
+		}
+		if (count > maxSensibleNames) {
+			throw std::invalid_argument("Names list not null-terminated");
 		}
 		return count;
 	}
 
 public:
-	PortNames(jack_client_t* client, const char* namePattern,
-			const char* typePattern, unsigned long flags) :
-			portNames_(jack_get_ports(client, namePattern, typePattern, flags)),
-			count_(countPorts(portNames_))
+	PortNames(const char ** names, FreeNames free, size_t maxSensibleNames) :
+		portNames_(names), count_(countPorts(portNames_, maxSensibleNames)), free_(free)
 	{
+	}
+
+	PortNames(PortNames &&source) : portNames_(source.portNames_), count_(source.count_), free_(source.free_)
+	{
+		source.portNames_ = nullptr;
+		source.count_ = 0;
 	}
 
 	size_t count() const {
@@ -298,11 +466,12 @@ public:
 	}
 
 	~PortNames() {
-		if (portNames_ != nullptr) {
-			jack_free(portNames_);
+		if (portNames_ && free_) {
+			free_(portNames_);
 		}
 	}
 };
+
 
 
 } /* End of namespace speakerman */

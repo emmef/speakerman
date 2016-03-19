@@ -104,8 +104,6 @@ class JackProcessor
 
 		ports_->registerPorts(client);
 
-		onPortsRegistered(client, *ports_);
-
 		ErrorHandler::checkZeroOrThrow(jack_set_process_callback(client, realtimeCallback, this), "Setting callback");
 	}
 
@@ -117,7 +115,6 @@ class JackProcessor
 			delete ports_;
 		}
 	}
-
 
 protected:
 	virtual const PortDefinitions &getDefinitions() =  0;
@@ -137,7 +134,7 @@ protected:
 	 * Do whatever is necessary when the ports are registered with
 	 * the Jack server, for instance, change port connections.
 	 */
-	virtual void onPortsRegistered(jack_client_t * client, const Ports &ports) = 0;
+	virtual void onPortsEnabled(jack_client_t * client, const Ports &ports) = 0;
 	/**
 	 * Do whatever is necessary if the state is reset.
 	 * This is not a destructor. But the processor can be reused or
@@ -220,6 +217,14 @@ public:
 			return false;
 		}
 		return true;
+	}
+
+	void onActivate(jack_client_t *client)
+	{
+		lock guard(mutex_);
+		if (ports_) {
+			onPortsEnabled(client, *ports_);
+		}
 	}
 
 	void reset()
