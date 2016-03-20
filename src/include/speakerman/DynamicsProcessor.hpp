@@ -37,62 +37,6 @@ namespace speakerman {
 using namespace tdap;
 
 
-class DynamicProcessorLevels
-{
-	double gains_[SpeakermanConfig::MAX_GROUPS + 1];
-	double signal_[SpeakermanConfig::MAX_GROUPS];
-	size_t groups_;
-
-public:
-	DynamicProcessorLevels(size_t groups) : groups_(groups) {}
-
-	size_t groups() const { return groups_; }
-	size_t signals() const { return groups_ + 1; }
-
-	void reset()
-	{
-		for (size_t limiter = 0; limiter <= groups_; limiter++) {
-			gains_[limiter] = 1.0;
-		}
-		for (size_t group = 0; group < groups_; group++) {
-			signal_[group] = 0.0;
-		}
-	}
-
-	void setGroupGain(size_t group, double gain)
-	{
-		double &g = gains_[1 + IndexPolicy::array(group, groups_)];
-		g = Values::min(g, gain);
-	}
-
-	double getGroupGain(size_t group) const
-	{
-		return gains_[1 + IndexPolicy::array(group, groups_)];
-	}
-
-	void setSubGain(double gain)
-	{
-		double &g = gains_[0];
-		g = Values::min(g, gain);
-	}
-
-
-	double getSubGain() const
-	{
-		return gains_[0];
-	}
-
-	void setSignal(size_t group, double signal)
-	{
-		double &s = signal_[IndexPolicy::array(group, groups_)];
-		s = Values::max(s, signal);
-	}
-
-	double getSignal(size_t group) const
-	{
-		return signal_[IndexPolicy::array(group, groups_)];
-	}
-};
 
 
 template<typename T, size_t CHANNELS_PER_GROUP, size_t GROUPS, size_t CROSSOVERS>

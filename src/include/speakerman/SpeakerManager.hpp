@@ -36,18 +36,13 @@
 
 namespace speakerman {
 
-
-class SpeakerManagerControl : public JackProcessor
+class AbstractSpeakerManager : public SpeakerManagerControl, public JackProcessor
 {
-public:
 
-	virtual const SpeakermanConfig &getConfig() const = 0;
-	virtual bool applyConfigAndGetLevels(const SpeakermanConfig &config, DynamicProcessorLevels *levels, std::chrono::milliseconds duration) = 0;
-	virtual bool getLevels(DynamicProcessorLevels *levels, std::chrono::milliseconds duration) = 0;
 };
 
 template<typename T, size_t CHANNELS_PER_GROUP, size_t GROUPS>
-class SpeakerManager : public SpeakerManagerControl
+class SpeakerManager : public AbstractSpeakerManager
 {
 	static_assert(is_floating_point<T>::value, "expected floating-point value parameter");
 	static constexpr size_t CROSSOVERS = 3;

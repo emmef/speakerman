@@ -29,7 +29,7 @@
 #include <speakerman/jack/JackClient.hpp>
 #include <speakerman/SpeakermanConfig.hpp>
 #include <speakerman/SpeakerManager.hpp>
-
+#include <speakerman/SpeakermanWebServer.hpp>
 
 using namespace speakerman;
 using namespace tdap;
@@ -68,7 +68,7 @@ public:
 	}
 };
 
-Owner<SpeakerManagerControl> manager;
+Owner<AbstractSpeakerManager> manager;
 SpeakermanConfig configFileConfig;
 static volatile int signalNumber = -1;
 static volatile int userInput;
@@ -121,14 +121,28 @@ static void configUpdater()
 			configFileConfig = readSpeakermanConfig(configFileConfig, false);
 			manager.get().applyConfigAndGetLevels(configFileConfig, &levels, sleeper);
 		}
-		else {
-			manager.get().getLevels(&levels, sleeper);
-		}
-		for (size_t i = 0; i < levels.groups(); i++) {
-			std::cout << "GROUP " << i << " SIGNAL=" << levels.getSignal(i) << "; GAIN=" << levels.getGroupGain(i) << std::endl;
-		}
-		std::cout << "SUB-GAIN: " << levels.getSubGain() << std::endl;
 	}
+}
+
+static void webServer()
+{
+	web_server server(manager.get());
+
+	try {
+		server.open("8088", 10, 10, nullptr);
+		server.work(nullptr);
+	}
+	catch (const std::exception &e) {
+		std::cerr << "Web server error: " << e.what() << std::endl;
+	}
+//	else {
+//		manager.get().getLevels(&levels, sleeper);
+//	}
+//	for (size_t i = 0; i < levels.groups(); i++) {
+//		std::cout << "GROUP " << i << " SIGNAL=" << levels.getSignal(i) << "; GAIN=" << levels.getGroupGain(i) << std::endl;
+//	}
+//	std::cout << "SUB-GAIN: " << levels.getSubGain() << std::endl;
+
 }
 
 int mainLoop(Owner<JackClient> &owner)
@@ -137,6 +151,8 @@ int mainLoop(Owner<JackClient> &owner)
 	fetchChars.detach();
 	std::thread checkConfigUpdates(configUpdater);
 	checkConfigUpdates.detach();
+	std::thread webServerThread(webServer);
+	webServerThread.detach();
 	std::chrono::milliseconds duration(100);
 
 	try {
@@ -192,9 +208,10 @@ int mainLoop(Owner<JackClient> &owner)
 
 
 speakerman::config::Reader configReader;
+speakerman::server_socket webserver;
 
 template<typename F, size_t GROUPS>
-SpeakerManagerControl *createManagerGr(const SpeakermanConfig & config)
+AbstractSpeakerManager *createManagerGr(const SpeakermanConfig & config)
 {
 	static_assert(is_floating_point<F>::value, "Sample type must be floating point");
 
@@ -214,7 +231,7 @@ SpeakerManagerControl *createManagerGr(const SpeakermanConfig & config)
 }
 
 template <typename F>
-static SpeakerManagerControl *createManager(const SpeakermanConfig & config)
+static AbstractSpeakerManager *createManager(const SpeakermanConfig & config)
 {
 
 	switch (config.groups) {
@@ -241,6 +258,10 @@ int main(int count, char * arguments[]) {
 	auto result = JackClient::createDefault("Speaker manager");
 	clientOwner.set(result.getClient());
 
+	int error;
+	if (!webserver.open("8080", 10, 10, &error)) {
+		std::cerr << "Could not open webserver: " << strerror(error) << std::endl;
+	}
 
 	const char * all = ".*";
 	PortNames inputs = clientOwner.get().portNames(all, all, JackPortIsPhysical|JackPortIsOutput);

@@ -22,7 +22,10 @@
 #ifndef SMS_SPEAKERMAN_SPEAKERMANCONFIG_GUARD_H_
 #define SMS_SPEAKERMAN_SPEAKERMANCONFIG_GUARD_H_
 
+#include <chrono>
 #include <ostream>
+#include <tdap/IndexPolicy.hpp>
+#include <tdap/Value.hpp>
 #include <speakerman/utils/Config.hpp>
 
 namespace speakerman {
@@ -126,6 +129,74 @@ namespace speakerman {
 		long long timeStamp;
 	};
 
+
+	class DynamicProcessorLevels
+	{
+		double gains_[SpeakermanConfig::MAX_GROUPS + 1];
+		double signal_[SpeakermanConfig::MAX_GROUPS];
+		size_t groups_;
+
+	public:
+		DynamicProcessorLevels(size_t groups) : groups_(groups) {}
+
+		size_t groups() const { return groups_; }
+		size_t signals() const { return groups_ + 1; }
+
+		void reset()
+		{
+			for (size_t limiter = 0; limiter <= groups_; limiter++) {
+				gains_[limiter] = 1.0;
+			}
+			for (size_t group = 0; group < groups_; group++) {
+				signal_[group] = 0.0;
+			}
+		}
+
+		void setGroupGain(size_t group, double gain)
+		{
+			double &g = gains_[1 + IndexPolicy::array(group, groups_)];
+			g = Values::min(g, gain);
+		}
+
+		double getGroupGain(size_t group) const
+		{
+			return gains_[1 + IndexPolicy::array(group, groups_)];
+		}
+
+		void setSubGain(double gain)
+		{
+			double &g = gains_[0];
+			g = Values::min(g, gain);
+		}
+
+
+		double getSubGain() const
+		{
+			return gains_[0];
+		}
+
+		void setSignal(size_t group, double signal)
+		{
+			double &s = signal_[IndexPolicy::array(group, groups_)];
+			s = Values::max(s, signal);
+		}
+
+		double getSignal(size_t group) const
+		{
+			return signal_[IndexPolicy::array(group, groups_)];
+		}
+	};
+
+	class SpeakerManagerControl
+	{
+	public:
+
+		virtual const SpeakermanConfig &getConfig() const = 0;
+		virtual bool applyConfigAndGetLevels(const SpeakermanConfig &config, DynamicProcessorLevels *levels, std::chrono::milliseconds timeoutMillis) = 0;
+		virtual bool getLevels(DynamicProcessorLevels *levels, std::chrono::milliseconds timeoutMillis) = 0;
+	};
+
+
 	const char * configFileName();
 	SpeakermanConfig readSpeakermanConfig(bool initial);
 	SpeakermanConfig readSpeakermanConfig(const SpeakermanConfig &basedUpon, bool initial);
@@ -133,6 +204,8 @@ namespace speakerman {
 	void dumpSpeakermanConfig(const SpeakermanConfig& dump, std::ostream &output);
 	long long getFileTimeStamp(const char * fileName);
 	long long getConfigFileTimeStamp();
+
+
 
 } /* End of namespace speakerman */
 
