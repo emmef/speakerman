@@ -25,6 +25,7 @@
 #include <sys/socket.h>
 #include <condition_variable>
 #include <iostream>
+#include <speakerman/SocketStream.hpp>
 
 namespace speakerman
 {
@@ -50,10 +51,10 @@ namespace speakerman
 		using State = server_socket_state;
 		using Result = server_worker_result;
 		using Lock = std::unique_lock<std::mutex>;
-		using Stream = std::basic_iostream<char>;
+		using Stream = socket_stream;
 
 		typedef server_worker_result (*server_socket_worker)(
-				Stream &stream, const struct sockaddr &address, const server_socket &server, void *data);
+				socket_stream &stream, const struct sockaddr &address, const server_socket &server, void *data);
 		typedef bool (*server_socket_work_enter)(void *data);
 		typedef void (*server_socket_work_leave)(void *data);
 

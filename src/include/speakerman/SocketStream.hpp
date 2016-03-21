@@ -1,165 +1,112 @@
-#ifndef _GALIK_SOCKETSTREAM_H
-#define _GALIK_SOCKETSTREAM_H
-
-/*-----------------------------------------------------------------.
-| Copyright (C) 2011 Galik grafterman@googlemail.com               |
-'------------------------------------------------------------------'
-
-This code is was created from code (C) Copyright Nicolai M. Josuttis 2001
-with the following Copyright Notice:
-*/
-
-/* The following code declares classes to read from and write to
- * file descriptore or file handles.
+/*
+ * SocketStream.hpp
  *
- * See
- *      http://www.josuttis.com/cppcode
- * for details and the latest version.
+ * Part of 'Speaker management system'
  *
- * - open:
- *      - integrating BUFSIZ on some systems?
- *      - optimized reading of multiple characters
- *      - stream for reading AND writing
- *      - i18n
+ * Copyright (C) 2013-2014 Michel Fleur.
+ * https://github.com/emmef/simpledsp
  *
- * (C) Copyright Nicolai M. Josuttis 2001.
- * Permission to copy, use, modify, sell and distribute this software
- * is granted provided this copyright notice appears in all copies.
- * This software is provided "as is" without express or implied
- * warranty, and with no claim as to its suitability for any purpose.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * Version: Jul 28, 2002
- * History:
- *  Jul 28, 2002: bugfix memcpy() => memmove()
- *                fdinbuf::underflow(): cast for return statements
- *  Aug 05, 2001: first public version
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
- /*
+#ifndef SMS_SPEAKERMAN_SOCKET_STREAM_GUARD_H_
+#define SMS_SPEAKERMAN_SOCKET_STREAM_GUARD_H_
 
-Permission to copy, use, modify, sell and distribute this software
-is granted under the same conditions.
+#include <limits>
+#include <cerrno>
+#include <cstddef>
+#include <cstdio>
 
-'----------------------------------------------------------------*/
-
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <netdb.h>
-#include <streambuf>
-#include <istream>
-#include <ostream>
-
-namespace galik { namespace net {
-
-template<typename Char>
-class basic_socketbuf
-: public std::basic_streambuf<Char>
+namespace speakerman
 {
-public:
-	typedef Char char_type;
-	typedef std::basic_streambuf<char_type> buf_type;
-	typedef std::basic_ostream<char_type> stream_type;
-	typedef typename buf_type::int_type int_type;
-	typedef typename std::basic_streambuf<Char>::traits_type traits_type;
+	static constexpr size_t STREAM_BUFFER_SIZE = 1024;
+	static constexpr int INTERRUPTED = EOF - 1;
+	static constexpr int NOFILE = EOF - 2;
+	static constexpr int RESET_BY_PEER = EOF - 3;
+	static constexpr int INVALID_ARGUMENT = EOF - 4;
 
-protected:
-
-	static const int char_size = sizeof(char_type);
-	static const int SIZE = 128;
-	char_type obuf[SIZE] ;
-	char_type ibuf[SIZE] ;
-
-	int sock;
-
-public:
-	basic_socketbuf(): sock(0)
+	class socket_input_stream
 	{
-		buf_type::setp(obuf, obuf + (SIZE - 1));
-		buf_type::setg(ibuf, ibuf, ibuf);
-	}
+		int fd_;
+		char buffer_[STREAM_BUFFER_SIZE];
+		int pos_;
+		int mark_;
+		bool blocking_;
 
-	virtual ~basic_socketbuf() { sync(); }
+		int unsafe_read();
 
-	void set_socket(int sock) { this->sock = sock; }
-	int get_socket() { return this->sock; }
+	public:
+		socket_input_stream(int fd);
+		socket_input_stream();
 
-protected:
+		bool canReadFromBuffer() const;
+		int read();
+		void set_file(int fd);
+		int readLine(char *buffer, size_t size);
+		~socket_input_stream();
+	};
 
-	int output_buffer()
+	class socket_stream;
+	class socket_output_stream
 	{
-		int num = buf_type::pptr() - buf_type::pbase();
-		if(send(sock, reinterpret_cast<char*>(obuf), num * char_size, 0) != num)
-			return traits_type::eof();
-		buf_type::pbump(-num);
-		return num;
-	}
+		int fd_;
+		char buffer_[STREAM_BUFFER_SIZE];
+		int pos_;
+		int mark_;
+		friend class socket_stream;
 
-	virtual int_type overflow(int_type c)
+		int unsafe_send(size_t offset, size_t count, bool do_throw);
+		int default_flush(bool do_throw);
+		int unsafe_flush(bool do_throw);
+		int unsafe_write(char c);
+		void unsafe_set_file(int fd);
+
+	public:
+		socket_output_stream(int fd);
+		socket_output_stream();
+
+		bool canWriteToBuffer() const;
+		int write(char c);
+		int write_string(const char *str, size_t max_len, size_t *written);
+		int flush();
+		int set_file_check_flush(int fd, int *flushResult);
+		int set_file(int fd);
+		~socket_output_stream();
+	};
+
+	class socket_stream
 	{
-		if(c != traits_type::eof())
-		{
-			*buf_type::pptr() = c;
-			buf_type::pbump(1);
-		}
+		socket_input_stream istream;
+		socket_output_stream ostream;
+		int fd_;
 
-		if(output_buffer() == traits_type::eof())
-			return traits_type::eof();
-		return c;
-	}
+	public:
+		socket_stream() {}
+		socket_stream(int fd) { set_file(fd); }
 
-	virtual int sync()
-	{
-		if(output_buffer() == traits_type::eof())
-			return traits_type::eof();
-		return 0;
-	}
+		int set_file(int fd);
 
-	virtual int_type underflow()
-	{
-		if(buf_type::gptr() < buf_type::egptr())
-			return *buf_type::gptr();
+		int read() { return istream.read(); }
+		int read_line(char *line, size_t max_size) { return istream.readLine(line, max_size); }
+		bool canReadFromBuffer() const { istream.canReadFromBuffer(); }
 
-		int num;
-		if((num = recv(sock, reinterpret_cast<char*>(ibuf), SIZE * char_size, 0)) <= 0)
-			return traits_type::eof();
+		int flush() { return ostream.flush(); }
+		int write(char c) { return ostream.write(c); }
+		int write_string(const char *str, size_t max_len, size_t *written) { return ostream.write_string(str, max_len, written); }
+		bool canWriteToBuffer() const { return ostream.canWriteToBuffer(); }
 
-		buf_type::setg(ibuf, ibuf, ibuf + num);
-		return *buf_type::gptr();
-	}
-};
+		~socket_stream();
+	};
+} /* End of namespace speakerman */
 
-typedef basic_socketbuf<char> socketbuf;
-typedef basic_socketbuf<wchar_t> wsocketbuf;
-
-template<typename Char>
-class basic_socketstream
-: public std::basic_iostream<Char>
-{
-public:
-	typedef Char char_type;
-	typedef std::basic_iostream<char_type> stream_type;
-	typedef basic_socketbuf<char_type> buf_type;
-
-protected:
-	buf_type buf;
-
-public:
-	basic_socketstream(int s): stream_type(&buf) { buf.set_socket(s); }
-
-	void close()
-	{
-		if(buf.get_socket() != 0) {
-			::close(buf.get_socket());
-		}
-		stream_type::clear();
-	}
-
-	~basic_socketstream() { close(); }
-};
-
-typedef basic_socketstream<char> socketstream;
-typedef basic_socketstream<wchar_t> wsocketstream;
-
-}} // galik::net
-
-#endif // _GALIK_SOCKETSTREAM_H
+#endif /* SMS_SPEAKERMAN_SOCKET_STREAM_GUARD_H_ */

@@ -23,6 +23,7 @@
 #include <cstring>
 #include <cerrno>
 #include <chrono>
+#include <fcntl.h>
 #include <iostream>
 #include <netdb.h>
 #include <sys/types.h>
@@ -36,7 +37,6 @@
 namespace speakerman {
 
 	using namespace tdap;
-	using SocketStream = galik::net::socketstream;
 
 	static int closeSocket(int socket)
 	{
@@ -355,7 +355,15 @@ namespace speakerman {
 			if (acceptDescriptor == -1) {
 				return returnFalse(errorCode);
 			}
-			SocketStream stream(acceptDescriptor);
+			timeval tv;
+			tv.tv_sec = 2;
+			tv.tv_usec = 0;
+			if (setsockopt(acceptDescriptor, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) == -1)
+			{
+				std::cerr << "Cannot set socket timeout: " << strerror(errno) << std::endl;
+			}
+
+			socket_stream stream(acceptDescriptor);
 			try {
 				Result r = worker(stream, address, *this, data);
 				if (r == Result::STOP) {

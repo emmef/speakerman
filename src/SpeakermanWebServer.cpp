@@ -33,6 +33,7 @@ namespace speakerman
 
 	bool web_server::work_enter()
 	{
+		return true;
 	}
 
 	void web_server::work_leave()
@@ -70,11 +71,29 @@ namespace speakerman
 	web_server::Result web_server::accept_work(Stream &stream, const struct sockaddr& address, const server_socket& socket)
 	{
 		char c;
-		while (!stream.eof()) {
-			stream >> c;
+		bool headers = true;
+		int state = 0;
+		while (headers && (c = stream.read()) > 0) {
 			std::cout << c;
+			switch (state) {
+			case 0:
+				if (c == 10) {
+					state = 1;
+				}
+				break;
+			case 1:
+				if (c == 10) {
+					headers = false;
+				}
+				else if (c != 13) {
+					state = 0;
+				}
+				break;
+			default:
+				break;
+			}
 		}
-		stream << "HTTP/1.1 200 OK\n\r" << std::endl;
+		stream.write_string("HTTP/1.1 200 OK\n\r", 1000, nullptr);
 	}
 
 
