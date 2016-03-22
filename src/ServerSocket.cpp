@@ -134,8 +134,12 @@ namespace speakerman {
 		time_t start, now;
 		time(&start);
 		now = start;
+
+		int yes;
+		if (setsockopt(sockfd_, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes)) == -1) {
+			std::cerr << "Couldn't set socket to reuse address mode: " << strerror(errno) << std::endl;
+		}
 		int sleep_time = 0;
-		int yes = 1;
 		int error = 0;
 		while (true) {
 			if (sleep_time > 0) {
@@ -144,13 +148,6 @@ namespace speakerman {
 			int result = bind(sockfd_, info->ai_addr, info->ai_addrlen);
 			if (result != -1) {
 				return true;
-			}
-			error = errno;
-			if (setsockopt(sockfd_, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes))
-					!= -1 && sleep_time == 0) {
-				sleep_time = 1;
-				yes = 1;
-				continue;
 			}
 			time(&now);
 			int nextSleepTime = Values::max(2, sleep_time * 3 / 2);

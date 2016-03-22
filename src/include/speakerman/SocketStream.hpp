@@ -29,11 +29,16 @@
 
 namespace speakerman
 {
-	static constexpr size_t STREAM_BUFFER_SIZE = 1024;
-	static constexpr int INTERRUPTED = EOF - 1;
-	static constexpr int NOFILE = EOF - 2;
-	static constexpr int RESET_BY_PEER = EOF - 3;
-	static constexpr int INVALID_ARGUMENT = EOF - 4;
+	static constexpr size_t STREAM_BUFFER_SIZE = 128;
+
+	struct stream_result
+	{
+		static constexpr int INTERRUPTED = EOF - 1;
+		static constexpr int INVALID_HANDLE = EOF - 2;
+		static constexpr int RESET_BY_PEER = EOF - 3;
+		static constexpr int INVALID_ARGUMENT = EOF - 4;
+		static constexpr int DATA_TRUNCATED = EOF - 5;
+	};
 
 	class socket_input_stream
 	{
@@ -49,10 +54,12 @@ namespace speakerman
 		socket_input_stream(int fd);
 		socket_input_stream();
 
+		void set_bocking(bool value);
+		bool get_bocking();
 		bool canReadFromBuffer() const;
 		int read();
 		void set_file(int fd);
-		int readLine(char *buffer, size_t size);
+		int read_line(char *buffer, size_t size);
 		~socket_input_stream();
 	};
 
@@ -97,7 +104,7 @@ namespace speakerman
 		int set_file(int fd);
 
 		int read() { return istream.read(); }
-		int read_line(char *line, size_t max_size) { return istream.readLine(line, max_size); }
+		int read_line(char *line, size_t max_size) { return istream.read_line(line, max_size); }
 		bool canReadFromBuffer() const { istream.canReadFromBuffer(); }
 
 		int flush() { return ostream.flush(); }

@@ -267,17 +267,17 @@ int main(int count, char * arguments[]) {
 	PortNames inputs = clientOwner.get().portNames(all, all, JackPortIsPhysical|JackPortIsOutput);
 	PortNames outputs = clientOwner.get().portNames(all, all, JackPortIsPhysical|JackPortIsOutput);
 
-	if (!clientOwner.get().setProcessor(manager.get())) {
-		std::cerr << "Failed to set processor" << std::endl;
-		return 1;
-	}
+//	if (!clientOwner.get().setProcessor(manager.get())) {
+//		std::cerr << "Failed to set processor" << std::endl;
+//		return 1;
+//	}
 
 	signal(SIGINT, signal_callback_handler);
 	signal(SIGTERM, signal_callback_handler);
 	signal(SIGABRT, signal_callback_handler);
 
-	std::cout << "activate..." << std::endl;
-	clientOwner.get().setActive();
+//	std::cout << "activate..." << std::endl;
+//	clientOwner.get().setActive();
 
 	std::cout << "activated..." << std::endl;
 	mainLoop(clientOwner);

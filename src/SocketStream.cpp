@@ -47,31 +47,37 @@ namespace speakerman {
 				recv(fd_, buffer_, STREAM_BUFFER_SIZE, 0) :
 				recv(fd_, buffer_, STREAM_BUFFER_SIZE, MSG_DONTWAIT);
 		if (r < 0) {
-			std::cout << "Error code " << strerror(errno) << std::endl;
 			switch (errno) {
 			case EAGAIN:
 				return EOF;
 			case EINTR:
-				return INTERRUPTED;
+				return stream_result::INTERRUPTED;
 			default:
 				throw std::runtime_error(strerror(errno));
 			}
 		}
 		else if (r == 0) {
-			std::cout << "No bytes read" << std::endl;
 			return EOF;
 		}
 		else {
-			std::cout << "Read " << r << " bytes" << std::endl;
-
 			mark_ = r;
 			pos_ = 0;
 			return buffer_[pos_++];
 		}
 	}
 
-	socket_input_stream::socket_input_stream(int fd) { set_file(fd); }
+	socket_input_stream::socket_input_stream(int fd) : blocking_(true) { set_file(fd); }
 	socket_input_stream::socket_input_stream() : socket_input_stream(-1) {}
+
+	void socket_input_stream::set_bocking(bool value)
+	{
+		blocking_ = value;
+	}
+
+	bool socket_input_stream::get_bocking()
+	{
+		return blocking_;
+	}
 
 	bool socket_input_stream::canReadFromBuffer() const
 	{
@@ -81,7 +87,7 @@ namespace speakerman {
 	int socket_input_stream::read()
 	{
 		if (fd_ == -1) {
-			return NOFILE;
+			return stream_result::INVALID_HANDLE;
 		}
 		return unsafe_read();
 	}
@@ -92,14 +98,14 @@ namespace speakerman {
 		pos_ = mark_ = 0;
 	}
 
-	int socket_input_stream::readLine(char *buffer, size_t size)
+	int socket_input_stream::read_line(char *buffer, size_t size)
 	{
 		size_t pos = 0;
 		if (fd_ == -1) {
-			return NOFILE;
+			return stream_result::INVALID_HANDLE;
 		}
 		if (size == 0 || !buffer) {
-			return INVALID_ARGUMENT;
+			return stream_result::INVALID_ARGUMENT;
 		}
 		buffer[0] = 0;
 		if (size == 1) {
@@ -109,9 +115,9 @@ namespace speakerman {
 		while (pos < length) {
 			int rd = unsafe_read();
 			switch (rd) {
-			case INTERRUPTED:
+			case stream_result::INTERRUPTED:
 				buffer[pos] = 0;
-				return INTERRUPTED;
+				return stream_result::INTERRUPTED;
 			case EOF:
 				return terminate_line(buffer, pos);
 			case '\n':
@@ -124,7 +130,8 @@ namespace speakerman {
 				buffer[pos++] = rd;
 			}
 		}
-		return terminate_line(buffer, pos);
+		buffer[pos] = 0;
+		return stream_result::DATA_TRUNCATED;
 	}
 
 	socket_input_stream::~socket_input_stream()
@@ -138,11 +145,11 @@ namespace speakerman {
 		if (w == -1) {
 			switch (errno) {
 			case ECONNRESET:
-				return RESET_BY_PEER;
+				return stream_result::RESET_BY_PEER;
 			case EAGAIN:
 				return 0;
 			case EINTR:
-				return INTERRUPTED;
+				return stream_result::INTERRUPTED;
 			default:
 				if (do_throw) {
 					throw std::runtime_error(strerror(errno));
@@ -234,7 +241,7 @@ namespace speakerman {
 	int socket_output_stream::write(char c)
 	{
 		if (fd_ == -1) {
-			return NOFILE;
+			return stream_result::INVALID_HANDLE;
 		}
 		return unsafe_write(c);
 	}
@@ -245,7 +252,7 @@ namespace speakerman {
 			if (written) {
 				*written = 0;
 			}
-			return NOFILE;
+			return stream_result::INVALID_HANDLE;
 		}
 		if (max_len == 0) {
 			max_len == std::numeric_limits<size_t>::max();
@@ -271,7 +278,7 @@ namespace speakerman {
 	int socket_output_stream::flush()
 	{
 		if (fd_ == -1) {
-			return NOFILE;
+			return stream_result::INVALID_HANDLE;
 		}
 		return unsafe_flush(true);
 	}
@@ -284,7 +291,7 @@ namespace speakerman {
 		}
 
 		unsafe_set_file(fd);
-		return r == INTERRUPTED ? INTERRUPTED : 0;
+		return r == stream_result::INTERRUPTED ? stream_result::INTERRUPTED : 0;
 	}
 
 	int socket_output_stream::set_file(int fd)
