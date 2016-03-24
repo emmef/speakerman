@@ -321,7 +321,7 @@ namespace speakerman
 	{
 		output_stream &stream = *stream_;
 		http_status::format_message(stream, http_status::OK);
-		stream.flush();
+		stream_->flush();
 
 		if (content_stream_length_ > 0) {
 			size_t writes = content_stream_length_;
@@ -329,17 +329,17 @@ namespace speakerman
 			for (size_t i = 0; i < content_stream_length_; i++) {
 				int c = content_stream_->read();
 				if (c < 0) {
-					stream.flush();
+					stream_->flush();
 					cleanup_content_stream();
 					return http_status::PARTIAL_CONTENT;
 				}
 				if (stream.write(c) < 0) {
-					stream.flush();
+					stream_->flush();
 					cleanup_content_stream();
 					return http_status::PARTIAL_CONTENT;
 				}
 			}
-			stream.flush();
+			stream_->flush();
 			cleanup_content_stream();
 			return http_status::OK;
 		}
@@ -351,7 +351,7 @@ namespace speakerman
 			}
 			int r, writes = 0;
 			while ((r = response_.read()) >= 0 && (w = stream.write(r)) >= 0) { writes++; }
-			stream.flush();
+			stream_->flush();
 			return
 					w >= 0 && (r >= 0 || r == stream_result::END_OF_STREAM) ? http_status::OK : http_status::PARTIAL_CONTENT;
 		}

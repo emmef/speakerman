@@ -32,87 +32,128 @@ namespace speakerman
 {
 	static constexpr size_t STREAM_BUFFER_SIZE = 128;
 
-	class socket_input_stream : public file_owner, input_stream
+	class raw_socket_input_stream : public input_stream
 	{
-		char buffer_[STREAM_BUFFER_SIZE];
-		int pos_;
-		int mark_;
-		bool blocking_;
+		bool owns_descriptor_ = false;
+		int file_descriptor_ = -1;
+		bool blocking_ = true;
+	public:
+		raw_socket_input_stream();
+		raw_socket_input_stream(int file_descriptor, bool owns_descriptor);
+		virtual int read() override;
+		virtual signed long read(void* destination, size_t offs, size_t length) override;
+		virtual void close() throw() override;
+		void set_bocking(bool value);
+		bool get_bocking() const;
+		void set_file_descriptor(int file_descriptor, bool owns_descriptor);
+		virtual ~raw_socket_input_stream();
+	};
 
-		int unsafe_read();
-	protected:
-		virtual void close_file() override;
-		virtual void before_close_file() override;
-		virtual void on_file_set() override;
+	class socket_input_stream : public input_stream
+	{
+		raw_socket_input_stream stream_;
+		buffered_input_stream buffered_;
 
 	public:
-		socket_input_stream(int file_descriptor, bool owns_file);
-		socket_input_stream();
-
+		socket_input_stream(size_t buffer_size, int file_descriptor, bool owns_descriptor);
+		socket_input_stream(size_t buffer_size);
+		virtual int read() override final
+		{
+			return buffered_.read();
+		}
+		virtual signed long read(void* destination, size_t offs, size_t length) override final
+		{
+			return buffered_.read(destination, offs, length);
+		}
+		virtual void close() throw() override;
+		void set_file_descriptor(int file_descriptor, bool owns_descriptor);
 		void set_bocking(bool value);
 		bool get_bocking();
-		bool canReadFromBuffer() const;
-		virtual int read() override;
-		virtual void close() override;
+		void flush();
 		~socket_input_stream();
 	};
 
-	class socket_stream;
-	class socket_output_stream : public file_owner, output_stream
+	class raw_socket_output_stream : public output_stream
 	{
-		char buffer_[STREAM_BUFFER_SIZE];
-		int pos_;
-		friend class socket_stream;
+		bool owns_descriptor_ = false;
+		int file_descriptor_ = -1;
+		bool blocking_ = true;
+	public:
+		raw_socket_output_stream();
+		raw_socket_output_stream(int file_descriptor, bool owns_descriptor);
+		virtual int write(char c) override final;
+		virtual signed long write(const void *source, size_t offs, size_t length) override final;
+		void set_file_descriptor(int file_descriptor, bool owns_descriptor);
+		void set_bocking(bool value);
+		bool get_bocking() const;
+		virtual void close() throw() override;
+		virtual ~raw_socket_output_stream();
+	};
 
-		int unsafe_send(size_t offset, size_t count, bool do_throw);
-		int unsafe_flush(bool do_throw);
-		int unsafe_write(char c);
-		void unsafe_set_file(int fd);
-	protected:
-		virtual void close_file() override;
-		virtual void before_close_file() override;
-		virtual void on_file_set() override;
+	class socket_output_stream : public output_stream
+	{
+		raw_socket_output_stream stream_;
+		buffered_output_stream buffered_;
 
 	public:
-		socket_output_stream(int fd, bool owns_file);
-		socket_output_stream();
-
-		bool canWriteToBuffer() const;
-		virtual int write(char c) override;
-		int write_string(const char *str, size_t max_len, size_t *written);
-		virtual void flush() override;
-		virtual void close() override;
+		socket_output_stream(size_t buffer_size, int file_descriptor, bool owns_descriptor);
+		socket_output_stream(size_t buffer_size);
+		virtual int write(char c) override final
+		{
+			return buffered_.write(c);
+		}
+		virtual signed long write(const void* source, size_t offs, size_t length) override final
+		{
+			return buffered_.write(source, offs, length);
+		}
+		void set_file_descriptor(int file_descriptor, bool owns_descriptor);
+		void set_bocking(bool value);
+		bool get_bocking();
+		void flush();
+		virtual void close() throw() override;
 		~socket_output_stream();
 	};
 
+
 	class socket_stream : public input_stream, public output_stream
 	{
-		socket_input_stream istream;
-		socket_output_stream ostream;
+		raw_socket_input_stream istream_;
+		raw_socket_output_stream ostream_;
+		buffered_input_stream ibuffered_;
+		buffered_output_stream obuffered_;
 
 	public:
-		socket_stream(int fd, bool owns_file) { set_file(fd, owns_file); }
-		socket_stream() : socket_stream(-1, false) {}
+		socket_stream(size_t read_buffer_size, size_t write_buffer_size, int file_descriptor, bool owns_descriptor);
+		socket_stream(size_t read_buffer_size, size_t write_buffer_size);
+		socket_stream(size_t buffer_size);
 
-		virtual int read() { return istream.read(); }
-		virtual void close() {	istream.close(); ostream.close(); }
-		virtual int write(char c) { return ostream.write(c); }
-		virtual void flush() { ostream.flush(); }
-
-		int set_file(int fd, bool owns_file)
+		virtual int read() override final
 		{
-			istream.set_file(fd, false);
-			ostream.set_file(fd, owns_file);
+			return ibuffered_.read();
 		}
-
-		bool canReadFromBuffer() const { istream.canReadFromBuffer(); }
-
-		bool canWriteToBuffer() const { return ostream.canWriteToBuffer(); }
-
-		virtual ~socket_stream() {
-
+		virtual signed long read(void* destination, size_t offs, size_t length) override final
+		{
+			return ibuffered_.read(destination, offs, length);
 		}
+		virtual int write(char c) override final
+		{
+			return obuffered_.write(c);
+		}
+		virtual signed long write(const void* source, size_t offs, size_t length) override final
+		{
+			return obuffered_.write(source, offs, length);
+		}
+		virtual void close() throw() override;
+		void set_file_descriptor(int file_descriptor, bool owns_descriptor);
+		void set_read_bocking(bool value);
+		bool get_read_bocking();
+		void set_write_bocking(bool value);
+		bool get_write_bocking();
+		void flush();
+		~socket_stream();
 	};
+
+
 } /* End of namespace speakerman */
 
 #endif /* SMS_SPEAKERMAN_SOCKET_STREAM_GUARD_H_ */

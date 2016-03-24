@@ -37,15 +37,21 @@ namespace speakerman {
 		return pos;
 	}
 
-	int socket_input_stream::unsafe_read()
-	{
-		if (pos_ < mark_) {
-			return buffer_[pos_++];
-		}
+	raw_socket_input_stream::raw_socket_input_stream(int file_descriptor, bool owns_descriptor) :
+			file_descriptor_(file_descriptor), owns_descriptor_(owns_descriptor), blocking_(true) {}
 
+	raw_socket_input_stream::raw_socket_input_stream() :
+		raw_socket_input_stream(-1, false) {}
+
+	int raw_socket_input_stream::read()
+	{
+		if (file_descriptor_ == -1) {
+			return stream_result::INVALID_HANDLE;
+		}
+		char result;
 		int r = blocking_ ?
-				recv(file_descriptor(), buffer_, STREAM_BUFFER_SIZE, 0) :
-				recv(file_descriptor(), buffer_, STREAM_BUFFER_SIZE, MSG_DONTWAIT);
+				recv(file_descriptor_, &result, 1, 0) :
+				recv(file_descriptor_, &result, 1, MSG_DONTWAIT);
 		if (r < 0) {
 			switch (errno) {
 			case EAGAIN:
@@ -56,77 +62,117 @@ namespace speakerman {
 				throw std::runtime_error(strerror(errno));
 			}
 		}
-		else if (r == 0) {
-			return EOF;
+		if (r == 0) {
+			return stream_result::END_OF_STREAM;
 		}
-		else {
-			mark_ = r;
-			pos_ = 0;
-			return buffer_[pos_++];
+		return result;
+	}
+
+	signed long raw_socket_input_stream::read(void* destination, size_t offs, size_t length)
+	{
+		if (file_descriptor_ == -1) {
+			return stream_result::INVALID_HANDLE;
+		}
+		int r = blocking_ ?
+				recv(file_descriptor_, destination, STREAM_BUFFER_SIZE, 0) :
+				recv(file_descriptor_, destination, STREAM_BUFFER_SIZE, MSG_DONTWAIT);
+
+		if (r < 0) {
+			switch (errno) {
+			case EAGAIN:
+				return EOF;
+			case EINTR:
+				return stream_result::INTERRUPTED;
+			default:
+				throw std::runtime_error(strerror(errno));
+			}
+		}
+		return r;
+	}
+
+	void raw_socket_input_stream::close() throw()
+	{
+		if (file_descriptor_ != -1) {
+			if (owns_descriptor_) {
+				::close(file_descriptor_);
+			}
+			file_descriptor_ = -1;
 		}
 	}
 
-	socket_input_stream::socket_input_stream(int file_descriptor, bool owns_file) :
-			blocking_(true)
-	{
-		set_file(file_descriptor, owns_file);
-	}
-
-	socket_input_stream::socket_input_stream() : socket_input_stream(-1, false)
-	{
-	}
-
-	void socket_input_stream::set_bocking(bool value)
+	void raw_socket_input_stream::set_bocking(bool value)
 	{
 		blocking_ = value;
 	}
 
-	bool socket_input_stream::get_bocking()
+	bool raw_socket_input_stream::get_bocking() const
 	{
 		return blocking_;
 	}
 
-	bool socket_input_stream::canReadFromBuffer() const
+	void raw_socket_input_stream::set_file_descriptor(int file_descriptor, bool owns_descriptor)
 	{
-		return file_descriptor() != -1 && pos_ < mark_;
+		close();
+		file_descriptor_ = file_descriptor;
+		owns_descriptor_ = owns_descriptor;
 	}
 
-	int socket_input_stream::read()
+	raw_socket_input_stream::~raw_socket_input_stream()
 	{
-		if (file_descriptor() == -1) {
-			return stream_result::INVALID_HANDLE;
-		}
-		return unsafe_read();
+		close();
 	}
 
-	void socket_input_stream::close()
-	{
-		set_file(-1, 0);
-	}
-
-	void socket_input_stream::on_file_set()
-	{
-		pos_ = mark_ = 0;
-	}
-
-	void socket_input_stream::close_file()
-	{
-		::close(file_descriptor());
-	}
-
-	void socket_input_stream::before_close_file()
+	socket_input_stream::socket_input_stream(size_t buffer_size) :
+			socket_input_stream(buffer_size, -1, false)
 	{
 	}
 
+	socket_input_stream::socket_input_stream(size_t buffer_size, int file_descriptor, bool owns_descriptor) :
+			buffered_(buffer_size)
+	{
+		buffered_.set_resource(&stream_, false);
+		stream_.set_file_descriptor(file_descriptor, owns_descriptor);
+	}
 
+	void socket_input_stream::close() throw()
+	{
+		buffered_.close();
+	}
+	void socket_input_stream::flush()
+	{
+		buffered_.flush();
+	}
+	void socket_input_stream::set_file_descriptor(int file_descriptor, bool owns_descriptor)
+	{
+		buffered_.close();
+		stream_.set_file_descriptor(file_descriptor, owns_descriptor);
+		buffered_.set_resource(&stream_, false);
+	}
+	void socket_input_stream::set_bocking(bool value)
+	{
+		stream_.set_bocking(value);
+	}
+	bool socket_input_stream::get_bocking()
+	{
+		return stream_.get_bocking();
+	}
 	socket_input_stream::~socket_input_stream()
 	{
 		close();
 	}
 
-	int socket_output_stream::unsafe_send(size_t offset, size_t count, bool do_throw)
+	raw_socket_output_stream::raw_socket_output_stream() :
+			raw_socket_output_stream(-1, false) {}
+
+	raw_socket_output_stream::raw_socket_output_stream(int file_descriptor, bool owns_descriptor) :
+			file_descriptor_(file_descriptor), owns_descriptor_(owns_descriptor), blocking_(false) { }
+
+	int raw_socket_output_stream::write(char c)
 	{
-		int w = send(file_descriptor(), buffer_ + offset, count, MSG_DONTWAIT);
+		char buffer = c;
+		int w = blocking_ ?
+				send(file_descriptor_, &buffer, 1, 0) :
+				send(file_descriptor_, &buffer, 1, MSG_DONTWAIT);
 		if (w == -1) {
 			switch (errno) {
 			case ECONNRESET:
@@ -135,127 +181,148 @@ namespace speakerman {
 				return 0;
 			case EINTR:
 				return stream_result::INTERRUPTED;
-			default:
-				if (do_throw) {
-					throw std::runtime_error(strerror(errno));
-				}
+			}
+		}
+		return w;
+
+	}
+
+	signed long raw_socket_output_stream::write(const void *source, size_t offset, size_t length)
+	{
+		const char * buffer_ = static_cast<const char *>(source);
+		int w = send(file_descriptor_, buffer_ + offset, length, MSG_DONTWAIT);
+		if (w == -1) {
+			switch (errno) {
+			case ECONNRESET:
+				return stream_result::RESET_BY_PEER;
+			case EAGAIN:
+				return 0;
+			case EINTR:
+				return stream_result::INTERRUPTED;
 			}
 		}
 		return w;
 	}
 
-	int socket_output_stream::unsafe_flush(bool do_throw)
+	void raw_socket_output_stream::set_file_descriptor(int file_descriptor, bool owns_descriptor)
 	{
-		size_t written = 0;
-		while (written < pos_) {
-			long signed w = unsafe_send(written, pos_ - written, do_throw);
-			if (w < 0) {
-				return w;
+		close();
+		file_descriptor_ = file_descriptor;
+		owns_descriptor_ = owns_descriptor;
+	}
+	void raw_socket_output_stream::set_bocking(bool value)
+	{
+		blocking_ = value;
+	}
+	bool raw_socket_output_stream::get_bocking() const
+	{
+		return blocking_;
+	}
+	void raw_socket_output_stream::close() throw()
+	{
+		if (file_descriptor_ != -1) {
+			if (owns_descriptor_) {
+				::close(file_descriptor_);
 			}
-			written += w;
+			file_descriptor_ = -1;
 		}
-		pos_ = 0;
-		return written;
 	}
-
-	int socket_output_stream::unsafe_write(char c)
+	raw_socket_output_stream::~raw_socket_output_stream()
 	{
-		if (pos_ < STREAM_BUFFER_SIZE) {
-			buffer_[pos_++] = c;
-			return 1;
-		}
-		int f = unsafe_flush(true);
-		if (f <= 0) {
-			return f;
-		}
-		if (pos_ == STREAM_BUFFER_SIZE) {
-			buffer_[0] = c;
-			pos_ = 1;
-		}
-		else {
-			buffer_[pos_++] = c;
-		}
-		return 1;
+		close();
 	}
 
-	socket_output_stream::socket_output_stream(int fd, bool owns_file)
+	socket_output_stream::socket_output_stream(size_t buffer_size, int file_descriptor, bool owns_descriptor) :
+		buffered_(buffer_size)
 	{
-		set_file(fd, owns_file);
+		buffered_.set_resource(&stream_, false);
+		stream_.set_file_descriptor(file_descriptor, owns_descriptor);
 	}
-	socket_output_stream::socket_output_stream() : socket_output_stream(-1, false) {}
 
-	void socket_output_stream::on_file_set()
+	socket_output_stream::socket_output_stream(size_t buffer_size) :
+		socket_output_stream(buffer_size, -1, false) {}
+
+	void socket_output_stream::set_file_descriptor(int file_descriptor, bool owns_descriptor)
 	{
-		pos_ = 0;
+		close();
+		stream_.set_file_descriptor(file_descriptor, owns_descriptor);
+		buffered_.set_resource(&stream_, false);
 	}
-
-	bool socket_output_stream::canWriteToBuffer() const
+	void socket_output_stream::set_bocking(bool value)
 	{
-		return file_descriptor() != -1 && pos_ < STREAM_BUFFER_SIZE;
+		stream_.set_bocking(value);
 	}
-
-	int socket_output_stream::write(char c)
+	bool socket_output_stream::get_bocking()
 	{
-		if (file_descriptor() == -1) {
-			return stream_result::INVALID_HANDLE;
-		}
-		return unsafe_write(c);
+		return stream_.get_bocking();
 	}
-
-	int socket_output_stream::write_string(const char *str, size_t max_len, size_t *written)
-	{
-		if (file_descriptor() == -1) {
-			if (written) {
-				*written = 0;
-			}
-			return stream_result::INVALID_HANDLE;
-		}
-		if (max_len == 0) {
-			max_len == std::numeric_limits<size_t>::max();
-		}
-		for (size_t i = 0; max_len == 0 || i < max_len; i++) {
-			char c = str[i];
-			if (c == 0) {
-				if (written) {
-					*written = i;
-				}
-				return i;
-			}
-			int w = unsafe_write(c);
-			if (w < 0) {
-				if (written) {
-					*written = i;
-				}
-				return w;
-			}
-		}
-	}
-
 	void socket_output_stream::flush()
 	{
-		if (file_descriptor() >= 0) {
-			unsafe_flush(false);
-		}
+		buffered_.flush();
 	}
-
-	void socket_output_stream::close()
+	void socket_output_stream::close() throw()
 	{
-		set_file(-1, false);
+		buffered_.close();
 	}
-
-	void socket_output_stream::close_file()
-	{
-		::close(file_descriptor());
-	}
-	void socket_output_stream::before_close_file()
-	{
-		flush();
-	}
-
 	socket_output_stream::~socket_output_stream()
 	{
 		close();
 	}
+
+	socket_stream::socket_stream(size_t read_buffer_size, size_t write_buffer_size, int file_descriptor, bool owns_descriptor) :
+			ibuffered_(read_buffer_size),
+			obuffered_(write_buffer_size)
+	{
+		ibuffered_.set_resource(&istream_, false);
+		obuffered_.set_resource(&ostream_, false);
+		ostream_.set_file_descriptor(file_descriptor, owns_descriptor);
+		istream_.set_file_descriptor(file_descriptor, false);
+	}
+	socket_stream::socket_stream(size_t read_buffer_size, size_t write_buffer_size) :
+			socket_stream(read_buffer_size, write_buffer_size, -1, false) {}
+
+	socket_stream::socket_stream(size_t buffer_size) :
+			socket_stream(buffer_size, buffer_size) {}
+
+	void socket_stream::flush()
+	{
+		ibuffered_.flush();
+		obuffered_.flush();
+	}
+	void socket_stream::close() throw()
+	{
+		ibuffered_.close();
+		obuffered_.close();
+	}
+	void socket_stream::set_file_descriptor(int file_descriptor, bool owns_descriptor)
+	{
+		close();
+		istream_.set_file_descriptor(file_descriptor, false);
+		ostream_.set_file_descriptor(file_descriptor, owns_descriptor);
+		ibuffered_.set_resource(&istream_, false);
+		obuffered_.set_resource(&ostream_, false);
+	}
+	void socket_stream::set_read_bocking(bool value)
+	{
+		istream_.set_bocking(value);
+	}
+	bool socket_stream::get_read_bocking()
+	{
+		return istream_.get_bocking();
+	}
+	void socket_stream::set_write_bocking(bool value)
+	{
+		ostream_.set_bocking(value);
+	}
+	bool socket_stream::get_write_bocking()
+	{
+		return ostream_.get_bocking();
+	}
+	socket_stream::~socket_stream()
+	{
+		close();
+	}
+
 
 } /* End of namespace speakerman */
 

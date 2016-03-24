@@ -276,8 +276,8 @@ int main(int count, char * arguments[]) {
 	signal(SIGTERM, signal_callback_handler);
 	signal(SIGABRT, signal_callback_handler);
 
-//	std::cout << "activate..." << std::endl;
-//	clientOwner.get().setActive();
+	std::cout << "activate..." << std::endl;
+	clientOwner.get().setActive();
 
 	std::cout << "activated..." << std::endl;
 	mainLoop(clientOwner);

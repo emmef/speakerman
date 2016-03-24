@@ -20,8 +20,8 @@
  */
 
 #include <stdexcept>
+#include <cstring>
 #include <speakerman/Stream.hpp>
-
 
 namespace speakerman
 {
@@ -48,6 +48,34 @@ namespace speakerman
 		last_count = count;
 	}
 
+	static size_t valid_capacity(size_t cap)
+	{
+		if (cap >= 8 && cap <= 104896000) {
+			return cap;
+		}
+		throw std::invalid_argument("Invalid capacity");
+	}
+
+	template <typename T>
+	static T * non_null(T *ptr)
+	{
+		if (ptr) {
+			return ptr;
+		}
+		throw std::invalid_argument("Null pointer argument");
+	}
+
+	template<typename T>
+	static T minimum_of(T v1, T v2)
+	{
+		return v1 < v2 ? v1 : v2;
+	}
+
+	template<typename T>
+	static T maximum_of(T v1, T v2)
+	{
+		return v1 >= v2 ? v1 : v2;
+	}
 
 	signed long read_from_stream(input_stream &stream, void* data, size_t offs, size_t length)
 	{
@@ -163,36 +191,218 @@ namespace speakerman
 		return write_string_to_stream(*this, string, length);
 	}
 
-	file_owner::file_owner() :
-			file_descriptor_(-1), owns_file_(false) {
+
+	buffered_input_stream::buffered_input_stream(size_t buffer_size, input_stream *stream, bool owns_stream) :
+			size_(valid_capacity(buffer_size)), wr_(0), rd_(0), data_(new char[size_]), stream_(stream), owns_stream_(owns_stream)
+	{
 	}
 
-	void file_owner::set_file(int file_descriptor, bool owns_file) {
-//		printf("file_owner(%p)::set_file(%i, %d)\n", this, file_descriptor, owns_file);
-		cleanup_file();
-		file_descriptor_ = file_descriptor;
-		owns_file_ = owns_file;
-		on_file_set();
+	buffered_input_stream::buffered_input_stream(size_t buffer_size) :
+			size_(valid_capacity(buffer_size)), wr_(0), rd_(0), data_(new char[size_]), stream_(nullptr), owns_stream_(false)
+	{
 	}
 
-	file_owner::~file_owner() {}
+	int buffered_input_stream::read()
+	{
+		if (rd_ < wr_) {
+			return data_[rd_++];
+		}
+		if (!stream_) {
+			return stream_result::INVALID_HANDLE;
+		}
+		long signed r = stream_->read(data_, 0, size_);
+		if (r < 0) {
+			return r == stream_result::END_OF_STREAM ? 0 : r;
+		}
+		wr_ = r;
+		rd_ = 0;
+		if (rd_ < wr_) {
+			return data_[rd_++];
+		}
+		return stream_result::END_OF_STREAM;
+	}
 
-	void file_owner::cleanup_file() {
-//		printf("file_owner(%p)::cleanup_file()\n", this);
-		if (file_descriptor_ >= 0) {
-			before_close_file();
-			if (owns_file_) {
-				close_file();
+	signed long buffered_input_stream::read(void* buff, size_t offs, size_t length)
+	{
+		if (length == 0) {
+			return 0;
+		}
+		char *dest = static_cast<char*>(buff) + offs;
+		size_t to_read = length;
+		if (rd_ < wr_) {
+			size_t moves = wr_ - rd_;
+			if (moves > length) {
+				memmove(dest, data_ + rd_, length);
+				rd_ += length;
+				return length;
+			}
+			memmove(dest, data_ + rd_, moves);
+			to_read -= moves;
+			dest += moves;
+			rd_ = wr_ = 0; // buffer depleted
+		}
+		if (!stream_) {
+			return stream_result::INVALID_HANDLE;
+		}
+		// bypass own buffer and write to target!
+		for (int retry = 0; (to_read > 0) && (retry < 3); retry++) {
+			long signed r = stream_->read(dest, 0, to_read);
+			if (r < 0) {
+				return r == stream_result::END_OF_STREAM ? length - to_read : r;
+			}
+			to_read -= r;
+			dest += r;
+		}
+		return length - to_read;
+	}
+
+	void buffered_input_stream::close() throw()
+	{
+		flush();
+		if (stream_) {
+			stream_->close();
+			if (owns_stream_) {
+				delete stream_;
+			}
+			stream_ = nullptr;
+		}
+	}
+
+	void buffered_input_stream::flush()
+	{
+		rd_ = wr_ = 0;
+	}
+
+	void buffered_input_stream::set_resource(input_stream *stream, bool owns_stream)
+	{
+		close();
+		stream_ = stream;
+		owns_stream_ = owns_stream;
+	}
+
+	buffered_input_stream::~buffered_input_stream()
+	{
+		if (data_) {
+			delete [] data_;
+			data_ = nullptr;
+		}
+		close();
+	}
+
+	buffered_output_stream::buffered_output_stream(size_t buffer_size, output_stream *stream, bool owns_stream) :
+			size_(valid_capacity(buffer_size)), wr_(0), rd_(0), data_(new char[size_]), stream_(stream), owns_stream_(owns_stream)
+	{
+
+	}
+
+	buffered_output_stream::buffered_output_stream(size_t buffer_size) :
+			size_(valid_capacity(buffer_size)), wr_(0), rd_(0), data_(new char[size_]), stream_(nullptr), owns_stream_(false)
+	{
+
+	}
+
+	int buffered_output_stream::write(char c)
+	{
+		if (wr_ < size_) {
+			data_[wr_++] = c;
+			return 1;
+		}
+		long signed w = internal_flush();
+		if (w <= 0) {
+			return w;
+		}
+		data_[wr_++] = c;
+		return 1;
+	}
+
+	signed long buffered_output_stream::write(const void *buff, size_t offs, size_t length)
+	{
+		if (length == 0) {
+			return 0;
+		}
+		const char *source = static_cast<const char*>(buff) + offs;
+		if (wr_ + length <= size_) {
+			memmove(data_, source, length);
+			wr_ += length;
+			return length;
+		}
+		if (!stream_) {
+			return stream_result::INVALID_HANDLE;
+		}
+		long signed w = internal_flush();
+		if (w < 0) {
+			return w;
+		}
+		else if (w == 0 && wr_ != rd_) {
+			return 0;
+		}
+		size_t to_write = length;
+		for (int retry = 0; (to_write >= 0) && (retry < 10); retry++) {
+			w = stream_->write(source, 0, to_write);
+			if (w < 0) {
+				return w == stream_result::END_OF_STREAM ? length - to_write : w;
+			}
+			source += w;
+			to_write -= w;
+		}
+		return length - to_write;
+	}
+
+	long signed buffered_output_stream::internal_flush()
+	{
+		if (wr_ == rd_) {
+			return 0;
+		}
+		size_t rd = rd_;
+		for (int retry = 0; (wr_ != rd_) && retry < 10; retry++) {
+			long signed w = stream_->write(data_, rd_, wr_ - rd_);
+			if (w < 0) {
+				if (w != stream_result::END_OF_STREAM) {
+					return w;
+				}
+				rd_ += w;
 			}
 		}
+		size_t written = rd_ - rd;
+		if (rd_ == wr_) {
+			rd_ = wr_ = 0;
+		}
+		return written;
 	}
 
-	static size_t valid_capacity(size_t cap)
+	void buffered_output_stream::flush()
 	{
-		if (cap >= 128 && cap <= 104896000) {
-			return cap;
+		if (stream_) {
+			internal_flush();
 		}
-		throw std::invalid_argument("Invalid capacity");
+	}
+
+	void buffered_output_stream::close() throw()
+	{
+		flush();
+		if (stream_) {
+			stream_->close();
+			if (owns_stream_) {
+				delete stream_;
+			}
+			stream_ = nullptr;
+		}
+	}
+
+	void buffered_output_stream::set_resource(output_stream *stream, bool owns_stream)
+	{
+		close();
+		stream_ = stream;
+		owns_stream_ = owns_stream;
+	}
+
+	buffered_output_stream::~buffered_output_stream()
+	{
+		if (data_) {
+			delete [] data_;
+			data_ = nullptr;
+		}
+		close();
 	}
 
 	buffer_stream::buffer_stream(size_t capacity) :
@@ -259,7 +469,7 @@ namespace speakerman
 		write_ = read_ = 0;
 	}
 
-	void buffer_stream::close()
+	void buffer_stream::close() throw()
 	{
 		write_ = read_ = 0;
 	}

@@ -333,6 +333,7 @@ namespace speakerman {
 		State state = state_;
 		lock.unlock();
 
+		socket_stream stream(1024);
 		while (state == State::WORKING) {
 			sockaddr address;
 			socklen_t length = sizeof(sockaddr_storage);
@@ -348,15 +349,17 @@ namespace speakerman {
 				std::cerr << "Cannot set socket timeout: " << strerror(errno) << std::endl;
 			}
 
-			socket_stream stream(acceptDescriptor, true);
+			stream.set_file_descriptor(acceptDescriptor, true);
 			try {
 				Result r = worker(stream, address, *this, data);
+				stream.close();
 				if (r == Result::STOP) {
 					return true;
 				}
 			}
 			catch (const std::exception &e) {
 				std::cerr << "Error during work on socket: " << e.what() << std::endl;
+				stream.close();
 			}
 			state = this->state();
 		}
