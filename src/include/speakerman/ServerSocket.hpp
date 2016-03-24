@@ -55,8 +55,6 @@ namespace speakerman
 
 		typedef server_worker_result (*server_socket_worker)(
 				socket_stream &stream, const struct sockaddr &address, const server_socket &server, void *data);
-		typedef bool (*server_socket_work_enter)(void *data);
-		typedef void (*server_socket_work_leave)(void *data);
 
 	public:
 		server_socket() { }
@@ -74,7 +72,7 @@ namespace speakerman
 
 		bool isWorking() const { return state() == State::WORKING; }
 
-		bool work(int *errorCode, server_socket_worker worker, server_socket_work_enter enter, server_socket_work_leave leaver, void * data);
+		bool work(int *errorCode, server_socket_worker worker, void * data);
 
 		void close();
 

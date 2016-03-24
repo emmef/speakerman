@@ -19,27 +19,11 @@
  * limitations under the License.
  */
 
+#include <cstring>
 #include <speakerman/SpeakermanWebServer.hpp>
 
 namespace speakerman
 {
-	bool web_server::enter_function(void* data) {
-		return static_cast<web_server*>(data)->work_enter();
-	}
-
-	void web_server::leave_function(void* data) {
-		static_cast<web_server*>(data)->work_leave();
-	}
-
-	bool web_server::work_enter()
-	{
-		return true;
-	}
-
-	void web_server::work_leave()
-	{
-	}
-
 	bool web_server::open(const char* service, int timeoutSeconds, int backLog, int* errorCode)
 	{
 		return socket_.open(service, timeoutSeconds, backLog, errorCode);
@@ -48,10 +32,11 @@ namespace speakerman
 
 	bool web_server::work(int *errorCode)
 	{
-		return socket_.work(errorCode, web_server::worker_function, web_server::enter_function, web_server::leave_function, this);
+		return socket_.work(errorCode, web_server::worker_function, this);
 	}
 
 	web_server::web_server(SpeakerManagerControl& speakerManager) :
+			http_message(10240),
 			manager_(speakerManager)
 	{
 	}
@@ -70,31 +55,74 @@ namespace speakerman
 
 	web_server::Result web_server::accept_work(Stream &stream, const struct sockaddr& address, const server_socket& socket)
 	{
-		char c;
-		bool headers = true;
-		int state = 0;
-		while (headers && (c = stream.read()) > 0) {
-			std::cout << c;
-			switch (state) {
-			case 0:
-				if (c == 10) {
-					state = 1;
-				}
-				break;
-			case 1:
-				if (c == 10) {
-					headers = false;
-				}
-				else if (c != 13) {
-					state = 0;
-				}
-				break;
-			default:
+		handle(stream);
+		return Result::CONTINUE;
+	}
+
+	const char * web_server::on_url(const char* url)
+	{
+		size_t i;
+		for (i = 0; i < URL_LENGTH; i++) {
+			char c = url[i];
+			if (c != 0) {
+				url_[i] = c;
+			}
+			else {
 				break;
 			}
+
 		}
-		stream.write_string("HTTP/1.1 200 OK\n\r", 1000, nullptr);
+		if (i < URL_LENGTH) {
+			url_[i] = 0;
+			std::cout << "D: URL = " << url_ << std::endl;
+			return nullptr;
+		}
+		return "URL too long";
 	}
+
+	void web_server::handle_request()
+	{
+		if (strncmp("/", url_, 32) == 0) {
+			strncpy(url_, "/index.html", 32);
+		}
+
+		if (strncasecmp("/levels.json", url_, 32) == 0) {
+			DynamicProcessorLevels levels(1);
+			std::chrono::milliseconds wait(1000);
+			if (manager_.getLevels(&levels, wait)) {
+				set_content_type("text/json");
+				response().write_string("\"levels\" : {}", 1024);
+				set_success();
+			}
+			else {
+				set_error(http_status::SERVICE_UNAVAILABLE);
+			}
+		}
+		else if (strncasecmp("/favicon.ico", url_, 32) == 0) {
+			set_content_type("text/plain");
+			response().write_string("X", 1);
+			set_success();
+		}
+		else if (strncasecmp(url_, "/index.html", 32) == 0) {
+			set_content_type("text/html");
+			response().write_string("<html>\n", 32);
+			response().write_string("<head>\n", 32);
+			response().write_string("<title>\n", 32);
+			response().write_string("Speakerman\n", 32);
+			response().write_string("</title>\n", 32);
+			response().write_string("</head>\n", 32);
+			response().write_string("<body>\n", 32);
+			response().write_string("Speakerman\n", 32);
+			response().write_string("<a href=\"/levels.json\">Levels</a>\r\n", 1024);
+			response().write_string("</body>\n", 32);
+			response().write_string("</html>\n", 32);
+//			set_success();
+		}
+		else {
+			set_error(404);
+		}
+	}
+
 
 
 } /* End of namespace speakerman */

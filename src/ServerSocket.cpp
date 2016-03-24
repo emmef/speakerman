@@ -227,8 +227,6 @@ namespace speakerman {
 		server_socket_state &state_;
 		std::unique_lock<std::mutex> &lock_;
 		std::condition_variable &variable_;
-		server_socket::server_socket_work_leave leave_;
-		void *data_;
 		const server_socket_state expected_;
 		const server_socket_state set_;
 	public:
@@ -236,23 +234,16 @@ namespace speakerman {
 				server_socket_state &state,
 				std::unique_lock<std::mutex> &lock,
 				std::condition_variable &variable,
-				server_socket::server_socket_work_leave leave,
-				void *data,
 				const server_socket_state expectedOnClose,
 				const server_socket_state setOnClose) :
 					state_(state),
 					lock_(lock),
 					variable_(variable),
-					leave_(leave),
-					data_(data),
 					expected_(expectedOnClose),
 					set_(setOnClose) {}
 
 		~state_on_close()
 		{
-			if (leave_) {
-				leave_(data_);
-			}
 			lock_.lock();
 			if (state_ == expected_) {
 				state_ = set_;
@@ -322,7 +313,7 @@ namespace speakerman {
 		}
 	}
 
-	bool server_socket::work(int *errorCode, server_socket_worker worker, server_socket_work_enter enter, server_socket_work_leave leave, void * data)
+	bool server_socket::work(int *errorCode, server_socket_worker worker, void * data)
 	{
 		if (!worker) {
 			throw std::invalid_argument("Worker function cannot be ");
@@ -338,12 +329,9 @@ namespace speakerman {
 		default:
 			return returnFalseWithCode(errorCode, EBADFD);
 		}
-		state_on_close state_guard(state_, lock, condition_, leave, data, State::WORKING, State::LISTENING);
+		state_on_close state_guard(state_, lock, condition_, State::WORKING, State::LISTENING);
 		State state = state_;
 		lock.unlock();
-		if (enter && !enter(data)) {
-			return returnFalseWithCode(errorCode, EBADFD);
-		}
 
 		while (state == State::WORKING) {
 			sockaddr address;
@@ -360,7 +348,7 @@ namespace speakerman {
 				std::cerr << "Cannot set socket timeout: " << strerror(errno) << std::endl;
 			}
 
-			socket_stream stream(acceptDescriptor);
+			socket_stream stream(acceptDescriptor, true);
 			try {
 				Result r = worker(stream, address, *this, data);
 				if (r == Result::STOP) {

@@ -23,18 +23,19 @@
 #define SMS_SPEAKERMAN_WEBSERVER_GUARD_H_
 
 #include <speakerman/ServerSocket.hpp>
+#include <speakerman/HttpMessage.hpp>
 #include <speakerman/SpeakermanConfig.hpp>
 
 namespace speakerman
 {
-	class web_server
+	class web_server : protected http_message
 	{
 	public:
 		using Result = server_worker_result;
 		using State = server_socket_state;
 		using Stream = server_socket::Stream;
+		static constexpr size_t URL_LENGTH = 1023;
 
-	public:
 		web_server(SpeakerManagerControl& speakerManager);
 
 		bool open(const char* service, int timeoutSeconds, int backLog, int* errorCode);
@@ -53,20 +54,20 @@ namespace speakerman
 
 		~web_server(){}
 
+	protected:
+		virtual bool content_stream_delete() const override { return false; }
+		virtual const char * on_url(const char* url) override;
+		virtual void handle_request() override;
 	private:
 		SpeakerManagerControl &manager_;
 		server_socket socket_;
+		char url_[URL_LENGTH + 1];
 
 		Result accept_work(Stream &stream, const struct sockaddr& address, const server_socket& socket);
-		bool work_enter();
-		void work_leave();
 
 		static Result worker_function(
 				Stream &stream, const struct sockaddr& address,
 				const server_socket& socket, void* data);
-
-		static bool enter_function(void* data);
-		static void leave_function(void* data);
 	};
 
 } /* End of namespace speakerman */
