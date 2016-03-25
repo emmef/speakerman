@@ -113,15 +113,15 @@ static int getChar() {
 static void configUpdater()
 {
 	std::chrono::milliseconds sleeper(1001);
-	while (signalNumber == -1) {
-		this_thread::sleep_for(sleeper);
-		auto stamp = getConfigFileTimeStamp();
-		DynamicProcessorLevels levels(1);
-		if (stamp != configFileConfig.timeStamp) {
-			configFileConfig = readSpeakermanConfig(configFileConfig, false);
-			manager.get().applyConfigAndGetLevels(configFileConfig, &levels, sleeper);
-		}
-	}
+//	while (signalNumber == -1) {
+//		this_thread::sleep_for(sleeper);
+//		auto stamp = getConfigFileTimeStamp();
+//		DynamicProcessorLevels levels;
+//		if (stamp != configFileConfig.timeStamp) {
+//			configFileConfig = readSpeakermanConfig(configFileConfig, false);
+//			manager.get().applyConfigAndGetLevels(configFileConfig, &levels, sleeper);
+//		}
+//	}
 }
 
 static void webServer()
@@ -276,8 +276,8 @@ int main(int count, char * arguments[]) {
 	signal(SIGTERM, signal_callback_handler);
 	signal(SIGABRT, signal_callback_handler);
 
-//	std::cout << "activate..." << std::endl;
-//	clientOwner.get().setActive();
+	std::cout << "activate..." << std::endl;
+	clientOwner.get().setActive();
 
 	std::cout << "activated..." << std::endl;
 	mainLoop(clientOwner);

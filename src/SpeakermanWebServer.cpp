@@ -35,17 +35,52 @@ namespace speakerman
 		return socket_.work(errorCode, web_server::worker_function, this);
 	}
 
+	void web_server::thread_static_function(web_server *server)
+	{
+		server->thread_function();
+	}
+
+	void web_server::thread_function()
+	{
+		static std::chrono::milliseconds wait(1000);
+		static std::chrono::milliseconds sleep(100);
+		int count = 0;
+		SpeakermanConfig configFileConfig = readSpeakermanConfig(configFileConfig, true);
+		DynamicProcessorLevels levels;
+		while (true) {
+			count++;
+			if (count == 10) {
+				count = 0;
+				auto stamp = getConfigFileTimeStamp();
+				if (stamp != configFileConfig.timeStamp) {
+					cout << "read config!" << std::endl;
+					configFileConfig = readSpeakermanConfig(configFileConfig, false);
+					if (manager_.applyConfigAndGetLevels(configFileConfig, &levels, wait)) {
+						level_buffer.put(levels);
+					}
+				}
+			}
+			else if (manager_.getLevels(&levels, wait)) {
+				level_buffer.put(levels);
+			}
+			this_thread::sleep_for(sleep);
+		}
+	}
+
 	web_server::web_server(SpeakerManagerControl& speakerManager) :
 			http_message(10240),
 			manager_(speakerManager)
 	{
+		thread t(thread_static_function, this);
+		level_fetch_thread.swap(t);
+		level_fetch_thread.detach();
 	}
 
 	web_server::Result web_server::worker_function(
 			server_socket::Stream &stream, const struct sockaddr& address,
 			const server_socket& socket, void* data)
 	{
-		static_cast<web_server*>(data)->accept_work(stream, address, socket);
+		return static_cast<web_server*>(data)->accept_work(stream, address, socket);
 	}
 
 	void web_server::close()
@@ -80,6 +115,12 @@ namespace speakerman
 		return "URL too long";
 	}
 
+	static const char *toString(char *buffer, size_t len, double value)
+	{
+		snprintf(buffer, len, "%lf", value);
+		return buffer;
+	}
+
 	void web_server::handle_request()
 	{
 		if (strncmp("/", url_, 32) == 0) {
@@ -87,12 +128,40 @@ namespace speakerman
 		}
 
 		if (strncasecmp("/levels.json", url_, 32) == 0) {
-			DynamicProcessorLevels levels(1);
-			std::chrono::milliseconds wait(1000);
-			if (manager_.getLevels(&levels, wait)) {
+			char floats[30];
+			LevelEntry entry;
+			level_buffer.get(0, entry);
+			if (entry.set) {
+				DynamicProcessorLevels levels = entry.levels;
+				std::cout << "Groups: " << levels.groups() << std::endl;
+
 				set_content_type("text/json");
-				response().write_string("\"levels\" : {}", 1024);
-				set_success();
+				response().write_string("\"levels\": {\r\n");
+				response().write_string("\t\"subGain\": \"");
+				response().write_string(toString(floats, 30, levels.getSubGain()));
+				response().write_string("\", \r\n");
+				response().write_string("\t\"periods\": \"");
+				response().write_string(toString(floats, 30, levels.count()));
+				response().write_string("\", \r\n");
+					response().write_string("\t\"group\" : [\r\n");
+						for (size_t i = 0; i < levels.groups(); i++) {
+							response().write_string("\t\t{\r\n");
+							response().write_string("\t\t\t\"gain\": \"");
+							response().write_string(toString(floats, 30, levels.getGroupGain(i)));
+							response().write_string("\", \r\n");
+							response().write_string("\t\t\t\"gain_avg\": \"");
+							response().write_string(toString(floats, 30, levels.getAverageGroupGain(i)));
+							response().write_string("\", \r\n");
+							response().write_string("\t\t\t\"level\": \"");
+							response().write_string(toString(floats, 30, levels.getSignal(i)));
+							response().write_string("\"\r\n");
+							if (i < levels.groups() - 1) {
+								response().write(',');
+							}
+							response().write_string("\t\t}\r\n");
+						}
+					response().write_string("\t]\r\n");
+				response().write_string("}\r\n");
 			}
 			else {
 				set_error(http_status::SERVICE_UNAVAILABLE);

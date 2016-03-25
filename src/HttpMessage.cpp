@@ -203,7 +203,7 @@ namespace speakerman
 		if (extraMessage) {
 			size_t len = strnlen(extraMessage, 1024);
 			char buff[6];
-			snprintf(buff, 60, "%zu", len);
+			snprintf(buff, 6, "%zu", len);
 			r = stream.write_string("\r\nContent-Type: text/plain\r\nContent-length: ", 60);
 			if (r < 0) {
 				return r;

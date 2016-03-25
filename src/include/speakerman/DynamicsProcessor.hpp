@@ -105,7 +105,7 @@ private:
 public:
 	DynamicProcessorLevels levels;
 
-	DynamicsProcessor() : rmsDelay(96000), limiterDelay(96000), sampleRate_(0), levels(GROUPS)
+	DynamicsProcessor() : rmsDelay(96000), limiterDelay(96000), sampleRate_(0), levels(GROUPS, BANDS)
 	{
 		levels.reset();
 	}

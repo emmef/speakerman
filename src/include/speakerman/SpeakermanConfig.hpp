@@ -133,29 +133,51 @@ namespace speakerman {
 	class DynamicProcessorLevels
 	{
 		double gains_[SpeakermanConfig::MAX_GROUPS + 1];
+		double avg_gains_[SpeakermanConfig::MAX_GROUPS + 1];
 		double signal_[SpeakermanConfig::MAX_GROUPS];
 		size_t groups_;
+		size_t crossovers_;
+		size_t count_;
 
 	public:
-		DynamicProcessorLevels(size_t groups) : groups_(groups) {}
+		DynamicProcessorLevels() : groups_(0), count_(0) {};
+		DynamicProcessorLevels(size_t groups, size_t crossovers) : groups_(groups), crossovers_(crossovers) {}
 
 		size_t groups() const { return groups_; }
 		size_t signals() const { return groups_ + 1; }
+		size_t count() const { return count_; }
+		size_t crossovers() const { return crossovers_; }
+
+		void operator += (const DynamicProcessorLevels &levels)
+		{
+			size_t count = Values::min(groups_, levels.groups_);
+			for (size_t i= 0; i <= count; i++) {
+				gains_[i] = Values::min(gains_[i], levels.gains_[i]);
+				avg_gains_[i] += levels.avg_gains_[i];
+			}
+			for (size_t i= 0; i < count; i++) {
+				signal_[i] = Values::max(signal_[i], levels.signal_[i]);
+			}
+			count_ += levels.count_;
+		}
 
 		void reset()
 		{
 			for (size_t limiter = 0; limiter <= groups_; limiter++) {
 				gains_[limiter] = 1.0;
+				avg_gains_[limiter] = 0;
 			}
 			for (size_t group = 0; group < groups_; group++) {
 				signal_[group] = 0.0;
 			}
+			count_ = 0;
 		}
 
 		void setGroupGain(size_t group, double gain)
 		{
 			double &g = gains_[1 + IndexPolicy::array(group, groups_)];
 			g = Values::min(g, gain);
+			avg_gains_[1 + group] += g;
 		}
 
 		double getGroupGain(size_t group) const
@@ -163,16 +185,28 @@ namespace speakerman {
 			return gains_[1 + IndexPolicy::array(group, groups_)];
 		}
 
+		double getAverageGroupGain(size_t group) const
+		{
+			size_t den = count_ * crossovers_;
+			return den == 0 ? 1.0 : avg_gains_[1 + IndexPolicy::array(group, groups_)] / den;
+		}
+
 		void setSubGain(double gain)
 		{
 			double &g = gains_[0];
 			g = Values::min(g, gain);
+			avg_gains_[0] += g;
+			count_++;
 		}
-
 
 		double getSubGain() const
 		{
 			return gains_[0];
+		}
+
+		double getAverageSubGain() const
+		{
+			return count_ == 0 ? 1.0 : avg_gains_[0] / count_;
 		}
 
 		void setSignal(size_t group, double signal)
@@ -198,6 +232,7 @@ namespace speakerman {
 
 
 	const char * configFileName();
+	const char * webDirectory();
 	SpeakermanConfig readSpeakermanConfig(bool initial);
 	SpeakermanConfig readSpeakermanConfig(const SpeakermanConfig &basedUpon, bool initial);
 	SpeakermanConfig getDefaultConfig();

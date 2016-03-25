@@ -244,6 +244,7 @@ namespace speakerman {
 		return name.c_str();
 	}
 
+
 	template<typename T>
 	static bool readNumber(T &variable, const char *key, const char *value, T min, T max, bool forceWithin = false)
 	{

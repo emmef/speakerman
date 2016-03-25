@@ -107,33 +107,6 @@ namespace speakerman
 		virtual void set_config(const T &config) = 0;
 	};
 
-	template<typename T, class Y>
-	class managed_output_stream : public output_stream
-	{
-		using Stream = managable_output_stream<T>;
-		static_assert(std::is_base_of<Stream,Y>::value, "Type parameter must be subclass of manageable_output_stream of same type");
-		Stream stream_;
-		void cleanup() {
-			stream_.flush();
-			stream_.close();
-		}
-	public:
-		virtual int write(char c) { stream_.write(c); }
-		virtual signed long write(const void *buff, size_t offs, size_t length)
-		{
-			return stream_.write(buff, offs, length);
-		}
-		virtual signed long write_string(const char*string, size_t length)
-		{
-			return stream_.write_string(string, length);
-		}
-		virtual void flush() { stream_.flush(); }
-		void set_config(const T& config) {
-			cleanup();
-			stream_.set_config(config);
-		}
-		virtual ~managed_output_stream() { cleanup(); }
-	};
 
 	class file_owner
 	{
@@ -155,8 +128,8 @@ namespace speakerman
 
 	class buffer_stream : public output_stream, public input_stream
 	{
-		char * data_;
 		size_t capacity_;
+		char * data_;
 		size_t read_;
 		size_t write_;
 	protected :

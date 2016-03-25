@@ -22,12 +22,88 @@
 #ifndef SMS_SPEAKERMAN_WEBSERVER_GUARD_H_
 #define SMS_SPEAKERMAN_WEBSERVER_GUARD_H_
 
+#include <thread>
+#include <mutex>
+#include <chrono>
+#include <tdap/Power2.hpp>
 #include <speakerman/ServerSocket.hpp>
 #include <speakerman/HttpMessage.hpp>
 #include <speakerman/SpeakermanConfig.hpp>
 
 namespace speakerman
 {
+using namespace std;
+using namespace std::chrono;
+
+	static milliseconds::rep currentMillis()
+	{
+		return chrono::duration_cast<chrono::milliseconds>(chrono::system_clock::now().time_since_epoch()).count();
+	}
+
+	static long relative_milliseconds()
+	{
+		static milliseconds::rep START = currentMillis();
+
+		return currentMillis() - START;
+	}
+
+	struct LevelEntry
+	{
+		DynamicProcessorLevels levels;
+		bool set;
+		long stamp;
+		LevelEntry() : set(false) {}
+		LevelEntry(DynamicProcessorLevels lvl) :
+			levels(lvl), set(true), stamp(relative_milliseconds()) { }
+	};
+
+	class LevelEntryBuffer
+	{
+		mutex m;
+		static constexpr size_t SIZE = 128;
+		static constexpr size_t MASK = SIZE - 1;
+		static_assert(tdap::Power2::constant::is(SIZE), "Size must be power of two");
+		LevelEntry entries[SIZE];
+		size_t wr_;
+
+		static size_t prev(size_t n)
+		{
+			return (n + SIZE - 1) & MASK;
+		}
+
+		static size_t next(size_t n)
+		{
+			return (n + 1) & MASK;
+		}
+
+	public:
+
+		void put(const DynamicProcessorLevels &levels)
+		{
+			unique_lock<mutex> lock(m);
+			wr_ = prev(wr_);
+			entries[wr_] = LevelEntry(levels);
+		}
+
+		void get(long lastChecked, LevelEntry &target)
+		{
+			unique_lock<mutex> lock(m);
+			target = entries[wr_];
+			if (lastChecked <= 0) {
+				return;
+			}
+			size_t read = wr_;
+			read = next(read);
+			LevelEntry entry = entries[read];
+			while (entry.set && entry.stamp > lastChecked) {
+				target.levels += entry.levels;
+				read = next(read);
+				entry = entries[read];
+			}
+		}
+	};
+
+
 	class web_server : protected http_message
 	{
 	public:
@@ -61,7 +137,12 @@ namespace speakerman
 	private:
 		SpeakerManagerControl &manager_;
 		server_socket socket_;
+		LevelEntryBuffer level_buffer;
 		char url_[URL_LENGTH + 1];
+		std::thread level_fetch_thread;
+		static void thread_static_function(web_server *);
+		void thread_function();
+
 
 		Result accept_work(Stream &stream, const struct sockaddr& address, const server_socket& socket);
 

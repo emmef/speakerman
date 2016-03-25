@@ -90,7 +90,7 @@ class SpeakerManager : public AbstractSpeakerManager
 		Levels levels;
 		bool configChanged;
 
-		TransportData() : levels(GROUPS), configChanged(false) {}
+		TransportData() : levels(GROUPS, CROSSOVERS), configChanged(false) {}
 	};
 
 	Transport<TransportData> transport;
@@ -103,7 +103,7 @@ protected:
 		std::cout << "Updated metrics: {rate:" << metrics.sampleRate << ", bsize:" << metrics.bufferSize << "}" << std::endl;
 		AdvancedRms::UserConfig config = { 0.0005, 0.400, 0.5, 1.2 };
 		processor.setSampleRate(metrics.sampleRate, crossovers(), config_);
-		Levels levels(GROUPS);
+		Levels levels(GROUPS, CROSSOVERS);
 		levels.reset();
 		preparedConfigData.configData = processor.getConfigData();
 		preparedConfigData.configChanged = true; // force to reload equalizer filters
