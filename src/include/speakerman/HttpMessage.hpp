@@ -68,6 +68,10 @@ namespace speakerman
 		size_t read_buffer_size() { return response_.allocated_size(); }
 		size_t read_buffer_length() { return response_.maximum_size(); }
 
+		int write_header(const char * header, const char *value);
+		int write_content_length(size_t value);
+		int write_content_type(const char *value);
+
 	protected:
 		/**
 		 * Invoked when method was read from the request line.
@@ -114,17 +118,15 @@ namespace speakerman
 		void set_content_type(const char *type);
 		void handle_content(size_t contentLength, input_stream *stream);
 		void cleanup_content_stream();
-
-		int write_header(const char * header, const char *value);
-		int write_content_length(size_t value);
-		int write_content_type(const char *value);
+		int set_header(const char * header, const char *value);
 
 		output_stream &response() { return response_; }
 
 	public:
-		http_message(size_t buffer_size) :
+		http_message(size_t buffer_size, size_t headers_size) :
 			busy_(false),
-			response_(buffer_size)
+			response_(buffer_size),
+			headers_(headers_size)
 		{}
 
 		/**
@@ -143,12 +145,14 @@ namespace speakerman
 			response_stream(size_t capacity) : buffer_stream(capacity) {}
 			char* buffer() const { return data(); }
 		};
+
 		std::atomic_flag busy_;
 		socket_stream *stream_;
+		buffer_stream headers_;
 
 		response_stream response_;
 
-		ssize_t content_stream_length_;
+		size_t content_stream_length_;
 		const char * content_type_;
 		input_stream *content_stream_;
 	};

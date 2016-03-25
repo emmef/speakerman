@@ -35,26 +35,26 @@ namespace speakerman
 using namespace std;
 using namespace std::chrono;
 
-	static milliseconds::rep currentMillis()
+	static long long current_millis()
 	{
-		return chrono::duration_cast<chrono::milliseconds>(chrono::system_clock::now().time_since_epoch()).count();
+		return system_clock::now().time_since_epoch().count() / 1000000;
 	}
 
 	static long relative_milliseconds()
 	{
-		static milliseconds::rep START = currentMillis();
+		static long long START = current_millis();
 
-		return currentMillis() - START;
+		return current_millis() - START;
 	}
 
 	struct LevelEntry
 	{
 		DynamicProcessorLevels levels;
 		bool set;
-		long stamp;
+		long long stamp;
 		LevelEntry() : set(false) {}
 		LevelEntry(DynamicProcessorLevels lvl) :
-			levels(lvl), set(true), stamp(relative_milliseconds()) { }
+			levels(lvl), set(true), stamp(current_millis()) { }
 	};
 
 	class LevelEntryBuffer
@@ -85,7 +85,7 @@ using namespace std::chrono;
 			entries[wr_] = LevelEntry(levels);
 		}
 
-		void get(long lastChecked, LevelEntry &target)
+		void get(long long lastChecked, LevelEntry &target)
 		{
 			unique_lock<mutex> lock(m);
 			target = entries[wr_];
@@ -95,7 +95,7 @@ using namespace std::chrono;
 			size_t read = wr_;
 			read = next(read);
 			LevelEntry entry = entries[read];
-			while (entry.set && entry.stamp > lastChecked) {
+			while (read != wr_ && entry.set && entry.stamp > lastChecked) {
 				target.levels += entry.levels;
 				read = next(read);
 				entry = entries[read];
@@ -111,6 +111,8 @@ using namespace std::chrono;
 		using State = server_socket_state;
 		using Stream = server_socket::Stream;
 		static constexpr size_t URL_LENGTH = 1023;
+		static constexpr const char *COOKIE_TIME_STAMP = "levelTimeStamp";
+		static constexpr size_t COOKIE_TIME_STAMP_LENGTH = strlen(COOKIE_TIME_STAMP);
 
 		web_server(SpeakerManagerControl& speakerManager);
 
@@ -133,6 +135,7 @@ using namespace std::chrono;
 	protected:
 		virtual bool content_stream_delete() const override { return false; }
 		virtual const char * on_url(const char* url) override;
+		virtual void on_header(const char* header, const char* value) override;
 		virtual void handle_request() override;
 	private:
 		SpeakerManagerControl &manager_;
@@ -140,6 +143,7 @@ using namespace std::chrono;
 		LevelEntryBuffer level_buffer;
 		char url_[URL_LENGTH + 1];
 		std::thread level_fetch_thread;
+		long long levelTimeStamp = 0;
 		static void thread_static_function(web_server *);
 		void thread_function();
 

@@ -68,7 +68,7 @@ namespace speakerman
 	}
 
 	web_server::web_server(SpeakerManagerControl& speakerManager) :
-			http_message(10240),
+			http_message(10240, 2048),
 			manager_(speakerManager)
 	{
 		thread t(thread_static_function, this);
@@ -90,6 +90,7 @@ namespace speakerman
 
 	web_server::Result web_server::accept_work(Stream &stream, const struct sockaddr& address, const server_socket& socket)
 	{
+		levelTimeStamp = 0;
 		handle(stream);
 		return Result::CONTINUE;
 	}
@@ -115,9 +116,74 @@ namespace speakerman
 		return "URL too long";
 	}
 
-	static const char *toString(char *buffer, size_t len, double value)
+	void web_server::on_header(const char* header, const char* value)
+	{
+		static constexpr int ASSIGN = 1;
+		static constexpr int VALUE = 2;
+		static constexpr int NUM = 3;
+		static constexpr int DONE = 4;
+		unsigned long long number = 0;
+		unsigned long long previousNumber = 0;
+		if (strcasecmp("cookie", header) == 0) {
+			const char * pos = strstr(value, COOKIE_TIME_STAMP);
+			if (pos) {
+				pos += COOKIE_TIME_STAMP_LENGTH;
+				int status = ASSIGN;
+				char c;
+				while (status != DONE && (c = *pos++) != 0) {
+					switch (status) {
+					case ASSIGN:
+						if (c == '=') {
+							status = VALUE;
+						}
+						else if (c != ' ') {
+							return;
+						}
+						break;
+					case VALUE:
+						if (c == ' ') {
+							continue;
+						}
+						if (c == ';') {
+							return;
+						}
+						if (c >= '0' && c <= '9') {
+							number = c - '0';
+							status = NUM;
+						}
+						else {
+							return;
+						}
+						break;
+					case NUM:
+						if (c >= '0' && c <= '9') {
+							previousNumber = number;
+							number *= 10;
+							number += c - '0';
+							if (number < previousNumber) {
+								status = DONE;
+							}
+						}
+						else if (c == ';') {
+							status = DONE;
+						}
+						break;
+					}
+				}
+				levelTimeStamp = number;
+			}
+		}
+	}
+
+	static const char *ftostr(char *buffer, size_t len, double value)
 	{
 		snprintf(buffer, len, "%lf", value);
+		return buffer;
+	}
+
+	static const char *itostr(char *buffer, size_t len, long long value)
+	{
+		snprintf(buffer, len, "%lli", value);
 		return buffer;
 	}
 
@@ -128,32 +194,35 @@ namespace speakerman
 		}
 
 		if (strncasecmp("/levels.json", url_, 32) == 0) {
-			char floats[30];
+			char numbers[60];
 			LevelEntry entry;
-			level_buffer.get(0, entry);
+			level_buffer.get(levelTimeStamp, entry);
 			if (entry.set) {
 				DynamicProcessorLevels levels = entry.levels;
-				std::cout << "Groups: " << levels.groups() << std::endl;
-
+				snprintf(numbers, 60, "%s=%lli", COOKIE_TIME_STAMP, entry.stamp);
+				set_header("Set-Cookie", numbers);
 				set_content_type("text/json");
 				response().write_string("\"levels\": {\r\n");
+				response().write_string("\t\"elapsedMillis\": \"");
+				response().write_string(itostr(numbers, 30, entry.stamp - levelTimeStamp));
+				response().write_string("\", \r\n");
 				response().write_string("\t\"subGain\": \"");
-				response().write_string(toString(floats, 30, levels.getSubGain()));
+				response().write_string(ftostr(numbers, 30, levels.getSubGain()));
 				response().write_string("\", \r\n");
 				response().write_string("\t\"periods\": \"");
-				response().write_string(toString(floats, 30, levels.count()));
+				response().write_string(itostr(numbers, 30, levels.count()));
 				response().write_string("\", \r\n");
 					response().write_string("\t\"group\" : [\r\n");
 						for (size_t i = 0; i < levels.groups(); i++) {
 							response().write_string("\t\t{\r\n");
 							response().write_string("\t\t\t\"gain\": \"");
-							response().write_string(toString(floats, 30, levels.getGroupGain(i)));
+							response().write_string(ftostr(numbers, 30, levels.getGroupGain(i)));
 							response().write_string("\", \r\n");
 							response().write_string("\t\t\t\"gain_avg\": \"");
-							response().write_string(toString(floats, 30, levels.getAverageGroupGain(i)));
+							response().write_string(ftostr(numbers, 30, levels.getAverageGroupGain(i)));
 							response().write_string("\", \r\n");
 							response().write_string("\t\t\t\"level\": \"");
-							response().write_string(toString(floats, 30, levels.getSignal(i)));
+							response().write_string(ftostr(numbers, 30, levels.getSignal(i)));
 							response().write_string("\"\r\n");
 							if (i < levels.groups() - 1) {
 								response().write(',');

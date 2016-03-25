@@ -131,32 +131,38 @@ namespace speakerman {
 	static bool ensure_bind(const addrinfo_owner& info, int sockfd_,
 			int timeoutSeconds, int* errorCode)
 	{
-		time_t start, now;
-		time(&start);
-		now = start;
+		time_t end, now;
+		time(&end);
+		now = end;
+		end += timeoutSeconds > 0 ? timeoutSeconds : 1000;
 
 		int yes;
 		if (setsockopt(sockfd_, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes)) == -1) {
 			std::cerr << "Couldn't set socket to reuse address mode: " << strerror(errno) << std::endl;
 		}
-		int sleep_time = 0;
 		int error = 0;
+		int sleep_time = 1;
 		while (true) {
-			if (sleep_time > 0) {
-				sleep(sleep_time);
-			}
 			int result = bind(sockfd_, info->ai_addr, info->ai_addrlen);
 			if (result != -1) {
 				return true;
 			}
 			time(&now);
-			int nextSleepTime = Values::max(2, sleep_time * 3 / 2);
-			if (timeoutSeconds > 0) {
-				int deadline = timeoutSeconds - (now - start);
-				if (deadline <= 0) {
-					break;
-				}
-				nextSleepTime = Values::min(deadline, nextSleepTime);
+			if (now >= end) {
+				error = ETIMEDOUT;
+				break;
+			}
+			int sleep_suggestion = (sleep_time + 1) * 3 / 2;
+			int sleep_end = now + sleep_suggestion;
+			int actual_end = end < sleep_end ? end : sleep_end;
+			sleep_time = actual_end - now;
+			if (sleep_time > 0) {
+				std::cout << "bind-wait sleeps for " << sleep_time << " seconds" << std::endl;
+				sleep(sleep_time);
+			}
+			else {
+				error = ETIMEDOUT;
+				break;
 			}
 		}
 		if (errorCode) {

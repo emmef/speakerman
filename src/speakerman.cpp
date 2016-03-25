@@ -89,26 +89,6 @@ inline static accurate_t frequencyWeight(accurate_t f, accurate_t shelve1, accur
 		return (1 + fRel * fShelve2Corr) / (1.0 + fRel);
 }
 
-static void charFetcher()
-{
-	std::chrono::milliseconds duration(101);
-	while (signalNumber == -1) {
-		char c;
-		cin >> c;
-		userInput = c;
-		cout << "User input " << c << endl;
-		while (userInput != EOF) {
-			std::this_thread::sleep_for(duration);
-		}
-	}
-	cout << "Ended user input" << endl;
-}
-
-static int getChar() {
-	int chr = userInput;
-	userInput = EOF;
-	return chr;
-}
 
 static void configUpdater()
 {
@@ -147,8 +127,6 @@ static void webServer()
 
 int mainLoop(Owner<JackClient> &owner)
 {
-	std::thread fetchChars(charFetcher);
-	fetchChars.detach();
 	std::thread checkConfigUpdates(configUpdater);
 	checkConfigUpdates.detach();
 	std::thread webServerThread(webServer);
@@ -158,37 +136,10 @@ int mainLoop(Owner<JackClient> &owner)
 	try {
 		bool running = true;
 		while (running && signalNumber == -1) {
-			int cmnd = getChar();
-			if (cmnd == EOF) {
-				std:this_thread::sleep_for(duration);
-				continue;
-			}
-			std::cout << "User input" << cmnd << std::endl;
-			switch (cmnd) {
-			case 'a' :
-			case 'A' :
-				std::cout << "Activating..." << std::endl;
-				owner.get().setActive();
-				break;
-			case 'c' :
-			case 'C' :
-				std::cout << "Closing..." << std::endl;
-				owner.get().close();
-				running = false;
-				break;
-			case 'q' :
-			case 'Q' :
-				std::cout << "Quiting..." << std::endl;
-				running=false;
-				break;
-			case '+' :
-				break;
-			case '-' :
-				break;
-			default:
-				std::cerr << "Unknown command " << cmnd << std::endl;
-				break;
-			}
+			std:this_thread::sleep_for(duration);
+			int cmnd;
+			cin >> cmnd;
+			continue;
 		}
 	}
 	catch (const std::exception &e) {

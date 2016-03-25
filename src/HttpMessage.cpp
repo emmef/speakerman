@@ -36,7 +36,12 @@ namespace speakerman
 	public:
 		StatusCode(int code, const char *message) :
 			std::runtime_error(http_status::status_name(code)),
-			code_(code), additional_message_(message) {}
+			code_(code), additional_message_(message)
+		{
+			if (!http_status::is_ok(code)) {
+				std::cerr << "HTTP " << code << std::endl;
+			}
+		}
 		StatusCode(int code) : StatusCode(code, nullptr) {}
 		int code() const { return code_; }
 		bool has_additional_message() const { return additional_message_ != nullptr; }
@@ -242,7 +247,7 @@ namespace speakerman
 	const char * http_message::on_method(const char* method)
 	{
 		if (strncmp("GET", method, 10) == 0) {
-			std::cout << "D: Method = " << method << std::endl;
+//			std::cout << "D: Method = " << method << std::endl;
 			return nullptr;
 		}
 		return "GET";
@@ -251,7 +256,7 @@ namespace speakerman
 	const char* http_message::on_url(const char* url)
 	{
 		if (*url == '/') {
-			std::cout << "D: URI = " << url << std::endl;
+//			std::cout << "D: URI = " << url << std::endl;
 			return nullptr;
 		}
 		return "Only absolute paths allowed";
@@ -259,18 +264,17 @@ namespace speakerman
 
 	const char* http_message::on_version(const char* version)
 	{
-		std::cout << "D: VERSION = " << version << std::endl;
+//		std::cout << "D: VERSION = " << version << std::endl;
 		return nullptr;
 	}
 
 	void http_message::on_header(const char* header, const char* value)
 	{
-		std::cout << "D: HEADER = " << header << " : " << value << std::endl;
+//		std::cout << "D: HEADER = " << header << " : " << value << std::endl;
 	}
 
-	int http_message::write_header(const char * header, const char *value)
+	static int write_header_raw(const char * header, const char *value, output_stream &stream)
 	{
-		output_stream &stream = *stream_;
 		int w = stream.write_string(header, 100);
 		if (w < 0) {
 			return w;
@@ -284,6 +288,16 @@ namespace speakerman
 			return w;
 		}
 		return stream.write_string("\r\n", 3);
+	}
+
+	int http_message::write_header(const char * header, const char *value)
+	{
+		return write_header_raw(header, value, *stream_);
+	}
+
+	int http_message::set_header(const char * header, const char *value)
+	{
+		return write_header_raw(header, value, headers_);
 	}
 
 	int http_message::write_content_length(size_t value)
@@ -310,6 +324,13 @@ namespace speakerman
 				return w;
 			}
 		}
+		int r;
+		while ((r = headers_.read()) >= 0) {
+			w = stream_->write(r);
+			if (w < 0) {
+				return w;
+			}
+		}
 		w = stream_->write_string("\r\n", 2);
 		if (w < 0) {
 			return w;
@@ -325,7 +346,7 @@ namespace speakerman
 
 		if (content_stream_length_ > 0) {
 			size_t writes = content_stream_length_;
-			int w = handle_content_prefix(writes);
+			handle_content_prefix(writes);
 			for (size_t i = 0; i < content_stream_length_; i++) {
 				int c = content_stream_->read();
 				if (c < 0) {
@@ -389,6 +410,7 @@ namespace speakerman
 			read_url();
 			read_version();
 			read_headers();
+			headers_.flush();
 			handle_request();
 			return handle_ok();
 		}
