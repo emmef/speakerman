@@ -1,5 +1,5 @@
 /*
- * Names.hpp
+ * Names.cpp
  *
  * Part of 'Speaker management system'
  *
@@ -23,11 +23,8 @@
 #define SMS_SPEAKERMAN_NAMES_GUARD_H_
 
 #include <regex>
-#include <mutex>
-#include <stdexcept>
 
 #include <jack/jack.h>
-#include <tdap/Array.hpp>
 #include <tdap/CapacityPolicy.hpp>
 
 namespace speakerman {
@@ -37,238 +34,82 @@ using namespace tdap;
 
 class Names
 {
-	static void checkLengthOrThrow(size_t bufferSize, int result)
-	{
-		if (result > 0 && (size_t)result < bufferSize) {
-			return;
-		}
-		throw std::logic_error("Jack port/client name regular expression initialization error");
-	}
+	static void checkLengthOrThrow(size_t bufferSize, int result);
 
 	static constexpr size_t MAX_SIZE_LENGTH = 20;
 
 	static constexpr size_t minimum_name_length = 2;
 
-	static const size_t client_port_separator_length() { return strlen(client_port_separator()); }
+	static const size_t client_port_separator_length();
 
-	static const char * template_name_regex() { return "[-_\\.,0-9a-zA-Z ]{%zu,%zu}"; }
+	static const char* template_name_regex();
 
-	static const size_t template_name_regex_length() { return strlen(template_name_regex()); }
+	static const size_t template_name_regex_length();
 
 
-	static const size_t pattern_max_length()
-	{
-		static const size_t value =
-				2 + // Begin and end markers ^$
-				2 * template_name_regex_length() + // basic tempates without length
-				client_port_separator_length() + // client/port separator
-				2 * MAX_SIZE_LENGTH;
-		return value;
-	}
+	static const size_t pattern_max_length();
 
-	static const size_t pattern_max_buffer_size() { return pattern_max_length() + 1; }
+	static const size_t pattern_max_buffer_size();
 
-	static string get_name_pattern(size_t clientLength, size_t portLength)
-	{
-		static const int SIZE = pattern_max_buffer_size();
+	static string get_name_pattern(size_t clientLength, size_t portLength);
 
-		size_t formatTemplateLength = 2 * template_name_regex_length() + client_port_separator_length();
-
-		char formatTemplate[SIZE];
-		char pattern[SIZE];
-
-		if (clientLength > 0 && portLength > 0) {
-			checkLengthOrThrow(SIZE, snprintf(formatTemplate, SIZE,
-					"^%s%s%s$", template_name_regex(), client_port_separator(), template_name_regex()));
-		}
-		else {
-			checkLengthOrThrow(SIZE, snprintf(formatTemplate, SIZE, "^%s$", template_name_regex()));
-		}
-
-		if (clientLength > 0) {
-			if (portLength > 0) {
-				checkLengthOrThrow(SIZE, snprintf(pattern, SIZE,
-						formatTemplate, minimum_name_length, clientLength, minimum_name_length, portLength));
-			}
-			else {
-				checkLengthOrThrow(SIZE, snprintf(pattern, SIZE,
-						formatTemplate, minimum_name_length, clientLength));
-			}
-		}
-		else if (portLength > 0) {
-			checkLengthOrThrow(SIZE, snprintf(pattern, SIZE,
-					formatTemplate, minimum_name_length, portLength));
-		}
-		else {
-			snprintf(pattern, SIZE, "^$");
-		}
-
-		return pattern;
-	}
-
-	static const char * valid_name(const regex &regex, const char * name, const char * description)
-	{
-		if (regex_match(name, regex)) {
-			return name;
-		}
-		string message = "Invalid name (";
-		message += description;
-		message += "): '";
-		message += name;
-		message += "'";
-
-		throw std::invalid_argument(message);
-	}
+	static const char* valid_name(const regex& regex, const char* name,
+			const char* description);
 
 public:
-	static const char * const client_port_separator() { return ":"; }
+	static const char* const client_port_separator();
 
-	static size_t get_full_size()
-	{
-		static const size_t value = jack_port_name_size();
-		return value;
-	}
+	static size_t get_full_size();
 
-	static size_t get_client_size()
-	{
-		static const size_t value = jack_client_name_size();
-		return value;
-	}
+	static size_t get_client_size();
 
-	static size_t get_port_size()
-	{
-		static const size_t value =
-				get_full_size() -
-				get_client_size() -
-				client_port_separator_length();
-		return value;
-	}
+	static size_t get_port_size();
 
-	static const string get_port_pattern()
-	{
-		static const string pattern = get_name_pattern(0, get_port_size());
+	static const string get_port_pattern();
 
-		return pattern;
-	}
+	static const string get_client_pattern();
 
-	static const string get_client_pattern()
-	{
-		static const string pattern = get_name_pattern(get_client_size(), 0);
+	static const string get_full_pattern();
 
-		return pattern;
-	}
+	static const regex& get_port_regex();
 
-	static const string get_full_pattern()
-	{
-		static const string pattern = get_name_pattern(get_client_size(), get_port_size());
+	static const regex& get_client_regex();
 
-		return pattern;
-	}
+	static const regex& get_full_regex();
 
-	static const regex &get_port_regex()
-	{
-		static const regex NAME_REGEX(get_port_pattern());
+	static bool is_valid_port(const char* unchecked);
 
-		return NAME_REGEX;
-	}
+	static bool is_valid_port_full(const char* unchecked);
 
-	static const regex &get_client_regex()
-	{
-		static const regex NAME_REGEX(get_client_pattern());
+	static bool is_valid_client(const char* unchecked);
 
-		return NAME_REGEX;
-	}
+	static const char* valid_port(const char* unchecked);
 
-	static const regex &get_full_regex()
-	{
-		static const regex NAME_REGEX(get_full_pattern());
+	static const char* valid_port_full(const char* unchecked);
 
-		return NAME_REGEX;
-	}
+	static const char* valid_client(const char* unchecked);
 
-	static bool is_valid_port(const char *unchecked)
-	{
-		return std::regex_match(unchecked, get_port_regex());
-	}
+	static const string& valid_port(const string& unchecked);
 
-	static bool is_valid_port_full(const char *unchecked)
-	{
-		return std::regex_match(unchecked, get_port_regex());
-	}
+	static const string& valid_port_full(const string& unchecked);
 
-	static bool is_valid_client(const char *unchecked)
-	{
-		return std::regex_match(unchecked, get_port_regex());
-	}
+	static const string& valid_client(const string& unchecked);
 
-	static const char * valid_port(const char *unchecked)
-	{
-		return valid_name(get_port_regex(), unchecked, "port");
-	}
+	static string& valid_port(string& unchecked);
 
-	static const char * valid_port_full(const char *unchecked)
-	{
-		return valid_name(get_full_regex(), unchecked, "full port");
-	}
+	static string& valid_port_full(string& unchecked);
 
-	static const char * valid_client(const char *unchecked)
-	{
-		return valid_name(get_client_regex(), unchecked, "port");
-	}
-
-	static const string &valid_port(const string &unchecked)
-	{
-		valid_name(get_port_regex(), unchecked.c_str(), "port");
-		return unchecked;
-	}
-
-	static const string &valid_port_full(const string &unchecked)
-	{
-		valid_name(get_full_regex(), unchecked.c_str(), "full port");
-		return unchecked;
-	}
-
-	static const string &valid_client(const string &unchecked)
-	{
-		valid_name(get_client_regex(), unchecked.c_str(), "port");
-		return unchecked;
-	}
-
-	static string &valid_port(string &unchecked)
-	{
-		valid_name(get_port_regex(), unchecked.c_str(), "port");
-		return unchecked;
-	}
-
-	static string &valid_port_full(string &unchecked)
-	{
-		valid_name(get_full_regex(), unchecked.c_str(), "full port");
-		return unchecked;
-	}
-
-	static string &valid_client(string &unchecked)
-	{
-		valid_name(get_client_regex(), unchecked.c_str(), "port");
-		return unchecked;
-	}
+	static string& valid_client(string& unchecked);
 };
 
 class NameList;
 class NameListPolicy : public CapacityPolicy
 {
 public:
-	virtual size_t checkAndGetlength(const NameList &list, const char *name) const
-	{
-		return strlen(name);
-	}
-	virtual size_t maxNames() const
-	{
-		return Count<const char *>::max();
-	}
-	virtual size_t maxCharacters() const
-	{
-		return Count<char>::max();
-	}
+	virtual size_t checkAndGetlength(const NameList& list,
+			const char* name) const;
+	virtual size_t maxNames() const;
+	virtual size_t maxCharacters() const;
 };
 
 
@@ -282,93 +123,25 @@ class NameList
 	char * characters_ = nullptr;
 	const NameListPolicy &policy_;
 
-	void ensureCapacity(size_t length)
-	{
-		const char *oldCharacters = characters_;
-		policy_.ensureCapacity(
-				characters_, characterCapacity_, characterCount_,
-				characterCount_ + length + 1, policy_.maxCharacters());
-		if (oldCharacters != characters_) {
-			correctNames(oldCharacters, characters_);
-		}
-		policy_.ensureCapacity(names_, nameCapacity_, nameCount_,
-				nameCount_ + 1, policy_.maxNames());
-	}
+	void ensureCapacity(size_t length);
 
-	void correctNames(const char *oldChars, const char * newChars)
-	{
-		ptrdiff_t offset = newChars - oldChars;
-		for (size_t i = 0; i < nameCount_; i++) {
-			names_[i] += offset;
-		}
-	}
+	void correctNames(const char* oldChars, const char* newChars);
 
 public:
-	NameList(const NameListPolicy &policy, size_t initialNameCapacity, size_t initialCharacterCapacity) :
-		nameCount_(0),
-		nameCapacity_(initialNameCapacity),
-		names_(initialNameCapacity > 0 ? new const char *[initialNameCapacity] : nullptr),
-		characterCount_(0),
-		characterCapacity_(initialCharacterCapacity),
-		characters_(initialCharacterCapacity > 0 ? new char [initialCharacterCapacity] : nullptr),
-		policy_(policy) {}
+	NameList(const NameListPolicy& policy, size_t initialNameCapacity,
+			size_t initialCharacterCapacity);
 
-	NameList(const NameListPolicy &policy) : NameList(policy, 16, 1024) {}
+	NameList(const NameListPolicy& policy);
 
-	NameList(NameList &&source) :
-		nameCount_(source.nameCount_),
-		nameCapacity_(source.nameCapacity_),
-		names_(source.names_),
-		characterCount_(source.characterCount_),
-		characterCapacity_(source.characterCapacity_),
-		characters_(source.characters_),
-		policy_(source.policy_)
-	{
-		source.removeAll();
-		source.characters_ = nullptr;
-		source.names_ = nullptr;
-	}
+	NameList(NameList&& source);
 
-	NameList(const NameList &source) :
-		nameCount_(source.nameCount_),
-		nameCapacity_(source.nameCapacity_),
-		names_(nameCapacity_ > 0 ? new const char *[nameCapacity_] : nullptr),
-		characterCount_(source.characterCount_),
-		characterCapacity_(source.characterCapacity_),
-		characters_(characterCapacity_ > 0 ? new char [characterCapacity_] : nullptr),
-		policy_(source.policy_)
-	{
-		memmove(characters_, source.characters_, characterCount_);
-		// NOT same as correctNames()
-		ptrdiff_t offset = characters_ - source.characters_;
-		for (size_t i = 0; i < nameCount_; i++) {
-			names_[i] = source.names_[i] + offset;
-		}
-	}
+	NameList(const NameList& source);
 
-	void add(const char * name)
-	{
-		size_t length = policy_.checkAndGetlength(*this, name);
-		ensureCapacity(length);
-		char * addedName = characters_ + characterCount_;
-		strncpy(addedName, name, length);
-		addedName[length] = '\0';
-		characterCount_ += length + 1;
-		names_[nameCount_++] = addedName;
-	}
+	void add(const char* name);
 
-	const char * get(size_t i) const
-	{
-		if (i < nameCount_) {
-			return names_[i];
-		}
-		throw std::invalid_argument("Name index out of bounds");
-	}
+	const char* get(size_t i) const;
 
-	const char * operator[](size_t i) const
-	{
-		return get(i);
-	}
+	const char* operator [](size_t i) const;
 
 	size_t count() const { return nameCount_; }
 
@@ -377,37 +150,13 @@ public:
 	/**
 	 * Remove all names, but don't free any memory
 	 */
-	void removeAll()
-	{
-		characterCount_ = 0;
-		nameCount_ = 0;
-	}
+	void removeAll();
 
-	void free()
-	{
-		if (names_) {
-			delete [] names_;
-		}
-		if (characters_) {
-			delete [] characters_;
-		}
-		removeAll();
-	}
+	void free();
 
-	~NameList()
-	{
-		free();
-	}
+	~NameList();
 };
 
-
-class PortNamesProvider
-{
-public:
-	virtual const char ** createNames() = 0;
-	virtual void destroyNames(const char **names) = 0;
-	~PortNamesProvider() = default;
-};
 
 class PortNames
 {
@@ -418,60 +167,23 @@ public:
 	FreeNames free_;
 
 
-	size_t rangeCheck(size_t index) const {
-		if (index < count_) {
-			return index;
-		}
-		throw out_of_range("Port name index out of range");
-	}
+	size_t rangeCheck(size_t index) const;
 
-	static size_t countPorts(const char ** portNames, size_t maxSensibleNames)
-	{
-		if (!portNames) {
-			return 0;
-		}
-		const char** name = portNames;
-		size_t count = 0;
-		while (name[count] != nullptr && count <= maxSensibleNames) {
-			count++;
-		}
-		if (count > maxSensibleNames) {
-			throw std::invalid_argument("Names list not null-terminated");
-		}
-		return count;
-	}
+	static size_t countPorts(const char** portNames, size_t maxSensibleNames);
 
 public:
-	PortNames(const char ** names, FreeNames free, size_t maxSensibleNames) :
-		portNames_(names), count_(countPorts(portNames_, maxSensibleNames)), free_(free)
-	{
-	}
+	PortNames(const char** names, FreeNames free, size_t maxSensibleNames);
 
-	PortNames(PortNames &&source) : portNames_(source.portNames_), count_(source.count_), free_(source.free_)
-	{
-		source.portNames_ = nullptr;
-		source.count_ = 0;
-	}
+	PortNames(PortNames&& source);
 
-	size_t count() const {
-		return count_;
-	}
+	size_t count() const;
 
-	const char* get(size_t idx) const {
-		return portNames_[rangeCheck(idx)];
-	}
+	const char* get(size_t idx) const;
 
-	const char* operator [](size_t idx) const {
-		return get(idx);
-	}
+	const char* operator [](size_t idx) const;
 
-	~PortNames() {
-		if (portNames_ && free_) {
-			free_(portNames_);
-		}
-	}
+	~PortNames();
 };
-
 
 
 } /* End of namespace speakerman */

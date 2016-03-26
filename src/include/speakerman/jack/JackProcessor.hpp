@@ -26,7 +26,6 @@
 #include <jack/types.h>
 #include <atomic>
 #include <mutex>
-#include <tdap/Guards.hpp>
 #include <speakerman/jack/Port.hpp>
 
 namespace speakerman {
@@ -60,61 +59,19 @@ class JackProcessor
 	using lock = unique_lock<mutex>;
 
 	std::atomic_flag running_ = ATOMIC_FLAG_INIT;
+	long long processingCycles;
 
 	class Reset {
 		JackProcessor *owner_;
 	public:
-		Reset(JackProcessor *owner) : owner_(owner) { }
-		~Reset()
-		{
-			owner_->unsafeResetState();
-		}
+		Reset(JackProcessor *owner);
+		~Reset();
 	};
 
-	static int realtimeCallback(jack_nframes_t frames, void *data)
-	{
-		if (data) {
-			try {
-				return static_cast<JackProcessor *>(data)->realtimeProcessWrapper(frames);
-			}
-			catch (const std::exception &e) {
-				cerr << "Exception in processing thread: " << e.what() << endl;
-				return 1;
-			}
-		}
-		return 1;
-	}
-
-	int realtimeProcessWrapper(jack_nframes_t frames)
-	{
-		TryEnter guard(running_);
-		if (guard.entered() && ports_) {
-			ports_->getBuffers(frames);
-			return process(frames, *ports_) ? 0 : 1;
-		}
-		return 0;
-	}
-
-	void ensurePorts(jack_client_t *client)
-	{
-		if (ports_) {
-			return;
-		}
-		ports_ = new Ports(getDefinitions());
-
-		ports_->registerPorts(client);
-
-		ErrorHandler::checkZeroOrThrow(jack_set_process_callback(client, realtimeCallback, this), "Setting callback");
-	}
-
-	void unsafeResetState()
-	{
-		running_.test_and_set();
-		metrics_ = {0, 0};
-		if (ports_) {
-			delete ports_;
-		}
-	}
+	static int realtimeCallback(jack_nframes_t frames, void *data);
+	int realtimeProcessWrapper(jack_nframes_t frames);
+	void ensurePorts(jack_client_t *client);
+	void unsafeResetState();
 
 protected:
 	virtual const PortDefinitions &getDefinitions() =  0;
@@ -154,7 +111,7 @@ protected:
 	virtual bool process(jack_nframes_t frames, const Ports &ports) = 0;
 
 public:
-	JackProcessor() { running_.test_and_set(); }
+	JackProcessor();
 	/**
 	 * Returns the sample rate.
 	 * The rate is only non-zero if #needsSampleRate() returns true
@@ -185,62 +142,11 @@ public:
 	 */
 	virtual bool needsSampleRate() const = 0;
 
-	bool updateMetrics(jack_client_t *client, ProcessingMetrics update)
-	{
-		lock guard(mutex_);
-		bool rateConditionMet =
-				!needsSampleRate() ||
-				(update.sampleRate != 0 && update.sampleRate != metrics_.sampleRate);
-		bool bufferSizeConditionMet =
-				!needsBufferSize() ||
-				(update.bufferSize != 0 && update.bufferSize != metrics_.bufferSize);
-
-		/**
-		 * If the processor indicates it does not need information
-		 * on either sample rate or buffer size, we will not make that information
-		 * available to it.
-		 */
-		ProcessingMetrics relevantMetrics = {
-				needsSampleRate() ? update.sampleRate : 0,
-				needsBufferSize() ? update.bufferSize : 0
-		};
-
-		if (rateConditionMet && bufferSizeConditionMet) {
-			if (onMetricsUpdate(relevantMetrics)) {
-				if (metrics_ == ProcessingMetrics::withRate(0).withBufferSize(0)) {
-					ensurePorts(client);
-				}
-				metrics_ = relevantMetrics;
-				running_.clear();
-				return true;
-			}
-			return false;
-		}
-		return true;
-	}
-
-	void onActivate(jack_client_t *client)
-	{
-		lock guard(mutex_);
-		if (ports_) {
-			onPortsEnabled(client, *ports_);
-		}
-	}
-
-	void reset()
-	{
-		lock guard(mutex_);
-		Reset reset(this);
-		onReset();
-	}
-
-	virtual ~JackProcessor()
-	{
-		if (ports_) {
-			delete ports_;
-			ports_ = nullptr;
-		}
-	}
+	bool updateMetrics(jack_client_t *client, ProcessingMetrics update);
+	void onActivate(jack_client_t *client);
+	void reset();
+	long long getProcessingCycles() const;
+	virtual ~JackProcessor();
 };
 
 } /* End of namespace speakerman */

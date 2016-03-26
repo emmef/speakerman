@@ -1,6 +1,19 @@
 bin_PROGRAMS=speakerman
 
-speakerman_SOURCES=ErrorHandler.cpp SpeakermanConfig.cpp Stream.cpp SocketStream.cpp ServerSocket.cpp HttpMessage.cpp SpeakermanWebServer.cpp speakerman.cpp
+speakerman_SOURCES=\
+	ErrorHandler.cpp \
+	SpeakermanConfig.cpp \
+	Stream.cpp \
+	SocketStream.cpp \
+	ServerSocket.cpp \
+	HttpMessage.cpp \
+	SpeakermanWebServer.cpp \
+	JackClient.cpp \
+	JackProcessor.cpp \
+	Names.cpp \
+	Port.cpp \
+	PortDefinition.cpp \
+	speakerman.cpp
 
 speakerman_LDADD=$(UNITTESTCPP_LIBS) $(JACK_LIBS) $(GLIB_LIBS) -lpthread 
 speakerman_CXXFLAGS=-I$(top_srcdir)/src/include $(GLIB_CFLAGS) $(JACK_CFLAGS) $(UNITTESTCPP_CFLAGS)

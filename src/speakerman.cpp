@@ -210,7 +210,7 @@ int main(int count, char * arguments[]) {
 	clientOwner.set(result.getClient());
 
 	int error;
-	if (!webserver.open("8080", 10, 10, &error)) {
+	if (!webserver.open("8080", 60, 10, &error)) {
 		std::cerr << "Could not open webserver: " << strerror(error) << std::endl;
 	}
 

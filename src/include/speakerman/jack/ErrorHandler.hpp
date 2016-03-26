@@ -22,12 +22,9 @@
 #ifndef SMS_SPEAKERMAN_ERROR_HANDLER_GUARD_H_
 #define SMS_SPEAKERMAN_ERROR_HANDLER_GUARD_H_
 
-#include <string>
-#include <iostream>
-#include <stdexcept>
 #include <atomic>
+#include <stdexcept>
 
-#include <jack/jack.h>
 #include <jack/types.h>
 
 
@@ -41,46 +38,19 @@ class ErrorHandler
 	static thread_local bool force_log_;
 	static atomic_bool callback_installed_;
 
-	static void error_callback(const char * message) {
-		message_ = message;
-		if (force_log_) {
-			force_log_ = false;
-			std::cerr << "Forced log: " << message << std::endl;
-		}
-	}
+	static void error_callback(const char* message);
 
 
 public:
-	static void clear()
-	{
-		message_ = nullptr;
-	}
+	static void clear();
 
-	static void clear_ensure()
-	{
-		bool v = false;
-		if (std::atomic_compare_exchange_strong(&callback_installed_, &v, true)) {
-			jack_set_error_function(ErrorHandler::error_callback);
-		}
-		clear();
-	}
+	static void clear_ensure();
 
-	static void setForceLogNext()
-	{
-		ErrorHandler::force_log_ = true;
-	}
+	static void setForceLogNext();
 
-	static const char * get_message()
-	{
-		return message_;
-	}
+	static const char* get_message();
 
-	static const char * get_message_clear()
-	{
-		const char * result = message_;
-		message_ = 0;
-		return result;
-	}
+	static const char* get_message_clear();
 
 	/**
 	 * Checks if the value is zero and throws runtime_error otherwise.
@@ -93,34 +63,7 @@ public:
 	 * @param value The value to check
 	 * @param description Additional description
 	 */
-	static void checkZeroOrThrow(int value, const char * description)
-	{
-		if (value == 0) {
-			return;
-		}
-		char ws[30];
-		snprintf(ws,30,"%i", value);
-
-		string message = "[";
-		message += ws;
-		message += "]";
-		const char *error = get_message_clear();
-		if (description) {
-			message += " ";
-			message += description;
-			if (error) {
-				message += ": ";
-				message += error;
-			}
-		}
-		else if (error) {
-			message += error;
-		}
-		else {
-			message += "Unspecified error";
-		}
-		throw std::runtime_error(message);
-	}
+	static void checkZeroOrThrow(int value, const char* description);
 
 	/**
 	 * Throws runtime_exception if the pointer ptr is nullptr.
@@ -129,25 +72,34 @@ public:
 	 * @return the non-nullptr pointer
 	 */
 	template<typename T>
-	static T * checkNotNullOrThrow(T * const ptr, const char * description)
-	{
+	static T* checkNotNullOrThrow(T* const ptr, const char* description) {
 		if (ptr) {
 			return ptr;
 		}
-
-		const char *error = get_message_clear();
+		const char* error = get_message_clear();
 		if (error) {
 			string message = description ? description : "Error";
 			message += ": ";
 			message += error;
 			throw std::runtime_error(message);
-		}
-		else if (description) {
+		} else if (description) {
 			throw std::runtime_error(description);
-		}
-		else {
+		} else {
 			throw std::runtime_error("Jack error");
 		}
+	}
+	/**
+	 * Throws runtime_exception if the pointer ptr is nullptr.
+	 * @param ptr The pointer
+	 * @param description Additional message in error
+	 * @return the non-nullptr pointer
+	 */
+	template<typename T>
+	bool returnIfZero(int value, int* result) {
+		if (result) {
+			*result = value;
+		}
+		return value == 0;
 	}
 
 	/**
@@ -156,13 +108,7 @@ public:
 	 * @param result Stores the value if it is not nullptr.
 	 * @return true if the value is zero.
 	 */
-	static bool returnIfZero(int value, int *result)
-	{
-		if (result) {
-			*result = value;
-		}
-		return value == 0;
-	}
+	static bool returnIfZero(int value, int* result);
 };
 
 

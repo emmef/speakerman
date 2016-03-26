@@ -22,12 +22,10 @@
 #ifndef SMS_SPEAKERMAN_PORTDEFINITION_GUARD_H_
 #define SMS_SPEAKERMAN_PORTDEFINITION_GUARD_H_
 
-#include <jack/jack.h>
 #include <jack/types.h>
 
 #include <tdap/Array.hpp>
 
-#include "ErrorHandler.hpp"
 #include "Names.hpp"
 
 namespace speakerman {
@@ -45,16 +43,7 @@ enum class PortIsTerminal
 	NO, YES
 };
 
-static const char * const port_direction_name(PortDirection direction)
-{
-	switch (direction) {
-		case PortDirection::IN:
-			return "IN";
-		case PortDirection::OUT:
-			return "OUT";
-	}
-}
-
+const char * const port_direction_name(PortDirection direction);
 
 /**
  * Conveniently defines an audio port.
@@ -68,54 +57,23 @@ struct PortDefinition
 		PortDirection direction;
 		PortIsTerminal terminal;
 
-		unsigned long int flags() const
-		{
-			return
-					(direction == PortDirection::OUT ? JackPortFlags::JackPortIsOutput : JackPortFlags::JackPortIsInput) |
-					(terminal == PortIsTerminal::YES ? JackPortFlags::JackPortIsTerminal : 0);
-		}
-
+		unsigned long int flags() const;
 		const char * type() const { return JACK_DEFAULT_AUDIO_TYPE; }
 	};
 
-	static Data validated(Data data)
-	{
-		Names::valid_port(data.name);
-
-		return data;
-	}
+	static Data validated(Data data);
 
 	const Data data;
 
-	static PortDefinition input(const char *name)
-	{
-		return PortDefinition(Names::valid_port(name), PortDirection::IN, PortIsTerminal::NO);
-	}
-
-	static PortDefinition output(const char *name)
-	{
-		return PortDefinition(Names::valid_port(name), PortDirection::OUT, PortIsTerminal::NO);
-	}
-
-	PortDefinition terminal_port() const
-	{
-		return PortDefinition(data.name, data.direction, PortIsTerminal::YES);
-	}
-
-	PortDefinition renamed(const char * newName) const
-	{
-		return PortDefinition(newName, data.direction, data.terminal);
-	}
-	
-	PortDefinition(const PortDefinition::Data source) : data(validated(source)) {};
+	static PortDefinition input(const char *name);
+	static PortDefinition output(const char *name);
+	PortDefinition terminal_port() const;
+	PortDefinition renamed(const char * newName) const;
+	PortDefinition(const PortDefinition::Data source);
 
 private:
 
-	PortDefinition(const char * name, PortDirection direction, PortIsTerminal terminal) :
-		data(Data{ name, direction, terminal })
-	{
-		data.flags();
-	}
+	PortDefinition(const char * name, PortDirection direction, PortIsTerminal terminal);
 };
 
 class PortDefinitions
@@ -123,144 +81,43 @@ class PortDefinitions
 	Array<PortDefinition::Data> definitions;
 	Array<char> nameStorage;
 
-	static size_t validSize(size_t size, size_t maxPorts)
-	{
-		if (size > maxPorts) {
-			size_t p = Count<char>::product(size, maxPorts);
-			if (p > 0) {
-				return p;
-			}
-		}
-		throw std::invalid_argument("Invalid size for name storage");
-	}
+	static size_t validSize(size_t size, size_t maxPorts);
 
-	void addValidated(PortDefinition data)
-	{
-		size_t ports = portCount();
-		if (ports >= maxPorts()) {
-			throw std::runtime_error("Too many ports");
-		}
-		size_t length = strnlen(data.data.name, Names::get_port_size());
-		size_t size = length + 1;
-
-		size_t offset = nameStorage.size();
-		size_t newSize = offset + size;
-		nameStorage.setSize(newSize);
-		char * copy = nameStorage + offset;
-		strncpy(copy, data.data.name, Names::get_port_size());
-		copy[offset + length] = 0;
-		definitions.setSize(ports + 1);
-		definitions[ports].name = copy;
-		definitions[ports].direction = data.data.direction;
-		definitions[ports].terminal = data.data.terminal;
-	}
+	void addValidated(PortDefinition data);
 
 public:
-	PortDefinitions(size_t maxPorts, size_t nameStorageSize) :
-		definitions(maxPorts, 0), nameStorage(validSize(nameStorageSize, maxPorts), 0) { }
+	PortDefinitions(size_t maxPorts, size_t nameStorageSize);
 
-	PortDefinitions(size_t maxPorts) : PortDefinitions(maxPorts, maxPorts * 32) {}
+	PortDefinitions(size_t maxPorts);
 
-	PortDefinitions() : PortDefinitions(16) {}
+	PortDefinitions();
 
-	PortDefinitions(const PortDefinitions &source, ConstructionPolicy policy) :
-		definitions(source.definitions, policy), nameStorage(source.nameStorage, policy)
-	{
-		const char * sourceNames = source.nameStorage + 0;
-		const char * destinationNames = nameStorage + 0;
-		for (size_t i = 0; i < portCount(); i++) {
-			definitions[i].name = destinationNames +
-					(source.definitions[i].name - sourceNames);
-		}
-	}
+	PortDefinitions(const PortDefinitions& source, ConstructionPolicy policy);
 
 	size_t portCount() const { return definitions.size(); }
 
 	size_t maxPorts() const { return definitions.capacity(); }
 
-	int indexOf(const char * name) const
-	{
-		for (size_t i = 0; i < definitions.size(); i++) {
-			if (strncasecmp(name, definitions[i].name, Names::get_port_size()) == 0) {
-				return i;
-			}
-		}
-		return -1;
-	}
+	int indexOf(const char* name) const;
 
-	int indexOf(const char * name, PortDirection direction) const
-	{
-		for (size_t i = 0; i < portCount(); i++) {
-			if (strncasecmp(name, definitions[i].name, Names::get_port_size()) == 0) {
-				if (definitions[i].direction == direction) {
-					return i;
-				}
-			}
-		}
-		return -1;
-	}
+	int indexOf(const char* name, PortDirection direction) const;
 
-	const char * ensuredNewName(const char * name) const
-	{
-		if (indexOf(name) < 0) {
-			return name;
-		}
-		string message = "Port name already in use: '";
-		message += name;
-		message += "'";
-		throw std::invalid_argument(message);
-	}
+	const char* ensuredNewName(const char* name) const;
 
-	void add(PortDefinition definition)
-	{
-		ensuredNewName(definition.data.name);
-		addValidated(definition);
-	}
+	void add(PortDefinition definition);
 
-	void addInput(const char * name)
-	{
-		add(PortDefinition::input(name));
-	}
+	void addInput(const char* name);
 
-	void addOutput(const char * name)
-	{
-		add(PortDefinition::output(name));
-	}
+	void addOutput(const char* name);
 
-	const PortDefinition::Data getByName(const char *name) const
-	{
-		int idx = indexOf(name);
+	const PortDefinition::Data getByName(const char* name) const;
 
-		if (idx >= 0) {
-			return operator[](idx);
-		}
+	const PortDefinition::Data* getByNamePtr(const char* name) const;
 
-		const char *nm = Names::valid_port(name);
-		string message = "Have no port with name: '";
-		message += nm;
-		message += "'";
+	const PortDefinition::Data& operator [](size_t index) const;
 
-		throw invalid_argument(message);
-	}
-
-	const PortDefinition::Data *getByNamePtr(const char *name) const
-	{
-		int idx = indexOf(name);
-
-		return idx < 0 ? nullptr : &operator[](idx);
-	}
-
-	const PortDefinition::Data &operator[](size_t index) const
-	{
-		return definitions[index];
-	}
-
-	const PortDefinition operator()(size_t index) const
-	{
-		return PortDefinition(definitions[index]);
-	}
+	const PortDefinition operator ()(size_t index) const;
 };
-
 
 
 } /* End of namespace speakerman */

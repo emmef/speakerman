@@ -22,14 +22,11 @@
 #ifndef SMS_SPEAKERMAN_JACKCLIENT_GUARD_H_
 #define SMS_SPEAKERMAN_JACKCLIENT_GUARD_H_
 
-#include <jack/jack.h>
 #include <jack/types.h>
 #include <atomic>
 #include <mutex>
 #include <thread>
 #include <condition_variable>
-#include <string>
-#include <iostream>
 #include "Port.hpp"
 #include <speakerman/jack/JackProcessor.hpp>
 
@@ -39,49 +36,9 @@ using namespace std;
 using namespace tdap;
 enum class ClientState { NONE, CLOSED, OPEN, CONFIGURED, ACTIVE, SHUTTING_DOWN };
 
-static const char * client_state_name(ClientState state)
-{
-	switch (state) {
-	case ClientState::CLOSED :
-		return "CLOSED";
-	case ClientState::CONFIGURED :
-		return "CONFIGURED";
-	case ClientState::OPEN:
-		return "OPEN";
-	case ClientState::ACTIVE:
-		return "ACTIVE";
-	case ClientState::SHUTTING_DOWN:
-		return "SHUTTING_DOWN";
-	default:
-		return "NONE";
-	}
-}
-
-static bool client_state_defined(ClientState state)
-{
-	switch (state) {
-	case ClientState::CLOSED :
-	case ClientState::CONFIGURED :
-	case ClientState::OPEN:
-	case ClientState::ACTIVE:
-	case ClientState::SHUTTING_DOWN:
-		return true;
-	default:
-		return false;
-	}
-}
-
-static bool client_state_is_shutdown_state(ClientState state)
-{
-	switch (state) {
-	case ClientState::CLOSED :
-	case ClientState::SHUTTING_DOWN:
-		return true;
-	default:
-		return false;
-	}
-
-}
+const char * client_state_name(ClientState state);
+bool client_state_defined(ClientState state);
+bool client_state_is_shutdown_state(ClientState state);
 
 struct ShutDownInfo
 {
@@ -105,6 +62,7 @@ struct ShutDownInfo
 };
 
 class JackClient;
+
 struct CreateClientResult
 {
 	JackClient * client;
@@ -136,171 +94,50 @@ class JackClient
 	string name_;
 	JackProcessor *processor_ = nullptr;
 	ProcessingMetrics metrics_;
+	long xRuns;
+	long long lastXrunProcessingCycle;
 
-	static void awaitShutdownCaller(JackClient *client)
-	{
-		client->awaitShutDownAndClose();
-	}
+	static void awaitShutdownCaller(JackClient* client);
 
-	static void jackShutdownCallback(void * client)
-	{
-		if (client) {
-			static_cast<JackClient*>(client)->onShutdown(
-					ShutDownInfo::withReason("jack_on_shutdown"));
-		}
-	}
+	static void jackShutdownCallback(void* client);
 
-	static void jackInfoShutdownCallback(jack_status_t code, const char * reason, void * client)
-	{
-		if (client) {
-			static_cast<JackClient*>(client)->onShutdown({code, reason, true});
-		}
-	}
+	static void jackInfoShutdownCallback(jack_status_t code, const char* reason, void* client);
 
-	static int jackBufferSizeCallback(jack_nframes_t frames, void * client)
-	{
-		return client ? static_cast<JackClient*>(client)->onBufferSizeChange(frames) : 1;
-	}
+	static int jackBufferSizeCallback(jack_nframes_t frames, void* client);
 
-	static int jackSampleRateCallback(jack_nframes_t rate, void * client)
-	{
-		return client ? static_cast<JackClient*>(client)->onSampleRateChange(rate) : 1;
-	}
+	static int jackSampleRateCallback(jack_nframes_t rate, void* client);
 
-	static int jackXrunCallback(void * client)
-	{
-		return client ? static_cast<JackClient*>(client)->onXRun() : 1;
-	}
+	static int jackXrunCallback(void* client);
 
-	void registerCallbacks()
-	{
-		jack_on_shutdown(client_, jackShutdownCallback, this);
-		jack_on_info_shutdown(client_, jackInfoShutdownCallback, this);
-	}
+	void registerCallbacks();
 
-	void awaitShutdownAndCloseUnsafe(unique_lock<mutex> &lock)
-	{
-		cout << "Await shutdown..." << endl;
-		while (!client_state_is_shutdown_state(state_)) {
-			awaitShutdownCondition_.wait(lock);
-			cout << "Wakeup!..." << endl;
-		}
-		closeUnsafe();
-	}
+	void awaitShutdownAndCloseUnsafe(unique_lock<mutex>& lock);
 
-	void awaitShutDownAndClose()
-	{
-		cout << "Start closer thread" << endl;
-		unique_lock<mutex> lock(mutex_);
-		try {
-			awaitShutdownThreadRunning_ = true;
-			cout << "Closer thread awaits..." << endl;
-			awaitShutdownAndCloseUnsafe(lock);
-			awaitShutdownThreadRunning_ = false;
-			awaitShutdownCondition_.notify_all();
-		}
-		catch (const std::exception &e) {
-			cerr << "Encountered exception in shutdown-thread of \"" << name_ << "\": " << e.what() << endl;
-		}
-		catch (...) {
-			awaitShutdownThreadRunning_ = false;
-			awaitShutdownCondition_.notify_all();
-			throw;
-		}
-	}
+	void awaitShutDownAndClose();
 
-	bool notifyShutdownUnsafe(ShutDownInfo info, unique_lock<mutex> &lock)
-	{
-		if (!client_state_is_shutdown_state(state_)) {
-			shutdownInfo_ = info;
-			state_ = ClientState::SHUTTING_DOWN;
-			awaitShutdownCondition_.notify_all();
-			return true;
-		}
-		cout << "Ignore notify: already closed" << endl;
-		return false;
-	}
+	bool notifyShutdownUnsafe(ShutDownInfo info, unique_lock<mutex>& lock);
 
-	void onShutdown(ShutDownInfo info)
-	{
-		unique_lock<mutex> lock(mutex_);
-		notifyShutdownUnsafe(info, lock);
-	}
+	void onShutdown(ShutDownInfo info);
 
-	void closeUnsafe()
-	{
-		if (state_ == ClientState::CLOSED) {
-			cout << "closeUnsafe(): already closed" << endl;
-			return;
-		}
-		cout << "closeUnsafe()" << endl;
-		if (client_) {
-			std::cout << "Closing client: '" << name() << "'" << std::endl;
-			jack_client_t *c = client_;
-			client_ = nullptr;
+	void closeUnsafe();
 
-			ErrorHandler::clear_ensure();
-			ErrorHandler::setForceLogNext();
-			jack_client_close(c);
-		}
-		processor_ = nullptr;
-		ProcessingMetrics m;
-		metrics_ = m;
-		state_ = ClientState::CLOSED;
-		cout << "closeUnsafe(): end" << endl;
-	}
-
-	static void jack_portnames_free(const char ** names) { jack_free(names); }
+	static void jack_portnames_free(const char** names);
 
 protected:
-	virtual void registerAdditionalCallbacks(jack_client_t *client) {}
+	virtual void registerAdditionalCallbacks(jack_client_t* client);
 
-	JackClient(jack_client_t *client) :
-		client_(client)
-	{
-		awaitShutdownThread_ = thread(awaitShutdownCaller, this);
-		awaitShutdownThread_.detach();
-		name_ = jack_get_client_name(client_);
-		state_ = ClientState::OPEN;
-		registerCallbacks();
-		registerAdditionalCallbacks(client_);
-	}
+	JackClient(jack_client_t* client);
 
-	int onMetricsUpdate(ProcessingMetrics m)
-	{
-		unique_lock<mutex> lock(mutex_);
-		try {
-			ProcessingMetrics update = metrics_.mergeWithUpdate(m);
-			if (processor_->updateMetrics(client_, update)) {
-				metrics_ = update;
-				return 0;
-			}
-		}
-		catch (const std::exception &e) {
-			std:cerr << "Exception in onMetricsUpdate: " << e.what() << std::endl;
-		}
-		return 1;
-	}
+	int onMetricsUpdate(ProcessingMetrics m);
 
-	int onSampleRateChange(jack_nframes_t rate)
-	{
-		return onMetricsUpdate({rate, 0});
-	}
+	int onSampleRateChange(jack_nframes_t rate);
 
-	int onBufferSizeChange(jack_nframes_t size)
-	{
-		return onMetricsUpdate({0, size});
-	}
+	int onBufferSizeChange(jack_nframes_t size);
 
 
 public:
 
-	virtual int onXRun()
-	{
-		notifyShutdown("XRUN occured!");
-		cerr << "XRUN occurred!" << endl;
-		return 1;
-	}
+	virtual int onXRun();
 
 	template<typename ...A>
 	static CreateClientResult create(const char *serverName, jack_options_t options, A... args)
@@ -323,124 +160,27 @@ public:
 		return { nullptr, lastState, serverName};
 	}
 
-	const string &name() const
-	{
-		return name_;
-	}
+	const string& name() const;
 
-	bool setProcessor(JackProcessor &processor)
-	{
-		{
-			unique_lock<mutex> lock(mutex_);
-			if (state_ != ClientState::OPEN) {
-				throw runtime_error("setProcessor: Not in OPEN state");
-			}
-			processor_ = &processor;
-		}
-		try {
-			if (processor_->needsBufferSize()) {
-				ErrorHandler::checkZeroOrThrow(
-						jack_set_buffer_size_callback(client_, jackBufferSizeCallback, this),
-						"Set buffer size callback");
-			}
-			if (processor_->needsSampleRate()) {
-				ErrorHandler::checkZeroOrThrow(
-						jack_set_sample_rate_callback(client_, jackSampleRateCallback, this),
-						"Set sample rate callback");
-			}
-			ErrorHandler::checkZeroOrThrow(
-					jack_set_xrun_callback(client_, jackXrunCallback, this),
-					"Set sample rate callback");
-			{
-				unique_lock<mutex> lock(mutex_);
-				state_ = ClientState::CONFIGURED;
-				return true;
-			}
-		}
-		catch(const std::exception &e) {
-			std::cout << "Wrong" << e.what() << std::endl;
-			{
-				unique_lock<mutex> lock(mutex_);
-				processor_ = nullptr;
-			}
-			throw e;
-		}
-	}
+	bool setProcessor(JackProcessor& processor);
 
-	void setActive()
-	{
-		unique_lock<mutex> lock(mutex_);
-		if (state_ != ClientState::CONFIGURED) {
-			throw runtime_error("setProcessor: Not in CONFIGURED state");
-		}
+	void setActive();
 
-		ErrorHandler::checkZeroOrThrow(jack_activate(client_), "Activating");
-		state_ = ClientState::ACTIVE;
+	ClientState getState();
 
-		processor_->onActivate(client_);
-	}
+	void notifyShutdown(const char* reason);
 
-	ClientState getState()
-	{
-		unique_lock<mutex> lock(mutex_);
-		return state_;
-	}
+	ShutDownInfo awaitClose();
 
-	void notifyShutdown(const char * reason)
-	{
-		onShutdown(ShutDownInfo::withReason(reason));
-	}
+	static PortNames portNames(jack_client_t* client, const char* namePattern,
+			const char* typePattern, unsigned long flags);
 
-	ShutDownInfo awaitClose()
-	{
-		unique_lock<mutex> lock(mutex_);
-		if (state_ != ClientState::ACTIVE) {
-			throw runtime_error("setProcessor: Not in ACTIVE state");
-		}
-		awaitShutdownAndCloseUnsafe(lock);
-		return shutdownInfo_;
-	}
+	PortNames portNames(const char* namePattern, const char* typePattern,
+			unsigned long flags);
 
-	static PortNames portNames(jack_client_t * client, const char* namePattern, const char* typePattern, unsigned long flags)
-	{
-		const char ** names = jack_get_ports(client, namePattern, typePattern, flags);
+	ShutDownInfo close();
 
-		return PortNames(names, jack_portnames_free, 1024);
-	}
-
-	PortNames portNames(const char* namePattern, const char* typePattern, unsigned long flags)
-	{
-		unique_lock<mutex> lock(mutex_);
-		if (state_ != ClientState::OPEN && state_ != ClientState::CONFIGURED) {
-			throw runtime_error("setProcessor: Not in OPEN or CONFIGURED state");
-		}
-		return portNames(client_, namePattern, typePattern, flags);
-	}
-
-	ShutDownInfo close()
-	{
-		unique_lock<mutex> lock(mutex_);
-		if (notifyShutdownUnsafe(ShutDownInfo::withReason("Explicit close"), lock)) {
-			closeUnsafe();
-			while (awaitShutdownThreadRunning_) {
-				cout << "Wait for terminate thread to end..."<< endl;
-				awaitShutdownCondition_.wait(lock);
-				awaitShutdownCondition_.notify_all();
-			}
-			cout << "Wait for terminate thread to end -- done!"<< endl;
-			return shutdownInfo_;
-		}
-		else {
-			return ShutDownInfo::withReason("Already closing");
-		}
-	}
-
-	virtual ~JackClient()
-	{
-		cout << "destructor" << endl;
-		close();
-		cout << "destructor -- done!" << endl;
-	}
+	virtual ~JackClient();
 };
 
 
