@@ -84,7 +84,7 @@ static void webServer()
 	web_server server(manager.get());
 
 	try {
-		server.open("8088", 10, 10, nullptr);
+		server.open("8088", 60, 10, nullptr);
 		server.work(nullptr);
 	}
 	catch (const std::exception &e) {
@@ -168,9 +168,6 @@ int main(int count, char * arguments[]) {
 	clientOwner.set(result.getClient());
 
 	int error;
-	if (!webserver.open("8080", 60, 10, &error)) {
-		std::cerr << "Could not open webserver: " << strerror(error) << std::endl;
-	}
 
 	const char * all = ".*";
 	PortNames inputs = clientOwner.get().portNames(all, all, JackPortIsPhysical|JackPortIsOutput);
