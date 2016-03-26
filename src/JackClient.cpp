@@ -24,6 +24,7 @@
 #include <iostream>
 
 #include <condition_variable>
+#include <speakerman/jack/SignalHandler.hpp>
 #include <speakerman/jack/JackClient.hpp>
 #include <speakerman/jack/ErrorHandler.hpp>
 

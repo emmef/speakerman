@@ -148,10 +148,8 @@ namespace speakerman
 
 		std::atomic_flag busy_;
 		socket_stream *stream_;
-		buffer_stream headers_;
-
 		response_stream response_;
-
+		buffer_stream headers_;
 		size_t content_stream_length_;
 		const char * content_type_;
 		input_stream *content_stream_;

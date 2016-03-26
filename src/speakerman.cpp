@@ -25,8 +25,8 @@
 #include <cstdlib>
 #include <thread>
 
-#include <signal.h>
 #include <speakerman/jack/JackClient.hpp>
+#include <speakerman/jack/SignalHandler.hpp>
 #include <speakerman/SpeakermanConfig.hpp>
 #include <speakerman/SpeakerManager.hpp>
 #include <speakerman/SpeakermanWebServer.hpp>
@@ -70,38 +70,13 @@ public:
 
 Owner<AbstractSpeakerManager> manager;
 SpeakermanConfig configFileConfig;
-static volatile int signalNumber = -1;
 static volatile int userInput;
-
-extern "C" {
-	void signal_callback_handler(int signum)
-	{
-		std::cerr << std::endl << "Caught signal " << strsignal(signum) << std::endl;
-
-		signalNumber = signum;
-	}
-}
 
 inline static accurate_t frequencyWeight(accurate_t f, accurate_t shelve1, accurate_t shelve2, accurate_t power)
 {
 		accurate_t fRel = pow(f / shelve1, power);
 		accurate_t fShelve2Corr = pow(1.0 / shelve2, power);
 		return (1 + fRel * fShelve2Corr) / (1.0 + fRel);
-}
-
-
-static void configUpdater()
-{
-	std::chrono::milliseconds sleeper(1001);
-//	while (signalNumber == -1) {
-//		this_thread::sleep_for(sleeper);
-//		auto stamp = getConfigFileTimeStamp();
-//		DynamicProcessorLevels levels;
-//		if (stamp != configFileConfig.timeStamp) {
-//			configFileConfig = readSpeakermanConfig(configFileConfig, false);
-//			manager.get().applyConfigAndGetLevels(configFileConfig, &levels, sleeper);
-//		}
-//	}
 }
 
 static void webServer()
@@ -115,46 +90,29 @@ static void webServer()
 	catch (const std::exception &e) {
 		std::cerr << "Web server error: " << e.what() << std::endl;
 	}
-//	else {
-//		manager.get().getLevels(&levels, sleeper);
-//	}
-//	for (size_t i = 0; i < levels.groups(); i++) {
-//		std::cout << "GROUP " << i << " SIGNAL=" << levels.getSignal(i) << "; GAIN=" << levels.getGroupGain(i) << std::endl;
-//	}
-//	std::cout << "SUB-GAIN: " << levels.getSubGain() << std::endl;
-
+	catch (const signal_exception &e) {
+		cerr << "Web server thread stopped" << endl;
+		e.handle();
+	}
 }
 
 int mainLoop(Owner<JackClient> &owner)
 {
-	std::thread checkConfigUpdates(configUpdater);
-	checkConfigUpdates.detach();
 	std::thread webServerThread(webServer);
 	webServerThread.detach();
-	std::chrono::milliseconds duration(100);
 
+	const std::chrono::milliseconds duration(100);
 	try {
-		bool running = true;
-		while (running && signalNumber == -1) {
-			std:this_thread::sleep_for(duration);
-			int cmnd;
-			cin >> cmnd;
-			continue;
+		while (true) {
+			this_thread::sleep_for(duration);
+			SignalHandler::check_raised();
 		}
+		cout << "Bye!";
 	}
-	catch (const std::exception &e) {
-		std::cerr << "Exception caught: " << e.what();
-		return SIGABRT;
+	catch (const signal_exception &e) {
+		e.handle();
+		return e.signal();
 	}
-	if (signalNumber == -1) {
-		signalNumber = 0;
-	}
-	cout << "Bye!";
-	if (signalNumber > 0) {
-		cout << " CODE " << signalNumber;
-	}
-	cout << endl;
-	return signalNumber;
 }
 
 
@@ -222,10 +180,6 @@ int main(int count, char * arguments[]) {
 		std::cerr << "Failed to set processor" << std::endl;
 		return 1;
 	}
-
-	signal(SIGINT, signal_callback_handler);
-	signal(SIGTERM, signal_callback_handler);
-	signal(SIGABRT, signal_callback_handler);
 
 	std::cout << "activate..." << std::endl;
 	clientOwner.get().setActive();

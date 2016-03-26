@@ -61,7 +61,7 @@ namespace speakerman
 	class socket_output_stream : public file_owner, output_stream
 	{
 		char buffer_[STREAM_BUFFER_SIZE];
-		int pos_;
+		size_t pos_;
 		friend class socket_stream;
 
 		int unsafe_send(size_t offset, size_t count, bool do_throw);
@@ -103,9 +103,10 @@ namespace speakerman
 		{
 			istream.set_file(fd, false);
 			ostream.set_file(fd, owns_file);
+			return 0;
 		}
 
-		bool canReadFromBuffer() const { istream.canReadFromBuffer(); }
+		bool canReadFromBuffer() const { return istream.canReadFromBuffer(); }
 
 		bool canWriteToBuffer() const { return ostream.canWriteToBuffer(); }
 

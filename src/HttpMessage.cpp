@@ -480,7 +480,7 @@ namespace speakerman
 	void http_message::read_method()
 	{
 		int c;
-		int length = 0;
+		size_t length = 0;
 		for (length = 0; length < (read_buffer_size()-1) && ((c = stream_->read()) >= 0); length++) {
 			if (c < 'A' || c > 'Z') {
 				break;
@@ -510,10 +510,10 @@ namespace speakerman
 		static constexpr int URI_HEX2 = 4;
 		static constexpr int URI_INVCHAR = -2;
 
-		int dig, num;
+		int dig, num = 0;
 		int c;
 		int state = URI_SPACE;
-		int length;
+		size_t length;
 
 		for (length = 0; length < (read_buffer_size()-1) && ((c = stream_->read()) >= 0); ) {
 			if (state == URI_SPACE) {
@@ -552,7 +552,7 @@ namespace speakerman
 					state = URI_HEX2;
 				}
 			}
-			else if (state = URI_HEX2) {
+			else if (state == URI_HEX2) {
 				dig = getHexValue(c);
 				if (dig < 0) {
 					state = URI_INVCHAR;
@@ -584,7 +584,7 @@ namespace speakerman
 		static constexpr const char * TEMPLATE = "HTTP/#\n";
 		socket_stream& stream = *stream_;
 		int tPos = 0;
-		int length;
+		size_t  length;
 		int c;
 		int state = VERSION_COPY;
 		for (length = 0; length < (read_buffer_size()-1) && ((c = stream.read()) >= 0); ) {
@@ -638,14 +638,14 @@ namespace speakerman
 		static constexpr int VALUE_WHITESPACE = 7;
 		static constexpr int VALUE = 8;
 
-		int length;
+		size_t length;
 		int c;
 		int state = NONE;
 		const char * value = nullptr;
 		for (length = 0; length < read_buffer_length() && ((c = stream_->read()) >= 0); ) {
 			if (state == NONE) {
 				if (c == '\n') {
-					state == LF;
+					state = LF;
 				}
 				else if (c == '\r') {
 					state = CR;

@@ -20,6 +20,7 @@
  */
 
 #include <cstring>
+#include <speakerman/jack/SignalHandler.hpp>
 #include <speakerman/SpeakermanWebServer.hpp>
 
 namespace speakerman
@@ -37,7 +38,12 @@ namespace speakerman
 
 	void web_server::thread_static_function(web_server *server)
 	{
-		server->thread_function();
+		try {
+			server->thread_function();
+		}
+		catch (const signal_exception &e) {
+			e.handle("Web server configuration update and level fetching");
+		}
 	}
 
 	void web_server::thread_function()
@@ -48,6 +54,7 @@ namespace speakerman
 		SpeakermanConfig configFileConfig = readSpeakermanConfig(configFileConfig, true);
 		DynamicProcessorLevels levels;
 		while (true) {
+			SignalHandler::check_raised();
 			count++;
 			if (count == 10) {
 				count = 0;

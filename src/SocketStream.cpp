@@ -31,12 +31,6 @@
 
 namespace speakerman {
 
-	static int terminate_line(char *buffer, size_t pos)
-	{
-		buffer[pos] = 0;
-		return pos;
-	}
-
 	int socket_input_stream::unsafe_read()
 	{
 		if (pos_ < mark_) {
@@ -211,7 +205,7 @@ namespace speakerman {
 			return stream_result::INVALID_HANDLE;
 		}
 		if (max_len == 0) {
-			max_len == std::numeric_limits<size_t>::max();
+			max_len = std::numeric_limits<size_t>::max();
 		}
 		for (size_t i = 0; max_len == 0 || i < max_len; i++) {
 			char c = str[i];
@@ -229,6 +223,7 @@ namespace speakerman {
 				return w;
 			}
 		}
+		return stream_result::DATA_TRUNCATED;
 	}
 
 	void socket_output_stream::flush()

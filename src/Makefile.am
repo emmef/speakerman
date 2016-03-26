@@ -2,6 +2,7 @@ bin_PROGRAMS=speakerman
 
 speakerman_SOURCES=\
 	ErrorHandler.cpp \
+	SignalHandler.cpp \
 	SpeakermanConfig.cpp \
 	Stream.cpp \
 	SocketStream.cpp \

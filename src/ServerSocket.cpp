@@ -31,6 +31,7 @@
 
 #include <tdap/MemoryFence.hpp>
 #include <tdap/Value.hpp>
+#include <speakerman/jack/SignalHandler.hpp>
 #include <speakerman/ServerSocket.hpp>
 #include <speakerman/SocketStream.hpp>
 
@@ -143,6 +144,7 @@ namespace speakerman {
 		int error = 0;
 		int sleep_time = 1;
 		while (true) {
+			SignalHandler::check_raised();
 			int result = bind(sockfd_, info->ai_addr, info->ai_addrlen);
 			if (result != -1) {
 				return true;
@@ -340,6 +342,7 @@ namespace speakerman {
 		lock.unlock();
 
 		while (state == State::WORKING) {
+			SignalHandler::check_raised();
 			sockaddr address;
 			socklen_t length = sizeof(sockaddr_storage);
 			int acceptDescriptor = accept(sockfd_, &address, &length);
@@ -366,6 +369,7 @@ namespace speakerman {
 			}
 			state = this->state();
 		}
+		return false;
 	}
 
 	void server_socket::close(Lock &lock)
