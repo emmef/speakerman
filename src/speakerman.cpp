@@ -161,6 +161,7 @@ using namespace std;
 int main(int count, char * arguments[]) {
 	configFileConfig = readSpeakermanConfig(true);
 
+	cout << "Executing " << arguments[0] << endl;
 	dumpSpeakermanConfig(configFileConfig, cout);
 	manager.set(createManager<double>(configFileConfig));
 
