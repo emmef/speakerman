@@ -108,6 +108,7 @@ int mainLoop(Owner<JackClient> &owner)
 			SignalHandler::check_raised();
 		}
 		cout << "Bye!";
+		return 0;
 	}
 	catch (const signal_exception &e) {
 		e.handle();
@@ -182,7 +183,6 @@ int main(int count, char * arguments[]) {
 	clientOwner.get().setActive();
 
 	std::cout << "activated..." << std::endl;
-	mainLoop(clientOwner);
-	return 0;
+	return mainLoop(clientOwner);
 }
 

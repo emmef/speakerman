@@ -49,7 +49,7 @@ namespace speakerman
 	void web_server::thread_function()
 	{
 		static std::chrono::milliseconds wait(1000);
-		static std::chrono::milliseconds sleep(100);
+		static std::chrono::milliseconds sleep(50);
 		int count = 0;
 		SpeakermanConfig configFileConfig = readSpeakermanConfig(configFileConfig, true);
 		DynamicProcessorLevels levels;
@@ -117,7 +117,7 @@ namespace speakerman
 		}
 		if (i < URL_LENGTH) {
 			url_[i] = 0;
-			std::cout << "D: URL = " << url_ << std::endl;
+//			std::cout << "D: URL = " << url_ << std::endl;
 			return nullptr;
 		}
 		return "URL too long";
@@ -208,13 +208,17 @@ namespace speakerman
 				DynamicProcessorLevels levels = entry.levels;
 				snprintf(numbers, 60, "%s=%lli", COOKIE_TIME_STAMP, entry.stamp);
 				set_header("Set-Cookie", numbers);
-				set_content_type("text/json");
-				response().write_string("\"levels\": {\r\n");
+				set_header("Access-Control-Allow-Origin", "*");
+				set_content_type("application/json");
+				response().write_string("{\r\n");
 				response().write_string("\t\"elapsedMillis\": \"");
 				response().write_string(itostr(numbers, 30, entry.stamp - levelTimeStamp));
 				response().write_string("\", \r\n");
 				response().write_string("\t\"subGain\": \"");
 				response().write_string(ftostr(numbers, 30, levels.getSubGain()));
+				response().write_string("\", \r\n");
+				response().write_string("\t\"subGainAverage\": \"");
+				response().write_string(ftostr(numbers, 30, levels.getAverageSubGain()));
 				response().write_string("\", \r\n");
 				response().write_string("\t\"periods\": \"");
 				response().write_string(itostr(numbers, 30, levels.count()));
@@ -225,7 +229,7 @@ namespace speakerman
 							response().write_string("\t\t\t\"gain\": \"");
 							response().write_string(ftostr(numbers, 30, levels.getGroupGain(i)));
 							response().write_string("\", \r\n");
-							response().write_string("\t\t\t\"gain_avg\": \"");
+							response().write_string("\t\t\t\"gainAverage\": \"");
 							response().write_string(ftostr(numbers, 30, levels.getAverageGroupGain(i)));
 							response().write_string("\", \r\n");
 							response().write_string("\t\t\t\"level\": \"");

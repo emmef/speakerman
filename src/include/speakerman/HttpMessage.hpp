@@ -36,6 +36,7 @@ namespace speakerman
 		static constexpr unsigned OK = 200;
 		static constexpr unsigned PARTIAL_CONTENT = 206;
 		static constexpr unsigned BAD_REQUEST = 400;
+		static constexpr unsigned NOT_FOUND = 404;
 		static constexpr unsigned METHOD_NOT_ALLOWED = 405;
 		static constexpr unsigned REQUEST_URI_TOO_LONG = 414;
 		static constexpr unsigned INTERNAL_SERVER_ERROR = 500;

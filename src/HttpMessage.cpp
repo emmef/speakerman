@@ -148,6 +148,9 @@ namespace speakerman
 		case BAD_REQUEST:
 			// 400
 			return "Bad Request";
+		case NOT_FOUND:
+			// 404
+			return "Not Found";
 		case METHOD_NOT_ALLOWED:
 			// 405
 			return "Method Not Allowed";
