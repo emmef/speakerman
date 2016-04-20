@@ -22,21 +22,7 @@
 	<script type="text/javascript">
 		function createCORSRequest(method, url) {
 		  var xhr = new XMLHttpRequest();
-		  if ("withCredentials" in xhr) {
-		    // Check if the XMLHttpRequest object has a "withCredentials" property.
-		    // "withCredentials" only exists on XMLHTTPRequest2 objects.
-		    xhr.open(method, url, true);
-		  } 
-		  else if (typeof XDomainRequest != "undefined") {
-		    // Otherwise, check if XDomainRequest.
-		    // XDomainRequest only exists in IE, and is IE's way of making CORS requests.
-		    xhr = new XDomainRequest();
-		    xhr.open(method, url);
-		  } 
-		  else {
-		    // Otherwise, CORS is not supported by the browser.
-		    xhr = null;
-		  }
+		  xhr.open(method, url);
 		  return xhr;
 		}
 		
@@ -115,7 +101,7 @@
 				setMeters(levels);
 			}
 			else {
-				//console.log("No correct response");
+				console.log("No correct response");
 			}
 		}
 		
@@ -127,18 +113,13 @@
 					console.log("Postpone");
 				}
 				else {
-					var url = "http://nojudge:8088/levels.json";
+					var url = "/levels.json";
 					xHttpRequest = createCORSRequest('GET', url);
-					if (!xHttpRequest) {
-				  		throw new Error('CORS not supported');
-					}	
-					
 					xHttpRequest.onload = handleRequest;
 					xHttpRequest.onloadend = function() {
 						xHttpRequest = null;
 						window.setTimeout(function() {sendLevelRequest(); }, 50);					
 					}
-					//xHttpRequest.withCredentials = true;
 					xHttpRequest.send();
 				}
 			//}

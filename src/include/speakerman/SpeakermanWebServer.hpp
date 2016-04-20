@@ -29,6 +29,7 @@
 #include <speakerman/ServerSocket.hpp>
 #include <speakerman/HttpMessage.hpp>
 #include <speakerman/SpeakermanConfig.hpp>
+#include <speakerman/SingleThreadFileCache.hpp>
 
 namespace speakerman
 {
@@ -139,6 +140,7 @@ using namespace std::chrono;
 		virtual void handle_request() override;
 	private:
 		SpeakerManagerControl &manager_;
+		file_entry indexHtmlFile;
 		server_socket socket_;
 		LevelEntryBuffer level_buffer;
 		char url_[URL_LENGTH + 1];

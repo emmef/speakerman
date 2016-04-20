@@ -22,6 +22,7 @@
 #include <cstring>
 #include <speakerman/jack/SignalHandler.hpp>
 #include <speakerman/SpeakermanWebServer.hpp>
+#include <speakerman/SingleThreadFileCache.hpp>
 
 namespace speakerman
 {
@@ -76,7 +77,8 @@ namespace speakerman
 
 	web_server::web_server(SpeakerManagerControl& speakerManager) :
 			http_message(10240, 2048),
-			manager_(speakerManager)
+			manager_(speakerManager),
+			indexHtmlFile("index.html")
 	{
 		thread t(thread_static_function, this);
 		level_fetch_thread.swap(t);
@@ -254,18 +256,8 @@ namespace speakerman
 		}
 		else if (strncasecmp(url_, "/index.html", 32) == 0) {
 			set_content_type("text/html");
-			response().write_string("<html>\n", 32);
-			response().write_string("<head>\n", 32);
-			response().write_string("<title>\n", 32);
-			response().write_string("Speakerman\n", 32);
-			response().write_string("</title>\n", 32);
-			response().write_string("</head>\n", 32);
-			response().write_string("<body>\n", 32);
-			response().write_string("Speakerman\n", 32);
-			response().write_string("<a href=\"/levels.json\">Levels</a>\r\n", 1024);
-			response().write_string("</body>\n", 32);
-			response().write_string("</html>\n", 32);
-//			set_success();
+			indexHtmlFile.reset();
+			handle_content(indexHtmlFile.size(), &indexHtmlFile);
 		}
 		else {
 			set_error(404);

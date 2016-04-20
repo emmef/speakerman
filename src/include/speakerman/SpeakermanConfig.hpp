@@ -230,7 +230,8 @@ namespace speakerman {
 		virtual bool getLevels(DynamicProcessorLevels *levels, std::chrono::milliseconds timeoutMillis) = 0;
 	};
 
-
+	const char *getInstallBaseDirectory();
+	const char * getWebSiteDirectory();
 	const char * configFileName();
 	const char * webDirectory();
 	SpeakermanConfig readSpeakermanConfig(bool initial);

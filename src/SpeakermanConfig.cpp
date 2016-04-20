@@ -25,6 +25,7 @@
 #include <mutex>
 #include <iostream>
 #include <sys/stat.h>
+#include <unistd.h>
 #include <tdap/Value.hpp>
 #include <tdap/IndexPolicy.hpp>
 #include <tdap/Count.hpp>
@@ -190,6 +191,64 @@ namespace speakerman {
 	static constexpr const char * KEY_GROUP_EQS = "/equalizers";
 	static constexpr const char * KEY_GROUP_THRESHOLD = "/threshold";
 	static constexpr const char * KEY_GROUP_VOLUME = "/volume";
+
+	static bool fileExists(const char * fileName)
+	{
+		FILE *f = fopen(fileName, "r");
+		if (f) {
+			fclose(f);
+			return true;
+		}
+		return false;
+	}
+
+	static string internalGetInstallBase()
+	{
+		static constexpr const char *prefix = INSTALL_DIR;
+		if (access(prefix, F_OK) != 0) {
+			return "";
+		}
+		string prefixDir = prefix;
+		if (prefixDir.at(prefixDir.length() - 1) != '/') {
+			prefixDir += '/';
+		}
+		std::cout << "Install prefix: " << prefixDir << std::endl;
+		return prefixDir;
+	}
+
+	const char *getInstallBaseDirectory()
+	{
+		static const string base = internalGetInstallBase();
+
+		return base.length() > 0 ? base.c_str() : nullptr;
+	}
+
+	static string internalGetWebSiteDirectory()
+	{
+		static const char *prefix = getInstallBaseDirectory();
+		std::cout << "Test " << prefix << std::endl;
+		if (prefix == nullptr) {
+			return "";
+		}
+		string prefixDir = prefix;
+		prefixDir += "share/speakerman/web/";
+		string indexPath = prefixDir;
+		indexPath += "index.html";
+		if (access(indexPath.c_str(), F_OK) == 0) {
+			std::cout << "Web site directory: " << prefixDir << std::endl;
+			return prefixDir;
+		}
+		std::cout << "Test " << prefixDir << std::endl;
+
+		return "";
+	}
+
+	const char * getWebSiteDirectory()
+	{
+		static string dir = internalGetWebSiteDirectory();
+
+		return dir.length() > 0 ? dir.c_str() : nullptr;
+	}
 
 	static string getConfigFileName()
 	{
