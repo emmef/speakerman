@@ -192,19 +192,23 @@ namespace tdap {
 			curves.reset();
 
 			// Cut off irrelevant low frequencies
-			FixedSizeIirCoefficientFilter<double, 1, 4> cutoff;
-			auto llCoeffs = cutoff.coefficients_.wrap();
+			FixedSizeIirCoefficientFilter<double, 1, 4> cutoffLow;
+			auto llCoeffs = cutoffLow.coefficients_.wrap();
 			Butterworth::create(llCoeffs, sampleRate, 30.0, Butterworth::Pass::HIGH, 1.0);
+			FixedSizeIirCoefficientFilter<double, 1, 4> cutoffHigh;
+			auto hhCoeffs = cutoffHigh.coefficients_.wrap();
+			Butterworth::create(hhCoeffs, sampleRate, 12000.0, Butterworth::Pass::LOW, 1.0);
 
 			// initialization
-			cutoff.reset();
+			cutoffLow.reset();
+			cutoffHigh.reset();
 			double unweightedTotal = 0.0;
 			for (size_t band = 0; band <= CROSSOVERS; band++) {
 				y[band] = 0.0;
 			}
 			FixedSizeArray<double, 2> filtered;
 			for (size_t sample = 0; sample < samples; sample++) {
-				T input = cutoff.filter(0, noise());       // bandwidth limited pink noise
+				T input = cutoffHigh.filter(0, cutoffLow.filter(0, noise()));       // bandwidth limited pink noise
 				unweightedTotal += input * input;          // unweighted full-range measurement
 				filtered[0] = input;// apply keying filter
 				filtered[1] = curves.filter(0, input);// apply keying filter
