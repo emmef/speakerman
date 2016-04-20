@@ -114,26 +114,33 @@ public:
 	}
 };
 
-template <typename S, size_t BUCKETS_PER_RC, size_t RC_PER_WINDOW>
+template <typename S, size_t BUCKET_COUNT>
 class BucketIntegratedRms
 {
-	static_assert(BUCKETS_PER_RC >= 1 && BUCKETS_PER_RC <= 16, "Invalid number of buckets per RC");
-	static_assert(RC_PER_WINDOW >= 1 && RC_PER_WINDOW <= 16, "Invalid number of RC per window");
+	static_assert(BUCKET_COUNT >= 2 && BUCKET_COUNT <= 64, "Invalid number of buckets");
 	static_assert(is_floating_point<S>::value, "Expected floating-point type parameter");
 
 	static constexpr double INTEGRATOR_WINDOW_SIZE_RATIO = 0.25;
 	static constexpr double INTEGRATOR_BUCKET_RATIO = 8;
-	static constexpr size_t BUCKET_COUNT = BUCKETS_PER_RC * RC_PER_WINDOW;
 
 	BucketRms<S, BUCKET_COUNT> rms_;
 	IntegrationCoefficients<S> coeffs_;
 	S int1_, int2_;
 
 public:
+	size_t setWindowSizeAndRc(size_t newSize, size_t rcSize)
+	{
+		size_t windowSize = rms_.setWindowSize(newSize);
+		size_t minRc = 2 * windowSize / BUCKET_COUNT;
+		coeffs_.setCharacteristicSamples(Values::max(minRc, rcSize));
+		return windowSize;
+	}
+
 	size_t setWindowSize(size_t newSize)
 	{
 		size_t windowSize = rms_.setWindowSize(newSize);
-		coeffs_.setCharacteristicSamples(windowSize / RC_PER_WINDOW);
+		size_t minRc = 2 * windowSize / BUCKET_COUNT;
+		coeffs_.setCharacteristicSamples(Values::max(minRc, windowSize / 4));
 		return windowSize;
 	}
 
@@ -172,7 +179,7 @@ public:
 };
 
 template <typename S>
-using DefaultRms = BucketIntegratedRms<S, 8, 2>;
+using DefaultRms = BucketIntegratedRms<S, 16>;
 
 } /* End of name space tdap */
 

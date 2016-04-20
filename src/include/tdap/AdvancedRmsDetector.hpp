@@ -37,6 +37,7 @@ struct AdvancedRms
 {
 	static constexpr double PERCEPTIVE_FAST_WINDOWSIZE = 0.030;
 	static constexpr double PERCEPTIVE_SLOW_WINDOWSIZE = 0.400;
+	static constexpr double MAX_BUCKET_INTEGRATION_TIME = 0.075;
 
 	static ValueRange<double> &peakWeightRange()
 	{
@@ -75,10 +76,6 @@ struct AdvancedRms
 		double maxRc;
 		double peakWeight;
 		double slowWeight;
-//		double minRc = 0.001;
-//		double maxRc = 0.400;
-//		double peakWeight = 0.5;
-//		double slowWeight = 1.5;
 
 		UserConfig validate()
 		{
@@ -103,6 +100,7 @@ struct AdvancedRms
 		static_assert(RC_TIMES > 2, "Need at least three characteristic times");
 		FixedSizeArray<size_t, RC_TIMES> characteristicSamples;
 		FixedSizeArray<T, RC_TIMES> scale;
+		size_t maxBucketIntegrationWindow;
 		size_t followCharacteristicSamples;
 		size_t followHoldSamples;
 
@@ -111,6 +109,7 @@ struct AdvancedRms
 			UserConfig config = userConfig.validate();
 			followCharacteristicSamples = 0.5 + sampleRate * followRcRange().getBetween(config.minRc / 2);
 			followHoldSamples = 0.5 + sampleRate * followHoldTimeRange().getBetween(config.minRc * 2);
+			maxBucketIntegrationWindow = 0.5 + sampleRate * MAX_BUCKET_INTEGRATION_TIME;
 			double fastScalePower = log(config.peakWeight) / log(config.minRc / PERCEPTIVE_FAST_WINDOWSIZE);
 			double slowScalePower = log(config.slowWeight) / log(config.maxRc / PERCEPTIVE_FAST_WINDOWSIZE);
 			double ratioIncrement;
@@ -163,7 +162,7 @@ struct AdvancedRms
 		}
 		struct Filter
 		{
-			BucketIntegratedRms<double, 4, 3> integrator;
+			BucketIntegratedRms<double, 24> integrator;
 			double scale;
 		};
 		FixedSizeArray<Filter, RC_TIMES> filters_;
@@ -190,7 +189,8 @@ struct AdvancedRms
 			T minOutputScale = 1.0;
 			for (size_t i = 0; i < RC_TIMES; i++)
 			{
-				filters_[i].integrator.setWindowSize(config.characteristicSamples[i]);
+				size_t windowSize = config.characteristicSamples[i];
+				filters_[i].integrator.setWindowSizeAndRc(windowSize, Values::min(windowSize / 3, config.maxBucketIntegrationWindow));
 				T scale = config.scale[i];
 				filters_[i].scale = scale;
 				if (scale > 1) {
