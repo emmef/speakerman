@@ -30,7 +30,7 @@
 
 namespace speakerman
 {
-	static constexpr size_t STREAM_BUFFER_SIZE = 128;
+	static constexpr size_t STREAM_BUFFER_SIZE = 1024;
 
 	class socket_input_stream : public file_owner, input_stream
 	{
