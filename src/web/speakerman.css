@@ -15,12 +15,16 @@ body {
 .area-metric-sub { position: absolute; left: 1ex; top: 1ex; right: 1ex; bottom: 1ex;}
 .area-metric-signal { position: absolute; left: 2ex; top: 2ex; right: 2ex; bottom: 2ex;}
 .area-metric-main-avg { position: absolute; left: 4ex; top: 4ex; right: 4ex; bottom: 4ex;}
-.area-metric-main { position: relative; left: 6ex; top: 6ex; width:4ex; height: 4ex;}
+.area-metric-main { position: absolute; left: 5.5ex; top: 5.5ex; width:5ex; height: 5ex;}
 
-.area-align { text-align: center; vertical-align: middle; }
-.group-name { 
-	font-size: 300%; font-weight: bold; color:rgba(255,255,255,0.7); 
-	position:absolute; left:1ex; top:1ex; right:1ex; bottom:1ex;
+.area-metric-group-name { 
+	position:absolute; left:2ex; top:0.25ex; width: 12ex; height: 12ex;
+	text-align: center; vertical-align: top;
+}
+.font-group-name {
+	font-size: 300%;
+	font-weight: normal;
+	color: rgba(255,255,255,0.6);
 }
 
 .m-area-size { position: absolute; margin:0; padding: 1% 2% 1% 2%; left: 2%; top: 2%; right: 2%; bottom: 2%; }
