@@ -27,18 +27,3 @@ body {
 	color: rgba(255,255,255,0.6);
 }
 
-.m-area-size { position: absolute; margin:0; padding: 1% 2% 1% 2%; left: 2%; top: 2%; right: 2%; bottom: 2%; }
-.m-area-bor { border: none; }
-.m-area-bor * { }
-.m-area-col { background-color: rgba(255,255,255,0.8); }
-.m-border-col { border-color: #555 #eee #eee #555; }
-.m-background { background-color: rgba(0,0,0,0.5); }
-.m-size { margin: 0; height: 95%; min-height: 100px;}
-.g-indicator { position: absolute; left:9%; right:9%; }
-.g-level { background-color: rgba(0,192,0,0.9); }
-.g-level-b { background-color: rgba(32,96,32,1); }
-.g-avg { background-color: rgba(128,0,0,0.7); }
-.g-limit { background-color: rgba(255,0,0,1); }
-.g-sub { position:absolute; left:2%; right:2%; }
-.title { position: absolute; font-size: }
-
