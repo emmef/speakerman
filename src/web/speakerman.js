@@ -47,7 +47,7 @@ function setMeters(levels)
 			var mainAvg = document.getElementById(prefix + "_main_avg");
 			var main = document.getElementById(prefix + "_main");
 
-			var signalPercentage = group.level > 1e-3 ? 0.3 + 0.7 * getSignalInDbPercent(group.level, 1e-1) : 0; 
+			var signalPercentage = group.level > 2e-3 ? 0.3 + 0.7 * getSignalInDbPercent(group.level, 1e-1) : 0; 
 			var subGainPercentage = 1 - getSignalInDbPercent(subGain, 0.25);
 			var subAvgGainPercentage = 1 - getSignalInDbPercent(subGainAverage, 0.25);
 			var mainGainPercentage = 1 - getSignalInDbPercent(group.gain, 0.25)
