@@ -1,0 +1,40 @@
+* { 
+	padding: 0; 
+	margin: 0; 
+	border:none;
+	font-family: verdana, sans-serif;
+}
+body { 
+	background-color: rgb(64,64,64); color: grey; 
+	min-width: 20ex; 
+	min-height: 20ex;
+	padding: 1ex;
+}
+
+.area-metric-sub-avg { position: relative; width: 16ex; height: 16ex;}
+.area-metric-sub { position: absolute; left: 1ex; top: 1ex; right: 1ex; bottom: 1ex;}
+.area-metric-signal { position: absolute; left: 2ex; top: 2ex; right: 2ex; bottom: 2ex;}
+.area-metric-main-avg { position: absolute; left: 4ex; top: 4ex; right: 4ex; bottom: 4ex;}
+.area-metric-main { position: relative; left: 6ex; top: 6ex; width:4ex; height: 4ex;}
+
+.area-align { text-align: center; vertical-align: middle; }
+.group-name { 
+	font-size: 300%; font-weight: bold; color:rgba(255,255,255,0.7); 
+	position:absolute; left:1ex; top:1ex; right:1ex; bottom:1ex;
+}
+
+.m-area-size { position: absolute; margin:0; padding: 1% 2% 1% 2%; left: 2%; top: 2%; right: 2%; bottom: 2%; }
+.m-area-bor { border: none; }
+.m-area-bor * { }
+.m-area-col { background-color: rgba(255,255,255,0.8); }
+.m-border-col { border-color: #555 #eee #eee #555; }
+.m-background { background-color: rgba(0,0,0,0.5); }
+.m-size { margin: 0; height: 95%; min-height: 100px;}
+.g-indicator { position: absolute; left:9%; right:9%; }
+.g-level { background-color: rgba(0,192,0,0.9); }
+.g-level-b { background-color: rgba(32,96,32,1); }
+.g-avg { background-color: rgba(128,0,0,0.7); }
+.g-limit { background-color: rgba(255,0,0,1); }
+.g-sub { position:absolute; left:2%; right:2%; }
+.title { position: absolute; font-size: }
+

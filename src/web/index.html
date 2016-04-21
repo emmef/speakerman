@@ -1,142 +1,37 @@
+<html>
 <head>
-	<style type="text/css">
-		body { 
-			position:fixed; background-color: black; color: grey; 
-			margin:0; padding: 0;
-			width: 100%; min-width: 20ex; 
-			height: 100%; min-height: 20ex;}
-		.m-area-size { position: absolute; margin:0; padding: 1% 2% 1% 2%; left: 2%; top: 2%; right: 2%; bottom: 2%; }
-		.m-area-bor { border: none; }
-		.m-area-col { background-color: rgba(255,255,255,0.8); }
-		.m-border-col { border-color: #555 #eee #eee #555; }
-		.m-background { background-color: rgba(0,0,0,0.5); }
-		.m-size { margin: 0; height: 95%; min-height: 100px;}
-		.g-indicator { position: absolute; left:9%; right:9%; }
-		.g-level { background-color: rgba(0,192,0,0.9); }
-		.g-level-b { background-color: rgba(32,96,32,1); }
-		.g-avg { background-color: rgba(128,0,0,0.7); }
-		.g-limit { background-color: rgba(255,0,0,1); }
-		.g-sub { position:absolute; left:2%; right:2%; }
-		.title { position: absolute; font-size: }
-	</style>
-	<script type="text/javascript">
-		function createCORSRequest(method, url) {
-		  var xhr = new XMLHttpRequest();
-		  xhr.open(method, url);
-		  return xhr;
-		}
-		
-		var xHttpRequest = null;
-		
-		function getSignalInDbPercent(level) {
-			var level = 1e-6 + Math.abs(level)
-			var dB = Math.log(level) / Math.log(2);
-			dB = -Math.min(0, Math.max(-7, dB));
-			dB *= (100/7); 
-			return dB
-		}
-		
-		function getGainInDbPercent(gain) {
-			return getSignalInDbPercent(gain);
-		}
-		
-		function fallOff(element, value, minimum) 
-		{
-			var previous = element.previousMeasurement ? element.previousMeasurement : minimum ? 1 : 0;
-			var newValue = value;
-			if ((minimum && (value > previous)) || (!minimum && (value < previous))) {
-				newValue = value * 0.25 + previous * 0.75;
-			}
-			element.previousMeasurement = newValue;
-			return newValue;
-		}
-			
-		function setMeters(levels) 
-		{
-			var i;
-			for (i = 0; i < 4; i++) {
-				var subGain = levels.subGain;
-				var subGainAverage = levels.subGainAverage;
-				if (levels.group && levels.group[i]) {
-					var prefix = "group_" + i + "_";
-					var signal = document.getElementById(prefix + "signal");
-					var subAvg = document.getElementById(prefix + "sub_avg");
-					var sub = document.getElementById(prefix + "sub");
-					var mainAvg = document.getElementById(prefix + "main_avg");
-					var main = document.getElementById(prefix + "main");
-					var mainGain = levels.group[i].gain
-					var signalLevel = levels.group[i].level;
-					
-					if (signal) {
-						signal.style.height = "" + getSignalInDbPercent(fallOff(signal, 1.0-signalLevel,false))+ "%";
-					}					
-					if (subAvg) {
-						subAvg.style.height = "" + getGainInDbPercent(fallOff(subAvg, subGainAverage, true)) + "%";
-					}
-					if (sub) {
-						var top = getGainInDbPercent(subGain);					
-						sub.style.top = "" + top + "%";
-						sub.style.height = top < 2 ? "" + top + "%" : "2%";
-					}
-					if (mainAvg) {
-						mainAvg.style.height = "" + getGainInDbPercent(fallOff(mainAvg, levels.group[i].gainAverage),true) + "%";
-					}
-					if (main) {
-						var top = getGainInDbPercent(mainGain)
-						main.style.top = "" + getGainInDbPercent(mainGain) + "%";
-						main.style.height = top < 2 ? "" + top + "%" : "2%";
-					}
-					
-				}
-			}
-		}
-
-		function handleRequest() 
-		{
-			if (!xHttpRequest) {
-				//console.log("No request");
-			} // xHttpRequest.readyState == 4 && 
-			else if (xHttpRequest && xHttpRequest.status == 200) {
-				var levels = JSON.parse(xHttpRequest.responseText);
-				setMeters(levels);
-			}
-			else {
-				console.log("No correct response");
-			}
-		}
-		
-			
-		function sendLevelRequest() 
-		{
-			//try {
-				if (xHttpRequest) {
-					console.log("Postpone");
-				}
-				else {
-					var url = "/levels.json";
-					xHttpRequest = createCORSRequest('GET', url);
-					xHttpRequest.onload = handleRequest;
-					xHttpRequest.onloadend = function() {
-						xHttpRequest = null;
-						window.setTimeout(function() {sendLevelRequest(); }, 50);					
-					}
-					xHttpRequest.send();
-				}
-			//}
-		}
-	</script>
+	<link rel="stylesheet" type="text/css" href="/speakerman.css?version=1.0">
+	<script type="text/javascript" src="/speakerman.js?version=1.0"></script>
 	<title>SpeakerMan &trade;</title>
 </head>
 <body onload="sendLevelRequest()">
-	<div class="m-area-size m-area-col">
-		<div id="group_0" class="m-area-bor m-background m-size">
-			<div id="group_0_sub_avg" class="g-sub g-avg" style="top:0;height:25%;"></div>
-			<div id="group_0_sub" class="g-sub g-limit" style="top:25%;height:2%;"></div>
-			<div class="g-indicator g-level-b" style="bottom:0;height:100%;"></div>
-			<div id="group_0_signal" class="g-indicator g-level" style="bottom:0;height:25%;"></div>
-			<div id="group_0_main_avg" class="g-indicator g-avg" style="top:0;height:40%;"></div>
-			<div id="group_0_main" class="g-indicator g-limit" style="top:62%;height:2%;"></div>  
-		</div>
+	<div id="group_0" class="area-metric-sub-avg area-align" style="background-color:darkred">
+		<div id="group_0_sub" class="area-metric-sub" style="background-color:red"></div>
+		<div id="group_0_signal" class="area-metric-signal" style="background-color:green"></div>
+		<div id="group_0_main_avg" class="area-metric-main-avg" style="background-color:darkred"></div>
+		<div id="group_0_main" class="area-metric-main" style="background-color:red"></div>
+		<div class="group-name">1</div>
+	</div>
+	<div id="group_1" class="area-metric-sub-avg area-align" style="background-color:darkred">
+		<div id="group_1_sub" class="area-metric-sub" style="background-color:red"></div>
+		<div id="group_1_signal" class="area-metric-signal" style="background-color:green"></div>
+		<div id="group_1_main_avg" class="area-metric-main-avg" style="background-color:darkred"></div>
+		<div id="group_1_main" class="area-metric-main" style="background-color:red"></div>
+		<div class="group-name">1</div>
+	</div>
+	<div id="group_2" class="area-metric-sub-avg area-align" style="background-color:darkred">
+		<div id="group_2_sub" class="area-metric-sub" style="background-color:red"></div>
+		<div id="group_2_signal" class="area-metric-signal" style="background-color:green"></div>
+		<div id="group_2_main_avg" class="area-metric-main-avg" style="background-color:darkred"></div>
+		<div id="group_2_main" class="area-metric-main" style="background-color:red"></div>
+		<div class="group-name">1</div>
+	</div>
+	<div id="group_3" class="area-metric-sub-avg area-align" style="background-color:darkred">
+		<div id="group_3_sub" class="area-metric-sub" style="background-color:red"></div>
+		<div id="group_3_signal" class="area-metric-signal" style="background-color:green"></div>
+		<div id="group_3_main_avg" class="area-metric-main-avg" style="background-color:darkred"></div>
+		<div id="group_3_main" class="area-metric-main" style="background-color:red"></div>
+		<div class="group-name">1</div>
 	</div>
 </body>
 </html>

@@ -78,7 +78,10 @@ namespace speakerman
 	web_server::web_server(SpeakerManagerControl& speakerManager) :
 			http_message(10240, 2048),
 			manager_(speakerManager),
-			indexHtmlFile("index.html")
+			indexHtmlFile("index.html"),
+			cssFile("speakerman.css"),
+			javaScriptFile("speakerman.js"),
+			faviconFile("favicon.png")
 	{
 		thread t(thread_static_function, this);
 		level_fetch_thread.swap(t);
@@ -201,7 +204,12 @@ namespace speakerman
 		if (strncmp("/", url_, 32) == 0) {
 			strncpy(url_, "/index.html", 32);
 		}
-
+		for (size_t i = 0; i < URL_LENGTH && url_[i] != '\0' ; i++) {
+			if (url_[i] == '?') {
+				url_[i] = '\0';
+				break;
+			}
+		}
 		if (strncasecmp("/levels.json", url_, 32) == 0) {
 			char numbers[60];
 			LevelEntry entry;
@@ -259,11 +267,23 @@ namespace speakerman
 			indexHtmlFile.reset();
 			handle_content(indexHtmlFile.size(), &indexHtmlFile);
 		}
+		else if (strncasecmp(url_, "/speakerman.css", 32) == 0) {
+			set_content_type("text/css");
+			cssFile.reset();
+			handle_content(cssFile.size(), &cssFile);
+		}
+		else if (strncasecmp(url_, "/speakerman.js", 32) == 0) {
+			set_content_type("text/javascript");
+			javaScriptFile.reset();
+			handle_content(javaScriptFile.size(), &javaScriptFile);
+		}
+		else if (strncasecmp(url_, "/favicon.ico", 32) == 0) {
+			set_content_type("image/png");
+			faviconFile.reset();
+			handle_content(faviconFile.size(), &faviconFile);
+		}
 		else {
 			set_error(404);
 		}
 	}
-
-
-
 } /* End of namespace speakerman */

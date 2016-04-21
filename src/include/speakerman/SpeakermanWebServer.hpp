@@ -141,6 +141,9 @@ using namespace std::chrono;
 	private:
 		SpeakerManagerControl &manager_;
 		file_entry indexHtmlFile;
+		file_entry cssFile;
+		file_entry javaScriptFile;
+		file_entry faviconFile;
 		server_socket socket_;
 		LevelEntryBuffer level_buffer;
 		char url_[URL_LENGTH + 1];
