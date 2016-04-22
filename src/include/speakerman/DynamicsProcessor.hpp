@@ -190,6 +190,9 @@ public:
 		processChannelsRms();
 		mergeFrequencyBands();
 		processChannelsFilters();
+//		for (size_t i = 0; i < OUTPUTS; i++) {
+//			target[i] = output[i];
+//		}
 		processSubLimiter(target);
 		processChannelsLimiter(target);
 	}
@@ -300,12 +303,12 @@ private:
 
 	void processChannelsLimiter(FixedSizeArray<T, OUTPUTS> &target)
 	{
-		for (size_t group = 0, channel = 1; group < GROUPS; group++) {
-			size_t max = channel + CHANNELS_PER_GROUP;
+		for (size_t group = 0; group < GROUPS; group++) {
+			const size_t startOffs = 1 + group * CHANNELS_PER_GROUP;
 			T peak = 0.0;
-			for (size_t offset = channel; offset < max; offset++) {
+			for (size_t channel = 0, offset = startOffs; channel < CHANNELS_PER_GROUP; channel++, offset++) {
 				T x = output[offset];
-				output[offset] = limiterDelay.setAndGet(x);
+				output[offset] = x;//limiterDelay.setAndGet(x);
 				peak = Values::max(peak, fabs(x));
 			}
 			T scale = runtime.data().groupConfig(group).limiterScale();
@@ -313,9 +316,9 @@ private:
 			peak *= scale;
 			T detect = limiter[group + 1].applyWithMinimum(peak, 1.0);
 			T gain = 1.0 / detect;
-			for (size_t offset = channel; offset < max; offset++) {
+			for (size_t channel = 0, offset = startOffs; channel < CHANNELS_PER_GROUP; channel++, offset++) {
 				T out = Values::clamp(gain * output[offset], -threshold, threshold);
-				target[offset] = channelDelay[group + 1].setAndGet(out);
+				target[offset] = out;//channelDelay[group + 1].setAndGet(out);
 			}
 		}
 	}

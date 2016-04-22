@@ -134,6 +134,9 @@ protected:
  			if (!Port::try_connect_ports(client, capturePortNames.get(capture), inputs.get(input))) {
  				std::cout << "Could not connect \"" << capturePortNames.get(capture) << "\" with \"" << inputs.get(input) << "\"" << std::endl;
  			}
+ 			else {
+ 				std::cout << "Connected \"" << capturePortNames.get(capture) << "\" with \"" << inputs.get(input) << "\"" << std::endl;
+ 			}
  		}
  		std::cout << "Inputs: playback " << playbackPortNames.count() << " out " << outputs.count() << std::endl;
  		for (size_t i = 0; i < outputs.count(); i++) {
@@ -142,6 +145,9 @@ protected:
 
  			if (!Port::try_connect_ports(client, outputs.get(i), playbackPortNames.get(i))) {
  				std::cout << "Could not connect \"" << outputs.get(output) << "\" with \"" << playbackPortNames.get(playback) << "\"" << std::endl;
+ 			}
+ 			else {
+ 				std::cout << "Connected \"" << outputs.get(output) << "\" with \"" << playbackPortNames.get(playback) << "\"" << std::endl;
  			}
  		}
 	}
@@ -170,7 +176,7 @@ protected:
 		for (index = 0, portNumber = 0; index < INPUTS; portNumber++, index++) {
 			inputs[index] = ports.getBuffer(portNumber);
 		}
-		for (index = 0; index <= INPUTS; portNumber++, index++) {
+		for (index = 0; index < OUTPUTS; portNumber++, index++) {
 			outputs[index] = ports.getBuffer(portNumber);
 		}
 
@@ -185,11 +191,15 @@ protected:
 
 			processor.process(inFrame, outFrame);
 
+//			size_t channel;
+//			for (channel = 0; channel < INPUTS; channel++) {
+//				outputs[channel][i] = outFrame[channel + 1];
+//			}
+//			outputs[channel][i] = outFrame[0];
 			size_t channel;
-			for (channel = 0; channel < OUTPUTS - 1; channel++) {
-				outputs[channel][i] = outFrame[channel + 1];
+			for (channel = 0; channel < OUTPUTS; channel++) {
+				outputs[channel][i] = outFrame[channel];
 			}
-			outputs[channel][i] = outFrame[0];
 		}
 
 		lockFreeData.data().levels = processor.levels;
@@ -210,13 +220,16 @@ public:
 			 snprintf(name, 1 + Names::get_port_size(),
 					 "in_%zu_%zu", 1 + channel/CHANNELS_PER_GROUP, 1 + channel % CHANNELS_PER_GROUP);
 			 portDefinitions_.addInput(name);
+			 cout << "I: added input " << name << std::endl;
 		}
+		portDefinitions_.addOutput("out_sub");
 		for (size_t channel = 0; channel < Processor::INPUTS; channel++) {
 			snprintf(name, 1 + Names::get_port_size(),
 					 "out_%zu_%zu", 1 + channel/CHANNELS_PER_GROUP, 1 + channel % CHANNELS_PER_GROUP);
 			portDefinitions_.addOutput(name);
+			cout << "I: added output " << name << std::endl;
 		}
-		portDefinitions_.addOutput("out_sub");
+		cout << "I: added output " << "out_sub" << std::endl;
 	}
 
 	virtual const SpeakermanConfig &getConfig() const override
