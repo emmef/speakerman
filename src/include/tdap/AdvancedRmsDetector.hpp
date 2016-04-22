@@ -37,7 +37,7 @@ struct AdvancedRms
 {
 	static constexpr double PERCEPTIVE_FAST_WINDOWSIZE = 0.030;
 	static constexpr double PERCEPTIVE_SLOW_WINDOWSIZE = 0.400;
-	static constexpr double MAX_BUCKET_INTEGRATION_TIME = 0.075;
+	static constexpr double MAX_BUCKET_INTEGRATION_TIME = 0.025;
 
 	static ValueRange<double> &peakWeightRange()
 	{
