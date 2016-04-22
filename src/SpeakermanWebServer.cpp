@@ -245,10 +245,11 @@ namespace speakerman
 							response().write_string("\t\t\t\"level\": \"");
 							response().write_string(ftostr(numbers, 30, levels.getSignal(i)));
 							response().write_string("\"\r\n");
+							response().write_string("\t\t}");
 							if (i < levels.groups() - 1) {
 								response().write(',');
 							}
-							response().write_string("\t\t}\r\n");
+							response().write_string("\r\n");
 						}
 					response().write_string("\t]\r\n");
 				response().write_string("}\r\n");
