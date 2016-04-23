@@ -27,6 +27,7 @@
 #include <tdap/IndexPolicy.hpp>
 #include <tdap/Value.hpp>
 #include <speakerman/utils/Config.hpp>
+#include <cmath>
 
 namespace speakerman {
 
@@ -61,8 +62,8 @@ namespace speakerman {
 		static constexpr size_t DEFAULT_EQS = 0;
 		static constexpr size_t MAX_EQS = 2;
 
-		static constexpr double MIN_THRESHOLD = 0.030;
-		static constexpr double DEFAULT_THRESHOLD = 0.2;
+		static constexpr double MIN_THRESHOLD = 0.010;
+		static constexpr double DEFAULT_THRESHOLD = 0.1;
 		static constexpr double MAX_THRESHOLD = 0.5;
 
 		static constexpr double MIN_VOLUME = 0;
@@ -104,7 +105,7 @@ namespace speakerman {
 		static constexpr size_t MAX_GROUP_CHANNELS = 5;
 
 		static constexpr double MIN_REL_SUB_THRESHOLD = 0.25;
-		static constexpr double DEFAULT_REL_SUB_THRESHOLD = 1.0;
+		static constexpr double DEFAULT_REL_SUB_THRESHOLD = M_SQRT2;
 		static constexpr double MAX_REL_SUB_THRESHOLD = 2.0;
 
 		static constexpr double MIN_SUB_DELAY = GroupConfig::MIN_DELAY;
