@@ -16,20 +16,21 @@ function getSignalInDbPercent(level, minLvl) {
 	return (levelLog + minLog) / minLog;
 }
 
-function getRgbValue(percentage, selector, useStartLevel) {
-	var usedPercentage = percentage;
-	if (useStartLevel) {
-		usedPercentage = percentage > 0.01 ? 0.3 + 0.7 * percentage : 0;
-	}
-	var value = Math.max(0, Math.min(255, Math.round(usedPercentage * 255)));
-	switch (selector) {
-		case 1: 
-			return "rgb(0," + value + ",0)";
-		case 2:
-			return "rgb(0,0," + value + ")";
-		default:
-			return "rgb(" + value + ",0,0)";
-	}
+function scaledValue(value, scale) {
+	var boundValue = Math.min(255, Math.max(0, typeof value === 'number' ? value : 0));
+	
+	return Math.round(scale * boundValue);
+}
+
+function getRgbValue(scale, r, g, b, minNonZero) {
+	var boundScale = Math.min(1.0, Math.max(0.0, typeof scale === 'number' ? scale : 0));
+	var threshold = (!minNonZero) ? 0 : typeof minNonZero != 'number' ? 0.25 : Math.min(0.5, Math.max(0, minNonZero));
+	var usedScale = boundScale < 0.002 ? 0 : threshold + (1.0 - threshold) * boundScale;
+	
+	return "rgb(" 
+		+ scaledValue(r, usedScale) + ","
+		+ scaledValue(g, usedScale) + ","
+		+ scaledValue(b, usedScale) + ")";
 }
 
 function setMeters(levels) 
@@ -43,40 +44,66 @@ function setMeters(levels)
 			var prefix = "group_" + i;
 			var subAvg = document.getElementById(prefix);
 			var sub = document.getElementById(prefix + "_sub");
-			var signal = document.getElementById(prefix + "_signal");
 			var mainAvg = document.getElementById(prefix + "_main_avg");
 			var main = document.getElementById(prefix + "_main");
 
-			var signalPercentage = group.level > 2e-3 ? 0.3 + 0.7 * getSignalInDbPercent(group.level, 1e-1) : 0; 
-			var subGainPercentage = 1 - getSignalInDbPercent(subGain, 0.25);
+			var signalPercentage = group.level > 1e-3 ? getSignalInDbPercent(group.level, 1e-2) : 0; 
+			
 			var subAvgGainPercentage = 1 - getSignalInDbPercent(subGainAverage, 0.25);
-			var mainGainPercentage = 1 - getSignalInDbPercent(group.gain, 0.25)
+			var subGainPercentage = Math.max(subAvgGainPercentage, 1 - getSignalInDbPercent(subGain, 0.25));
 			var mainAvgGainPercentage = 1 - getSignalInDbPercent(group.gainAverage, 0.25);
-			/*
-			if (console) {
-				console.log("SIG=" + signalPercentage + 
-					"; SUB=" + subGainPercentage + "; AVG=" + subAvgGainPercentage + 
-					"; MAIN=" + mainGainPercentage + "; AVG=" + mainAvgGainPercentage);
-			}
-			*/
-			if (signal) {
-				var limiting = Math.max(subGainPercentage,mainGainPercentage);
-				var greenAttenuate = 0.2 + 0.8 * (1 - limiting);
-				
-				signal.style.backgroundColor = getRgbValue(greenAttenuate * signalPercentage, 1);
-			}					
+			var mainGainPercentage = Math.max(mainAvgGainPercentage, 1 - getSignalInDbPercent(group.gain, 0.25));
+			var mainGainMax = Math.max(subGainPercentage, mainGainPercentage);
+			
 			if (subAvg) {
-				subAvg.style.display = "block";
-				subAvg.style.backgroundColor = getRgbValue(subAvgGainPercentage, 0, true);
+				if (subAvgGainPercentage > 0.01) {
+					subAvg.style.backgroundColor = getRgbValue(subAvgGainPercentage, 255, 0, 64, 0.4);
+				}
+				else if (mainGainMax > 0.01) {
+					subAvg.style.backgroundColor = "black";
+				}
+				else {
+					subAvg.style.backgroundColor = getRgbValue(signalPercentage, 0, 255, 0, 0.2);
+				}
 			}
 			if (sub) {
-				sub.style.backgroundColor = getRgbValue(subGainPercentage, 0, true);
+				if (subGainPercentage > 0.01) {
+					sub.style.backgroundColor = getRgbValue(Math.max(subGainPercentage, subAvgGainPercentage), 255, 0, 64, 0.4);
+				}
+				else if (subAvgGainPercentage > 0.01) {
+					sub.style.backgroundColor = getRgbValue(subAvgGainPercentage, 255, 0, 64, 0.4);
+				}
+				else if (mainGainMax > 0.01) {
+					sub.style.backgroundColor = "black";
+				}
+				else {
+					sub.style.backgroundColor = getRgbValue(signalPercentage, 0, 255, 0, 0.2);
+				}
 			}
 			if (mainAvg) {
-				mainAvg.style.backgroundColor = getRgbValue(mainAvgGainPercentage, 0, true);
+				if (mainAvgGainPercentage > 0.01) {
+					mainAvg.style.backgroundColor = getRgbValue(mainAvgGainPercentage, 255, 0, 0, 0.4);
+				}
+				else if (mainGainMax > 0.01) {
+					mainAvg.style.backgroundColor = "black";
+				}
+				else {
+					mainAvg.style.backgroundColor = getRgbValue(signalPercentage, 0, 255, 0, 0.2);
+				}
 			}
 			if (main) {
-				main.style.backgroundColor = getRgbValue(mainGainPercentage, 0, true);
+				if (mainGainPercentage > 0.01) {
+					main.style.backgroundColor = getRgbValue(mainGainPercentage, 255, 0, 0, 0.4);
+				}
+				else if (mainAvgGainPercentage > 0.01) {
+					main.style.backgroundColor = getRgbValue(mainAvgGainPercentage, 255, 0, 0, 0.4);
+				}
+				else if (mainGainMax > 0.01) {
+					main.style.backgroundColor = "black";
+				}
+				else {
+					main.style.backgroundColor = getRgbValue(signalPercentage, 0, 255, 0, 0.2);
+				}
 			}
 		}
 		else {

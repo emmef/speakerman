@@ -11,19 +11,20 @@ body {
 	padding: 1ex;
 }
 
-.area-metric-sub-avg { position: relative; width: 16ex; height: 16ex;}
+.area-metric-sub-avg { display:block; position:relative; width: 16ex; height: 16ex;}
 .area-metric-sub { position: absolute; left: 1ex; top: 1ex; right: 1ex; bottom: 1ex;}
-.area-metric-signal { position: absolute; left: 2ex; top: 2ex; right: 2ex; bottom: 2ex;}
-.area-metric-main-avg { position: absolute; left: 4ex; top: 4ex; right: 4ex; bottom: 4ex;}
-.area-metric-main { position: absolute; left: 5.5ex; top: 5.5ex; width:5ex; height: 5ex;}
+.area-metric-separator { position: absolute; left: 2ex; top: 2ex; right: 2ex; bottom: 2ex; background-color: rgb(64,64,32); }
+.area-metric-main-avg { position: absolute; left: 2.2ex; top: 2.22ex; right: 2.2ex; bottom: 2.2ex;}
+.area-metric-main { position: absolute; left: 4ex; top: 4ex; width:8ex; height: 8ex;}
 
 .area-metric-group-name { 
-	position:absolute; left:2ex; top:0.25ex; width: 12ex; height: 12ex;
-	text-align: center; vertical-align: top;
+	position:relative; left:4ex; top:4ex; width: 8ex; height: 8ex;
+	text-align: center; vertical-align: middle;
 }
 .font-group-name {
 	font-size: 300%;
 	font-weight: normal;
 	color: rgba(255,255,255,0.6);
+	text-align: center; vertical-align: middle;
 }
 
