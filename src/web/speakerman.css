@@ -2,28 +2,48 @@
 	padding: 0; 
 	margin: 0; 
 	border:none;
-	font-family: verdana, sans-serif;
+	font-family: 'Open Sans', verdana, sans-serif;
 }
 body { 
-	background-color: rgb(64,64,64); color: grey; 
+	background-color: black; color: grey; 
 	min-width: 20ex; 
 	min-height: 20ex;
 	padding: 1ex;
 }
 
-.area-metric-sub-avg { display:block; position:relative; width: 16ex; height: 16ex;}
-.area-metric-sub { position: absolute; left: 1ex; top: 1ex; right: 1ex; bottom: 1ex;}
-.area-metric-separator { position: absolute; left: 2ex; top: 2ex; right: 2ex; bottom: 2ex; background-color: rgb(64,64,32); }
-.area-metric-main-avg { position: absolute; left: 2.2ex; top: 2.22ex; right: 2.2ex; bottom: 2.2ex;}
-.area-metric-main { position: absolute; left: 4ex; top: 4ex; width:8ex; height: 8ex;}
-
-.area-metric-group-name { 
-	position:relative; left:4ex; top:4ex; width: 8ex; height: 8ex;
+.area-sub-avg { 
+	display:block; position:relative; width: 16ex; height: 16ex;
+	background-color: rgb(255,0,64);
+}
+.area-sub { 
+	position: absolute; left: 1ex; top: 1ex; right: 1ex; bottom: 1ex;
+	background-color: rgb(255,0,64);
+	border: 0.2ex solid rgba(128,0,32,0);
+}
+.area-main-avg { 
+	position: absolute; left: 1ex; top: 1ex; right: 1ex; bottom: 1ex;
+	background-color: rgb(255,0,0);
+	border: 0.15ex solid rgba(80, 0, 0, 0);
+	border-radius: 7ex; 
+}
+.area-main { 
+	position: absolute; left: 3ex; top: 3ex; width:10ex; height: 10ex;
+	background-color: rgb(255,0,0);
+	border: 0.2ex solid rgba(128, 0, 0,0);
+	border-radius: 5ex; 
+}
+.area-signal { 
+	position: absolute; left: 5ex; top: 5ex; width:6ex; height: 6ex; 
+	border: 0.2ex solid rgba(0,128,0,0);
+	border-radius: 2ex 2ex 2ex 2ex;
+}
+.area-group-name { 
+	position:relative; left:4ex; top:5ex; width: 8ex; height: 8ex;
 	text-align: center; vertical-align: middle;
 }
 .font-group-name {
-	font-size: 300%;
-	font-weight: normal;
+	font-size: 250%;
+	font-weight: bold;
 	color: rgba(255,255,255,0.6);
 	text-align: center; vertical-align: middle;
 }
