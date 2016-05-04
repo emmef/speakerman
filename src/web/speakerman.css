@@ -21,7 +21,7 @@ body {
 	border: 0.2ex solid rgba(128,0,32,0);
 }
 .area-main-avg { 
-	position: absolute; left: 1ex; top: 1ex; right: 1ex; bottom: 1ex;
+	position: absolute; left: 1.5ex; top: 1.51ex; right: 1.5ex; bottom: 1.5ex;
 	background-color: rgb(255,0,0);
 	border: 0.15ex solid rgba(80, 0, 0, 0);
 	border-radius: 7ex; 
