@@ -99,12 +99,12 @@ private:
 
 	static AdvancedRms::UserConfig rmsUserConfig()
 	{
-		return { 0.0005, 0.66, 0.5, 1.0 };
+		return { 0.0005, 0.66, 0.5, 1.1 };
 	}
 
 	static AdvancedRms::UserConfig rmsUserSubConfig()
 	{
-		return { 0.005, 0.66, 0.75, 1.0 };
+		return { 0.005, 0.66, 0.75, 1.1 };
 	}
 
 public:
