@@ -23,6 +23,7 @@
 #define SMS_SPEAKERMAN_SPEAKERMANAGER_GUARD_H_
 
 #include <iostream>
+#include <cmath>
 #include <tdap/Delay.hpp>
 #include <tdap/FixedSizeArray.hpp>
 #include <tdap/AdvancedRmsDetector.hpp>
@@ -60,8 +61,8 @@ class SpeakerManager : public AbstractSpeakerManager
 	{
 		CrossoverFrequencies cr;
 		cr[0] = 80;
-		cr[1] = 160;
-		cr[2] = 4500;
+		cr[1] = 168;
+		cr[2] = 2566;
 		return cr;
 	};
 
@@ -112,6 +113,17 @@ protected:
 		return true;
 	}
 
+	void connectPorts(jack_client_t *client, const char *sourceName, const char *destinationName)
+	{
+		if (!Port::try_connect_ports(client, sourceName, destinationName)) {
+			std::cout << "Could not connect \"" << sourceName << "\" with \"" << destinationName << "\"" << std::endl;
+		}
+		else {
+			std::cout << "Connected \"" << sourceName << "\" with \"" << destinationName << "\"" << std::endl;
+		}
+
+	}
+
 	virtual void onPortsEnabled(jack_client_t *client, const Ports &ports) override
 	{
 		const char * unspecified = ".*";
@@ -120,35 +132,26 @@ protected:
  		NameList inputs = ports.inputNames();
  		NameList outputs = ports.outputNames();
 
- 		size_t inputWrap = Values::min(inputs.count(), capturePortNames.count());
- 		size_t inputCount = Values::max(inputs.count(), capturePortNames.count());
+ 		size_t inputCount = Values::min(inputs.count(), capturePortNames.count());
+ 		int subOutPut = Values::min(config_.subOutput, playbackPortNames.count()) - 1;
+ 		size_t outputCount = Values::min(outputs.count(), playbackPortNames.count());
 
- 		size_t outputWrap = Values::min(outputs.count(), playbackPortNames.count());
- 		size_t outputCount = Values::max(outputs.count(), playbackPortNames.count());
-
- 		std::cout << "Inputs: capture " << capturePortNames.count() << " in " << inputs.count() << std::endl;
- 		for (size_t i = 0; i < inputs.count(); i++) {
- 			size_t capture = i % capturePortNames.count();
- 			size_t input = i % inputs.count();
-
- 			if (!Port::try_connect_ports(client, capturePortNames.get(capture), inputs.get(input))) {
- 				std::cout << "Could not connect \"" << capturePortNames.get(capture) << "\" with \"" << inputs.get(input) << "\"" << std::endl;
- 			}
- 			else {
- 				std::cout << "Connected \"" << capturePortNames.get(capture) << "\" with \"" << inputs.get(input) << "\"" << std::endl;
- 			}
+ 		size_t groupOutputStart = 0;
+ 		if (subOutPut >= 0) {
+ 	 		connectPorts(client, outputs.get(0), playbackPortNames.get(subOutPut));
+ 	 		groupOutputStart = 1;
  		}
- 		std::cout << "Inputs: playback " << playbackPortNames.count() << " out " << outputs.count() << std::endl;
- 		for (size_t i = 0; i < outputs.count(); i++) {
- 			size_t playback = i % playbackPortNames.count();
- 			size_t output = i % outputs.count();
 
- 			if (!Port::try_connect_ports(client, outputs.get(i), playbackPortNames.get(i))) {
- 				std::cout << "Could not connect \"" << outputs.get(output) << "\" with \"" << playbackPortNames.get(playback) << "\"" << std::endl;
+ 		std::cout << "Outputs: playback " << playbackPortNames.count() << " out " << outputs.count() << std::endl;
+ 		for (size_t out = groupOutputStart, port = 0; out < outputCount; port++) {
+ 			if (port == subOutPut) {
+ 				continue;
  			}
- 			else {
- 				std::cout << "Connected \"" << outputs.get(output) << "\" with \"" << playbackPortNames.get(playback) << "\"" << std::endl;
- 			}
+ 			connectPorts(client, outputs.get(out++), playbackPortNames.get(port));
+ 		}
+ 		std::cout << "Inputs: capture " << capturePortNames.count() << " in " << inputs.count() << std::endl;
+ 		for (size_t i = 0; i < inputCount; i++) {
+ 			connectPorts(client, capturePortNames.get(i), inputs.get(i));
  		}
 	}
 
@@ -171,34 +174,56 @@ protected:
 				processor.updateConfig(lockFreeData.data().configData);
 			}
 		}
-		size_t portNumber;
-		size_t index;
-		for (index = 0, portNumber = 0; index < INPUTS; portNumber++, index++) {
-			inputs[index] = ports.getBuffer(portNumber);
+		size_t outputGroupStartIndex;
+		int subPort = config_.subOutput - 1;
+		size_t outputCount;
+		outputs[0] = ports.getBuffer(0);
+		if (subPort >= 0) {
+			outputCount = OUTPUTS;
+			outputGroupStartIndex = 1;
 		}
-		for (index = 0; index < OUTPUTS; portNumber++, index++) {
+		else {
+			outputCount = OUTPUTS - 1;
+			outputGroupStartIndex = 0;
+		}
+
+		for (size_t portNumber = outputGroupStartIndex, index = 1; portNumber < outputCount; portNumber++, index++) {
 			outputs[index] = ports.getBuffer(portNumber);
+		}
+		for (size_t index = 0, portNumber = outputCount; index < INPUTS; portNumber++, index++) {
+			inputs[index] = ports.getBuffer(portNumber);
 		}
 
 		FixedSizeArray<T, INPUTS> inFrame;
 		FixedSizeArray<T, OUTPUTS> outFrame;
 
-		for (size_t i = 0; i < frames; i++) {
+		if (subPort >= 0) {
+			for (size_t i = 0; i < frames; i++) {
+				for (size_t channel = 0; channel < INPUTS; channel++) {
+					inFrame[channel] = inputs[channel][i];
+				}
 
-			for (size_t channel = 0; channel < INPUTS; channel++) {
-				inFrame[channel] = inputs[channel][i];
+				processor.process(inFrame, outFrame);
+
+				for (size_t channel = 0; channel < OUTPUTS; channel++) {
+					outputs[channel][i] = outFrame[channel];
+				}
 			}
+		}
+		else {
+			double scale = 1.0 / sqrt(OUTPUTS - 1);
+			for (size_t i = 0; i < frames; i++) {
+				for (size_t channel = 0; channel < INPUTS; channel++) {
+					inFrame[channel] = inputs[channel][i];
+				}
 
-			processor.process(inFrame, outFrame);
+				processor.process(inFrame, outFrame);
 
-//			size_t channel;
-//			for (channel = 0; channel < INPUTS; channel++) {
-//				outputs[channel][i] = outFrame[channel + 1];
-//			}
-//			outputs[channel][i] = outFrame[0];
-			size_t channel;
-			for (channel = 0; channel < OUTPUTS; channel++) {
-				outputs[channel][i] = outFrame[channel];
+				double subValue = outFrame[0] * scale;
+
+				for (size_t channel = 1; channel < OUTPUTS; channel++) {
+					outputs[channel][i] = outFrame[channel] + subValue;
+				}
 			}
 		}
 
@@ -216,20 +241,27 @@ public:
 		config_(config)
 	{
 		char name[1 + Names::get_port_size()];
+		size_t outputs;
+		if (config.subOutput > 0) {
+			portDefinitions_.addOutput("out_sub");
+			outputs = Processor::OUTPUTS;
+			cout << "I: added output " << "out_sub" << std::endl;
+		}
+		else {
+			outputs = Processor::OUTPUTS - 1;
+		}
+		for (size_t channel = 0; channel < outputs; channel++) {
+			snprintf(name, 1 + Names::get_port_size(),
+					 "out_%zu_%zu", 1 + channel/CHANNELS_PER_GROUP, 1 + channel % CHANNELS_PER_GROUP);
+			portDefinitions_.addOutput(name);
+			cout << "I: added output " << name << std::endl;
+		}
 		for (size_t channel = 0; channel < Processor::INPUTS; channel++) {
 			 snprintf(name, 1 + Names::get_port_size(),
 					 "in_%zu_%zu", 1 + channel/CHANNELS_PER_GROUP, 1 + channel % CHANNELS_PER_GROUP);
 			 portDefinitions_.addInput(name);
 			 cout << "I: added input " << name << std::endl;
 		}
-		portDefinitions_.addOutput("out_sub");
-		for (size_t channel = 0; channel < Processor::INPUTS; channel++) {
-			snprintf(name, 1 + Names::get_port_size(),
-					 "out_%zu_%zu", 1 + channel/CHANNELS_PER_GROUP, 1 + channel % CHANNELS_PER_GROUP);
-			portDefinitions_.addOutput(name);
-			cout << "I: added output " << name << std::endl;
-		}
-		cout << "I: added output " << "out_sub" << std::endl;
 	}
 
 	virtual const SpeakermanConfig &getConfig() const override
