@@ -117,44 +117,59 @@ int mainLoop(Owner<JackClient> &owner)
 }
 
 
-speakerman::config::Reader configReader;
+//speakerman::config::Reader configReader;
 speakerman::server_socket webserver;
 
-template<typename F, size_t GROUPS>
-AbstractSpeakerManager *createManagerGr(const SpeakermanConfig & config)
+template<typename F, size_t GROUPS, size_t CROSSOVERS>
+AbstractSpeakerManager *createManagerSampleType(const SpeakermanConfig & config)
 {
 	static_assert(is_floating_point<F>::value, "Sample type must be floating point");
 
 	switch (config.groupChannels) {
 	case 1:
-		return new SpeakerManager<F, 1, GROUPS>(config);
+		return new SpeakerManager<F, 1, GROUPS, CROSSOVERS>(config);
 	case 2:
-		return new SpeakerManager<F, 2, GROUPS>(config);
+		return new SpeakerManager<F, 2, GROUPS, CROSSOVERS>(config);
 	case 3:
-		return new SpeakerManager<F, 3, GROUPS>(config);
+		return new SpeakerManager<F, 3, GROUPS, CROSSOVERS>(config);
 	case 4:
-		return new SpeakerManager<F, 4, GROUPS>(config);
+		return new SpeakerManager<F, 4, GROUPS, CROSSOVERS>(config);
 	case 5:
-		return new SpeakerManager<F, 5, GROUPS>(config);
+		return new SpeakerManager<F, 5, GROUPS, CROSSOVERS>(config);
 	}
 	throw invalid_argument("Number of channels per group must be between 1 and 5");
+}
+
+template <typename F, size_t CROSSOVERS>
+static AbstractSpeakerManager *createManagerGroup(const SpeakermanConfig & config)
+{
+
+	switch (config.groups) {
+	case 1:
+		return createManagerSampleType<F, 1, CROSSOVERS>(config);
+	case 2:
+		return createManagerSampleType<F, 2, CROSSOVERS>(config);
+	case 3:
+		return createManagerSampleType<F, 3, CROSSOVERS>(config);
+	case 4:
+		return createManagerSampleType<F, 4, CROSSOVERS>(config);
+	}
+	throw invalid_argument("Number of groups must be between 1 and 4");
 }
 
 template <typename F>
 static AbstractSpeakerManager *createManager(const SpeakermanConfig & config)
 {
 
-	switch (config.groups) {
+	switch (config.crossovers) {
 	case 1:
-		return createManagerGr<F, 1>(config);
+		return createManagerGroup<F, 1>(config);
 	case 2:
-		return createManagerGr<F, 2>(config);
+		return createManagerGroup<F, 2>(config);
 	case 3:
-		return createManagerGr<F, 3>(config);
-	case 4:
-		return createManagerGr<F, 4>(config);
+		return createManagerGroup<F, 3>(config);
 	}
-	throw invalid_argument("Number of groups must be between 1 and 4");
+	throw invalid_argument("Number of crossovers must be between 1 and 3");
 }
 
 using namespace std;
