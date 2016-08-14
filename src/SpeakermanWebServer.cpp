@@ -62,8 +62,16 @@ namespace speakerman
 				auto stamp = getConfigFileTimeStamp();
 				if (stamp != configFileConfig.timeStamp) {
 					cout << "read config!" << std::endl;
-					configFileConfig = readSpeakermanConfig(configFileConfig, false);
-					if (manager_.applyConfigAndGetLevels(configFileConfig, &levels, wait)) {
+					bool read = false;
+					try {
+						configFileConfig = readSpeakermanConfig(configFileConfig, false);
+						read = true;
+					}
+					catch (const runtime_error &e) {
+						cerr << "Error reading configuration: " << e.what() << endl;
+						configFileConfig.timeStamp = stamp;
+					}
+					if (read && manager_.applyConfigAndGetLevels(configFileConfig, &levels, wait)) {
 						level_buffer.put(levels);
 					}
 				}
