@@ -116,22 +116,29 @@ namespace speakerman {
 		static constexpr size_t DEFAULT_SUB_OUTPUT = 1;
 		static constexpr size_t MAX_SUB_OUTPUT = MAX_GROUPS *  MAX_GROUP_CHANNELS + 1;
 
+		static constexpr size_t MIN_CROSSOVERS = 1;
+		static constexpr size_t DEFAULT_CROSSOVERS = 3;
+		static constexpr size_t MAX_CROSSOVERS = 3;
+
 		static constexpr size_t KEY_GROUP_COUNT = 0;
 		static constexpr size_t KEY_CHANNELS = 1;
 		static constexpr size_t KEY_SUB_THRESHOLD = 2;
 		static constexpr size_t KEY_SUB_DELAY = 3;
 		static constexpr size_t KEY_SUB_OUTPUT = 4;
+		static constexpr size_t KEY_CROSSOVERS = 5;
 
 		static constexpr const char * KEY_SNIPPET_GROUP_COUNT = "groups";
 		static constexpr const char * KEY_SNIPPET_CHANNELS = "group-channels";
 		static constexpr const char * KEY_SNIPPET_SUB_THRESHOLD = "sub-relative-threshold";
 		static constexpr const char * KEY_SNIPPET_SUB_DELAY = "sub-delay";
 		static constexpr const char * KEY_SNIPPET_SUB_OUTPUT = "sub-output";
+		static constexpr const char * KEY_SNIPPET_CROSSOVERS = "crossovers";
 
 		GroupConfig group[MAX_GROUPS];
 		size_t groups;
 		size_t groupChannels;
 		size_t subOutput;
+		size_t crossovers;
 		double relativeSubThreshold;
 		double subDelay;
 		long long timeStamp;

@@ -42,11 +42,10 @@ class AbstractSpeakerManager : public SpeakerManagerControl, public JackProcesso
 
 };
 
-template<typename T, size_t CHANNELS_PER_GROUP, size_t GROUPS>
+template<typename T, size_t CHANNELS_PER_GROUP, size_t GROUPS, size_t CROSSOVERS>
 class SpeakerManager : public AbstractSpeakerManager
 {
 	static_assert(is_floating_point<T>::value, "expected floating-point value parameter");
-	static constexpr size_t CROSSOVERS = 3;
 
 	using Processor = DynamicsProcessor<T, CHANNELS_PER_GROUP, GROUPS, CROSSOVERS>;
 	using CrossoverFrequencies = typename Processor::CrossoverFrequencies;
@@ -61,8 +60,19 @@ class SpeakerManager : public AbstractSpeakerManager
 	{
 		CrossoverFrequencies cr;
 		cr[0] = 80;
-		cr[1] = 168;
-		cr[2] = 2566;
+		switch (cr.size()) {
+		case 1:
+			break;
+		case 2:
+			cr[1] = 160;
+			break;
+		case 3:
+			cr[1] = 160;
+			cr[2] = 2500;
+			break;
+		default:
+			throw std::invalid_argument("Too many crossovers");
+		}
 		return cr;
 	};
 
@@ -102,7 +112,7 @@ protected:
 	virtual bool onMetricsUpdate(ProcessingMetrics metrics) override
 	{
 		std::cout << "Updated metrics: {rate:" << metrics.sampleRate << ", bsize:" << metrics.bufferSize << "}" << std::endl;
-		AdvancedRms::UserConfig config = { 0.0005, 0.400, 0.5, 1.2 };
+		AdvancedRms::UserConfig config = { 0.0005, 0.400, 0.5, 1.5 };
 		processor.setSampleRate(metrics.sampleRate, crossovers(), config_);
 		Levels levels(GROUPS, CROSSOVERS);
 		levels.reset();
