@@ -217,6 +217,19 @@ struct AdvancedRms
 
 			return follower_.apply(value);
 		}
+
+		T integrate_new(T squareInput, T minOutput)
+		{
+			T value = minOutput;
+			for (size_t i = 0; i < filters_.size(); i++) {
+				T x = filters_[i].integrator.addSquareCompareAndGet(
+						squareInput, minOutput);
+				x *= filters_[i].scale;
+				value = Value<T>::max(value, x);
+			}
+
+			return follower_.apply(value);
+		}
 	};
 
 };
