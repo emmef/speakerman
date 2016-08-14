@@ -142,7 +142,8 @@ protected:
  		NameList inputs = ports.inputNames();
  		NameList outputs = ports.outputNames();
 
- 		size_t inputCount = Values::min(inputs.count(), capturePortNames.count());
+ 		size_t captureCount = capturePortNames.count();
+ 		size_t inputCount = Values::min(inputs.count(), captureCount);
  		int subOutPut = Values::min(config_.subOutput, playbackPortNames.count()) - 1;
  		size_t outputCount = Values::min(outputs.count(), playbackPortNames.count());
 
@@ -161,7 +162,7 @@ protected:
  		}
  		std::cout << "Inputs: capture " << capturePortNames.count() << " in " << inputs.count() << std::endl;
  		for (size_t i = 0; i < inputCount; i++) {
- 			connectPorts(client, capturePortNames.get(i), inputs.get(i));
+ 			connectPorts(client, capturePortNames.get((i + config_.inputOffset) % captureCount), inputs.get(i));
  		}
 	}
 
