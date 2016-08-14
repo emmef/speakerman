@@ -171,9 +171,9 @@ public:
 	{
 		S rms = rms_.addSquareAndGet(square);
 		return coeffs_.integrate(
-				coeffs_.integrate(
-						Value<S>::max(minimumRms, rms),
-						int1_),
+				Value<S>::max(
+						coeffs_.integrate(rms,int1_),
+						minimumRms),
 				int2_);
 	}
 };
