@@ -98,6 +98,7 @@ struct AdvancedRms
 	{
 		static_assert(is_floating_point<T>::value, "Need floating point type");
 		static_assert(RC_TIMES > 2, "Need at least three characteristic times");
+		static constexpr size_t MIDDLE = Value<size_t>::max(1, (RC_TIMES * 2 - 1) / 4);
 		FixedSizeArray<size_t, RC_TIMES> characteristicSamples;
 		FixedSizeArray<T, RC_TIMES> scale;
 		size_t maxBucketIntegrationWindow;
@@ -114,10 +115,9 @@ struct AdvancedRms
 			double slowScalePower = log(config.slowWeight) / log(config.maxRc / PERCEPTIVE_FAST_WINDOWSIZE);
 			double ratioIncrement;
 			size_t i;
-			size_t middle = (RC_TIMES * 3 - 1) / 4;
 
-			ratioIncrement = 1.0 / middle;
-			for (i = 0; i <= middle; i++) {
+			ratioIncrement = 1.0 / MIDDLE;
+			for (i = 0; i <= MIDDLE; i++) {
 				double t = ratioIncrement * i;
 				double rc = config.maxRc * pow(PERCEPTIVE_FAST_WINDOWSIZE / config.maxRc, t);
 				characteristicSamples[i] = 0.5 + sampleRate * rc;
@@ -125,7 +125,7 @@ struct AdvancedRms
 				scale[i] = pow(rcForScale / PERCEPTIVE_FAST_WINDOWSIZE, slowScalePower);
 //				std::cout << "RC " << (1000 * characteristicSamples[i] / sampleRate) << " ms. level=" << scale[i] << std::endl;
 			}
-			ratioIncrement = 1.0 / (RC_TIMES - middle - 1);
+			ratioIncrement = 1.0 / (RC_TIMES - MIDDLE - 1);
 			for (size_t j = 1; i < RC_TIMES; i++, j++) {
 				double t = ratioIncrement * j;
 				double rcForScale = PERCEPTIVE_FAST_WINDOWSIZE * pow(config.minRc / PERCEPTIVE_FAST_WINDOWSIZE, t);
@@ -190,7 +190,7 @@ struct AdvancedRms
 			for (size_t i = 0; i < RC_TIMES; i++)
 			{
 				size_t windowSize = config.characteristicSamples[i];
-				filters_[i].integrator.setWindowSizeAndRc(windowSize, Values::min(windowSize / 3, config.maxBucketIntegrationWindow));
+				filters_[i].integrator.setWindowSizeAndRc(windowSize, Values::min(windowSize / 4, config.maxBucketIntegrationWindow));
 				T scale = config.scale[i];
 				filters_[i].scale = scale;
 				if (scale > 1) {
