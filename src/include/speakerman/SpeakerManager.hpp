@@ -255,12 +255,9 @@ public:
 		size_t outputs;
 		if (config.subOutput > 0) {
 			portDefinitions_.addOutput("out_sub");
-			outputs = Processor::OUTPUTS;
 			cout << "I: added output " << "out_sub" << std::endl;
 		}
-		else {
-			outputs = Processor::OUTPUTS - 1;
-		}
+		outputs = Processor::OUTPUTS - 1;
 		for (size_t channel = 0; channel < outputs; channel++) {
 			snprintf(name, 1 + Names::get_port_size(),
 					 "out_%zu_%zu", 1 + channel/CHANNELS_PER_GROUP, 1 + channel % CHANNELS_PER_GROUP);
