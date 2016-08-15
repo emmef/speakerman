@@ -197,7 +197,7 @@ namespace tdap {
 			Butterworth::create(llCoeffs, sampleRate, 30.0, Butterworth::Pass::HIGH, 1.0);
 			FixedSizeIirCoefficientFilter<double, 1, 4> cutoffHigh;
 			auto hhCoeffs = cutoffHigh.coefficients_.wrap();
-			Butterworth::create(hhCoeffs, sampleRate, 10000.0, Butterworth::Pass::LOW, 1.0);
+			Butterworth::create(hhCoeffs, sampleRate, 8000.0, Butterworth::Pass::LOW, 1.0);
 
 			// initialization
 			cutoffLow.reset();
