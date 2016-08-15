@@ -83,7 +83,7 @@ private:
 	Crossovers::Filter<double, T, INPUTS, CROSSOVERS>  crossoverFilter;
 	ACurves::Filter<T, PROCESSING_CHANNELS> aCurve;
 
-	FixedSizeArray<AdvancedRms::Detector<T, 20>, DETECTORS> rmsDetector;
+	FixedSizeArray<AdvancedRms::Detector<T, 18>, DETECTORS> rmsDetector;
 
 	FixedSizeArray<HoldMaxDoubleIntegrated<T>, LIMITERS> limiter;
 	Delay<T> rmsDelay;
@@ -134,8 +134,8 @@ public:
 		rmsDelay.setDelay(PROCESSING_CHANNELS * rmsDelaySamples);
 
 		// Limiter delay and integration constants
-		T limiterIntegrationSamples = 0.0005 * sampleRate;
-		size_t limiterHoldSamples = 0.5 + 4 * limiterIntegrationSamples;
+		T limiterIntegrationSamples = 0.001 * sampleRate;
+		size_t limiterHoldSamples = 0.5 + 3 * limiterIntegrationSamples;
 		for (size_t i = 0; i < LIMITERS; i++) {
 			limiter[i].setMetrics(limiterIntegrationSamples, limiterHoldSamples);
 		}
@@ -234,7 +234,7 @@ private:
 		T x = processInput[0] + subNoise();
 		processInput[0] = rmsDelay.setAndGet(x);
 		x *= runtime.data().subRmsScale();
-		T detect = rmsDetector[0].integrate(x * x, 1.0);
+		T detect = rmsDetector[0].integrate_smooth(x * x, 1.0);
 		T gain = 1.0 / detect;
 		levels.setSubGain(gain);
 		processInput[0] *= gain;
@@ -254,7 +254,7 @@ private:
 					y *= scaleForUnity;
 					squareSum += y * y;
 				}
-				T detect = rmsDetector[detector].integrate(squareSum, 1.0);
+				T detect = rmsDetector[detector].integrate_smooth(squareSum, 1.0);
 				T gain = 1.0 / detect;
 				levels.setGroupGain(group, gain);
 				for (size_t offset = baseOffset; offset < nextOffset; offset++) {
@@ -308,7 +308,7 @@ private:
 			T peak = 0.0;
 			for (size_t channel = 0, offset = startOffs; channel < CHANNELS_PER_GROUP; channel++, offset++) {
 				T x = output[offset];
-				output[offset] = x;//limiterDelay.setAndGet(x);
+				output[offset] = limiterDelay.setAndGet(x);
 				peak = Values::max(peak, fabs(x));
 			}
 			T scale = runtime.data().groupConfig(group).limiterScale();

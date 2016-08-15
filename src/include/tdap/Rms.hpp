@@ -176,6 +176,16 @@ public:
 						minimumRms),
 				int2_);
 	}
+
+	S addSquareCompareAndGetSmoothMinimum(S square, S minimumRms)
+	{
+		S rms = rms_.addSquareAndGet(square);
+		return coeffs_.integrate(
+					coeffs_.integrate(
+							Value<S>::max(rms,minimumRms),int1_
+					),
+				int2_);
+	}
 };
 
 template <typename S>

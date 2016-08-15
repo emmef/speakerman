@@ -61,12 +61,12 @@ struct AdvancedRms
 	}
 	static ValueRange<double> &followRcRange()
 	{
-		static ValueRange<double> range(0.0005, 0.005);
+		static ValueRange<double> range(0.0005, 0.025);
 		return range;
 	}
 	static ValueRange<double> &followHoldTimeRange()
 	{
-		static ValueRange<double> range(0.001, 0.015);
+		static ValueRange<double> range(0.001, 0.050);
 		return range;
 	}
 
@@ -162,7 +162,7 @@ struct AdvancedRms
 		}
 		struct Filter
 		{
-			BucketIntegratedRms<double, 24> integrator;
+			BucketIntegratedRms<double, 16> integrator;
 			double scale;
 		};
 		FixedSizeArray<Filter, RC_TIMES> filters_;
@@ -205,24 +205,24 @@ struct AdvancedRms
 			follower_.setValue(x);
 		}
 
-		T integrate(T squareInput, T minOutput)
-		{
-			T value = minOutput * minOutputScale_;
-			for (size_t i = 0; i < filters_.size(); i++) {
-				T x = filters_[i].integrator.addSquareCompareAndGet(
-						squareInput, value);
-				x *= filters_[i].scale;
-				value = Value<T>::max(value, x);
-			}
+//		T integrate(T squareInput, T minOutput)
+//		{
+//			T value = minOutput * minOutputScale_;
+//			for (size_t i = 0; i < filters_.size(); i++) {
+//				T x = filters_[i].integrator.addSquareCompareAndGet(
+//						squareInput, value);
+//				x *= filters_[i].scale;
+//				value = Value<T>::max(value, x);
+//			}
+//
+//			return follower_.apply(value);
+//		}
 
-			return follower_.apply(value);
-		}
-
-		T integrate_new(T squareInput, T minOutput)
+		T integrate_smooth(T squareInput, T minOutput)
 		{
 			T value = minOutput;
 			for (size_t i = 0; i < filters_.size(); i++) {
-				T x = filters_[i].integrator.addSquareCompareAndGet(
+				T x = filters_[i].integrator.addSquareCompareAndGetSmoothMinimum(
 						squareInput, minOutput);
 				x *= filters_[i].scale;
 				value = Value<T>::max(value, x);
