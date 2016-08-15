@@ -35,7 +35,7 @@ namespace speakerman {
 
 		static constexpr double getLimiterThreshold(double threshold, double sloppyFactor)
 		{
-			return getThreshold(threshold) / Values::force_between(sloppyFactor, 0.1, 1.0);
+			return Values::min(1.0, 4 * getThreshold(threshold));
 		}
 
 		static constexpr double getRmsThreshold(double threshold, double relativeBandWeight)
