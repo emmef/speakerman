@@ -160,7 +160,11 @@ protected:
  			}
  			connectPorts(client, outputs.get(out++), playbackPortNames.get(port));
  		}
- 		std::cout << "Inputs: capture " << capturePortNames.count() << " in " << inputs.count() << std::endl;
+ 		std::cout << "Inputs: capture " << capturePortNames.count() << " in " << inputs.count();
+ 		if (config_.inputOffset > 0) {
+ 			cout << " offset " << config_.inputOffset;
+ 		}
+ 		cout << endl;
  		for (size_t i = 0; i < inputCount; i++) {
  			connectPorts(client, capturePortNames.get((i + config_.inputOffset) % captureCount), inputs.get(i));
  		}
