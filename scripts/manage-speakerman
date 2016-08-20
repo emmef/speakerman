@@ -1,1 +1,151 @@
-#!/bin/sh
+#!/bin/bash
+
+SPEAKERMAN_USER="musicman"
+SPEAKERMAN_EXECUTABLE_NAME="speakerman"
+
+JACK_CARD="0"
+JACK_PORTS="1024"
+JACK_RATE="96000"
+JACK_SAMPLES_PERIOD="512"
+JACK_PERIODS="2"
+JACK_EXECUTABLE="jackd"
+
+CONFIGFILE="/etc/speakerman/speakerman-setup.conf"
+if test -f "$CONFIGFILE" 
+then
+    . "$CONFIGFILE"
+fi
+
+ACTION=
+
+check_root() {
+    if [ "$EUID" == "0" ]
+    then
+		return 0
+	fi
+    echo "$0: Must be root to run with $1" >&2
+	return 1
+}
+
+case "$1" in
+  start)
+		if check_root "$*"
+		then 
+	        sudo -u ${SPEAKERMAN_USER} $0 as_user start
+			exit 0
+		fi
+ 	;;
+  stop)
+		if check_root "$*" 
+		then 
+	        sudo -u ${SPEAKERMAN_USER} $0 as_user stop
+			exit 0
+		fi
+	;;
+  as_user)
+		if [ "$USER" != "${SPEAKERMAN_USER}" ]
+		then 
+			echo "$0: Wrong user $USER instead of $SPEAKERMAN_USER"
+			exit 1
+		fi
+		case "$2" in 
+			start)
+				ACTION="start"
+			;;
+			stop)
+				ACTION="stop"
+			;;
+		esac
+	;;
+  *)
+	ACTION=
+	;;
+esac
+
+if [ "" == "$ACTION" ]
+then
+	echo "Usage (as root): $0 (start|stop)" >&2
+	exit 3
+fi
+
+# $1 PROGRAM
+executable()
+{
+	# If which is not available then we must be running before
+	# /usr is mounted on a system that has which in /usr/bin/.
+	# Conclude that $1 is not executable.
+	[ -x /bin/which ] || [ -x /usr/bin/which ] || return 1
+	which "$1" >/dev/null 2>&1
+}
+
+PATH="usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+JACK_COMMAND="${JACK_EXECUTABLE} -p$JACK_PORTS -dalsa -dhw:${JACK_CARD} -r${JACK_RATE} -p${JACK_SAMPLES_PERIOD} -n${JACK_PERIODS}"
+
+jack_active() {
+	if ! executable "$JACK_EXECUTABLE"
+	then
+		echo "Cannot find $JACK_EXECUTABLE" >&2
+		return 1
+	fi
+	if jack_wait -w -t 2 | grep -Ei '^timeout'
+	then
+		echo "Jack not active"
+		return 1
+	fi
+	return 0;
+}
+
+jack_kill() {
+	if ! executable "$JACK_EXECUTABLE"
+	then
+		echo "Cannot find $JACK_EXECUTABLE" >&2
+		return 1
+	fi
+	PIDS=`pidof "$JACK_EXECUTABLE"`
+	for pid in $PIDS
+	do
+		if ! kill -TERM $pid 
+		then
+			echo "couldn't kill $pid" >&2
+			return 1
+		fi
+	done
+	
+	while [ "$PIDS" != "" ]
+	do
+		PIDS=`pidof "$JACK_EXECUTABLE"`
+		echo "$PIDS"
+	done
+}
+
+jack_activate() {
+	if ! executable "$JACK_EXECUTABLE"
+	then
+		echo "Cannot find $JACK_EXECUTABLE" >&2
+		return 1
+	fi
+	if ! jack_kill
+	then
+		return 1
+	fi
+	echo "Executing $JACK_COMMAND"
+	date > /tmp/jack_log
+	nohup $JACK_COMMAND >>/tmp/jack_log &
+
+	if jack_wait -w -t 2 | grep -Ei '^timeout'
+	then
+		echo "Jack not active"
+		return 1
+	fi
+	echo 'Jack activated!'
+	return 0
+}
+
+echo "Uitvoeren actie $ACTION"
+
+if [ "$ACTION" == "start" ]
+then
+	jack_activate
+else
+	jack_kill
+fi

@@ -1,0 +1,70 @@
+#!/bin/sh
+#
+# Speakerman init script
+#
+### BEGIN INIT INFO
+# Provides:          speakerman
+# Required-Start:    $local_fs $remote_fs
+# Required-Stop:     $remote_fs
+# Default-Start:     S
+# Default-Stop:      0 1 6
+# Short-Description: Start and stop speakerman service
+# Description:       This script stores and restores mixer levels on
+#                    shutdown and bootup.On sysv-rc systems: to
+#                    disable storing of mixer levels on shutdown,
+#                    remove /etc/rc[06].d/K50alsa-utils.  To disable
+#                    restoring of mixer levels on bootup, rename the
+#                    "S50alsa-utils" symbolic link in /etc/rcS.d/ to
+#                    "K50alsa-utils".
+### END INIT INFO
+
+EXECUTABLE_FILE="manage-speakerman"
+PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+# Don't use set -e; check exit status instead
+# $1 PROGRAM
+executable()
+{
+	# If which is not available then we must be running before
+	# /usr is mounted on a system that has which in /usr/bin/.
+	# Conclude that $1 is not executable.
+	[ -x /bin/which ] || [ -x /usr/bin/which ] || return 1
+	which "$1" >/dev/null 2>&1
+}
+
+
+# Exit successfully but with warning, if package(s) no longer installed
+if executable "$EXECUTABLE_FILE"
+then
+	EXECUTABLE=`which "$EXECUTABLE_FILE"`
+else
+    log_warning_msg "Speakerman not installed; please remove $MYNAME"
+    exit 0
+fi
+
+# . /lib/lsb/init-functions
+
+# $1 status update
+speakerman_manage() 
+{
+	echo "Executing as user $EXECUTABLE"
+    nohup "${EXECUTABLE}" $1 >/var/log/speakerman &
+}
+
+case "$1" in
+  start)
+        speakerman_manage start
+	;;
+  stop)
+        speakerman_manage stop
+	;;
+  restart)
+        speakerman_manage stop
+        speakerman_manage start
+	;;
+  *)
+	echo "Usage: $MYNAME {start|stop|restart" >&2
+	exit 3
+	;;
+esac
+
