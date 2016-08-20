@@ -47,8 +47,7 @@ fi
 # $1 status update
 speakerman_manage() 
 {
-	echo "Executing as user $EXECUTABLE"
-    nohup "${EXECUTABLE}" $1 >/var/log/speakerman &
+    "${EXECUTABLE}" $1 2>&1 >>/var/log/speakerman
 }
 
 case "$1" in
@@ -63,7 +62,7 @@ case "$1" in
         speakerman_manage start
 	;;
   *)
-	echo "Usage: $MYNAME {start|stop|restart" >&2
+	echo "Usage: $0 (start|stop|restart)" >&2
 	exit 3
 	;;
 esac

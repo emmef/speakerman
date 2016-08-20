@@ -1,7 +1,6 @@
 #!/bin/bash
 
-SPEAKERMAN_USER="musicman"
-SPEAKERMAN_EXECUTABLE_NAME="speakerman"
+SPEAKERMAN_USER="speakerman"
 
 JACK_CARD="0"
 JACK_PORTS="1024"
@@ -15,6 +14,10 @@ if test -f "$CONFIGFILE"
 then
     . "$CONFIGFILE"
 fi
+
+SPEAKERMAN_EXECUTABLE_NAME="speakerman"
+SPEAKERMAN_LOG="/tmp/speakerman.log"
+JACK_LOG="/tmp/jack.log"
 
 ACTION=
 
@@ -79,14 +82,80 @@ executable()
 }
 
 PATH="usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+if ! executable "$JACK_EXECUTABLE"
+then
+	echo "Cannot find $JACK_EXECUTABLE" >&2
+	return 1
+fi
+
+if executable "$SPEAKERMAN_EXECUTABLE_NAME"
+then
+	SPEAKERMAN_EXECUTABLE=`which "$SPEAKERMAN_EXECUTABLE_NAME"`
+else
+	echo "Cannot find $SPEAKERMAN_EXECUTABLE_NAME" >&2
+	return 1
+fi
+
 JACK_COMMAND="${JACK_EXECUTABLE} -p$JACK_PORTS -dalsa -dhw:${JACK_CARD} -r${JACK_RATE} -p${JACK_SAMPLES_PERIOD} -n${JACK_PERIODS}"
 
-jack_active() {
-	if ! executable "$JACK_EXECUTABLE"
+# $1: Executable name
+# $2: signal
+exec_signal() {
+	PIDS=`pidof "$1"`
+	if [ "$PIDS" == "" ] 
 	then
-		echo "Cannot find $JACK_EXECUTABLE" >&2
+		return 0
+	fi
+	if ! kill -$2 $PIDS
+	then
+		echo "Couldn't kill all processes ($1) with kill -$2 $PIDS" >&2
 		return 1
 	fi
+}
+
+# $1: Executable name
+exec_await_terminated()
+{
+	ATTEMPT="0"
+	PIDS=`pidof "$1"`
+	while [ "$PIDS" != "" ]
+	do
+		sleep 1
+		ATTEMPT=$(($ATTEMPT + 1))
+		if [ $ATTEMPT -ge 2 ]
+		then	
+			return 1
+		fi
+		PIDS=`pidof "$1"`
+	done
+}
+
+# $1: Executable name
+exec_kill() {
+	if ! executable "$1"
+	then
+		echo "Cannot find $1" >&2
+		return 1
+	fi
+	if ! exec_signal "$1" TERM 
+	then
+		return 1
+	fi
+	if exec_await_terminated "$1"
+	then
+		return 0
+	fi
+	if ! exec_signal "$1" KILL
+	then
+		return 1
+	fi
+	if ! exec_await_terminated "$1"
+	then
+		return 1
+	fi
+}
+
+jack_active() {
 	if jack_wait -w -t 2 | grep -Ei '^timeout'
 	then
 		echo "Jack not active"
@@ -96,41 +165,20 @@ jack_active() {
 }
 
 jack_kill() {
-	if ! executable "$JACK_EXECUTABLE"
+	if ! exec_kill "$JACK_EXECUTABLE"
 	then
-		echo "Cannot find $JACK_EXECUTABLE" >&2
 		return 1
-	fi
-	PIDS=`pidof "$JACK_EXECUTABLE"`
-	for pid in $PIDS
-	do
-		if ! kill -TERM $pid 
-		then
-			echo "couldn't kill $pid" >&2
-			return 1
-		fi
-	done
-	
-	while [ "$PIDS" != "" ]
-	do
-		PIDS=`pidof "$JACK_EXECUTABLE"`
-		echo "$PIDS"
-	done
+	fi	
 }
 
 jack_activate() {
-	if ! executable "$JACK_EXECUTABLE"
-	then
-		echo "Cannot find $JACK_EXECUTABLE" >&2
-		return 1
-	fi
 	if ! jack_kill
 	then
 		return 1
 	fi
 	echo "Executing $JACK_COMMAND"
-	date > /tmp/jack_log
-	nohup $JACK_COMMAND >>/tmp/jack_log &
+	date >> "$JACK_LOG"
+	nohup $JACK_COMMAND 2>&1 >> "$JACK_LOG" &
 
 	if jack_wait -w -t 2 | grep -Ei '^timeout'
 	then
@@ -141,11 +189,41 @@ jack_activate() {
 	return 0
 }
 
+speakerman_activate() {
+	if ! exec_kill "$SPEAKERMAN_EXECUTABLE"
+	then
+		return 1
+	fi	
+	echo "Executing $SPEAKERMAN_EXECUTABLE"
+	date >> "$SPEAKERMAN_LOG"
+	nohup $SPEAKERMAN_EXECUTABLE 2>&1 >>"$SPEAKERMAN_LOG" &
+
+	ATTEMPT="0"
+	while ! wget --quiet "http://localhost:8088" 
+	do
+		sleep 1
+		ATTEMPT=$(($ATTEMPT + 1))
+		if [ $ATTEMPT -ge 3 ]
+		then	
+			return 1
+		fi
+	done
+	return 0
+}
+
 echo "Uitvoeren actie $ACTION"
 
 if [ "$ACTION" == "start" ]
 then
-	jack_activate
+	if jack_activate && speakerman_activate
+	then
+		echo "Started"
+	fi
 else
-	jack_kill
+	if exec_kill "$SPEAKERMAN_EXECUTABLE" 
+	then
+		jack_kill
+	else
+		return 1
+	fi
 fi
