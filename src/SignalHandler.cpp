@@ -97,7 +97,7 @@ SignalHandler::SignalHandler()
 
 const SignalHandler &SignalHandler::instance()
 {
-	SignalHandler instance;
+	static SignalHandler instance;
 	return instance;
 }
 
