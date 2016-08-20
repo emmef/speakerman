@@ -224,6 +224,6 @@ else
 	then
 		jack_kill
 	else
-		return 1
+		exit 1
 	fi
 fi
