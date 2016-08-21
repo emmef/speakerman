@@ -1,2 +1,2 @@
-dist_DATA=speakerman-setup.conf
+dist_DATA=speakerman.conf
 distdir=/etc/speakerman/

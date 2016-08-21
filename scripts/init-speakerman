@@ -1,0 +1,90 @@
+#!/bin/bash
+
+# Determine directory of this script
+MY_DIR=`dirname "$0"`
+pushd "$MY_DIR" >/dev/null
+MY_ROOT_DIR=`pwd -P` 
+popd >/dev/null
+export MY_ROOT_DIR
+
+# The directory of the script must indicate the service name
+SERVICE_NAME_CANDIDATE=`basename "$MY_ROOT_DIR"`
+
+# Verify if this is indeed a valid service name
+if echo "Service $SERVICE_NAME_CANDIDATE" | egrep '^Service [-_0-9a-z]+$' >/dev/null
+then
+	SERVICE_NAME="$SERVICE_NAME_CANDIDATE"
+else
+	echo "Need valid service name instead of \"$SERVICE_NAME\"" >&2
+	exit 1
+fi
+
+# Determine where to log
+
+DEFAULT_LOG_FILE="/var/log/$SERVICE_NAME.log"
+LOG_FILE="$DEFAULT_LOG_FILE"
+CONFIG_FILE="/etc/$SERVICE_NAME/$SERVICE_NAME.conf"
+
+if [ -f "$CONFIG_FILE" ] 
+then
+	. "$CONFIG_FILE"
+else 
+	echo "Service \"$SERVICE_NAME\" is using default configuration"
+fi
+
+DATE_FORMAT="%Y-%m-%d-%H:%M:%S.%N"
+LOG_START_LINE="S: `date +"$DATE_FORMAT"` :: *** Log $SERVICE_NAME ***"
+if ! echo "$LOG_START_LINE" >>"$LOG_FILE"
+then
+	LOG_FILE="$DEFAULT_LOG_FILE"
+fi
+if ! echo "$LOG_START_LINE" >>"$LOG_FILE"
+then
+	LOG_FILE="/tmp/$SERVICE_NAME.$$.log"
+	echo "$LOG_START_LINE" >>"$LOG_FILE"
+fi
+echo "Service \"$SERVICE_NAME\" is using log file \"$LOG_FILE\""
+
+# Determine service management script/executable
+
+MANAGER_SCRIPT="manage-$SERVICE_NAME"
+MANAGER="$MY_ROOT_DIR/$MANAGER_SCRIPT"
+
+if [ -x "$MANAGER" ]
+then
+	EXECUTE="$MANAGER $*"
+else
+	echo "Service management executable not found: \"$MANAGER\"" >&2
+	exit 1
+fi
+
+echo "Service \"$SERVICE_NAME\" invocation \"$EXECUTE\""
+
+error_log() {
+	while read readline 
+	do
+		echo "E: `date +"$DATE_FORMAT"` :: $readline" >>"$LOG_FILE"
+	done
+}
+
+message_log() {
+	while read readline 
+	do
+		echo "I: `date +"$DATE_FORMAT"` :: $readline" >>"$LOG_FILE"
+	done
+}
+
+redirect_stdout() {
+	$EXECUTE
+}
+
+redirect_standard() {
+	redirect_stdout | message_log 
+}
+
+redirect_all() {
+	redirect_standard 2>&1 | error_log
+}
+
+redirect_all
+

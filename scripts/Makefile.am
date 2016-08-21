@@ -1,5 +1,3 @@
-dist_bin_SCRIPTS=manage-speakerman
+dist_SCRIPTS=manage-speakerman init-speakerman
+distdir=$(prefix)/share/@PACKAGE@/
 
-
-dist_SCRIPTS=speakerman-service
-distdir=/etc/init.d/
