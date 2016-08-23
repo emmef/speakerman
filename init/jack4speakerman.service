@@ -1,0 +1,12 @@
+[Unit]
+Description=JACK service on behalf of speakerman
+After=sound.target
+
+[Service]
+LimitRTPRIO=infinity
+LimitMEMLOCK=infinity
+User=speakerman
+ExecStart=/usr/local/share/speakerman/start-jack
+
+[Install]
+WantedBy=multi-user.target

@@ -1,2 +1,2 @@
 dist_DATA=speakerman.conf
-distdir=/etc/speakerman/
+distdir=$(prefix)/share/@PACKAGE@/examples

@@ -1,75 +1,21 @@
 #!/bin/bash
 
-SPEAKERMAN_USER="speakerman"
+echo "Executing \"$SERVICE_NAME\" as $USER in home directory \"$HOME\""
 
-JACK_CARD="0"
-JACK_PORTS="1024"
-JACK_RATE="96000"
-JACK_SAMPLES_PERIOD="512"
-JACK_PERIODS="2"
-JACK_EXECUTABLE="jackd"
-
-CONFIGFILE="/etc/speakerman/speakerman-setup.conf"
-if test -f "$CONFIGFILE" 
-then
-    . "$CONFIGFILE"
-fi
-
+JACK_EXECUTABLE="$HOME/.jackdrc"
 SPEAKERMAN_EXECUTABLE_NAME="speakerman"
-SPEAKERMAN_LOG="/tmp/speakerman.log"
-JACK_LOG="/tmp/jack.log"
 
-ACTION=
-
-check_root() {
-    if [ "$EUID" == "0" ]
-    then
-		return 0
-	fi
-    echo "$0: Must be root to run with $1" >&2
-	return 1
-}
-
-case "$1" in
-  start)
-		if check_root "$*"
-		then 
-	        sudo -u ${SPEAKERMAN_USER} $0 as_user start
-			exit 0
-		fi
- 	;;
-  stop)
-		if check_root "$*" 
-		then 
-	        sudo -u ${SPEAKERMAN_USER} $0 as_user stop
-			exit 0
-		fi
+case "$1" in 
+	start)
+		ACTION="start"
 	;;
-  as_user)
-		if [ "$USER" != "${SPEAKERMAN_USER}" ]
-		then 
-			echo "$0: Wrong user $USER instead of $SPEAKERMAN_USER"
-			exit 1
-		fi
-		case "$2" in 
-			start)
-				ACTION="start"
-			;;
-			stop)
-				ACTION="stop"
-			;;
-		esac
+	stop)
+		ACTION="stop"
 	;;
-  *)
-	ACTION=
-	;;
-esac
-
-if [ "" == "$ACTION" ]
-then
+	*)
 	echo "Usage (as root): $0 (start|stop)" >&2
 	exit 3
-fi
+esac
 
 # $1 PROGRAM
 executable()
@@ -81,12 +27,21 @@ executable()
 	which "$1" >/dev/null 2>&1
 }
 
-PATH="usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-if ! executable "$JACK_EXECUTABLE"
+
+if [ -f "$HOME/.jackdrc" ]
 then
-	echo "Cannot find $JACK_EXECUTABLE" >&2
-	return 1
+	read JACK_EXECUTABLE JACK_COMMANDLINE < "$HOME/.jackdrc"
+	if ! executable "$JACK_EXECUTABLE"
+	then
+		echo "Cannot find $JACK_EXECUTABLE" >&2
+		return 1
+	fi
+else
+	echo "Cannot find jack startup file for user: $HOME/.jackdrc" >&2
+	exit 1
 fi
+
+PATH="usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
 if executable "$SPEAKERMAN_EXECUTABLE_NAME"
 then
@@ -96,7 +51,7 @@ else
 	return 1
 fi
 
-JACK_COMMAND="${JACK_EXECUTABLE} -p$JACK_PORTS -dalsa -dhw:${JACK_CARD} -r${JACK_RATE} -p${JACK_SAMPLES_PERIOD} -n${JACK_PERIODS}"
+JACK_COMMAND="$JACK_EXECUTABLE $JACK_COMMANDLINE"
 
 # $1: Executable name
 # $2: signal
@@ -176,16 +131,15 @@ jack_activate() {
 	then
 		return 1
 	fi
-	echo "Executing $JACK_COMMAND"
-	date >> "$JACK_LOG"
-	nohup $JACK_COMMAND 2>&1 >> "$JACK_LOG" &
+	echo "Executing as $USER: $JACK_COMMAND"
+	$JACK_COMMAND &
+	disown
 
 	if jack_wait -w -t 2 | grep -Ei '^timeout'
 	then
 		echo "Jack not active"
 		return 1
 	fi
-	echo 'Jack activated!'
 	return 0
 }
 
@@ -194,12 +148,12 @@ speakerman_activate() {
 	then
 		return 1
 	fi	
-	echo "Executing $SPEAKERMAN_EXECUTABLE"
-	date >> "$SPEAKERMAN_LOG"
-	nohup $SPEAKERMAN_EXECUTABLE 2>&1 >>"$SPEAKERMAN_LOG" &
+	echo "Executing as $USER: $SPEAKERMAN_EXECUTABLE"
 
+	$SPEAKERMAN_EXECUTABLE &
+	disown
 	ATTEMPT="0"
-	while ! wget --quiet "http://localhost:8088" 
+	while ! wget --quiet  -O /dev/null "http://localhost:8088"
 	do
 		sleep 1
 		ATTEMPT=$(($ATTEMPT + 1))
@@ -211,10 +165,44 @@ speakerman_activate() {
 	return 0
 }
 
-echo "Uitvoeren actie $ACTION"
-export DBUS_SESSION_BUS_ADDRESS="unix:path=/run/dbus/system_bus_socket"
+DBUS_LOCK="/tmp/.speakerman.dbus"
+
+ensure_dbus() {
+	if [ ! -f "$DBUS_LOCK" ] 
+	then
+		echo "Launching new DBUS"
+		if ! dbus-launch | tee "$DBUS_LOCK"
+		then
+			echo "Cannot start DBUS" >&2
+			exit 1
+		fi
+		. "$DBUS_LOCK"
+	else
+		. "$DBUS_LOCK"
+		if [ -e /proc/$DBUS_SESSION_BUS_PID ] 
+		then
+			echo "Using running DBUS"
+			cat "$DBUS_LOCK"
+		else
+			echo "Stale DBUS info; launching new DBUS"
+			if ! dbus-launch | tee "$DBUS_LOCK"
+			then
+				echo "Cannot start dbus" >&2
+				exit 1
+			fi
+			. "$DBUS_LOCK"
+		fi
+	fi
+}
+
 if [ "$ACTION" == "start" ]
 then
+	if ! ensure_dbus 
+	then 
+		exit 1
+	fi
+	export DBUS_SESSION_BUS_ADDRESS
+	export DBUS_SESSION_BUS_PID
 	if jack_activate && speakerman_activate
 	then
 		echo "Started"
@@ -223,6 +211,13 @@ else
 	if exec_kill "$SPEAKERMAN_EXECUTABLE" 
 	then
 		jack_kill
+		if [ -f "$DBUS_LOCK" ] 
+		then
+			. "$DBUS_LOCK"
+			echo "Stopping DBUS with pid=$DBUS_SESSION_BUS_PID"
+			kill -TERM $DBUS_SESSION_BUS_PID
+			rm "$DBUS_LOCK"
+		fi
 	else
 		exit 1
 	fi

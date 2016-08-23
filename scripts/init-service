@@ -1,14 +1,14 @@
 #!/bin/bash
 
+
 # Determine directory of this script
 MY_DIR=`dirname "$0"`
 pushd "$MY_DIR" >/dev/null
-MY_ROOT_DIR=`pwd -P` 
+SERVICE_SCRIPT_ROOT=`pwd -P` 
 popd >/dev/null
-export MY_ROOT_DIR
 
 # The directory of the script must indicate the service name
-SERVICE_NAME_CANDIDATE=`basename "$MY_ROOT_DIR"`
+SERVICE_NAME_CANDIDATE=`basename "$SERVICE_SCRIPT_ROOT"`
 
 # Verify if this is indeed a valid service name
 if echo "Service $SERVICE_NAME_CANDIDATE" | egrep '^Service [-_0-9a-z]+$' >/dev/null
@@ -19,25 +19,18 @@ else
 	exit 1
 fi
 
+export SERVICE_SCRIPT_ROOT
+export SERVICE_NAME
+export SERVICE_CONFIG_ROOT="/etc/$SERVICE_NAME/"
+export SERVICE_HAS_USER="Yes"
+export SERVICE_DBUS_INIT="Yes"
+
 # Determine where to log
 
 DEFAULT_LOG_FILE="/var/log/$SERVICE_NAME.log"
 LOG_FILE="$DEFAULT_LOG_FILE"
-CONFIG_FILE="/etc/$SERVICE_NAME/$SERVICE_NAME.conf"
-
-if [ -f "$CONFIG_FILE" ] 
-then
-	. "$CONFIG_FILE"
-else 
-	echo "Service \"$SERVICE_NAME\" is using default configuration"
-fi
-
 DATE_FORMAT="%Y-%m-%d-%H:%M:%S.%N"
-LOG_START_LINE="S: `date +"$DATE_FORMAT"` :: *** Log $SERVICE_NAME ***"
-if ! echo "$LOG_START_LINE" >>"$LOG_FILE"
-then
-	LOG_FILE="$DEFAULT_LOG_FILE"
-fi
+LOG_START_LINE="S: `date +"$DATE_FORMAT"` :: Init system invocation of \"$SERVICE_NAME\" ***"
 if ! echo "$LOG_START_LINE" >>"$LOG_FILE"
 then
 	LOG_FILE="/tmp/$SERVICE_NAME.$$.log"
@@ -47,8 +40,16 @@ echo "Service \"$SERVICE_NAME\" is using log file \"$LOG_FILE\""
 
 # Determine service management script/executable
 
-MANAGER_SCRIPT="manage-$SERVICE_NAME"
-MANAGER="$MY_ROOT_DIR/$MANAGER_SCRIPT"
+if [ -n "$SERVICE_HAS_USER" ] 
+then
+	MANAGER_SCRIPT="manage-service-user"
+else
+	MANAGER_SCRIPT="manage-service"
+fi
+
+
+
+MANAGER="$SERVICE_SCRIPT_ROOT/$MANAGER_SCRIPT"
 
 if [ -x "$MANAGER" ]
 then
@@ -60,31 +61,6 @@ fi
 
 echo "Service \"$SERVICE_NAME\" invocation \"$EXECUTE\""
 
-error_log() {
-	while read readline 
-	do
-		echo "E: `date +"$DATE_FORMAT"` :: $readline" >>"$LOG_FILE"
-	done
-}
-
-message_log() {
-	while read readline 
-	do
-		echo "I: `date +"$DATE_FORMAT"` :: $readline" >>"$LOG_FILE"
-	done
-}
-
-redirect_stdout() {
-	$EXECUTE
-}
-
-redirect_standard() {
-	redirect_stdout | message_log 
-}
-
-redirect_all() {
-	redirect_standard 2>&1 | error_log
-}
-
-redirect_all
+$EXECUTE 2>>"$LOG_FILE" >>"$LOG_FILE"
+#$EXECUTE 2>&1 | tee -a "$LOG_FILE"
 

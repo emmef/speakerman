@@ -1,2 +1,2 @@
-dist_SCRIPTS=speakerman-service
-distdir=/etc/init.d/
+dist_DATA=speakerman.service jack4speakerman.service
+distdir=/lib/systemd/system

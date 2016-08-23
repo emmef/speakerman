@@ -1,0 +1,14 @@
+[Unit]
+Description=Speaker mananager
+After=dbus.service alsa-state.service accounts-daemon.service rtkit-daemon.service
+
+[Service]
+Type=forking
+Group=audio
+ExecStart=/bin/bash -c '/usr/local/share/speakerman/init-service start'
+ExecStop=/bin/bash -c '/usr/local/share/speakerman/init-service stop'
+Restart=always
+ControlGroup=cpu:/
+
+[Install]
+WantedBy=multi-user.target
