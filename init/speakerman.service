@@ -1,14 +1,16 @@
 [Unit]
 Description=Speaker mananager
-After=dbus.service alsa-state.service accounts-daemon.service rtkit-daemon.service
+After=jack4speakerman.service
 
 [Service]
 Type=forking
 Group=audio
-ExecStart=/bin/bash -c '/usr/local/share/speakerman/init-service start'
-ExecStop=/bin/bash -c '/usr/local/share/speakerman/init-service stop'
+User=speakerman
+LimitRTPRIO=infinity
+LimitMEMLOCK=infinity
+ExecStart=/bin/bash -c '/usr/local/share/speakerman/manage-service start'
+ExecStop=/bin/bash -c '/usr/local/share/speakerman/manager-service stop'
 Restart=always
-ControlGroup=cpu:/
 
 [Install]
 WantedBy=multi-user.target

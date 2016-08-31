@@ -1,8 +1,10 @@
 #!/bin/bash
 
+SPEAKERMAN_EXECUTABLE_NAME="speakerman"
+SERVICE_NAME="Speaker management service"
+
 echo "Executing \"$SERVICE_NAME\" as $USER in home directory \"$HOME\""
 
-JACK_EXECUTABLE="$HOME/.jackdrc"
 SPEAKERMAN_EXECUTABLE_NAME="speakerman"
 
 case "$1" in 
@@ -27,20 +29,6 @@ executable()
 	which "$1" >/dev/null 2>&1
 }
 
-
-if [ -f "$HOME/.jackdrc" ]
-then
-	read JACK_EXECUTABLE JACK_COMMANDLINE < "$HOME/.jackdrc"
-	if ! executable "$JACK_EXECUTABLE"
-	then
-		echo "Cannot find $JACK_EXECUTABLE" >&2
-		return 1
-	fi
-else
-	echo "Cannot find jack startup file for user: $HOME/.jackdrc" >&2
-	exit 1
-fi
-
 PATH="usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
 if executable "$SPEAKERMAN_EXECUTABLE_NAME"
@@ -50,8 +38,6 @@ else
 	echo "Cannot find $SPEAKERMAN_EXECUTABLE_NAME" >&2
 	return 1
 fi
-
-JACK_COMMAND="$JACK_EXECUTABLE $JACK_COMMANDLINE"
 
 # $1: Executable name
 # $2: signal
@@ -119,30 +105,6 @@ jack_active() {
 	return 0;
 }
 
-jack_kill() {
-	if ! exec_kill "$JACK_EXECUTABLE"
-	then
-		return 1
-	fi	
-}
-
-jack_activate() {
-	if ! jack_kill
-	then
-		return 1
-	fi
-	echo "Executing as $USER: $JACK_COMMAND"
-	$JACK_COMMAND &
-	disown
-
-	if jack_wait -w -t 2 | grep -Ei '^timeout'
-	then
-		echo "Jack not active"
-		return 1
-	fi
-	return 0
-}
-
 speakerman_activate() {
 	if ! exec_kill "$SPEAKERMAN_EXECUTABLE"
 	then
@@ -165,59 +127,16 @@ speakerman_activate() {
 	return 0
 }
 
-DBUS_LOCK="/tmp/.speakerman.dbus"
-
-ensure_dbus() {
-	if [ ! -f "$DBUS_LOCK" ] 
-	then
-		echo "Launching new DBUS"
-		if ! dbus-launch | tee "$DBUS_LOCK"
-		then
-			echo "Cannot start DBUS" >&2
-			exit 1
-		fi
-		. "$DBUS_LOCK"
-	else
-		. "$DBUS_LOCK"
-		if [ -e /proc/$DBUS_SESSION_BUS_PID ] 
-		then
-			echo "Using running DBUS"
-			cat "$DBUS_LOCK"
-		else
-			echo "Stale DBUS info; launching new DBUS"
-			if ! dbus-launch | tee "$DBUS_LOCK"
-			then
-				echo "Cannot start dbus" >&2
-				exit 1
-			fi
-			. "$DBUS_LOCK"
-		fi
-	fi
-}
-
 if [ "$ACTION" == "start" ]
 then
-	if ! ensure_dbus 
-	then 
-		exit 1
-	fi
-	export DBUS_SESSION_BUS_ADDRESS
-	export DBUS_SESSION_BUS_PID
-	if jack_activate && speakerman_activate
+	if jack_active && speakerman_activate
 	then
 		echo "Started"
 	fi
 else
 	if exec_kill "$SPEAKERMAN_EXECUTABLE" 
 	then
-		jack_kill
-		if [ -f "$DBUS_LOCK" ] 
-		then
-			. "$DBUS_LOCK"
-			echo "Stopping DBUS with pid=$DBUS_SESSION_BUS_PID"
-			kill -TERM $DBUS_SESSION_BUS_PID
-			rm "$DBUS_LOCK"
-		fi
+		echo "Stopped"
 	else
 		exit 1
 	fi

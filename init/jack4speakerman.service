@@ -1,12 +1,15 @@
 [Unit]
 Description=JACK service on behalf of speakerman
-After=sound.target
+After=alsa-restore.service 
+Before=multi-user.target
 
 [Service]
+Type=simple
+Group=audio
+User=speakerman
 LimitRTPRIO=infinity
 LimitMEMLOCK=infinity
-User=speakerman
-ExecStart=/usr/local/share/speakerman/start-jack
+ExecStart=/bin/bash '/usr/local/share/speakerman/start-jack'
 
 [Install]
 WantedBy=multi-user.target
