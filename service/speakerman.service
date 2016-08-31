@@ -1,15 +1,18 @@
 [Unit]
 Description=Speaker mananager
-After=jack4speakerman.service
+After=alsa-restore.service
+# After=jack4speakerman.service
 
 [Service]
-Type=forking
+# Type=forking
+Type=simple
 Group=audio
 User=speakerman
 LimitRTPRIO=infinity
 LimitMEMLOCK=infinity
-ExecStart=/bin/bash -c '/usr/local/share/speakerman/manage-service start'
-ExecStop=/bin/bash -c '/usr/local/share/speakerman/manage-service stop'
+ExecStart=/usr/bin/dbus-run-session /usr/local/bin/speakerman
+#ExecStart=/bin/bash -c '/usr/local/share/speakerman/manage-service start'
+#ExecStop=/bin/bash -c '/usr/local/share/speakerman/manage-service stop'
 Restart=always
 
 [Install]

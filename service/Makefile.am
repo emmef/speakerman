@@ -1,2 +1,2 @@
-dist_DATA=speakerman.service jack4speakerman.service
+dist_DATA=speakerman.service
 distdir=/lib/systemd/system
