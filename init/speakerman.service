@@ -9,7 +9,7 @@ User=speakerman
 LimitRTPRIO=infinity
 LimitMEMLOCK=infinity
 ExecStart=/bin/bash -c '/usr/local/share/speakerman/manage-service start'
-ExecStop=/bin/bash -c '/usr/local/share/speakerman/manager-service stop'
+ExecStop=/bin/bash -c '/usr/local/share/speakerman/manage-service stop'
 Restart=always
 
 [Install]

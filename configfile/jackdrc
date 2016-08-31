@@ -1,1 +1,8 @@
-/usr/local/bin/jackd -p64 -R -P 25 -dalsa -dhw:Eight -r96000 -p256 -n2
+#!/bin/bash
+
+if [ -z "$JACK_CARD" ]
+then
+	JACK_CARD="0"
+fi
+
+/usr/local/bin/jackd -p64 -R -P 25 -dalsa -dhw:$JACK_CARD -r96000 -p256 -n2
