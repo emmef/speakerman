@@ -19,5 +19,5 @@ PKG_CHECK_MODULES(JACK, [jack >= 1.9.8],)
 AC_SUBST(JACK_CFLAGS)
 AC_SUBST(JACK_LIBS)
 
-AC_CONFIG_FILES(Makefile src/Makefile scripts/Makefile web/Makefile configfile/Makefile init/Makefile)
+AC_CONFIG_FILES(Makefile src/Makefile scripts/Makefile web/Makefile examples/Makefile init/Makefile)
 AC_OUTPUT
