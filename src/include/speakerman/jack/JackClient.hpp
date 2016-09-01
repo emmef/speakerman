@@ -142,10 +142,13 @@ public:
 	template<typename ...A>
 	static CreateClientResult create(const char *serverName, jack_options_t options, A... args)
 	{
-		jack_status_t lastState;
-		jack_client_t *c = jack_client_open(serverName, options, &lastState, args...);
-		if (c) {
-			return { new JackClient(c), static_cast<JackStatus>(0), serverName };
+		jack_status_t lastState = static_cast<JackStatus>(0);
+		for (int i = 1; i <= 10; i ++) {
+			jack_client_t *c = jack_client_open(serverName, options, &lastState, args...);
+			if (c) {
+				return { new JackClient(c), static_cast<JackStatus>(0), serverName };
+			}
+			std::cerr << "JackClient::create() attempt " << i << " failed with status " << lastState << std::endl;
 		}
 		return { nullptr, lastState, serverName};
 	}
