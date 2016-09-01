@@ -155,10 +155,13 @@ public:
 
 	static CreateClientResult createDefault(const char *serverName)
 	{
-		jack_status_t lastState;
-		jack_client_t *c = jack_client_open(serverName, JackOptions::JackNullOption, &lastState);
-		if (c) {
-			return { new JackClient(c), static_cast<JackStatus>(0), serverName };
+		jack_status_t lastState = static_cast<JackStatus>(0);
+		for (int i = 1; i <= 10; i ++) {
+			jack_client_t *c = jack_client_open(serverName, JackOptions::JackNullOption, &lastState);
+			if (c) {
+				return { new JackClient(c), static_cast<JackStatus>(0), serverName };
+			}
+			std::cerr << "JackClient::createDefault() attempt " << i << " failed with status " << lastState << std::endl;
 		}
 		return { nullptr, lastState, serverName};
 	}
