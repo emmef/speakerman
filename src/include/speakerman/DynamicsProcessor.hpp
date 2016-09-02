@@ -139,7 +139,7 @@ public:
 		for (size_t i = 0; i < LIMITERS; i++) {
 			limiter[i].setMetrics(limiterIntegrationSamples, limiterHoldSamples);
 		}
-		limiterDelay.setDelay(LIMITERS * limiterHoldSamples);
+		limiterDelay.setDelay(1 + LIMITERS * limiterHoldSamples);
 
 		rmsDetector[0].userConfigure(rmsUserSubConfig(), sampleRate);
 		for (size_t i = 1; i < DETECTORS; i++) {
@@ -190,9 +190,6 @@ public:
 		processChannelsRms();
 		mergeFrequencyBands();
 		processChannelsFilters();
-//		for (size_t i = 0; i < OUTPUTS; i++) {
-//			target[i] = output[i];
-//		}
 		processSubLimiter(target);
 		processChannelsLimiter(target);
 	}

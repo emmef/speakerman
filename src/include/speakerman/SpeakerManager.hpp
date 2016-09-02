@@ -189,29 +189,26 @@ protected:
 				processor.updateConfig(lockFreeData.data().configData);
 			}
 		}
-		size_t outputGroupStartIndex;
+		size_t portNumber = 0;
 		int subPort = config_.subOutput - 1;
-		size_t outputCount;
-		outputs[0] = ports.getBuffer(0);
 		if (subPort >= 0) {
-			outputCount = OUTPUTS;
-			outputGroupStartIndex = 1;
+			outputs[0] = ports.getBuffer(portNumber++);
+			for (size_t output = 1; output < OUTPUTS; output++, portNumber++) {
+				outputs[output] = ports.getBuffer(portNumber);
+			}
 		}
 		else {
-			outputCount = OUTPUTS - 1;
-			outputGroupStartIndex = 0;
+			for (size_t output = 0; output < OUTPUTS - 1; output++, portNumber++) {
+				outputs[output] = ports.getBuffer(portNumber);
+			}
 		}
-
-		for (size_t portNumber = outputGroupStartIndex, index = 1; portNumber < outputCount; portNumber++, index++) {
-			outputs[index] = ports.getBuffer(portNumber);
+		for (size_t input = 0; input < INPUTS; input++, portNumber++) {
+			inputs[input] = ports.getBuffer(portNumber);
 		}
-		for (size_t index = 0, portNumber = outputCount; index < INPUTS; portNumber++, index++) {
-			inputs[index] = ports.getBuffer(portNumber);
-		}
-
+			
 		FixedSizeArray<T, INPUTS> inFrame;
 		FixedSizeArray<T, OUTPUTS> outFrame;
-
+		
 		if (subPort >= 0) {
 			for (size_t i = 0; i < frames; i++) {
 				for (size_t channel = 0; channel < INPUTS; channel++) {
@@ -236,8 +233,8 @@ protected:
 
 				double subValue = outFrame[0] * scale;
 
-				for (size_t channel = 1; channel < OUTPUTS; channel++) {
-					outputs[channel][i] = outFrame[channel] + subValue;
+				for (size_t channel = 0; channel < OUTPUTS - 1; channel++) {
+					outputs[channel][i] = outFrame[channel + 1] + subValue;
 				}
 			}
 		}
@@ -256,13 +253,11 @@ public:
 		config_(config)
 	{
 		char name[1 + Names::get_port_size()];
-		size_t outputs;
 		if (config.subOutput > 0) {
 			portDefinitions_.addOutput("out_sub");
 			cout << "I: added output " << "out_sub" << std::endl;
 		}
-		outputs = Processor::OUTPUTS - 1;
-		for (size_t channel = 0; channel < outputs; channel++) {
+		for (size_t channel = 0; channel < Processor::OUTPUTS - 1; channel++) {
 			snprintf(name, 1 + Names::get_port_size(),
 					 "out_%zu_%zu", 1 + channel/CHANNELS_PER_GROUP, 1 + channel % CHANNELS_PER_GROUP);
 			portDefinitions_.addOutput(name);
@@ -274,6 +269,7 @@ public:
 			 portDefinitions_.addInput(name);
 			 cout << "I: added input " << name << std::endl;
 		}
+		
 	}
 
 	virtual const SpeakermanConfig &getConfig() const override
