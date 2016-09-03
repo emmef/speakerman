@@ -203,7 +203,9 @@ private:
 			const GroupRuntimeData<T, BANDS> &conf = runtime.data().groupConfig(group);
 			T volume = conf.volume();
 			for (size_t channel = 0; channel < CHANNELS_PER_GROUP; channel++, offs++) {
-				T x = input[offs];
+// hack for first implementation at venue				
+				T x = input[offs % CHANNELS_PER_GROUP];
+//				T x = input[offs];
 				signal += x * x;
 				inputWithVolumeAndNoise[offs] = x * volume + ns;
 			}
