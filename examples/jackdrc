@@ -1,0 +1,1 @@
+/usr/bin/jackd -p64 -R -P 25 -dalsa -dhw:Eight -r96000 -p256 -n2
