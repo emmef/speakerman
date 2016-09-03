@@ -19,6 +19,7 @@
  * limitations under the License.
  */
 
+#include <signal.h>
 #include <jack/jack.h>
 #include <string>
 #include <iostream>
@@ -180,6 +181,7 @@ void JackClient::closeUnsafe() {
 	metrics_ = m;
 	state_ = ClientState::CLOSED;
 	cout << "closeUnsafe(): end" << endl;
+	SignalHandler::instance().raise_signal(SIGABRT);
 }
 
 void JackClient::jack_portnames_free(const char** names) {
