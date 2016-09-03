@@ -1,19 +1,31 @@
 [Unit]
 Description=Speaker mananager
 After=alsa-restore.service
-# After=jack4speakerman.service
+After=usb-reset.service 
+#Requires=dbus-org.freedesktop.hostname1.service
+#Requires=dbus-org.freedesktop.locale1.service
+#Requires=dbus-org.freedesktop.login1.service
+#Requires=dbus-org.freedesktop.network1.service
+#Requires=dbus-org.freedesktop.resolve1.service
+#Requires=dbus-org.freedesktop.timedate1.service
+Requires=dbus.service
+Requires=dbus.socket
+Requires=networking.service
+Requires=NetworkManager.service
+Requires=sockets.target
+Requires=alsa-state.service
 
 [Service]
-# Type=forking
 Type=simple
 Group=audio
 User=speakerman
 LimitRTPRIO=infinity
 LimitMEMLOCK=infinity
+LimitRTTIME=20000
 ExecStart=/usr/bin/dbus-run-session /usr/local/bin/speakerman
-#ExecStart=/bin/bash -c '/usr/local/share/speakerman/manage-service start'
-#ExecStop=/bin/bash -c '/usr/local/share/speakerman/manage-service stop'
 Restart=always
+RestartSec=1
 
 [Install]
 WantedBy=multi-user.target
+#WantedBy=deafult.target
