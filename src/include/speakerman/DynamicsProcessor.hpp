@@ -174,7 +174,7 @@ public:
 		channelDelay[0].setDelay(data.subDelay());
 		for (size_t group = 0; group < GROUPS; group++) {
 			filters_[group].configure(data.groupConfig(group).filterConfig());
-			channelDelay[1 + group].setDelay(1 + CHANNELS_PER_GROUP * data.groupConfig(group).delay());
+			channelDelay[1 + group].setDelay(CHANNELS_PER_GROUP * data.groupConfig(group).delay());
 		}
 
 	}
