@@ -30,6 +30,7 @@
 #include <cmath>
 
 namespace speakerman {
+	static constexpr size_t MAX_SPEAKERMAN_GROUPS = 4;
 
 	struct EqualizerConfig
 	{
@@ -72,7 +73,7 @@ namespace speakerman {
 
 		static constexpr double MIN_DELAY = 0;
 		static constexpr double DEFAULT_DELAY = 0;
-		static constexpr double MAX_DELAY = 0.010;
+		static constexpr double MAX_DELAY = 0.020;
 
 		static constexpr size_t KEY_EQ_COUNT = 0;
 		static constexpr size_t KEY_THRESHOLD = 1;
@@ -90,7 +91,7 @@ namespace speakerman {
 		EqualizerConfig eq[MAX_EQS];
 		size_t eqs;
 		double threshold;
-		double volume;
+		double volume[MAX_SPEAKERMAN_GROUPS];
 		double delay;
 	};
 
@@ -98,7 +99,7 @@ namespace speakerman {
 	{
 		static constexpr size_t MIN_GROUPS = 1;
 		static constexpr size_t DEFAULT_GROUPS = 1;
-		static constexpr size_t MAX_GROUPS = 4;
+		static constexpr size_t MAX_GROUPS = MAX_SPEAKERMAN_GROUPS;
 
 		static constexpr size_t MIN_GROUP_CHANNELS = 1;
 		static constexpr size_t DEFAULT_GROUP_CHANNELS = 2;

@@ -29,6 +29,7 @@
 #include <tdap/Value.hpp>
 #include <tdap/IndexPolicy.hpp>
 #include <tdap/Count.hpp>
+#include <tdap/FixedSizeArray.hpp>
 #include <speakerman/SpeakermanConfig.hpp>
 #include <speakerman/utils/Config.hpp>
 
@@ -333,6 +334,43 @@ namespace speakerman {
 		return true;
 	}
 
+	template<typename T, size_t N>
+	static bool readNumbers(FixedSizeArray<T, N>  &array, const char *key, const char *value, T min, T max, bool forceWithin = false)
+	{
+		using Type = typename ValueManager<T>::Value;
+		const char *parsePos= value;
+
+		for (size_t i = 0; i < array.size(); i++) {
+			Type tempValue;
+			char *endptr = 0;
+			if (parsePos && *parsePos) {
+				tempValue = ValueManager<T>::parse(parsePos, &endptr);
+				if (tempValue == 0 && !(*endptr == 0 || *endptr == ',' || *endptr == ';')) {
+					std::cerr << "E: Invalid value for \"" << key << "\"[" << i << ": " << parsePos << std::endl;
+					return false;
+				}
+				cout << "Parsepos[" << i << "]: " << parsePos << "; value=" << tempValue << endl;
+				bool outOfRange = tempValue < min || tempValue > max;
+				if (outOfRange) {
+					cerr << "W: value for \"" << key << "\"[" << i << ": value " << tempValue << " out of [" << min << ".." << max << "]: ";
+					if (!forceWithin) {
+						cerr << "not set!" << endl;
+						return false;
+					}
+					tempValue = Value<Type>::force_between(tempValue, min, max);
+					cerr << "set to " << tempValue << endl;
+				}
+				parsePos = endptr && *endptr ? endptr + 1 : 0;
+			} else {
+				tempValue = static_cast<Type>(UNSET_FLOAT);
+			}
+
+			array[i] = static_cast<T>(tempValue);
+		}
+		
+		return true;
+	}
+
 	template<typename T>
 	static void setDefault(T &value, T unsetValue, T defaultValue, const char * key)
 	{
@@ -365,7 +403,9 @@ namespace speakerman {
 			GroupConfig &groupConfig = config.group[group];
 			groupConfig.eqs = GroupConfig::DEFAULT_EQS;
 			groupConfig.threshold = GroupConfig::DEFAULT_THRESHOLD;
-			groupConfig.volume = GroupConfig::DEFAULT_VOLUME;
+			for (size_t i = 0; i < SpeakermanConfig::MAX_GROUPS; i++) {
+				groupConfig.volume[i] = i == group ? GroupConfig::DEFAULT_VOLUME : 0;
+			}
 			groupConfig.delay = GroupConfig::DEFAULT_DELAY;
 			for (size_t eq = 0; eq < GroupConfig::MAX_EQS; eq++) {
 				EqualizerConfig &eqConfig = groupConfig.eq[eq];
@@ -457,7 +497,11 @@ namespace speakerman {
 			readNumber(config->config.threshold, key, value, GroupConfig::MIN_THRESHOLD, GroupConfig::MAX_THRESHOLD, true);
 		}
 		else if (isKey(key, config->initial, config->groupId, -1, GroupConfig::KEY_VOLUME)) {
-			readNumber(config->config.volume, key, value, GroupConfig::MIN_VOLUME, GroupConfig::MAX_VOLUME, true);
+			FixedSizeArray<double, SpeakermanConfig::MAX_GROUPS> volumes;
+			readNumbers(volumes, key, value, GroupConfig::MIN_VOLUME, GroupConfig::MAX_VOLUME, true);
+			for (size_t i = 0; i < SpeakermanConfig::MAX_GROUPS; i++) {
+				config->config.volume[i] = volumes[i];
+			}
 		}
 		else if (isKey(key, config->initial, config->groupId, -1, GroupConfig::KEY_DELAY)) {
 			readNumber(config->config.delay, key, value, GroupConfig::MIN_DELAY, GroupConfig::MAX_DELAY, true);
@@ -512,7 +556,9 @@ namespace speakerman {
 		GroupConfig &config = data.config;
 		config.eqs = UNSET_SIZE;
 		config.threshold = UNSET_FLOAT;
-		config.volume = UNSET_FLOAT;
+		for (size_t i = 0; i < SpeakermanConfig::MAX_GROUPS; i++) {
+			config.volume[i] = UNSET_FLOAT;
+		}
 		config.delay = UNSET_FLOAT;
 
 		auto result = reader.read(stream, readGroupCallback, &data);
@@ -523,7 +569,9 @@ namespace speakerman {
 		const GroupConfig &defaultConfig = basedUpon.group[data.groupId];
 		setDefault(config.eqs, UNSET_SIZE, defaultConfig.eqs, getConfigKey(data.groupId, -1, GroupConfig::KEY_EQ_COUNT));
 		setDefault(config.threshold, UNSET_FLOAT, defaultConfig.threshold, getConfigKey(data.groupId, -1, GroupConfig::KEY_THRESHOLD));
-		setDefault(config.volume, UNSET_FLOAT, defaultConfig.volume, getConfigKey(data.groupId, -1, GroupConfig::KEY_VOLUME));
+		for (size_t i = 0; i < SpeakermanConfig::MAX_GROUPS; i++) {
+			setDefault(config.volume[i], UNSET_FLOAT, defaultConfig.volume[i], getConfigKey(data.groupId, -1, GroupConfig::KEY_VOLUME));
+		}
 		setDefault(config.delay, UNSET_FLOAT, defaultConfig.delay, getConfigKey(data.groupId, -1, GroupConfig::KEY_DELAY));
 
 		for (size_t eq = 0; eq < GroupConfig::MAX_EQS; eq++) {
@@ -645,8 +693,15 @@ namespace speakerman {
 			const GroupConfig &groupConfig = dump.group[group];
 			output << getConfigKey(group, -1, GroupConfig::KEY_EQ_COUNT) << assgn << groupConfig.eqs << endl;
 			output << getConfigKey(group, -1, GroupConfig::KEY_THRESHOLD) << assgn << groupConfig.threshold << endl;
-			output << getConfigKey(group, -1, GroupConfig::KEY_VOLUME) << assgn << groupConfig.volume << endl;
 			output << getConfigKey(group, -1, GroupConfig::KEY_DELAY) << assgn << groupConfig.delay << endl;
+			output << getConfigKey(group, -1, GroupConfig::KEY_VOLUME) << assgn << "[";
+			for (size_t i = 0; i < dump.groups; i++) {
+				if (i > 0) {
+					output << ' ';
+				}
+				output << groupConfig.volume[i];
+			}
+			output << "]" << endl;
 
 			for (size_t eq = 0; eq < GroupConfig::MAX_EQS; eq++) {
 				const EqualizerConfig &eqConfig = groupConfig.eq[eq];

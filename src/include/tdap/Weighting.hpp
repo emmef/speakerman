@@ -204,9 +204,9 @@ struct ACurves
 		{
 			IndexPolicy::array(channel, CHANNELS);
 			SAMPLE y = input;
-			y = coefficients_.curve().do_filter<SAMPLE, flushToZero>(history_[channel].curveX, history_[channel].curveY, y);
-			y = coefficients_.lowPass().do_filter<SAMPLE, flushToZero>(history_[channel].lowX, history_[channel].lowY, y);
-			y = coefficients_.highPass().do_filter<SAMPLE, flushToZero>(history_[channel].highX, history_[channel].highY, y);
+			y = coefficients_.curve().template do_filter<SAMPLE, flushToZero>(history_[channel].curveX, history_[channel].curveY, y);
+			y = coefficients_.lowPass().template do_filter<SAMPLE, flushToZero>(history_[channel].lowX, history_[channel].lowY, y);
+			y = coefficients_.highPass().template do_filter<SAMPLE, flushToZero>(history_[channel].highX, history_[channel].highY, y);
 			return OVERALL_GAIN * y;
 		}
 

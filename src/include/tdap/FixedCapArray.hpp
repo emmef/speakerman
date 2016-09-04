@@ -36,6 +36,7 @@ class FixedCapArray : public FixedCapArrayTraits<T, FixedCapArray<T, CAPACITY>>
 	static constexpr size_t MAXSIZE = Power2::constant::next(CAPACITY);
 	friend class ArrayTraits<T, FixedCapArray<T, CAPACITY>>;
 	friend class FixedCapArrayTraits<T, FixedCapArray<T, CAPACITY>>;
+	using FixedCapArrayTraits<T, FixedCapArray<T, CAPACITY>>::validSize;
 
 	size_t size_ = 0;
 	T data_[MAXSIZE];

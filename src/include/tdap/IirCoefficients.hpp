@@ -291,8 +291,8 @@ public:
 		order_(Value<size_t>::valid_between(order, 1, maxOrder_)),
 		data_(new C[IirCoefficients::totalCoefficientsForOrder(maxOrder_)]) { }
 
-	size_t order() const override { return order_; }
-	size_t maxOrder() const override { return maxOrder_; }
+	size_t order() const { return order_; }
+	size_t maxOrder() const { return maxOrder_; }
 	bool hasFixedOrder() { return false; }
 	void setOrder(size_t order) { order_ = Value<size_t>::valid_between(order, 1, maxOrder_); }
 
@@ -414,7 +414,7 @@ public:
 			S * const yHistory, // (ORDER) y value history
 			S input) const
 	{
-		coefficients_.do_filter<S, flushToZero>(xHistory, yHistory, input);
+		coefficients_.template do_filter<S, flushToZero>(xHistory, yHistory, input);
 	}
 
 	template<typename S>
@@ -488,7 +488,7 @@ struct FixedSizeIirCoefficientFilter
 	C do_filter(size_t channel, C input)
 	{
 		IndexPolicy::array(channel, CHANNELS);
-		return coefficients_.do_filter<C, flushToZero>(history[channel].x, history[channel].y, input);
+		return coefficients_.template do_filter<C, flushToZero>(history[channel].x, history[channel].y, input);
 	}
 
 	C filter(size_t channel, C input)

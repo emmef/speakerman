@@ -88,7 +88,7 @@ namespace speakerman {
 	template <typename T, size_t BANDS>
 	class GroupRuntimeData
 	{
-		T volume_;
+		FixedSizeArray<T, SpeakermanConfig::MAX_GROUPS> volume_;
 		size_t delay_;
 		T bandRmsScale_[BANDS];
 		T limiterScale_;
@@ -97,7 +97,7 @@ namespace speakerman {
 		EqualizerFilterData<T> filterConfig_;
 
 	public:
-		T volume() const { return volume_; }
+		const FixedSizeArray<T, SpeakermanConfig::MAX_GROUPS> &volume() const { return volume_; }
 		T bandRmsScale(size_t i) const { return bandRmsScale_[IndexPolicy::array(i, BANDS)]; }
 		T limiterScale() const { return limiterScale_; }
 		T limiterThreshold() const { return limiterThreshold_; }
@@ -107,7 +107,7 @@ namespace speakerman {
 
 		void reset()
 		{
-			volume_ = 0;
+			volume_.zero();
 			delay_ = 0;
 			limiterScale_ = 1;
 			limiterThreshold_ = 1;
@@ -121,9 +121,9 @@ namespace speakerman {
 		template<typename...A>
 		void setLevels(const GroupConfig &conf, size_t channels, double sloppyFactor, size_t delay, const ArrayTraits<A...> &relativeBandWeights)
 		{
-			volume_ = Values::force_between(conf.volume, GroupConfig::MIN_VOLUME, GroupConfig::MAX_VOLUME);
-			if (volume_ < 1e-6) {
-				volume_ = 0;
+			for (size_t i = 0; i < SpeakermanConfig::MAX_GROUPS; i++) {
+				double v = Values::force_between(conf.volume[i], GroupConfig::MIN_VOLUME, GroupConfig::MAX_VOLUME);
+				volume_[i] = v < 1e-6 ? 0 : v;
 			}
 			delay_ = delay;
 			limiterThreshold_ = SpeakerManLevels::getLimiterThreshold(conf.threshold, sloppyFactor);
@@ -142,12 +142,14 @@ namespace speakerman {
 		void init(const GroupRuntimeData<T, BANDS> &source)
 		{
 			*this = source;
-			volume_ = 0;
+			volume_.zero();
 		}
 
 		void approach(const GroupRuntimeData<T, BANDS> &target, const IntegrationCoefficients<T> &integrator)
 		{
-			integrator.integrate(target.volume_, volume_);
+			for (size_t i = 0; i < SpeakermanConfig::MAX_GROUPS; i++) {
+				integrator.integrate(target.volume_[i], volume_[i]);
+			}
 			integrator.integrate(target.limiterThreshold_, limiterThreshold_);
 			integrator.integrate(target.limiterScale_, limiterScale_);
 			for (size_t band = 0; band < BANDS; band++) {
@@ -276,7 +278,14 @@ namespace speakerman {
 			for (size_t group = 0; group < GROUPS; group++) {
 				const GroupRuntimeData<T, bands()> &grpConfig = groupConfig(group);
 				std::cout << " group " << group << std::endl;
-				std::cout << "  volume=" << grpConfig.volume() << std::endl;
+				std::cout << "  volume=" << "[";
+				for (size_t i = 0; i < GROUPS; i++) {
+					if (i > 0) {
+						std::cout << " ";
+					}
+					std::cout << grpConfig.volume()[i];
+				}
+				std::cout << "]" << std::endl;
 				std::cout << "  delay=" << grpConfig.delay() << std::endl;
 				std::cout << "  equalizers=" << grpConfig.filterConfig().count() << std::endl;
 				std::cout << "  limiter: scale=" << grpConfig.limiterScale() << "; threshold=" << grpConfig.limiterThreshold() << std::endl;

@@ -25,6 +25,7 @@
 
 #include <tdap/Integration.hpp>
 #include <tdap/IndexPolicy.hpp>
+#include <tdap/ArrayTraits.hpp>
 
 namespace tdap {
 

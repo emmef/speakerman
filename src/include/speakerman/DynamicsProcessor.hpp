@@ -174,7 +174,7 @@ public:
 		channelDelay[0].setDelay(data.subDelay());
 		for (size_t group = 0; group < GROUPS; group++) {
 			filters_[group].configure(data.groupConfig(group).filterConfig());
-			channelDelay[1 + group].setDelay(CHANNELS_PER_GROUP * data.groupConfig(group).delay());
+			channelDelay[1 + group].setDelay(1 + CHANNELS_PER_GROUP * data.groupConfig(group).delay());
 		}
 
 	}
@@ -198,16 +198,17 @@ private:
 	void applyVolumeAddNoise(const FixedSizeArray<T, INPUTS> &input)
 	{
 		T ns = noise();
-		for (size_t group = 0, offs = 0; group < GROUPS; group++) {
-			T signal = 0;
+		for (size_t group = 0; group < GROUPS; group++) {
 			const GroupRuntimeData<T, BANDS> &conf = runtime.data().groupConfig(group);
-			T volume = conf.volume();
-			for (size_t channel = 0; channel < CHANNELS_PER_GROUP; channel++, offs++) {
-// hack for first implementation at venue				
-				T x = input[offs % CHANNELS_PER_GROUP];
-//				T x = input[offs];
+			auto volume = conf.volume();
+			T signal = 0;
+			for (size_t channel = 0; channel < CHANNELS_PER_GROUP; channel++) {
+				T x = 0.0;
+				for (size_t inGroup = 0; inGroup < GROUPS; inGroup++) {
+					x += volume[inGroup] * input[inGroup * CHANNELS_PER_GROUP + channel];
+				}
 				signal += x * x;
-				inputWithVolumeAndNoise[offs] = x * volume + ns;
+				inputWithVolumeAndNoise[group * CHANNELS_PER_GROUP + channel] = x + ns;
 			}
 			levels.setSignal(group, sqrt(signalIntegrator[group].integrate(signal)) * conf.signalMeasureFactor());
 		}
@@ -317,7 +318,7 @@ private:
 			T gain = 1.0 / detect;
 			for (size_t channel = 0, offset = startOffs; channel < CHANNELS_PER_GROUP; channel++, offset++) {
 				T out = Values::clamp(gain * output[offset], -threshold, threshold);
-				target[offset] = out;//channelDelay[group + 1].setAndGet(out);
+				target[offset] = channelDelay[group + 1].setAndGet(out);
 			}
 		}
 	}
