@@ -39,3 +39,5 @@ missing
 src/.deps
 src/speakerman
 *.cache
+.autotools
+speakerman.kdev4

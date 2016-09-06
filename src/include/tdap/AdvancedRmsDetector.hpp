@@ -121,7 +121,7 @@ struct AdvancedRms
 				double t = ratioIncrement * i;
 				double rc = config.maxRc * pow(PERCEPTIVE_FAST_WINDOWSIZE / config.maxRc, t);
 				characteristicSamples[i] = 0.5 + sampleRate * rc;
-				double rcForScale = config.maxRc * pow(PERCEPTIVE_FAST_WINDOWSIZE / config.maxRc, t * t);
+				double rcForScale = config.maxRc * pow(PERCEPTIVE_FAST_WINDOWSIZE / config.maxRc, t);
 				scale[i] = pow(rcForScale / PERCEPTIVE_FAST_WINDOWSIZE, slowScalePower);
 //				std::cout << "RC " << (1000 * characteristicSamples[i] / sampleRate) << " ms. level=" << scale[i] << std::endl;
 			}
