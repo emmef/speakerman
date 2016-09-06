@@ -112,6 +112,30 @@ public:
 		}
 		return output;
 	}
+
+	S addSquareAndGetSquare(S square)
+	{
+		bucket_[bucketNr_] += square;
+		sampleNr_++;
+		if (sampleNr_ == bucketSize_) {
+			sampleNr_ = 0;
+			S sum = 0.0;
+			for (size_t i = 0; i < N; i++) {
+				sum += bucket_[i];
+			}
+			if (bucketNr_ < N - 1) {
+				bucketNr_++;
+			}
+			else {
+				bucketNr_ = 0;
+			}
+			bucket_[bucketNr_] = 0;
+			sum /= N;
+			sum /= bucketSize_;
+			output = sum;
+		}
+		return output;
+	}
 };
 
 template <typename S, size_t BUCKET_COUNT>
@@ -125,7 +149,8 @@ class BucketIntegratedRms
 
 	BucketRms<S, BUCKET_COUNT> rms_;
 	IntegrationCoefficients<S> coeffs_;
-	S int1_, int2_;
+	S value_, int1_, int2_;
+	size_t holdSamples_, holdCount_;
 
 public:
 	size_t setWindowSizeAndRc(size_t newSize, size_t rcSize)
@@ -133,6 +158,8 @@ public:
 		size_t windowSize = rms_.setWindowSize(newSize);
 		size_t minRc = 2 * windowSize / BUCKET_COUNT;
 		coeffs_.setCharacteristicSamples(Values::max(minRc, rcSize));
+		holdSamples_ = Values::min(rcSize * 4, Values::max(rcSize, newSize / 2));
+		holdCount_ = 0;
 		return windowSize;
 	}
 
@@ -141,19 +168,21 @@ public:
 		size_t windowSize = rms_.setWindowSize(newSize);
 		size_t minRc = 2 * windowSize / BUCKET_COUNT;
 		coeffs_.setCharacteristicSamples(Values::max(minRc, windowSize / 4));
+		holdSamples_ = Values::max((size_t)1, newSize / 2);
+		holdCount_ = 0;
 		return windowSize;
 	}
 
 	void zero(S value)
 	{
 		rms_.zero();
-		int1_ = int2_ = 0;
+		value_ = int1_ = int2_ = 0;
 	}
 
 	void setValue(S value)
 	{
 		rms_.setvalue(value);
-		int1_ = int2_ = value;
+		value_ = int1_ = int2_ = value;
 	}
 
 	S addAndGet(S value)
@@ -165,6 +194,12 @@ public:
 	{
 		S rms = rms_.addSquareAndGet(square);
 		return coeffs_.integrate(coeffs_.integrate(rms, int1_), int2_);
+	}
+
+	S addSquareAndGetFastAttack(S square)
+	{
+		S rms = rms_.addSquareAndGetSquare(square);
+		return sqrt(coeffs_.integrate(coeffs_.integrate(rms, int1_), int2_));
 	}
 
 	S addSquareCompareAndGet(S square, S minimumRms)
@@ -180,9 +215,20 @@ public:
 	S addSquareCompareAndGetSmoothMinimum(S square, S minimumRms)
 	{
 		S rms = rms_.addSquareAndGet(square);
+		S detected = Value<S>::max(rms,minimumRms);
+		if (detected > value_) {
+			value_ = detected;
+			holdCount_ = holdSamples_;
+		}
+		else if (holdCount_ > 0) {
+			holdCount_--;
+		}
+		else {
+			value_ = detected;
+		}
 		return coeffs_.integrate(
 					coeffs_.integrate(
-							Value<S>::max(rms,minimumRms),int1_
+							value_,int1_
 					),
 				int2_);
 	}

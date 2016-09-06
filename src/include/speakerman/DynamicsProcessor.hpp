@@ -83,7 +83,7 @@ private:
 	Crossovers::Filter<double, T, INPUTS, CROSSOVERS>  crossoverFilter;
 	ACurves::Filter<T, PROCESSING_CHANNELS> aCurve;
 
-	FixedSizeArray<AdvancedRms::Detector<T, 18>, DETECTORS> rmsDetector;
+	FixedSizeArray<AdvancedRms::Detector<T, 20>, DETECTORS> rmsDetector;
 
 	FixedSizeArray<HoldMaxDoubleIntegrated<T>, LIMITERS> limiter;
 	Delay<T> rmsDelay;
@@ -99,12 +99,12 @@ private:
 
 	static AdvancedRms::UserConfig rmsUserConfig()
 	{
-		return { 0.0005, 0.5, 0.5, 1.0 };
+		return { 0.0005, 0.5, 0.4, 1.4 };
 	}
 
 	static AdvancedRms::UserConfig rmsUserSubConfig()
 	{
-		return { 0.010, 0.5, 0.75, 1.0 };
+		return { 0.010, 0.5, 0.8, 1.4 };
 	}
 
 public:

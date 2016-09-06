@@ -109,7 +109,7 @@ struct AdvancedRms
 		{
 			UserConfig config = userConfig.validate();
 			followCharacteristicSamples = 0.5 + sampleRate * followRcRange().getBetween(config.minRc / 2);
-			followHoldSamples = 0.5 + sampleRate * followHoldTimeRange().getBetween(config.minRc * 2);
+			followHoldSamples = 0.5 + sampleRate * PERCEPTIVE_FAST_WINDOWSIZE;//().getBetween(config.minRc * 2);
 			maxBucketIntegrationWindow = 0.5 + sampleRate * MAX_BUCKET_INTEGRATION_TIME;
 			double fastScalePower = log(config.peakWeight) / log(config.minRc / PERCEPTIVE_FAST_WINDOWSIZE);
 			double slowScalePower = log(config.slowWeight) / log(config.maxRc / PERCEPTIVE_FAST_WINDOWSIZE);
@@ -121,7 +121,7 @@ struct AdvancedRms
 				double t = ratioIncrement * i;
 				double rc = config.maxRc * pow(PERCEPTIVE_FAST_WINDOWSIZE / config.maxRc, t);
 				characteristicSamples[i] = 0.5 + sampleRate * rc;
-				double rcForScale = Value<double>::min(PERCEPTIVE_SLOW_WINDOWSIZE, rc);
+				double rcForScale = config.maxRc * pow(PERCEPTIVE_FAST_WINDOWSIZE / config.maxRc, t * t);
 				scale[i] = pow(rcForScale / PERCEPTIVE_FAST_WINDOWSIZE, slowScalePower);
 //				std::cout << "RC " << (1000 * characteristicSamples[i] / sampleRate) << " ms. level=" << scale[i] << std::endl;
 			}
@@ -184,7 +184,7 @@ struct AdvancedRms
 			follower_ = SmoothHoldMaxAttackRelease<T>(
 					config.followHoldSamples,
 					config.followCharacteristicSamples,
-					config.followCharacteristicSamples,
+					config.followHoldSamples,
 					0);
 			T minOutputScale = 1.0;
 			for (size_t i = 0; i < RC_TIMES; i++)
@@ -221,9 +221,14 @@ struct AdvancedRms
 		T integrate_smooth(T squareInput, T minOutput)
 		{
 			T value = minOutput;
-			for (size_t i = 0; i < filters_.size(); i++) {
-				T x = filters_[i].integrator.addSquareCompareAndGetSmoothMinimum(
-						squareInput, minOutput);
+			size_t i;
+			for (i = 0; i < RuntimeConfig<T, RC_TIMES>::MIDDLE; i++) {
+				T x = filters_[i].integrator.addSquareAndGetFastAttack(squareInput);
+				x *= filters_[i].scale;
+				value = Value<T>::max(value, x);
+			}
+			for (; i < filters_.size(); i++) {
+				T x = filters_[i].integrator.addSquareAndGet(squareInput);
 				x *= filters_[i].scale;
 				value = Value<T>::max(value, x);
 			}
