@@ -126,7 +126,7 @@ struct AdvancedRms
 				double rcScale = pow(rcForScale / PERCEPTIVE_FAST_WINDOWSIZE, slowScalePower);
 				scale[i] = rcScale;
 				minimumScale[i] = 1.0 / (rcScale * rcScale);
-//				std::cout << "RC " << (1000 * characteristicSamples[i] / sampleRate) << " ms. level=" << scale[i] << std::endl;
+				std::cout << "RC " << (1000 * characteristicSamples[i] / sampleRate) << " ms. level=" << scale[i] << std::endl;
 			}
 			ratioIncrement = 1.0 / (RC_TIMES - MIDDLE - 1);
 			for (size_t j = 1; i < RC_TIMES; i++, j++) {
@@ -136,7 +136,7 @@ struct AdvancedRms
 				double rcScale = pow(rcForScale / PERCEPTIVE_FAST_WINDOWSIZE, fastScalePower);
 				scale[i] = rcScale;
 				minimumScale[i] = 1.0 / rcScale;
-//				std::cout << "RC " << (1000 * characteristicSamples[i] / sampleRate) << " ms. level=" << scale[i] << std::endl;
+				std::cout << "RC " << (1000 * characteristicSamples[i] / sampleRate) << " ms. level=" << scale[i] << std::endl;
 			}
 
 		}
