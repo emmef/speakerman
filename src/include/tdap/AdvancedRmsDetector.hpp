@@ -101,6 +101,7 @@ struct AdvancedRms
 		static constexpr size_t MIDDLE = Value<size_t>::max(1, (RC_TIMES * 2 - 1) / 4);
 		FixedSizeArray<size_t, RC_TIMES> characteristicSamples;
 		FixedSizeArray<T, RC_TIMES> scale;
+		FixedSizeArray<T, RC_TIMES> minimumScale;
 		size_t maxBucketIntegrationWindow;
 		size_t followCharacteristicSamples;
 		size_t followHoldSamples;
@@ -122,7 +123,9 @@ struct AdvancedRms
 				double rc = config.maxRc * pow(PERCEPTIVE_FAST_WINDOWSIZE / config.maxRc, t);
 				characteristicSamples[i] = 0.5 + sampleRate * rc;
 				double rcForScale = config.maxRc * pow(PERCEPTIVE_FAST_WINDOWSIZE / config.maxRc, t);
-				scale[i] = pow(rcForScale / PERCEPTIVE_FAST_WINDOWSIZE, slowScalePower);
+				double rcScale = pow(rcForScale / PERCEPTIVE_FAST_WINDOWSIZE, slowScalePower);
+				scale[i] = rcScale;
+				minimumScale[i] = 1.0 / (rcScale * rcScale);
 //				std::cout << "RC " << (1000 * characteristicSamples[i] / sampleRate) << " ms. level=" << scale[i] << std::endl;
 			}
 			ratioIncrement = 1.0 / (RC_TIMES - MIDDLE - 1);
@@ -130,7 +133,9 @@ struct AdvancedRms
 				double t = ratioIncrement * j;
 				double rcForScale = PERCEPTIVE_FAST_WINDOWSIZE * pow(config.minRc / PERCEPTIVE_FAST_WINDOWSIZE, t);
 				characteristicSamples[i] = 0.5 + sampleRate * rcForScale;
-				scale[i] = pow(rcForScale / PERCEPTIVE_FAST_WINDOWSIZE, fastScalePower);
+				double rcScale = pow(rcForScale / PERCEPTIVE_FAST_WINDOWSIZE, fastScalePower);
+				scale[i] = rcScale;
+				minimumScale[i] = 1.0 / rcScale;
 //				std::cout << "RC " << (1000 * characteristicSamples[i] / sampleRate) << " ms. level=" << scale[i] << std::endl;
 			}
 
@@ -167,10 +172,14 @@ struct AdvancedRms
 		};
 		FixedSizeArray<Filter, RC_TIMES> filters_;
 		SmoothHoldMaxAttackRelease<T> follower_;
-		T minOutputScale_;
+		FixedSizeArray<double, RC_TIMES> minimumScale;
 
 	public:
-		Detector() : follower_(1, 1, 1, 1), minOutputScale_(1) {}
+		Detector() : follower_(1, 1, 1, 1) {
+			for (size_t i = 0; i <  RC_TIMES; i++) {
+				minimumScale[i] = 1;
+			}
+		}
 
 		void userConfigure(UserConfig userConfig, double sampleRate)
 		{
@@ -186,18 +195,14 @@ struct AdvancedRms
 					config.followCharacteristicSamples,
 					config.followHoldSamples,
 					0);
-			T minOutputScale = 1.0;
 			for (size_t i = 0; i < RC_TIMES; i++)
 			{
 				size_t windowSize = config.characteristicSamples[i];
 				filters_[i].integrator.setWindowSizeAndRc(windowSize, Values::min(windowSize / 4, config.maxBucketIntegrationWindow));
 				T scale = config.scale[i];
 				filters_[i].scale = scale;
-				if (scale > 1) {
-					minOutputScale *= scale;
-				}
+				minimumScale[i] = config.minimumScale[i];
 			}
-			minOutputScale_ = 1.0 / minOutputScale;
 		}
 
 		void setValue(T x)
@@ -220,15 +225,17 @@ struct AdvancedRms
 
 		T integrate_smooth(T squareInput, T minOutput)
 		{
-			T value = minOutput;
+			T value = 0;
 			size_t i;
 			for (i = 0; i < RuntimeConfig<T, RC_TIMES>::MIDDLE; i++) {
-				T x = filters_[i].integrator.addSquareAndGetFastAttack(squareInput);
+				T min = minOutput * minimumScale[i];
+				T x = filters_[i].integrator.addSquareAndGetFastAttackWithMinimum(squareInput, min);
 				x *= filters_[i].scale;
 				value = Value<T>::max(value, x);
 			}
 			for (; i < filters_.size(); i++) {
-				T x = filters_[i].integrator.addSquareAndGet(squareInput);
+				T min = minOutput * minimumScale[i];
+				T x = filters_[i].integrator.addSquareCompareAndGet(squareInput, min);
 				x *= filters_[i].scale;
 				value = Value<T>::max(value, x);
 			}

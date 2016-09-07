@@ -149,8 +149,7 @@ class BucketIntegratedRms
 
 	BucketRms<S, BUCKET_COUNT> rms_;
 	IntegrationCoefficients<S> coeffs_;
-	S value_, int1_, int2_;
-	size_t holdSamples_, holdCount_;
+	S int1_, int2_;
 
 public:
 	size_t setWindowSizeAndRc(size_t newSize, size_t rcSize)
@@ -158,8 +157,6 @@ public:
 		size_t windowSize = rms_.setWindowSize(newSize);
 		size_t minRc = 2 * windowSize / BUCKET_COUNT;
 		coeffs_.setCharacteristicSamples(Values::max(minRc, rcSize));
-		holdSamples_ = Values::min(rcSize * 4, Values::max(rcSize, newSize / 2));
-		holdCount_ = 0;
 		return windowSize;
 	}
 
@@ -168,21 +165,19 @@ public:
 		size_t windowSize = rms_.setWindowSize(newSize);
 		size_t minRc = 2 * windowSize / BUCKET_COUNT;
 		coeffs_.setCharacteristicSamples(Values::max(minRc, windowSize / 4));
-		holdSamples_ = Values::max((size_t)1, newSize / 2);
-		holdCount_ = 0;
 		return windowSize;
 	}
 
 	void zero(S value)
 	{
 		rms_.zero();
-		value_ = int1_ = int2_ = 0;
+		int1_ = int2_ = 0;
 	}
 
 	void setValue(S value)
 	{
 		rms_.setvalue(value);
-		value_ = int1_ = int2_ = value;
+		int1_ = int2_ = value;
 	}
 
 	S addAndGet(S value)
@@ -202,35 +197,16 @@ public:
 		return sqrt(coeffs_.integrate(coeffs_.integrate(rms, int1_), int2_));
 	}
 
-	S addSquareCompareAndGet(S square, S minimumRms)
+	S addSquareAndGetFastAttackWithMinimum(S square, S minimumSqr)
 	{
-		S rms = rms_.addSquareAndGet(square);
-		return coeffs_.integrate(
-				Value<S>::max(
-						coeffs_.integrate(rms,int1_),
-						minimumRms),
-				int2_);
+		S rms = Values::max(minimumSqr, rms_.addSquareAndGetSquare(square));
+		return sqrt(coeffs_.integrate(coeffs_.integrate(rms, int1_), int2_));
 	}
 
-	S addSquareCompareAndGetSmoothMinimum(S square, S minimumRms)
+	S addSquareCompareAndGet(S square, S minimumRms)
 	{
-		S rms = rms_.addSquareAndGet(square);
-		S detected = Value<S>::max(rms,minimumRms);
-		if (detected > value_) {
-			value_ = detected;
-			holdCount_ = holdSamples_;
-		}
-		else if (holdCount_ > 0) {
-			holdCount_--;
-		}
-		else {
-			value_ = detected;
-		}
-		return coeffs_.integrate(
-					coeffs_.integrate(
-							value_,int1_
-					),
-				int2_);
+		S rms = Values::max(minimumRms, rms_.addSquareAndGet(square));
+		return coeffs_.integrate(coeffs_.integrate(rms,int1_),int2_);
 	}
 };
 
