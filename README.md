@@ -10,7 +10,7 @@ Speakerman hae these goals:
 - to function as crossover. For now: all groups share the same sub-low group (< 80 Hz)
 
 ## Perception
-Human hearing is complex. It doesn't care about peaks &ndash; unless they are damagingly loud &ndash; but rather about the _energy_ in the signal. Which, naturally, depends on both frequency and how that energy is spread over time. A loud hum is pretty annoying. But a punchy kick drum that has the same energy _when measured over certain intervals_ is nice and makes you want to dance! This is all _very Funny_, but darn annoying a limiter. How is it possible to measure the perceived loudness of a signal and how to keep it under control without harming the experience?
+Human hearing is complex. It doesn't care about peaks &ndash; unless they are damagingly loud &ndash; but rather about the _energy_ in the signal. Which, naturally, depends on both frequency and how that energy is spread over time. A loud hum is pretty annoying. But a punchy kick drum that has the same energy _when measured over smaller intervals_ is nice and makes you want to dance! This is all _very Funny_, but darn annoying a limiter. How is it possible to measure the perceived loudness of a signal and how to keep it under control without harming the experience?
 
 In addition, it is necessary to constrain specific frequency ranges to different levels. This means the input will be split into multiple frequency bands, that will be individually limited in perceived loudness. All except the sub-low frequency band will be added back together in the end. 
 
