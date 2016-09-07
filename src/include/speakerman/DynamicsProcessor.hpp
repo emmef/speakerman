@@ -155,7 +155,7 @@ private:
 
 	static AdvancedRms::UserConfig rmsUserConfig()
 	{
-		static constexpr double SLOW = 0.5;
+		static constexpr double SLOW = 0.4;
 		static constexpr double FAST = 0.0005;
 		
 		return { FAST, SLOW, 
@@ -165,7 +165,7 @@ private:
 
 	static AdvancedRms::UserConfig rmsUserSubConfig()
 	{
-		static constexpr double SLOW = 0.5;
+		static constexpr double SLOW = 0.4;
 		static constexpr double FAST = 0.0005;
 		
 		return { FAST, SLOW, 
