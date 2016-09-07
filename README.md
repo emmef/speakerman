@@ -10,7 +10,7 @@ Speakerman hae these goals:
 - to function as crossover. For now: all groups share the same sub-low group (< 80 Hz)
 
 ## Perception
-Human hearing is complex. It doesn't care about peaks &ndash; unless they are damagingly loud &ndash; but rather about the _energy_ in the signal. Which, naturally, depends on both frequency and how that energy is spread over time. A loud hum is pretty annoying. But a punchy kick drum that has the same energy _when measured over smaller intervals_ is nice and makes you want to dance! This is all _very Funny_, but darn annoying a limiter. How is it possible to measure the perceived loudness of a signal and how to keep it under control without harming the experience?
+Human hearing is complex. It doesn't care about peaks &ndash; unless they are damagingly loud &ndash; but rather about the _energy_ in the signal. Which, naturally, depends on both frequency and how that energy is spread over time. A loud hum is pretty annoying. But a punchy kick drum wants to make you dance, even if it has the same energy _when measured over a smaller interval_. This is all _very Funny_, but darn annoying when designing a perceptive limiter. How is it possible to measure the perceived loudness of a signal and how to keep it under control without harming the experience?
 
 In addition, it is necessary to constrain specific frequency ranges to different levels. This means the input will be split into multiple frequency bands, that will be individually limited in perceived loudness. All except the sub-low frequency band will be added back together in the end. 
 
@@ -19,12 +19,12 @@ In the last century, a lot of research has been done into perceived loudness. De
 * the A-curve is _goud enough_ for the job with respect to perceived loudness per frequency 
 * the ITU-468 is a nice starting point for determining the perceived loudness of sounds when calculating the average energy over [different time intervals](#time-interval-energy-measuring).
 * the very short window "peak" sensitivity of the hearing is about 50 ms
-* sound that has a continued long window energy sounds louder
+* sound that with the same energy level over a larger time span, sounds louder (though that relation is different for different orders of time spans).
 
 All measurements (in all frequency bands, except the sub-low) will take the A-curve into account. 
 
 ### Time interval energy measuring
-Roughly speaking, ITU-468 tells us that the energy of a "burst" that is 16 times shorter, needs to be two times larger to be perceived as equally loud. This is unfortunate. Sound energy is calculated by first applying the [frequency dependency](#frequency) and then using RMS measurement over an interval. If an energy window of a certain size is used for measuring, a burst of <sup>1</sup>/<sub>16</sub>, will only measure 0.25, which means that with this measurement, this burst should be 4 times larger. And that is not how we perceive it. We can fix this by using RRMSS (rot rot mean square square) but that has other undesirable properties. Hence, multiple measurement windows are used that have a weight that makes the situation approach the ITU-468 behavior. 
+Roughly speaking, ITU-468 tells us that the energy of a "burst" that is 16 times shorter than a reference burst, needs to be two times larger to be perceived as equally loud (burst-length<sup>0.25</sup>). This is unfortunate. Sound energy is calculated by first applying the [frequency dependency](#frequency) and then using RMS measurement over an interval. If a window of a certain size is used for measuring, a burst of <sup>1</sup>/<sub>16</sub> of that window, will only measure 0.25. That measurement tells us the short burst should be four times larger instead of the perceived two times larger. We can fix this by using RRMSS (root root mean square square) but that has other undesirable properties. Hence, multiple measurement windows need to be used that have relative weights to simulate the ITU-468 behavior. 
 
 This, however, is short window perception. Like said before, a constant hum (or pink noise) is _very_ annoying. Also, if only a short window is used for perceived loudness, the limter would sound very radio-like if pressed: there is some punch (because of the ITU-468 measurement) but sound becomes very compressed and _thus_ is perceived louder. So _longer intervals should weight higher. That is easily done, but longer intervals also take longer to respond to sudden rises in loudness. Dumbly implementing these weights causes irritating "pumping" of the sound.
 
