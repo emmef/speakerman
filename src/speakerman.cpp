@@ -177,12 +177,11 @@ int main(int count, char * arguments[]) {
 	configFileConfig = readSpeakermanConfig(true);
 
 	cout << "Executing " << arguments[0] << endl;
-	dumpSpeakermanConfig(configFileConfig, cout);
-	manager.set(createManager<double>(configFileConfig));
 
 	Owner<JackClient> clientOwner;
 	auto result = JackClient::createDefault("Speaker manager");
 	clientOwner.set(result.getClient());
+	manager.set(createManager<double>(configFileConfig));
 
 	int error;
 

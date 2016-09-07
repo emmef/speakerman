@@ -349,7 +349,6 @@ namespace speakerman {
 					std::cerr << "E: Invalid value for \"" << key << "\"[" << i << ": " << parsePos << std::endl;
 					return false;
 				}
-				cout << "Parsepos[" << i << "]: " << parsePos << "; value=" << tempValue << endl;
 				bool outOfRange = tempValue < min || tempValue > max;
 				if (outOfRange) {
 					cerr << "W: value for \"" << key << "\"[" << i << ": value " << tempValue << " out of [" << min << ".." << max << "]: ";

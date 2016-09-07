@@ -122,6 +122,14 @@ class JackClient
 	void closeUnsafe();
 
 	static void jack_portnames_free(const char** names);
+	
+	static void suppress_message(const char *msg) { }
+	
+	class MessageSuppress {
+	public:
+		void suppress() { jack_set_error_function(suppress_message); jack_set_info_function(suppress_message); }
+		~MessageSuppress() { jack_set_error_function(nullptr); jack_set_info_function(nullptr); }
+	};
 
 protected:
 	virtual void registerAdditionalCallbacks(jack_client_t* client);
@@ -142,26 +150,36 @@ public:
 	template<typename ...A>
 	static CreateClientResult create(const char *serverName, jack_options_t options, A... args)
 	{
+		MessageSuppress suppress;
 		jack_status_t lastState = static_cast<JackStatus>(0);
+		long sleepMillis = 100;
+		suppress.suppress();
 		for (int i = 1; i <= 10; i ++) {
 			jack_client_t *c = jack_client_open(serverName, options, &lastState, args...);
 			if (c) {
 				return { new JackClient(c), static_cast<JackStatus>(0), serverName };
 			}
-			std::cerr << "JackClient::create() attempt " << i << " failed with status " << lastState << std::endl;
+			std::cerr << "JackClient::create() attempt " << i << " failed with status " << lastState << " (sleep " << sleepMillis << "msec." << std::endl;
+			std::this_thread::sleep_for(std::chrono::milliseconds(sleepMillis));
+			sleepMillis *= 1.7;
 		}
 		return { nullptr, lastState, serverName};
 	}
 
 	static CreateClientResult createDefault(const char *serverName)
 	{
+		MessageSuppress suppress;
 		jack_status_t lastState = static_cast<JackStatus>(0);
-		for (int i = 1; i <= 10; i ++) {
+		long sleepMillis = 100;
+		suppress.suppress();
+		for (int i = 1; i <= 9; i ++) {
 			jack_client_t *c = jack_client_open(serverName, JackOptions::JackNullOption, &lastState);
 			if (c) {
 				return { new JackClient(c), static_cast<JackStatus>(0), serverName };
 			}
-			std::cerr << "JackClient::createDefault() attempt " << i << " failed with status " << lastState << std::endl;
+			std::cerr << "JackClient::create() attempt " << i << " failed with status " << lastState << " (sleep " << sleepMillis << "ms.)" << std::endl;
+			std::this_thread::sleep_for(std::chrono::milliseconds(sleepMillis));
+			sleepMillis *= 1.7;
 		}
 		return { nullptr, lastState, serverName};
 	}
