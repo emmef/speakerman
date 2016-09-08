@@ -210,6 +210,253 @@ public:
 	}
 };
 
+	template <typename S, size_t BUCKETS, size_t LEVELS>
+	class MultiBucketMean
+	{
+	public:
+		static constexpr size_t MINIMUM_BUCKETS = 4;
+		static constexpr size_t MAXIMUM_BUCKETS = 64;
+		static_assert(is_arithmetic<S>::value, "Expected floating-point type parameter");
+		static_assert(Power2::constant::is(BUCKETS), "Bucket count must be valid power of two");
+		static_assert(Values::is_between(BUCKETS, MINIMUM_BUCKETS, 64), "Bucket count must be between 4 and 256");
+		static_assert(Values::is_between(LEVELS, 1, 16), "Levels must be between 1 and 16");
+
+		static constexpr size_t BUCKET_MASK = BUCKETS - 1;
+		static constexpr double BUCKET_WEIGHT = 1.0 / BUCKETS;
+
+	private:
+		struct BucketEntry
+		{
+			size_t current_;
+			S bucket_[BUCKETS];
+			BucketEntry *next_;
+			S mean_;
+
+			S addBucketValue(S value)
+			{
+				bucket_[current_] = value;
+				if (next && (current_ & 1)) {
+					S sum = value ;
+					next_->addBucketValue(value + bucket_[current_ - 1]);
+				}
+				current_++;
+				current_ &= BUCKET_MASK;
+				S sum = 0;
+				for (size_t i = 0; i < BUCKETS; i++) {
+					sum += bucket_[i];
+				}
+				mean_ = sum * BUCKET_WEIGHT;
+				return mean_;
+			}
+
+			void zero()
+			{
+				setValue(static_cast<S>(0));
+			}
+
+			void setValue(S value)
+			{
+				for (size_t i = 0; i < BUCKETS; i++) {
+					bucket_[i] = value;
+				}
+				current_ = 0;
+				mean_ = value;
+			}
+
+			void operator = (const BucketEntry &source)
+			{
+				current_ = source.current_;
+				mean_ = source.mean_;
+				for (size_t i = 0; i < BUCKETS; i++) {
+					bucket_[i] = source.bucket_[i];
+				}
+			}
+		};
+
+		BucketEntry entry_[LEVELS];
+
+		void init()
+		{
+			zero();
+			size_t i;
+			for (i = 0; i < LEVELS - 1; i++) {
+				entry_[i].next_ = &entry_[i + 1];
+			}
+			entry_[i].next_ = nullptr;
+		}
+
+	public:
+		MultiBucketMean() { init(); }
+		void zero()
+		{
+			setValue(static_cast<S>(0));
+		}
+
+		void setValue(S value)
+		{
+			for (size_t i= 0; i < LEVELS; i++) {
+				entry_[i].setValue(value);
+			}
+		}
+
+		void addBucketValue(S value)
+		{
+			entry_[0].addBucketValue(value);
+		}
+
+		FixedSizeArray<S, LEVELS> getMeans()
+		{
+			FixedSizeArray<S, LEVELS> means;
+			for (size_t i= 0; i < LEVELS; i++) {
+				means[i] = entry_[i].mean_;
+			}
+		};
+
+		S getMean(size_t level)
+		{
+			entry_[IndexPolicy::array(level, LEVELS)].mean_;
+		}
+
+		S getBucket(size_t level, size_t bucket)
+		{
+			entry_[IndexPolicy::array(level, LEVELS)].bucket_[IndexPolicy::array(bucket, BUCKETS)];
+		}
+
+		void operator = (const MultiBucketMean &source)
+		{
+			for (size_t i= 0; i < LEVELS; i++) {
+				entry_[i] = source.entry_[i];
+			}
+		}
+	};
+
+	template<typename S, size_t BUCKETS, size_t LEVELS>
+	class MultiRcRms
+	{
+	public:
+		enum class Modus { INTEGRATE_THEN_ROOT, ROOT_THEN_INTEGRATE };
+	private:
+		MultiBucketMean<S, BUCKETS, LEVELS> mean_;
+		Modus modus[LEVELS];
+		S scale_[LEVELS];
+		S threshold_[LEVELS];
+		S int1_[LEVELS], int2_[LEVELS];
+		S value_[LEVELS];
+		size_t samplesPerBucket, sample_;
+		S sum;
+		IntegrationCoefficients<S> coeffs_[LEVELS];
+
+		void init()
+		{
+			for (size_t i = 0; i < LEVELS; i++) {
+				scale_[i] = 1;
+				threshold_[i] = 0;
+			}
+			zero();
+			samplesPerBucket = 1;
+		}
+	public:
+		MultiRcRms()
+		{
+			for (size_t i = 0; i < LEVELS; i++) {
+				scale_[i] = 1;
+				threshold_[i] = 0;
+			}
+			samplesPerBucket = 1;
+		}
+
+		size_t setSmallWindow(size_t newSize)
+		{
+			size_t proposal1 = Values::force_between(newSize, BUCKETS, (const size_t) (1e6 * BUCKETS));
+			samplesPerBucket = newSize / BUCKETS;
+			size_t integrationSamples = MultiBucketMean<S, BUCKETS, LEVELS>::MINIMUM_BUCKETS * samplesPerBucket;
+			for (size_t i = 0; i < LEVELS; i++) {
+				coeffs_[i].setCharacteristicSamples(integrationSamples);
+				integrationSamples *= 2;
+			}
+			return samplesPerBucket * BUCKETS;
+		}
+
+		size_t setSmallWindowAndRc(size_t newSize, size_t proposedIntegrationSamples)
+		{
+			size_t proposal1 = Values::force_between(newSize, BUCKETS, (const size_t) (1e6 * BUCKETS));
+			samplesPerBucket = newSize / BUCKETS;
+			size_t minimumIntegrationSamples = MultiBucketMean<S, BUCKETS, LEVELS>::MINIMUM_BUCKETS * samplesPerBucket;
+			size_t integrationSamples = Values::max(proposedIntegrationSamples, minimumIntegrationSamples);
+			for (size_t i = 0; i < LEVELS; i++) {
+				coeffs_[i].setCharacteristicSamples(integrationSamples);
+				integrationSamples *= 2;
+			}
+			return samplesPerBucket * BUCKETS;
+		}
+
+		void configure(size_t level, S scale, S threshold, Modus modus)
+		{
+			S sc = Values::valid_between(scale, 1e-3, 1e6);
+			scale[IndexPolicy::array(level, LEVELS)] = sc;
+			if (modus == Modus::INTEGRATE_THEN_ROOT) {
+				threshold[level] = 1.0 / sc;
+			}
+			else {
+				threshold[level] = 1.0 / (sc * sc);
+			}
+		}
+
+		void addSquare(S square)
+		{
+			sum += square;
+			sample_++;
+			if (sample_ == samplesPerBucket) {
+				sample_ = 0;
+				mean_.addBucketValue(sum / samplesPerBucket);
+			}
+			for (size_t i = 0; i < LEVELS; i++) {
+				S mean = mean_.getMean(i);
+				if (modus[i] == Modus::INTEGRATE_THEN_ROOT) {
+					S max = Values::max(mean, threshold_[i]);
+					value_[i] = sqrt(coeffs_[i].integrate(coeffs_[i].integrate(max, int1_[i]), int2_[i]));
+				}
+				else {
+					S max = Values::max(sqrt(mean), threshold_[i]);
+					value_[i] = coeffs_[i].integrate(coeffs_[i].integrate(max, int1_[i]), int2_[i]);
+				}
+			}
+		}
+
+		S getValue(size_t level)
+		{
+			return value_[IndexPolicy::array(level, LEVELS)];
+		}
+
+		FixedSizeArray<S, LEVELS> getValues()
+		{
+			FixedSizeArray<S, LEVELS> result;
+			for (size_t i = 0; i < LEVELS; i++) {
+				result[i] = value_[i];
+			}
+			return result;
+		};
+
+		void zero()
+		{
+			setValue(static_cast<S>(0));
+		}
+
+		void setValue(S value)
+		{
+			S square = value * value;
+			mean_.setValue(square);
+			for (size_t i = 0; i < LEVELS; i++) {
+				int1_[i] = int2_[i] = square;
+				value_[i] = value;
+			}
+			sample_ = 0;
+			sum = samplesPerBucket * square;
+		}
+
+
+	};
+
 template <typename S>
 using DefaultRms = BucketIntegratedRms<S, 16>;
 
