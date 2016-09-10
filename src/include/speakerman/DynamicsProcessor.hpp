@@ -135,8 +135,9 @@ private:
 
 	Crossovers::Filter<double, T, INPUTS, CROSSOVERS>  crossoverFilter;
 	ACurves::Filter<T, PROCESSING_CHANNELS> aCurve;
+	using Detector = AdvancedRms::Detector<T>;
 
-	FixedSizeArray<AdvancedRms::Detector<T, 20>, DETECTORS> rmsDetector;
+	Detector *rmsDetector;
 
 	FixedSizeArray<HoldMaxDoubleIntegrated<T>, LIMITERS> limiter;
 	RmsDelay rmsDelay[PROCESSING_CHANNELS];
@@ -176,9 +177,13 @@ private:
 public:
 	DynamicProcessorLevels levels;
 
-	DynamicsProcessor() : sampleRate_(0), levels(GROUPS, CROSSOVERS)
+	DynamicsProcessor() : sampleRate_(0), levels(GROUPS, CROSSOVERS), rmsDetector(new Detector[DETECTORS])
 	{
 		levels.reset();
+	}
+
+	~DynamicsProcessor() {
+		delete [] rmsDetector;
 	}
 
 	void setSampleRate(

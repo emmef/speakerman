@@ -28,8 +28,9 @@
 #include <type_traits>
 #include <cmath>
 
-#include <tdap/Array.hpp>
+#include <tdap/FixedSizeArray.hpp>
 #include <tdap/Integration.hpp>
+#include <tdap/Power2.hpp>
 
 namespace tdap {
 using namespace std;
@@ -218,8 +219,8 @@ public:
 		static constexpr size_t MAXIMUM_BUCKETS = 64;
 		static_assert(is_arithmetic<S>::value, "Expected floating-point type parameter");
 		static_assert(Power2::constant::is(BUCKETS), "Bucket count must be valid power of two");
-		static_assert(Values::is_between(BUCKETS, MINIMUM_BUCKETS, 64), "Bucket count must be between 4 and 256");
-		static_assert(Values::is_between(LEVELS, 1, 16), "Levels must be between 1 and 16");
+		static_assert(Values::is_between(BUCKETS, MINIMUM_BUCKETS, MAXIMUM_BUCKETS), "Bucket count must be between 4 and 256");
+		static_assert(Values::is_between(LEVELS, (size_t)1, (size_t)16), "Levels must be between 1 and 16");
 
 		static constexpr size_t BUCKET_MASK = BUCKETS - 1;
 		static constexpr double BUCKET_WEIGHT = 1.0 / BUCKETS;
@@ -231,11 +232,12 @@ public:
 			S bucket_[BUCKETS];
 			BucketEntry *next_;
 			S mean_;
+			S weight_;
 
-			S addBucketValue(S value)
+			void addBucketValue(S value)
 			{
 				bucket_[current_] = value;
-				if (next && (current_ & 1)) {
+				if (next_ && (current_ & 1)) {
 					S sum = value ;
 					next_->addBucketValue(value + bucket_[current_ - 1]);
 				}
@@ -245,8 +247,7 @@ public:
 				for (size_t i = 0; i < BUCKETS; i++) {
 					sum += bucket_[i];
 				}
-				mean_ = sum * BUCKET_WEIGHT;
-				return mean_;
+				mean_ = sum * weight_;
 			}
 
 			void zero()
@@ -279,10 +280,13 @@ public:
 		{
 			zero();
 			size_t i;
-			for (i = 0; i < LEVELS - 1; i++) {
+			size_t effectiveBuckets = 1;
+			for (i = 0; i < LEVELS - 1; i++, effectiveBuckets *= 2) {
 				entry_[i].next_ = &entry_[i + 1];
+				entry_[i].weight_ = 1.0 / (BUCKETS * effectiveBuckets);
 			}
 			entry_[i].next_ = nullptr;
+			entry_[i].weight_ = 1.0 / (BUCKETS * effectiveBuckets);
 		}
 
 	public:
@@ -307,14 +311,26 @@ public:
 		FixedSizeArray<S, LEVELS> getMeans()
 		{
 			FixedSizeArray<S, LEVELS> means;
-			for (size_t i= 0; i < LEVELS; i++) {
-				means[i] = entry_[i].mean_;
+			for (size_t level= 0; level < LEVELS; level++) {
+				means[level] = entry_[level].mean_;
 			}
+			return means;
+		};
+
+		FixedSizeArray<FixedSizeArray<S, BUCKETS>, LEVELS> getBuckets()
+		{
+			FixedSizeArray<FixedSizeArray<S, BUCKETS>, LEVELS> buckets;
+			for (size_t level = 0; level < LEVELS; level++) {
+				for (size_t bucket = 0; bucket < BUCKETS; bucket++) {
+					buckets[level][bucket] = entry_[level].bucket_[bucket];
+				}
+			}
+			return buckets;
 		};
 
 		S getMean(size_t level)
 		{
-			entry_[IndexPolicy::array(level, LEVELS)].mean_;
+			return entry_[IndexPolicy::array(level, LEVELS)].mean_;
 		}
 
 		S getBucket(size_t level, size_t bucket)
@@ -333,36 +349,44 @@ public:
 	template<typename S, size_t BUCKETS, size_t LEVELS>
 	class MultiRcRms
 	{
-	public:
-		enum class Modus { INTEGRATE_THEN_ROOT, ROOT_THEN_INTEGRATE };
-	private:
 		MultiBucketMean<S, BUCKETS, LEVELS> mean_;
-		Modus modus[LEVELS];
 		S scale_[LEVELS];
-		S threshold_[LEVELS];
 		S int1_[LEVELS], int2_[LEVELS];
-		S value_[LEVELS];
 		size_t samplesPerBucket, sample_;
 		S sum;
 		IntegrationCoefficients<S> coeffs_[LEVELS];
+		size_t true_levels_ = LEVELS / 2;
 
 		void init()
 		{
 			for (size_t i = 0; i < LEVELS; i++) {
 				scale_[i] = 1;
-				threshold_[i] = 0;
 			}
 			zero();
 			samplesPerBucket = 1;
+		}
+
+		void addSquare(S square)
+		{
+			sum += square;
+			sample_++;
+			if (sample_ == samplesPerBucket) {
+				sample_ = 0;
+				mean_.addBucketValue(sum / samplesPerBucket);
+				sum = 0;
+			}
+
 		}
 	public:
 		MultiRcRms()
 		{
 			for (size_t i = 0; i < LEVELS; i++) {
 				scale_[i] = 1;
-				threshold_[i] = 0;
 			}
 			samplesPerBucket = 1;
+			sample_ = 0;
+			sum = 0;
+			setIntegrators(0);
 		}
 
 		size_t setSmallWindow(size_t newSize)
@@ -390,52 +414,71 @@ public:
 			return samplesPerBucket * BUCKETS;
 		}
 
-		void configure(size_t level, S scale, S threshold, Modus modus)
+		/**
+		 * Configure to which level (starting from smallest window size)
+		 * a true RMS is done (integration of root of mean of squares) and
+		 * after which a fast-attach RMS is done (root of integrated of
+		 * mean of squares)
+		 */
+		void configure_true_levels(size_t new_true_levels)
 		{
-			S sc = Values::valid_between(scale, 1e-3, 1e6);
-			scale[IndexPolicy::array(level, LEVELS)] = sc;
-			if (modus == Modus::INTEGRATE_THEN_ROOT) {
-				threshold[level] = 1.0 / sc;
+			if (new_true_levels > LEVELS) {
+				throw std::out_of_range("true_levels_ out of range");
 			}
-			else {
-				threshold[level] = 1.0 / (sc * sc);
-			}
+			true_levels_ = new_true_levels;
 		}
 
-		void addSquare(S square)
+		S set_scale(size_t level, S scale)
 		{
-			sum += square;
-			sample_++;
-			if (sample_ == samplesPerBucket) {
-				sample_ = 0;
-				mean_.addBucketValue(sum / samplesPerBucket);
-			}
-			for (size_t i = 0; i < LEVELS; i++) {
-				S mean = mean_.getMean(i);
-				if (modus[i] == Modus::INTEGRATE_THEN_ROOT) {
-					S max = Values::max(mean, threshold_[i]);
-					value_[i] = sqrt(coeffs_[i].integrate(coeffs_[i].integrate(max, int1_[i]), int2_[i]));
-				}
-				else {
-					S max = Values::max(sqrt(mean), threshold_[i]);
-					value_[i] = coeffs_[i].integrate(coeffs_[i].integrate(max, int1_[i]), int2_[i]);
-				}
-			}
+			S sc = Values::force_between(scale, 1e-3, 1e6);
+			scale_[IndexPolicy::array(level, LEVELS)] = sc * sc;
+			return sc;
 		}
 
-		S getValue(size_t level)
+		S get_scale(size_t level) const
 		{
-			return value_[IndexPolicy::array(level, LEVELS)];
+			return sqrt(scale_[level]);
 		}
 
-		FixedSizeArray<S, LEVELS> getValues()
+		S addSquareGetValue(S square, S threshold)
 		{
-			FixedSizeArray<S, LEVELS> result;
-			for (size_t i = 0; i < LEVELS; i++) {
-				result[i] = value_[i];
+			addSquare(square);
+			S value = threshold;
+			ssize_t level;
+			for (level = LEVELS - 1; level >= true_levels_; level--) {
+				S scaledSquaredMean = scale_[level] * mean_.getMean(level);
+				S squaredMax = Values::max(value * value, scaledSquaredMean);
+				S integratedSquaredMax = coeffs_[level].integrate(squaredMax, int1_[level]);
+				integratedSquaredMax = coeffs_[level].integrate(integratedSquaredMax, int2_[level]);
+				value = sqrt(integratedSquaredMax);
 			}
-			return result;
-		};
+			for (; level >= 0; level--) {
+				S scaledMean = sqrt(scale_[level] * mean_.getMean(level));
+				S max = Values::max(value, scaledMean);
+				S integratedMax = coeffs_[level].integrate(max, int1_[level]);
+				value = coeffs_[level].integrate(max, int2_[level]);
+			}
+			return value;
+		}
+
+		S addSquareGetValueSimple(S square, S threshold)
+		{
+			addSquare(square);
+			S value = threshold;
+			ssize_t level;
+			for (level = LEVELS - 1; level >= true_levels_; level--) {
+				S squaredMax = scale_[level] * mean_.getMean(level);
+				S integratedSquaredMax = coeffs_[level].integrate(squaredMax, int1_[level]);
+				integratedSquaredMax = coeffs_[level].integrate(integratedSquaredMax, int2_[level]);
+				value = Values::max(value, sqrt(integratedSquaredMax));
+			}
+			for (; level >= 0; level--) {
+				S max = sqrt(scale_[level] * mean_.getMean(level));
+				S integratedMax = coeffs_[level].integrate(max, int1_[level]);
+				value = Values::max(value, coeffs_[level].integrate(max, int2_[level]));
+			}
+			return value;
+		}
 
 		void zero()
 		{
@@ -446,15 +489,23 @@ public:
 		{
 			S square = value * value;
 			mean_.setValue(square);
-			for (size_t i = 0; i < LEVELS; i++) {
-				int1_[i] = int2_[i] = square;
-				value_[i] = value;
-			}
+
+			setIntegrators(value);
 			sample_ = 0;
 			sum = samplesPerBucket * square;
 		}
 
-
+		void setIntegrators(S value)
+		{
+			size_t level;
+			for (level = 0; level < true_levels_; level++) {
+				int1_[level] = int2_[level] = value;
+			}
+			S square = value * value;
+			for (; level < LEVELS; level++) {
+				int1_[level] = int2_[level] = square;
+			}
+		}
 	};
 
 template <typename S>

@@ -93,95 +93,50 @@ struct AdvancedRms
 		}
 	};
 
-	template<typename T, size_t RC_TIMES>
+	template<typename T>
 	struct RuntimeConfig
 	{
 		static_assert(is_floating_point<T>::value, "Need floating point type");
-		static_assert(RC_TIMES >= 4, "Need at least four characteristic times");
-		FixedSizeArray<size_t, RC_TIMES> characteristicSamples;
+		static constexpr size_t RC_TIMES = 10;
+		size_t smallWindowSamples;
 		FixedSizeArray<T, RC_TIMES> scale;
-		FixedSizeArray<T, RC_TIMES> minimumScale;
-		size_t maxBucketIntegrationWindow;
 		size_t followCharacteristicSamples;
 		size_t followHoldSamples;
-		size_t fastPerceptiveIdx_;
+		size_t trueRmsLevels;
 
 		void calculate(UserConfig userConfig, double sampleRate)
 		{
 			UserConfig config = userConfig.validate();
 			followCharacteristicSamples = 0.5 + sampleRate * followRcRange().getBetween(config.minRc / 2);
 			followHoldSamples = 0.5 + sampleRate * PERCEPTIVE_FAST_WINDOWSIZE;//().getBetween(config.minRc * 2);
-			maxBucketIntegrationWindow = 0.5 + sampleRate * MAX_BUCKET_INTEGRATION_TIME;
-
-			double perceptiveSlowToFast = log(PERCEPTIVE_SLOW_WINDOWSIZE / PERCEPTIVE_FAST_WINDOWSIZE);
-			double perceptiveFastToPeak = log(PERCEPTIVE_FAST_WINDOWSIZE / config.minRc);
-			size_t x, y, z;
-			
-			if (config.maxRc <= 0.45) {
-				double logSum = perceptiveSlowToFast + perceptiveFastToPeak;
-				x = Value<size_t>::max(1, perceptiveFastToPeak * RC_TIMES / logSum);
-				y = Value<size_t>::max(2, perceptiveSlowToFast * RC_TIMES / logSum);
-				x = RC_TIMES - y;
-				z = 0;
+			double largeRc = 2 * PERCEPTIVE_SLOW_WINDOWSIZE;
+			double smallRc = largeRc / pow(2, RC_TIMES - 1);
+			smallWindowSamples = smallRc *  sampleRate;
+			size_t i = 0;
+			double rc = smallRc;
+			while (Values::relative_distance(rc, PERCEPTIVE_FAST_WINDOWSIZE) > 0.5) {
+				scale[i++] = pow(rc / PERCEPTIVE_FAST_WINDOWSIZE, 0.25);
+				rc *= 2.0;
 			}
-			else {
-				double maxToPerceptiveSlow = log(config.maxRc / PERCEPTIVE_SLOW_WINDOWSIZE);
-				double logSum = maxToPerceptiveSlow + perceptiveSlowToFast + perceptiveFastToPeak;
-				x = Value<size_t>::max(1, perceptiveFastToPeak * RC_TIMES / logSum);
-				y = Value<size_t>::max(2, perceptiveSlowToFast * RC_TIMES / logSum);
-				z = Value<size_t>::max(1, maxToPerceptiveSlow * RC_TIMES / logSum);
-				if (x + y + z < RC_TIMES) {
-					x = RC_TIMES - y - z;
-				}
-				else {
-					while (x + y + z > RC_TIMES) {
-						if (z > 1) {
-							z--;
-						}
-						else if (y > 2) {
-							y--;
-						}
-						else if (x > 1) {
-							x--;
-						}
-						else {
-							throw std::runtime_error("Invalid number of RC-S");
-						}
-					}
-				}
+			scale[i++] = 1.0;
+			trueRmsLevels = i;
+			rc *= 2.0;
+			while (Values::relative_distance(rc, largeRc) > 0.5) {
+				scale[i++] = pow(rc / PERCEPTIVE_FAST_WINDOWSIZE, 0.15);
+				rc *= 2.0;
 			}
-			for (size_t i = 0; i < z; i++) {
-				double t = 1.0 * (z - i) / z;
-				double rc = PERCEPTIVE_SLOW_WINDOWSIZE * exp(log(config.maxRc / PERCEPTIVE_SLOW_WINDOWSIZE) * t);
-				double sc = exp(log(PERCEPTIVE_FAST_WINDOWSIZE / rc) * 0.25);
-				characteristicSamples[i] = 0.5 + rc * sampleRate;
-				scale[i] = sc;
-				minimumScale[i] = 1.0 / (sc * sc);
+			while (i < RC_TIMES) {
+				scale[i++] = pow(PERCEPTIVE_FAST_WINDOWSIZE / rc, 0.25);
+				rc *= 2.0;
 			}
-			for (size_t i = 0; i < y; i++) {
-				double t = 1.0 * (y - 1 - i) / (y - 1);
-				double rc = PERCEPTIVE_FAST_WINDOWSIZE * exp(log(PERCEPTIVE_SLOW_WINDOWSIZE / PERCEPTIVE_FAST_WINDOWSIZE) * t);
-				double sc = exp(log(rc / PERCEPTIVE_FAST_WINDOWSIZE) * 0.15);
-				characteristicSamples[z + i] = 0.5 + rc * sampleRate;
-				scale[z + i] = sc;
-				minimumScale[z + i] = 1.0 / (sc * sc);
-			}
-			for (size_t i = 0; i < x; i++) {
-				double t = 1.0 * (x - 1 - i) / x;
-				double rc = config.minRc * exp(log(PERCEPTIVE_FAST_WINDOWSIZE / config.minRc) * t);
-				double sc = exp(log(rc / PERCEPTIVE_FAST_WINDOWSIZE) * 0.25);
-				characteristicSamples[z + y + i] = 0.5 + rc * sampleRate;
-				scale[z + y  + i] = sc;
-				minimumScale[z + y + i] = 1.0 / sc;
-			}
-			fastPerceptiveIdx_ = z + y;
-			for (size_t i = 0; i < RC_TIMES; i++) {
-				std::cout << "RC " << (1000 * characteristicSamples[i] / sampleRate) << " ms. level=" << scale[i] << "; min-lvl=" << minimumScale[i] << std::endl;
-			}
+//			rc = smallRc;
+//			for (size_t i = 0; i < RC_TIMES; i++, rc *= 2.0) {
+//				std::cout << "RC " << (1000 * rc) << " ms. level=" << scale[i] << std::endl;
+//			}
 		}
 	};
 
-	template<typename T, size_t RC_TIMES>
+	template<typename T>
 	class Detector
 	{
 		static ValueRange<double> &peakWeightRange()
@@ -204,46 +159,35 @@ struct AdvancedRms
 			static ValueRange<double> range(0.001, 0.010);
 			return range;
 		}
-		struct Filter
-		{
-			BucketIntegratedRms<double, 16> integrator;
-			double scale;
-		};
-		FixedSizeArray<Filter, RC_TIMES> filters_;
+		MultiRcRms<T, (size_t)16, RuntimeConfig<T>::RC_TIMES> filter_;
 		SmoothHoldMaxAttackRelease<T> follower_;
-		FixedSizeArray<double, RC_TIMES> minimumScale;
-		size_t fastPerceptiveIdx_;
 
 	public:
 		Detector() : follower_(1, 1, 1, 1) {
-			for (size_t i = 0; i <  RC_TIMES; i++) {
-				minimumScale[i] = 1;
-			}
 		}
 
 		void userConfigure(UserConfig userConfig, double sampleRate)
 		{
-			RuntimeConfig<T, RC_TIMES> runtimeConfig;
+			RuntimeConfig<T> runtimeConfig;
 			runtimeConfig.calculate(userConfig, sampleRate);
 			configure(runtimeConfig);
 		}
 
-		void configure(RuntimeConfig<T, RC_TIMES> config)
+		void configure(RuntimeConfig<T> config)
 		{
 			follower_ = SmoothHoldMaxAttackRelease<T>(
 					config.followHoldSamples,
 					config.followCharacteristicSamples,
 					config.followHoldSamples,
 					0);
-			fastPerceptiveIdx_ = config.fastPerceptiveIdx_;
-			for (size_t i = 0; i < RC_TIMES; i++)
-			{
-				size_t windowSize = config.characteristicSamples[i];
-				filters_[i].integrator.setWindowSizeAndRc(windowSize, Values::min(windowSize / 4, config.maxBucketIntegrationWindow));
-				T scale = config.scale[i];
-				filters_[i].scale = scale;
-				minimumScale[i] = config.minimumScale[i];
+			filter_.configure_true_levels(config.trueRmsLevels);
+			filter_.setSmallWindow(config.smallWindowSamples);
+			filter_.setIntegrators(0.01);
+			for (size_t i = 0; i < RuntimeConfig<T>::RC_TIMES; i++) {
+				filter_.set_scale(i, config.scale[i]);
 			}
+			filter_.setValue(10);
+			follower_.setValue(10);
 		}
 
 		void setValue(T x)
@@ -251,36 +195,9 @@ struct AdvancedRms
 			follower_.setValue(x);
 		}
 
-//		T integrate(T squareInput, T minOutput)
-//		{
-//			T value = minOutput * minOutputScale_;
-//			for (size_t i = 0; i < filters_.size(); i++) {
-//				T x = filters_[i].integrator.addSquareCompareAndGet(
-//						squareInput, value);
-//				x *= filters_[i].scale;
-//				value = Value<T>::max(value, x);
-//			}
-//
-//			return follower_.apply(value);
-//		}
-
 		T integrate_smooth(T squareInput, T minOutput)
 		{
-			T value = 0;
-			size_t i;
-			for (i = 0; i < fastPerceptiveIdx_; i++) {
-				T min = minOutput * minimumScale[i];
-				T x = filters_[i].integrator.addSquareAndGetFastAttackWithMinimum(squareInput, min);
-				x *= filters_[i].scale;
-				value = Value<T>::max(value, x);
-			}
-			for (; i < filters_.size(); i++) {
-				T min = minOutput * minimumScale[i];
-				T x = filters_[i].integrator.addSquareCompareAndGet(squareInput, min);
-				x *= filters_[i].scale;
-				value = Value<T>::max(value, x);
-			}
-
+			T value = filter_.addSquareGetValue(squareInput, minOutput);
 			return follower_.apply(value);
 		}
 	};

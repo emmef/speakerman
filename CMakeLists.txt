@@ -1,11 +1,11 @@
 cmake_minimum_required(VERSION 3.6)
 project(speakerman)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -DINSTALL_DIR='\"/usr/local\"'")
 include_directories(include src/include)
 
+
 set(SOURCE_FILES
-    doc/simple_client.c
     src/include/speakerman/jack/ErrorHandler.hpp
     src/include/speakerman/jack/JackClient.hpp
     src/include/speakerman/jack/JackProcessor.hpp
@@ -75,4 +75,6 @@ set(LIBRARIES
         jack
         pthread
         )
-
+link_libraries(jack pthread)
+target_link_libraries(speakerman jack pthread)
+add_executable(test_speakerman test/main.cpp)
