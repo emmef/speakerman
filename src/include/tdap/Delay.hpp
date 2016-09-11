@@ -32,17 +32,17 @@ using namespace std;
 template<typename S>
 class Delay
 {
-	static_assert(is_floating_point<S>::value, "Expected floating-point type parameter");
+	static_assert(is_scalar<S>::value, "Expected scalar type parameter");
 
 	Array<S> buffer_;
-	size_t mask_;
 	size_t read_;
 	size_t write_;
+	size_t delay_;
 
 	static size_t validMaxDelay(size_t maxDelay)
 	{
 		if (maxDelay > 1 && maxDelay < Count<S>::max() / 2) {
-			return Power2::next(maxDelay);
+			return maxDelay;
 		}
 		throw std::invalid_argument("Maximum delay must be positive and have next larger power of two");
 	}
@@ -57,15 +57,15 @@ class Delay
 
 public:
 	Delay(size_t maxDelay) :
-		buffer_(validMaxDelay(maxDelay)),
-		mask_(buffer_.size() - 1),
+		buffer_(1 + validMaxDelay(maxDelay)),
 		read_(0),
-		write_(0)
+		write_(0),
+		delay_(0)
 	{
 
 	}
 
-	Delay() : Delay(4000, 0) {}
+	Delay() : Delay(4000) {}
 
 	size_t maxDelay() const
 	{
@@ -74,45 +74,113 @@ public:
 
 	size_t delay() const
 	{
-		return (write_ > read_ ? write_ : mask_ + write_ + 1) - read_;
+		return delay_;
 	}
 
 	void setDelay(size_t newDelay)
 	{
 		validDelay(newDelay);
-		size_t oldDelay = delay();
-		size_t newWrite = (read_ + newDelay) & mask_;
-		if (newDelay < oldDelay) {
-			write_ = newWrite;
-		}
-		else {
-			while (write_ != newWrite) {
-				buffer_[write_++] = 0;
-				write_ &= mask_;
-			}
-		}
+		buffer_.zero();
+		read_ = 0;
+		write_ = delay_;
 	}
 
 	void zero()
 	{
-		size_t rd = read_;
-		while (rd != write_)
-		{
-			buffer_[rd++] = 0;
-			rd &= mask_;
-		}
+		buffer_.zero();
 	}
 
 	S setAndGet(S value)
 	{
 		buffer_[write_++] = value;
 		S result = buffer_[read_++];
-		write_ &= mask_;
-		read_ &= mask_;
+		if (write_ > delay_) {
+			write_ = 0;
+		}
+		if (read_ > delay_) {
+			read_ = 0;
+		}
 		return result;
 	}
 
 };
+
+	template <typename S>
+	class MultiChannelDelay
+	{
+		size_t maxChannels_, maxDelay_;
+		Array<S> buffer_;
+		size_t read_, write_, channels_, delay_, end_;
+
+		static size_t getValidMaxChannels(size_t maxChannels, size_t maxDelay)
+		{
+			if (maxDelay == 0 || !Count<S>::is_valid_sum(maxDelay, 1)) {
+				throw std::runtime_error("MultiChannelDelay::<init> Maximum delay invalid");
+			}
+			if (Count<S>::product(maxChannels, maxDelay) > 0) {
+				return maxChannels;
+			}
+			throw std::runtime_error("MultiChannelDelay::<init> Combination of maximum channels and maximum delay invalid");
+		}
+
+		void setMetrics(size_t channels, size_t delay)
+		{
+			buffer_.zero();
+			channels_ = channels;
+			delay_ = delay;
+			read_ = 0;
+			write_ = channels_ * delay_;
+			end_ = channels_ * (delay_ + 1);
+		}
+	public:
+		MultiChannelDelay(size_t maxChannels, size_t maxDelay) :
+				maxChannels_(getValidMaxChannels(maxChannels, maxDelay)),
+				maxDelay_(maxDelay),
+				buffer_(maxChannels_ * (maxDelay_ + 1))
+		{
+			setMetrics(maxChannels_, 0);
+		}
+
+		void zero()
+		{
+			buffer_.zero();
+		}
+
+		void setChannels(size_t channels)
+		{
+			if (channels == 0 || channels > maxChannels_) {
+				throw std::runtime_error("MultiChannelDelay::setChannels invalid number of channels");
+			}
+			setMetrics(channels, delay_);
+		}
+
+		void setDelay(size_t delay)
+		{
+			if (delay > maxDelay_) {
+				throw std::runtime_error("MultiChannelDelay::setChannels invalid delay");
+			}
+			setMetrics(channels_, delay);
+		}
+
+		S setAndGet(size_t channel, S value)
+		{
+			IndexPolicy::array(channel, channels_);
+			buffer_[write_ + channel] = value;
+			return buffer_[read_ + channel];
+		}
+
+		void next()
+		{
+			write_ += channels_;
+			if (write_ > end_) {
+				write_ = 0;
+			}
+			read_ += channels_;
+			if (read_ > end_) {
+				read_ = 0;
+			}
+		}
+	};
 
 } /* End of name space tdap */
 

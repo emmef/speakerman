@@ -233,10 +233,10 @@ namespace speakerman
 				response().write_string(itostr(numbers, 30, entry.stamp - levelTimeStamp));
 				response().write_string("\", \r\n");
 				response().write_string("\t\"subGain\": \"");
-				response().write_string(ftostr(numbers, 30, levels.getSubGain()));
+				response().write_string(ftostr(numbers, 30, levels.getGain(0)));
 				response().write_string("\", \r\n");
 				response().write_string("\t\"subGainAverage\": \"");
-				response().write_string(ftostr(numbers, 30, levels.getAverageSubGain()));
+				response().write_string(ftostr(numbers, 30, levels.getAverageGain(0)));
 				response().write_string("\", \r\n");
 				response().write_string("\t\"periods\": \"");
 				response().write_string(itostr(numbers, 30, levels.count()));
@@ -245,13 +245,13 @@ namespace speakerman
 						for (size_t i = 0; i < levels.groups(); i++) {
 							response().write_string("\t\t{\r\n");
 							response().write_string("\t\t\t\"gain\": \"");
-							response().write_string(ftostr(numbers, 30, levels.getGroupGain(i)));
+							response().write_string(ftostr(numbers, 30, levels.getGain(i + 1)));
 							response().write_string("\", \r\n");
 							response().write_string("\t\t\t\"gainAverage\": \"");
-							response().write_string(ftostr(numbers, 30, levels.getAverageGroupGain(i)));
+							response().write_string(ftostr(numbers, 30, levels.getAverageGain(i + 1)));
 							response().write_string("\", \r\n");
 							response().write_string("\t\t\t\"level\": \"");
-							response().write_string(ftostr(numbers, 30, levels.getSignal(i)));
+							response().write_string(ftostr(numbers, 30, Values::max(levels.getSquaredSignal(0), levels.getSquaredSignal(i + 1))));
 							response().write_string("\"\r\n");
 							response().write_string("\t\t}");
 							if (i < levels.groups() - 1) {

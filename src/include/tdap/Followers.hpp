@@ -57,6 +57,10 @@ public:
 		}
 	}
 
+	size_t getHoldSamples() const {
+		return holdSamples;
+	}
+
 	S apply(S input)
 	{
 		if (input > holdValue) {
@@ -258,6 +262,11 @@ public:
 	void setValue(C x)
 	{
 		integrator_.setOutput(x);
+	}
+
+	size_t getHoldSamples() const
+	{
+		return holdMax.getHoldSamples();
 	}
 
 	AttackReleaseSmoothFilter<C> &integrator()

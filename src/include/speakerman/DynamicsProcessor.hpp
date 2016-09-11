@@ -113,16 +113,16 @@ public:
 		      GroupDelay() : Delay<T>(GROUP_MAX_DELAY_SAMPLES) {}
 	};
 	
-	class LimiterDelay : public Delay<T>
+	class LimiterDelay : public MultiChannelDelay<T>
 	{
 	public:
-		LimiterDelay() : Delay<T>(LIMITER_MAX_DELAY_SAMPLES) {}
+		LimiterDelay() : MultiChannelDelay<T>(DELAY_CHANNELS, LIMITER_MAX_DELAY_SAMPLES) {}
 	};
 	
-	class RmsDelay : public Delay<T>
+	class RmsDelay : public MultiChannelDelay<T>
 	{
 	public:
-		RmsDelay() : Delay<T>(RMS_MAX_DELAY_SAMPLES) {}
+		RmsDelay() : MultiChannelDelay<T>(PROCESSING_CHANNELS, RMS_MAX_DELAY_SAMPLES) {}
 	};
 
 private:
@@ -140,8 +140,8 @@ private:
 	Detector *rmsDetector;
 
 	FixedSizeArray<HoldMaxDoubleIntegrated<T>, LIMITERS> limiter;
-	RmsDelay rmsDelay[PROCESSING_CHANNELS];
-	LimiterDelay limiterDelay[LIMITERS];
+	RmsDelay rmsDelay;
+	LimiterDelay limiterDelay;
 	GroupDelay groupDelay[DELAY_CHANNELS];
 	EqualizerFilter<double, CHANNELS_PER_GROUP> filters_[GROUPS];
 
@@ -167,7 +167,7 @@ private:
 	static AdvancedRms::UserConfig rmsUserSubConfig()
 	{
 		static constexpr double SLOW = 0.4;
-		static constexpr double FAST = 0.0005;
+		static constexpr double FAST = 0.005;
 		
 		return { FAST, SLOW, 
 			pow(FAST / AdvancedRms::PERCEPTIVE_FAST_WINDOWSIZE, PERCEIVED_FAST_BURST_POWER), 
@@ -199,27 +199,25 @@ public:
 			signalIntegrator[i].coefficients.setCharacteristicSamples(AdvancedRms::PERCEPTIVE_FAST_WINDOWSIZE * sampleRate);
 		}
 
-		// Rms detector confiuration
-		AdvancedRms::UserConfig rmsConfig = rmsUserConfig();
-		size_t rmsDelaySamples = 0.5 + rmsConfig.minRc * 3 * sampleRate;
-		for (size_t channel = 0; channel < PROCESSING_CHANNELS; channel++) {
-			rmsDelay[channel].setDelay(rmsDelaySamples);
-		}
 
 		// Limiter delay and integration constants
-		T limiterIntegrationSamples = 0.001 * sampleRate;
+		T limiterIntegrationSamples = 0.0005 * sampleRate;
 		size_t limiterHoldSamples = 0.5 + 3 * limiterIntegrationSamples;
 		for (size_t i = 0; i < LIMITERS; i++) {
 			limiter[i].setMetrics(limiterIntegrationSamples, limiterHoldSamples);
 		}
-		for (size_t channel = 0; channel < LIMITERS; channel++) {
-			limiterDelay[channel].setDelay(limiterHoldSamples);
-		}
+		limiterDelay.setDelay(limiterHoldSamples);
+		limiterDelay.setChannels(DELAY_CHANNELS);
 
+		// Rms detector confiuration
 		rmsDetector[0].userConfigure(rmsUserSubConfig(), sampleRate);
+		AdvancedRms::UserConfig rmsConfig = rmsUserConfig();
 		for (size_t i = 1; i < DETECTORS; i++) {
 			rmsDetector[i].userConfigure(rmsConfig, sampleRate);
 		}
+		size_t rmsDelaySamples = rmsDetector[1].getHoldSamples();
+		rmsDelay.setDelay(rmsDelaySamples);
+		rmsDelay.setChannels(PROCESSING_CHANNELS);
 		auto weights = Crossovers::weights(crossovers, sampleRate);
 		relativeBandWeights[0] = weights[0];
 		for (size_t band = 1; band <= CROSSOVERS; band++) {
@@ -267,10 +265,13 @@ public:
 		moveToProcessingChannels(crossoverFilter.filter(inputWithVolumeAndNoise));
 		processSubRms();
 		processChannelsRms();
+		levels.next();
+		rmsDelay.next();
 		mergeFrequencyBands();
 		processChannelsFilters();
 		processSubLimiter(target);
 		processChannelsLimiter(target);
+		limiterDelay.next();
 	}
 
 private:
@@ -280,16 +281,13 @@ private:
 		for (size_t group = 0; group < GROUPS; group++) {
 			const GroupRuntimeData<T, BANDS> &conf = runtime.data().groupConfig(group);
 			auto volume = conf.volume();
-			T signal = 0;
 			for (size_t channel = 0; channel < CHANNELS_PER_GROUP; channel++) {
 				T x = 0.0;
 				for (size_t inGroup = 0; inGroup < GROUPS; inGroup++) {
 					x += volume[inGroup] * input[inGroup * CHANNELS_PER_GROUP + channel];
 				}
-				signal += x * x;
 				inputWithVolumeAndNoise[group * CHANNELS_PER_GROUP + channel] = x + ns;
 			}
-			levels.setSignal(group, sqrt(signalIntegrator[group].integrate(signal)) * conf.signalMeasureFactor());
 		}
 	}
 
@@ -311,11 +309,12 @@ private:
 	void processSubRms()
 	{
 		T x = processInput[0] + subNoise();
-		processInput[0] = rmsDelay[0].setAndGet(x);
+		processInput[0] = rmsDelay.setAndGet(0, x);
 		x *= runtime.data().subRmsScale();
-		T detect = rmsDetector[0].integrate_smooth(x * x, 1.0);
+		T signal;
+		T detect = rmsDetector[0].integrate_smooth(x * x, 1.0, signal);
 		T gain = 1.0 / detect;
-		levels.setSubGain(gain);
+		levels.addValues(0, gain, signal);
 		processInput[0] *= gain;
 	}
 
@@ -328,14 +327,15 @@ private:
 				size_t nextOffset = baseOffset + CHANNELS_PER_GROUP;
 				for (size_t offset = baseOffset; offset < nextOffset; offset++, delay++) {
 					T x = processInput[offset];
-					processInput[offset] = rmsDelay[delay].setAndGet(x);
+					processInput[offset] = rmsDelay.setAndGet(delay, x);
 					T y = aCurve.filter(offset, x);
 					y *= scaleForUnity;
 					squareSum += y * y;
 				}
-				T detect = rmsDetector[detector].integrate_smooth(squareSum, 1.0);
+				T signal;
+				T detect = rmsDetector[detector].integrate_smooth(squareSum, 1.0, signal);
 				T gain = 1.0 / detect;
-				levels.setGroupGain(group, gain);
+				levels.addValues(1 + group, gain, signal);
 				for (size_t offset = baseOffset; offset < nextOffset; offset++) {
 					processInput[offset] *= gain;
 				}
@@ -372,7 +372,7 @@ private:
 		T scale = runtime.data().subLimiterScale();
 		T threshold = runtime.data().subLimiterThreshold();
 		T x = output[0];
-		output[0] = limiterDelay[0].setAndGet(x);
+		output[0] = limiterDelay.setAndGet(0, x);
 		x *= scale;
 		T detect = limiter[0].applyWithMinimum(fabs(x), 1.0);
 		T gain = 1.0 / detect;
@@ -387,7 +387,7 @@ private:
 			T peak = 0.0;
 			for (size_t channel = 0, offset = startOffs; channel < CHANNELS_PER_GROUP; channel++, offset++, limiterDelayChannel++) {
 				T x = output[offset];
-				output[offset] = limiterDelay[limiterDelayChannel].setAndGet(x);
+				output[offset] = limiterDelay.setAndGet(limiterDelayChannel, x);
 				peak = Values::max(peak, fabs(x));
 			}
 			T scale = runtime.data().groupConfig(group).limiterScale();

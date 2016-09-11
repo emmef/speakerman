@@ -223,7 +223,6 @@ public:
 		static_assert(Values::is_between(LEVELS, (size_t)1, (size_t)16), "Levels must be between 1 and 16");
 
 		static constexpr size_t BUCKET_MASK = BUCKETS - 1;
-		static constexpr double BUCKET_WEIGHT = 1.0 / BUCKETS;
 
 	private:
 		struct BucketEntry
@@ -303,12 +302,12 @@ public:
 			}
 		}
 
-		void addBucketValue(S value)
+		inline void addBucketValue(S value)
 		{
 			entry_[0].addBucketValue(value);
 		}
 
-		FixedSizeArray<S, LEVELS> getMeans()
+		FixedSizeArray<S, LEVELS> getMeans() const
 		{
 			FixedSizeArray<S, LEVELS> means;
 			for (size_t level= 0; level < LEVELS; level++) {
@@ -317,7 +316,7 @@ public:
 			return means;
 		};
 
-		FixedSizeArray<FixedSizeArray<S, BUCKETS>, LEVELS> getBuckets()
+		FixedSizeArray<FixedSizeArray<S, BUCKETS>, LEVELS> getBuckets() const
 		{
 			FixedSizeArray<FixedSizeArray<S, BUCKETS>, LEVELS> buckets;
 			for (size_t level = 0; level < LEVELS; level++) {
@@ -328,12 +327,12 @@ public:
 			return buckets;
 		};
 
-		S getMean(size_t level)
+		inline S getMean(size_t level) const
 		{
 			return entry_[IndexPolicy::array(level, LEVELS)].mean_;
 		}
 
-		S getBucket(size_t level, size_t bucket)
+		inline S getBucket(size_t level, size_t bucket) const
 		{
 			entry_[IndexPolicy::array(level, LEVELS)].bucket_[IndexPolicy::array(bucket, BUCKETS)];
 		}
@@ -393,7 +392,7 @@ public:
 		{
 			size_t proposal1 = Values::force_between(newSize, BUCKETS, (const size_t) (1e6 * BUCKETS));
 			samplesPerBucket = newSize / BUCKETS;
-			size_t integrationSamples = MultiBucketMean<S, BUCKETS, LEVELS>::MINIMUM_BUCKETS * samplesPerBucket;
+			size_t integrationSamples = samplesPerBucket *  BUCKETS / 4;
 			for (size_t i = 0; i < LEVELS; i++) {
 				coeffs_[i].setCharacteristicSamples(integrationSamples);
 				integrationSamples *= 2;
@@ -461,22 +460,29 @@ public:
 			return value;
 		}
 
-		S addSquareGetValueSimple(S square, S threshold)
+		S addSquareGetValue(S square, S threshold, S &rawDetection)
 		{
 			addSquare(square);
 			S value = threshold;
+			rawDetection = 0;
 			ssize_t level;
 			for (level = LEVELS - 1; level >= true_levels_; level--) {
-				S squaredMax = scale_[level] * mean_.getMean(level);
+				S scaledSquaredMean = scale_[level] * mean_.getMean(level);
+				rawDetection = Values::max(rawDetection, scaledSquaredMean);
+				S squaredMax = Values::max(value * value, scaledSquaredMean);
 				S integratedSquaredMax = coeffs_[level].integrate(squaredMax, int1_[level]);
 				integratedSquaredMax = coeffs_[level].integrate(integratedSquaredMax, int2_[level]);
-				value = Values::max(value, sqrt(integratedSquaredMax));
+				value = sqrt(integratedSquaredMax);
 			}
 			for (; level >= 0; level--) {
-				S max = sqrt(scale_[level] * mean_.getMean(level));
+				double rawScaled = scale_[level] * mean_.getMean(level);
+				rawDetection = Values::max(rawDetection, rawScaled);
+				S scaledMean = sqrt(rawScaled);
+				S max = Values::max(value, scaledMean);
 				S integratedMax = coeffs_[level].integrate(max, int1_[level]);
-				value = Values::max(value, coeffs_[level].integrate(max, int2_[level]));
+				value = coeffs_[level].integrate(max, int2_[level]);
 			}
+			rawDetection = sqrt(rawDetection);
 			return value;
 		}
 

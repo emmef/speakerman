@@ -97,19 +97,22 @@ struct AdvancedRms
 	struct RuntimeConfig
 	{
 		static_assert(is_floating_point<T>::value, "Need floating point type");
-		static constexpr size_t RC_TIMES = 10;
+		static constexpr size_t RC_TIMES = 9;
 		size_t smallWindowSamples;
 		FixedSizeArray<T, RC_TIMES> scale;
-		size_t followCharacteristicSamples;
+		size_t followAttackSamples;
+		size_t followReleaseSamples;
 		size_t followHoldSamples;
 		size_t trueRmsLevels;
 
 		void calculate(UserConfig userConfig, double sampleRate)
 		{
 			UserConfig config = userConfig.validate();
-			followCharacteristicSamples = 0.5 + sampleRate * followRcRange().getBetween(config.minRc / 2);
-			followHoldSamples = 0.5 + sampleRate * PERCEPTIVE_FAST_WINDOWSIZE;//().getBetween(config.minRc * 2);
-			double largeRc = 2 * PERCEPTIVE_SLOW_WINDOWSIZE;
+			double largeRc = PERCEPTIVE_SLOW_WINDOWSIZE;
+			followAttackSamples = 0.5 + sampleRate * followRcRange().getBetween(userConfig.minRc / 2);
+			followHoldSamples = followAttackSamples * 4;
+			followReleaseSamples = 0.5 + sampleRate * PERCEPTIVE_FAST_WINDOWSIZE / 4;
+
 			double smallRc = largeRc / pow(2, RC_TIMES - 1);
 			smallWindowSamples = smallRc *  sampleRate;
 			size_t i = 0;
@@ -129,10 +132,10 @@ struct AdvancedRms
 				scale[i++] = pow(PERCEPTIVE_FAST_WINDOWSIZE / rc, 0.25);
 				rc *= 2.0;
 			}
-//			rc = smallRc;
-//			for (size_t i = 0; i < RC_TIMES; i++, rc *= 2.0) {
-//				std::cout << "RC " << (1000 * rc) << " ms. level=" << scale[i] << std::endl;
-//			}
+			rc = smallRc;
+			for (size_t i = 0; i < RC_TIMES; i++, rc *= 2.0) {
+				std::cout << "RC " << (1000 * rc) << " ms. level=" << scale[i] << std::endl;
+			}
 		}
 	};
 
@@ -177,8 +180,8 @@ struct AdvancedRms
 		{
 			follower_ = SmoothHoldMaxAttackRelease<T>(
 					config.followHoldSamples,
-					config.followCharacteristicSamples,
-					config.followHoldSamples,
+					config.followAttackSamples,
+					config.followReleaseSamples,
 					0);
 			filter_.configure_true_levels(config.trueRmsLevels);
 			filter_.setSmallWindow(config.smallWindowSamples);
@@ -195,9 +198,19 @@ struct AdvancedRms
 			follower_.setValue(x);
 		}
 
+		size_t getHoldSamples() const {
+			return follower_.getHoldSamples();
+		}
+
 		T integrate_smooth(T squareInput, T minOutput)
 		{
 			T value = filter_.addSquareGetValue(squareInput, minOutput);
+			return follower_.apply(value);
+		}
+
+		T integrate_smooth(T squareInput, T minOutput, T &squaredSignal)
+		{
+			T value = filter_.addSquareGetValue(squareInput, minOutput, squaredSignal);
 			return follower_.apply(value);
 		}
 	};

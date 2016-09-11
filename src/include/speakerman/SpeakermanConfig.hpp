@@ -157,90 +157,68 @@ namespace speakerman {
 	{
 		double gains_[SpeakermanConfig::MAX_GROUPS + 1];
 		double avg_gains_[SpeakermanConfig::MAX_GROUPS + 1];
-		double signal_[SpeakermanConfig::MAX_GROUPS];
-		size_t groups_;
-		size_t crossovers_;
+		double signal_square_[SpeakermanConfig::MAX_GROUPS + 1];
+		size_t channels_;
 		size_t count_;
 
-	public:
-		DynamicProcessorLevels() : groups_(0), count_(0) {};
-		DynamicProcessorLevels(size_t groups, size_t crossovers) : groups_(groups), crossovers_(crossovers) {}
+		void addGainAndSquareSignal(size_t group, double gain, double signal)
+		{
+			size_t i = IndexPolicy::array(group, channels_);
+			gains_[i] = Values::min(gains_[i], gain);
+			avg_gains_[i] += gains_[i];
+			signal_square_[i] = Values::max(signal_square_[i], signal);
+		}
 
-		size_t groups() const { return groups_; }
-		size_t signals() const { return groups_ + 1; }
+	public:
+		DynamicProcessorLevels() : channels_(0), count_(0) {};
+		DynamicProcessorLevels(size_t groups, size_t crossovers) : channels_(groups + 1), count_(0) {}
+
+		size_t groups() const { return channels_ - 1; }
 		size_t count() const { return count_; }
-		size_t crossovers() const { return crossovers_; }
 
 		void operator += (const DynamicProcessorLevels &levels)
 		{
-			size_t count = Values::min(groups_, levels.groups_);
-			for (size_t i= 0; i <= count; i++) {
+			size_t count = Values::min(channels_, levels.channels_);
+			for (size_t i= 0; i < count; i++) {
 				gains_[i] = Values::min(gains_[i], levels.gains_[i]);
 				avg_gains_[i] += levels.avg_gains_[i];
-			}
-			for (size_t i= 0; i < count; i++) {
-				signal_[i] = Values::max(signal_[i], levels.signal_[i]);
+				signal_square_[i] = Values::max(signal_square_[i], levels.signal_square_[i]);
 			}
 			count_ += levels.count_;
 		}
 
+		void next()
+		{
+			count_++;
+		}
+
 		void reset()
 		{
-			for (size_t limiter = 0; limiter <= groups_; limiter++) {
+			for (size_t limiter = 0; limiter < channels_; limiter++) {
 				gains_[limiter] = 1.0;
 				avg_gains_[limiter] = 0;
-			}
-			for (size_t group = 0; group < groups_; group++) {
-				signal_[group] = 0.0;
+				signal_square_[limiter] = 0.0;
 			}
 			count_ = 0;
 		}
 
-		void setGroupGain(size_t group, double gain)
-		{
-			double &g = gains_[1 + IndexPolicy::array(group, groups_)];
-			g = Values::min(g, gain);
-			avg_gains_[1 + group] += g;
+		void addValues(size_t group, double gain, double signal) {
+			addGainAndSquareSignal(group, gain, signal);
 		}
 
-		double getGroupGain(size_t group) const
+		double getGain(size_t group) const
 		{
-			return gains_[1 + IndexPolicy::array(group, groups_)];
+			return gains_[IndexPolicy::array(group, channels_)];
 		}
 
-		double getAverageGroupGain(size_t group) const
+		double getAverageGain(size_t group) const
 		{
-			size_t den = count_ * crossovers_;
-			return den == 0 ? 1.0 : avg_gains_[1 + IndexPolicy::array(group, groups_)] / den;
+			return count_ > 0 ? avg_gains_[IndexPolicy::array(group, channels_)] / count_ : 0;
 		}
 
-		void setSubGain(double gain)
+		double getSquaredSignal(size_t group) const
 		{
-			double &g = gains_[0];
-			g = Values::min(g, gain);
-			avg_gains_[0] += g;
-			count_++;
-		}
-
-		double getSubGain() const
-		{
-			return gains_[0];
-		}
-
-		double getAverageSubGain() const
-		{
-			return count_ == 0 ? 1.0 : avg_gains_[0] / count_;
-		}
-
-		void setSignal(size_t group, double signal)
-		{
-			double &s = signal_[IndexPolicy::array(group, groups_)];
-			s = Values::max(s, signal);
-		}
-
-		double getSignal(size_t group) const
-		{
-			return signal_[IndexPolicy::array(group, groups_)];
+			return signal_square_[IndexPolicy::array(group, channels_)];
 		}
 	};
 
