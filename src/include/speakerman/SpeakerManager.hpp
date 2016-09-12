@@ -282,6 +282,7 @@ public:
 		std::unique_lock<std::mutex> lock(mutex_);
 		TransportData result;
 		preparedConfigData.levels.reset();
+		preparedConfigData.configChanged = false;
 		if (transport.getAndSet(preparedConfigData, result, duration)) {
 			if (levels) {
 				*levels = result.levels;
