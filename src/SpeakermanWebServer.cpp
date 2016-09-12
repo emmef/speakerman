@@ -238,6 +238,9 @@ namespace speakerman
 				response().write_string("\t\"subGainAverage\": \"");
 				response().write_string(ftostr(numbers, 30, levels.getAverageGain(0)));
 				response().write_string("\", \r\n");
+				response().write_string("\t\"subLevel\": \"");
+				response().write_string(ftostr(numbers, 30, levels.getSquaredSignal(0)));
+				response().write_string("\", \r\n");
 				response().write_string("\t\"periods\": \"");
 				response().write_string(itostr(numbers, 30, levels.count()));
 				response().write_string("\", \r\n");
@@ -251,7 +254,7 @@ namespace speakerman
 							response().write_string(ftostr(numbers, 30, levels.getAverageGain(i + 1)));
 							response().write_string("\", \r\n");
 							response().write_string("\t\t\t\"level\": \"");
-							response().write_string(ftostr(numbers, 30, Values::max(levels.getSquaredSignal(0), levels.getSquaredSignal(i + 1))));
+							response().write_string(ftostr(numbers, 30, levels.getSquaredSignal(i + 1)));
 							response().write_string("\"\r\n");
 							response().write_string("\t\t}");
 							if (i < levels.groups() - 1) {
