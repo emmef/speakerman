@@ -97,7 +97,7 @@ struct AdvancedRms
 	struct RuntimeConfig
 	{
 		static_assert(is_floating_point<T>::value, "Need floating point type");
-		static constexpr size_t RC_TIMES = 9;
+		static constexpr size_t RC_TIMES = 11;
 		size_t smallWindowSamples;
 		FixedSizeArray<T, RC_TIMES> scale;
 		size_t followAttackSamples;
@@ -108,7 +108,7 @@ struct AdvancedRms
 		void calculate(UserConfig userConfig, double sampleRate)
 		{
 			UserConfig config = userConfig.validate();
-			double largeRc = PERCEPTIVE_SLOW_WINDOWSIZE;
+			double largeRc = 2 * PERCEPTIVE_SLOW_WINDOWSIZE;
 			followAttackSamples = 0.5 + sampleRate * followRcRange().getBetween(userConfig.minRc / 2);
 			followHoldSamples = followAttackSamples * 4;
 			followReleaseSamples = 0.5 + sampleRate * PERCEPTIVE_FAST_WINDOWSIZE / 4;
@@ -124,18 +124,20 @@ struct AdvancedRms
 			scale[i++] = 1.0;
 			trueRmsLevels = i;
 			rc *= 2.0;
+			double lastRc = 1.0;
 			while (Values::relative_distance(rc, largeRc) > 0.5) {
-				scale[i++] = pow(rc / PERCEPTIVE_FAST_WINDOWSIZE, 0.15);
+				lastRc = pow(rc / PERCEPTIVE_FAST_WINDOWSIZE, 0.105);
+				scale[i++] = lastRc;
 				rc *= 2.0;
 			}
 			while (i < RC_TIMES) {
-				scale[i++] = pow(PERCEPTIVE_FAST_WINDOWSIZE / rc, 0.25);
+				scale[i++] = 1;//pow(PERCEPTIVE_FAST_WINDOWSIZE / rc, 0.25);
 				rc *= 2.0;
 			}
-			rc = smallRc;
-			for (size_t i = 0; i < RC_TIMES; i++, rc *= 2.0) {
-				std::cout << "RC " << (1000 * rc) << " ms. level=" << scale[i] << std::endl;
-			}
+//			rc = smallRc;
+//			for (size_t i = 0; i < RC_TIMES; i++, rc *= 2.0) {
+//				std::cout << "RC " << (1000 * rc) << " ms. level=" << scale[i] << std::endl;
+//			}
 		}
 	};
 
@@ -184,7 +186,7 @@ struct AdvancedRms
 					config.followReleaseSamples,
 					0);
 			filter_.configure_true_levels(config.trueRmsLevels);
-			filter_.setSmallWindow(config.smallWindowSamples);
+			filter_.setSmallWindowAndRc(config.smallWindowSamples, 4, 2);
 			filter_.setIntegrators(0.01);
 			for (size_t i = 0; i < RuntimeConfig<T>::RC_TIMES; i++) {
 				filter_.set_scale(i, config.scale[i]);

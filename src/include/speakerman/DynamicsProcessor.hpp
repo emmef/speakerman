@@ -107,10 +107,10 @@ public:
 	using Configurable = SpeakermanRuntimeConfigurable<T, GROUPS, BANDS, CHANNELS_PER_GROUP>;
 	using ConfigData = SpeakermanRuntimeData<T, GROUPS, BANDS>;
 
-	class GroupDelay : public Delay<T>
+	class GroupDelay : public MultiChannelAndTimeDelay<T>
 	{
 	public:
-		      GroupDelay() : Delay<T>(GROUP_MAX_DELAY_SAMPLES) {}
+		      GroupDelay() : MultiChannelAndTimeDelay<T>(DELAY_CHANNELS, GROUP_MAX_DELAY_SAMPLES) {}
 	};
 	
 	class LimiterDelay : public MultiChannelDelay<T>
@@ -142,7 +142,7 @@ private:
 	FixedSizeArray<HoldMaxDoubleIntegrated<T>, LIMITERS> limiter;
 	RmsDelay rmsDelay;
 	LimiterDelay limiterDelay;
-	GroupDelay groupDelay[DELAY_CHANNELS];
+	GroupDelay groupDelay;
 	EqualizerFilter<double, CHANNELS_PER_GROUP> filters_[GROUPS];
 
 	Configurable runtime;
@@ -244,12 +244,12 @@ public:
 	void updateConfig(const ConfigData &data)
 	{
 		runtime.modify(data);
-		groupDelay[0].setDelay(data.subDelay());
+		groupDelay.setDelay(0, data.subDelay());
 		for (size_t group = 0, i = 1; group < GROUPS; group++) {
 			filters_[group].configure(data.groupConfig(group).filterConfig());
 			size_t delaySamples = data.groupConfig(group).delay();
 			for (size_t channel = 0; channel < CHANNELS_PER_GROUP; channel++, i++) {
-				groupDelay[i].setDelay(delaySamples);
+				groupDelay.setDelay(i, delaySamples);
 			}
 		}
 
@@ -272,6 +272,7 @@ public:
 		processSubLimiter(target);
 		processChannelsLimiter(target);
 		limiterDelay.next();
+		groupDelay.next();
 	}
 
 private:
@@ -377,7 +378,7 @@ private:
 		T detect = limiter[0].applyWithMinimum(fabs(x), 1.0);
 		T gain = 1.0 / detect;
 		T out = Values::clamp(gain * output[0], -threshold, threshold);
-		target[0] = groupDelay[0].setAndGet(out);
+		target[0] = groupDelay.setAndGet(0, out);
 	}
 
 	void processChannelsLimiter(FixedSizeArray<T, OUTPUTS> &target)
@@ -397,7 +398,7 @@ private:
 			T gain = 1.0 / detect;
 			for (size_t channel = 0, offset = startOffs; channel < CHANNELS_PER_GROUP; channel++, offset++, groupDelayChannel++) {
 				T out = Values::clamp(gain * output[offset], -threshold, threshold);
-				target[offset] = groupDelay[groupDelayChannel].setAndGet(out);
+				target[offset] = groupDelay.setAndGet(groupDelayChannel, out);
 			}
 		}
 	}
