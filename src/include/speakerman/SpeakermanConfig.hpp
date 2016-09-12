@@ -158,6 +158,7 @@ namespace speakerman {
 		double gains_[SpeakermanConfig::MAX_GROUPS + 1];
 		double avg_gains_[SpeakermanConfig::MAX_GROUPS + 1];
 		double signal_square_[SpeakermanConfig::MAX_GROUPS + 1];
+		double avg_signal_square_[SpeakermanConfig::MAX_GROUPS + 1];
 		size_t channels_;
 		size_t count_;
 
@@ -167,6 +168,7 @@ namespace speakerman {
 			gains_[i] = Values::min(gains_[i], gain);
 			avg_gains_[i] += gains_[i];
 			signal_square_[i] = Values::max(signal_square_[i], signal);
+			avg_signal_square_[i] = signal_square_[i];
 		}
 
 	public:
@@ -183,6 +185,7 @@ namespace speakerman {
 				gains_[i] = Values::min(gains_[i], levels.gains_[i]);
 				avg_gains_[i] += levels.avg_gains_[i];
 				signal_square_[i] = Values::max(signal_square_[i], levels.signal_square_[i]);
+				avg_signal_square_[i] += levels.avg_signal_square_[i];
 			}
 			count_ += levels.count_;
 		}
@@ -198,6 +201,7 @@ namespace speakerman {
 				gains_[limiter] = 1.0;
 				avg_gains_[limiter] = 0;
 				signal_square_[limiter] = 0.0;
+				avg_signal_square_[limiter] = 0.0;
 			}
 			count_ = 0;
 		}
@@ -216,9 +220,14 @@ namespace speakerman {
 			return count_ > 0 ? avg_gains_[IndexPolicy::array(group, channels_)] / count_ : 0;
 		}
 
-		double getSquaredSignal(size_t group) const
+		double getSignal(size_t group) const
 		{
-			return signal_square_[IndexPolicy::array(group, channels_)];
+			return sqrt(signal_square_[IndexPolicy::array(group, channels_)]);
+		}
+
+		double getAverageSignal(size_t group) const
+		{
+			return count_ > 0 ? sqrt(avg_signal_square_[IndexPolicy::array(group, channels_)] / count_) : 0;
 		}
 	};
 
