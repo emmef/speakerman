@@ -1,4 +1,4 @@
-bin_PROGRAMS=test_speakerman
+noinst_PROGRAMS=test_speakerman
 
 test_speakerman_SOURCES=\
 	main.cpp
