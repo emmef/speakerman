@@ -400,15 +400,15 @@ public:
 			return samplesPerBucket * BUCKETS;
 		}
 
-		size_t setSmallWindowAndRc(size_t newSize, size_t proposedIntegrationSamples)
+		size_t setSmallWindowAndRc(size_t newSize, double smallRcIntegrationBuckets, double largeRcIntegrationBuckets)
 		{
 			size_t proposal1 = Values::force_between(newSize, BUCKETS, (const size_t) (1e6 * BUCKETS));
 			samplesPerBucket = newSize / BUCKETS;
-			size_t minimumIntegrationSamples = MultiBucketMean<S, BUCKETS, LEVELS>::MINIMUM_BUCKETS * samplesPerBucket;
-			size_t integrationSamples = Values::max(proposedIntegrationSamples, minimumIntegrationSamples);
+			size_t minIntSamples = Value<double>::force_between(smallRcIntegrationBuckets, 2, BUCKETS) * samplesPerBucket;
+			size_t maxIntSamples = Value<double>::force_between(largeRcIntegrationBuckets, 2, BUCKETS) * samplesPerBucket * (1L << (LEVELS - 1));
+			double deltaBase = log(maxIntSamples) - log(minIntSamples);
 			for (size_t i = 0; i < LEVELS; i++) {
-				coeffs_[i].setCharacteristicSamples(integrationSamples);
-				integrationSamples *= 2;
+				coeffs_[i].setCharacteristicSamples(minIntSamples * exp(deltaBase * i / (LEVELS - 1)));
 			}
 			return samplesPerBucket * BUCKETS;
 		}
