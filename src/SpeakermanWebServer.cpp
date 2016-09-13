@@ -50,7 +50,7 @@ namespace speakerman
 	void web_server::thread_function()
 	{
 		static std::chrono::milliseconds wait(1000);
-		static std::chrono::milliseconds sleep(50);
+		static std::chrono::milliseconds sleep(200);
 		int count = 0;
 		SpeakermanConfig configFileConfig = readSpeakermanConfig(configFileConfig, true);
 		DynamicProcessorLevels levels;
