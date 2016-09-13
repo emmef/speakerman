@@ -55,6 +55,11 @@ class SpeakerManager : public AbstractSpeakerManager
 
 	static constexpr size_t INPUTS = Processor::INPUTS;
 	static constexpr size_t OUTPUTS = Processor::OUTPUTS;
+	RefArray<jack_default_audio_sample_t> inputs[INPUTS];
+	RefArray<jack_default_audio_sample_t> outputs[OUTPUTS];
+	FixedSizeArray<T, INPUTS> inFrame;
+	FixedSizeArray<T, OUTPUTS> outFrame;
+
 
 	static CrossoverFrequencies crossovers()
 	{
@@ -177,10 +182,7 @@ protected:
 
 	virtual bool process(jack_nframes_t frames, const Ports &ports) override
 	{
-		RefArray<jack_default_audio_sample_t> inputs[INPUTS];
-		RefArray<jack_default_audio_sample_t> outputs[OUTPUTS];
-
-		auto lockFreeData = transport.getLockFree();
+		auto lockFreeData = transport.getLockFreeNoFence(); // method already called from within a fence
 		bool modifiedTransport = lockFreeData.modified();
 
 		if (modifiedTransport) {
@@ -206,9 +208,7 @@ protected:
 			inputs[input] = ports.getBuffer(portNumber);
 		}
 			
-		FixedSizeArray<T, INPUTS> inFrame;
-		FixedSizeArray<T, OUTPUTS> outFrame;
-		
+
 		if (subPort >= 0) {
 			for (size_t i = 0; i < frames; i++) {
 				for (size_t channel = 0; channel < INPUTS; channel++) {

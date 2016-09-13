@@ -30,6 +30,8 @@
 #include <speakerman/SpeakermanConfig.hpp>
 #include <speakerman/SpeakerManager.hpp>
 #include <speakerman/SpeakermanWebServer.hpp>
+#include <malloc.h>
+#include <sys/mman.h>
 
 using namespace speakerman;
 using namespace tdap;
@@ -178,12 +180,13 @@ int main(int count, char * arguments[]) {
 
 	cout << "Executing " << arguments[0] << endl;
 
+
 	Owner<JackClient> clientOwner;
 	auto result = JackClient::createDefault("Speaker manager");
 	clientOwner.set(result.getClient());
 	manager.set(createManager<double>(configFileConfig));
-
-	int error;
+	mallopt(M_TRIM_THRESHOLD, -1);
+	mallopt(M_MMAP_MAX, 0);
 
 	const char * all = ".*";
 	PortNames inputs = clientOwner.get().portNames(all, all, JackPortIsPhysical|JackPortIsOutput);
@@ -194,6 +197,21 @@ int main(int count, char * arguments[]) {
 		return 1;
 	}
 
+	{
+		size_t groups = configFileConfig.groups;
+		size_t channels  = configFileConfig.groupChannels;
+		size_t crossovers = configFileConfig.crossovers;
+
+		size_t pages = 100 + groups * (100 + channels * (100 + crossovers * 100));
+		size_t allocSize = pages * 10240;
+		cout << "Allocating and locking " << allocSize << " bytes of memory" << endl;
+
+		Array<char> preAlloc(allocSize);
+		preAlloc.zero();
+		if (mlockall(MCL_CURRENT)) {
+			cerr << "Could not lock " << allocSize << " bytes of memory" << endl;
+		}
+	}
 	std::cout << "activate..." << std::endl;
 	clientOwner.get().setActive();
 

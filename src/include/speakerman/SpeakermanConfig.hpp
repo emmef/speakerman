@@ -238,6 +238,7 @@ namespace speakerman {
 		virtual const SpeakermanConfig &getConfig() const = 0;
 		virtual bool applyConfigAndGetLevels(const SpeakermanConfig &config, DynamicProcessorLevels *levels, std::chrono::milliseconds timeoutMillis) = 0;
 		virtual bool getLevels(DynamicProcessorLevels *levels, std::chrono::milliseconds timeoutMillis) = 0;
+		virtual ~SpeakerManagerControl() = default;
 	};
 
 	const char *getInstallBaseDirectory();
