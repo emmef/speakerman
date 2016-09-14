@@ -5,7 +5,7 @@
 	font-family: 'Open Sans', verdana, sans-serif;
 }
 body { 
-	background-color: black; color: grey; 
+	background-color: rgb(64,64,64); color: grey;
 	min-width: 20ex; 
 	min-height: 20ex;
 	padding: 1ex;
@@ -48,3 +48,30 @@ body {
 	text-align: center; vertical-align: middle;
 }
 
+.meter-levels {
+	display: block;
+	visibility: visible;
+/*	width:20ex;
+	height:2ex;*/
+	padding:0;
+	margin:0;
+}
+
+.meter-levels div {
+	display: inline;
+	visibility: visible;
+	width: 1ex;
+	height:1ex;
+	margin: 0;
+	padding: 0.25ex;
+}
+
+.meter-level-pixel {
+	background-color: black;
+	color:black;
+}
+
+.meter-title {
+	color:white;
+	text-align: left;
+}

@@ -50,7 +50,7 @@ namespace speakerman
 	void web_server::thread_function()
 	{
 		static std::chrono::milliseconds wait(1000);
-		static std::chrono::milliseconds sleep(200);
+		static std::chrono::milliseconds sleep(50);
 		int count = 0;
 		SpeakermanConfig configFileConfig = readSpeakermanConfig(configFileConfig, true);
 		DynamicProcessorLevels levels;
@@ -235,7 +235,7 @@ namespace speakerman
 				response().write_string("\t\"subGain\": \"");
 				response().write_string(ftostr(numbers, 30, levels.getGain(0)));
 				response().write_string("\", \r\n");
-				response().write_string("\t\"subGainAverage\": \"");
+				response().write_string("\t\"subAverageGain\": \"");
 				response().write_string(ftostr(numbers, 30, levels.getAverageGain(0)));
 				response().write_string("\", \r\n");
 				response().write_string("\t\"subLevel\": \"");
@@ -253,7 +253,7 @@ namespace speakerman
 							response().write_string("\t\t\t\"gain\": \"");
 							response().write_string(ftostr(numbers, 30, levels.getGain(i + 1)));
 							response().write_string("\", \r\n");
-							response().write_string("\t\t\t\"gainAverage\": \"");
+							response().write_string("\t\t\t\"averageGain\": \"");
 							response().write_string(ftostr(numbers, 30, levels.getAverageGain(i + 1)));
 							response().write_string("\",\r\n");
 							response().write_string("\t\t\t\"level\": \"");
