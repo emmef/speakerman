@@ -69,6 +69,7 @@ class JackProcessor
 	};
 
 	static int realtimeCallback(jack_nframes_t frames, void *data);
+	static void realtimeInitCallback(void *data);
 	int realtimeProcessWrapper(jack_nframes_t frames);
 	void ensurePorts(jack_client_t *client);
 	void unsafeResetState();

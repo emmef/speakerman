@@ -19,11 +19,15 @@
  * limitations under the License.
  */
 
+
 #include <iostream>
+#include <thread>
 #include <tdap/Guards.hpp>
 #include <tdap/MemoryFence.hpp>
 #include <speakerman/jack/ErrorHandler.hpp>
 #include <speakerman/jack/JackProcessor.hpp>
+#include <sys/mman.h>
+#include <pthread.h>
 
 namespace speakerman {
 
@@ -36,6 +40,38 @@ JackProcessor::Reset::~Reset()
 {
 	owner_->unsafeResetState();
 }
+
+	void JackProcessor::realtimeInitCallback(void *data)
+	{
+		static constexpr size_t PRE_ALLOC_STACK_SIZE = 102400;
+		auto self = pthread_self();
+		pthread_attr_t self_attributes;
+		if (pthread_getattr_np(self, &self_attributes)) {
+			perror("Could not get RT thread attributes");
+			return;
+		}
+		void *self_address;
+		size_t  self_size;
+		if (pthread_attr_getstack(&self_attributes, &self_address, &self_size)) {
+			perror("Could not get RT thread address and size");
+			return;
+		}
+		unsigned long long id = static_cast<unsigned long long>(self);
+		char *start = static_cast<char*>(self_address);
+		char *end_address = start + self_size;
+		char mark[PRE_ALLOC_STACK_SIZE];
+		void *mark_addr = &mark;
+		for (size_t i = 0; i < PRE_ALLOC_STACK_SIZE; i++) {
+			mark[i] = 0;
+		}
+		size_t lock_size = end_address - static_cast<char *>(mark_addr) - 16;
+		if (mlockall(MCL_CURRENT)) {
+			perror("could not pre-allocate and lock stack memory - XRUNs can be expected");
+		}
+		else {
+			printf("Thread %llu - locked %zu bytes of stack memory @ %p (filled with %i) plus all resident memory\n", id, lock_size, &mark, mark[0]);
+		}
+	}
 
 	int JackProcessor::realtimeCallback(jack_nframes_t frames, void *data)
 	{
@@ -72,7 +108,8 @@ JackProcessor::Reset::~Reset()
 
 		ports_->registerPorts(client);
 
-		ErrorHandler::checkZeroOrThrow(jack_set_process_callback(client, realtimeCallback, this), "Setting callback");
+		ErrorHandler::checkZeroOrThrow(jack_set_thread_init_callback(client, realtimeInitCallback, this), "Setting real time thread initialization callback");
+		ErrorHandler::checkZeroOrThrow(jack_set_process_callback(client, realtimeCallback, this), "Setting processing callback");
 	}
 
 	void JackProcessor::unsafeResetState()

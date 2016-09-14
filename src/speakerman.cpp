@@ -197,21 +197,6 @@ int main(int count, char * arguments[]) {
 		return 1;
 	}
 
-	{
-		size_t groups = configFileConfig.groups;
-		size_t channels  = configFileConfig.groupChannels;
-		size_t crossovers = configFileConfig.crossovers;
-
-		size_t pages = 100 + groups * (100 + channels * (100 + crossovers * 100));
-		size_t allocSize = pages * 10240;
-		cout << "Allocating and locking " << allocSize << " bytes of memory" << endl;
-
-		Array<char> preAlloc(allocSize);
-		preAlloc.zero();
-		if (mlockall(MCL_CURRENT)) {
-			cerr << "Could not lock " << allocSize << " bytes of memory" << endl;
-		}
-	}
 	std::cout << "activate..." << std::endl;
 	clientOwner.get().setActive();
 
