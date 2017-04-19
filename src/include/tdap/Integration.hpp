@@ -49,7 +49,7 @@ struct Integration {
 	}
 
 	template<typename F>
-	const ValueRange<F> &range()
+	static const ValueRange<F> &range()
 	{
 		static_assert(std::is_floating_point<F>::value, "Type parameter F should be floating point");
 		static const ValueRange<F> range_(min_samples<F>(), max_samples<F>());

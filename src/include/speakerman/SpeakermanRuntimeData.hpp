@@ -242,9 +242,13 @@ namespace speakerman {
 			for (size_t i = 0; i < bandWeights.size(); i++) {
 				std::cout << "Band weight[" << i << "]=" << bandWeights[i] << std::endl;
 			}
+			std::cout << "Thresholds ara all scaled with a factor " << config.thresholdsScale << std::endl;
 
 			for (size_t group = 0; group < config.groups; group++) {
-				const speakerman::GroupConfig &sourceConf = config.group[group];
+				speakerman::GroupConfig sourceConf = config.group[group];
+
+				sourceConf.threshold *= config.thresholdsScale;
+
 				GroupRuntimeData<T, BANDS> &targetConf = groupConfig_[group];
 				targetConf.setFilterConfig(EqualizerFilterData<T>::createConfigured(sourceConf, sampleRate));
 
@@ -264,7 +268,7 @@ namespace speakerman {
 			subRmsScale_ = 1.0 / subRmsThreshold_;
 			subDelay_ = 0.5 + sampleRate *
 					Values::force_between(config.subDelay, SpeakermanConfig::MIN_SUB_DELAY, SpeakermanConfig::MAX_SUB_DELAY);
-			controlSpeed_.setCharacteristicSamples(0.05 * sampleRate);
+			controlSpeed_.setCharacteristicSamples(0.25 * sampleRate);
 
 			compensateDelays();
 		}

@@ -178,8 +178,9 @@ using namespace std;
 int main(int count, char * arguments[]) {
 	configFileConfig = readSpeakermanConfig(true);
 
-	cout << "Executing " << arguments[0] << endl;
+	dumpSpeakermanConfig(configFileConfig, std::cout);
 
+	cout << "Executing " << arguments[0] << endl;
 
 	Owner<JackClient> clientOwner;
 	auto result = JackClient::createDefault("Speaker manager");

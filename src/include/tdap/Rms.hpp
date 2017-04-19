@@ -444,19 +444,19 @@ public:
 			addSquare(square);
 			S value = threshold;
 			ssize_t level;
-			for (level = LEVELS - 1; level >= true_levels_; level--) {
+			for (level = LEVELS - 1; level >= 0; level--) {
 				S scaledSquaredMean = scale_[level] * mean_.getMean(level);
 				S squaredMax = Values::max(value * value, scaledSquaredMean);
 				S integratedSquaredMax = coeffs_[level].integrate(squaredMax, int1_[level]);
 				integratedSquaredMax = coeffs_[level].integrate(integratedSquaredMax, int2_[level]);
 				value = sqrt(integratedSquaredMax);
 			}
-			for (; level >= 0; level--) {
-				S scaledMean = sqrt(scale_[level] * mean_.getMean(level));
-				S max = Values::max(value, scaledMean);
-				S integratedMax = coeffs_[level].integrate(max, int1_[level]);
-				value = coeffs_[level].integrate(max, int2_[level]);
-			}
+//			for (; level >= 0; level--) {
+//				S scaledMean = sqrt(scale_[level] * mean_.getMean(level));
+//				S max = Values::max(value, scaledMean);
+//				S integratedMax = coeffs_[level].integrate(max, int1_[level]);
+//				value = coeffs_[level].integrate(max, int2_[level]);
+//			}
 			return value;
 		}
 
@@ -466,7 +466,7 @@ public:
 			S value = threshold;
 			rawDetection = 0;
 			ssize_t level;
-			for (level = LEVELS - 1; level >= true_levels_; level--) {
+			for (level = LEVELS - 1; level >= 0; level--) {
 				S scaledSquaredMean = scale_[level] * mean_.getMean(level);
 				rawDetection = Values::max(rawDetection, scaledSquaredMean);
 				S squaredMax = Values::max(value * value, scaledSquaredMean);
@@ -474,14 +474,14 @@ public:
 				integratedSquaredMax = coeffs_[level].integrate(integratedSquaredMax, int2_[level]);
 				value = sqrt(integratedSquaredMax);
 			}
-			for (; level >= 0; level--) {
-				double rawScaled = scale_[level] * mean_.getMean(level);
-				rawDetection = Values::max(rawDetection, rawScaled);
-				S scaledMean = sqrt(rawScaled);
-				S max = Values::max(value, scaledMean);
-				S integratedMax = coeffs_[level].integrate(max, int1_[level]);
-				value = coeffs_[level].integrate(max, int2_[level]);
-			}
+//			for (; level >= 0; level--) {
+//				double rawScaled = scale_[level] * mean_.getMean(level);
+//				rawDetection = Values::max(rawDetection, rawScaled);
+//				S scaledMean = sqrt(rawScaled);
+//				S max = Values::max(value, scaledMean);
+//				S integratedMax = coeffs_[level].integrate(max, int1_[level]);
+//				value = coeffs_[level].integrate(max, int2_[level]);
+//			}
 			rawDetection = sqrt(rawDetection);
 			return value;
 		}

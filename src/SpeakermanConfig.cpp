@@ -52,7 +52,7 @@ namespace speakerman {
 	};
 
 
-	static constexpr size_t ID_GLOBAL_CNT = 7;
+	static constexpr size_t ID_GLOBAL_CNT = 8;
 	static constexpr size_t ID_GROUP_CNT = 4;
 	static constexpr size_t ID_EQ_CNT = 3;
 
@@ -69,7 +69,7 @@ namespace speakerman {
 		return
 			eqId >= 0 ? true :
 			groupId >= 0 ? true :
-			(fieldId == SpeakermanConfig::KEY_SUB_THRESHOLD || fieldId == SpeakermanConfig::KEY_SUB_DELAY);
+			(fieldId == SpeakermanConfig::KEY_SUB_THRESHOLD || fieldId == SpeakermanConfig::KEY_SUB_DELAY || fieldId == SpeakermanConfig::KEY_THRESHOLDS_SCALE);
 	}
 
 	static constexpr size_t GROUP_CONFIG_SIZE =
@@ -133,6 +133,7 @@ namespace speakerman {
 		strings[getOffset(-1, -1, SpeakermanConfig::KEY_SUB_OUTPUT)] = SpeakermanConfig::KEY_SNIPPET_SUB_OUTPUT;
 		strings[getOffset(-1, -1, SpeakermanConfig::KEY_CROSSOVERS)] = SpeakermanConfig::KEY_SNIPPET_CROSSOVERS;
 		strings[getOffset(-1, -1, SpeakermanConfig::KEY_INPUT_OFFSET)] = SpeakermanConfig::KEY_SNIPPET_INPUT_OFFSET;
+		strings[getOffset(-1, -1, SpeakermanConfig::KEY_THRESHOLDS_SCALE)] = SpeakermanConfig::KEY_SNIPPET_THRESHOLDS_SCALE;
 
 		string key;
 		for (size_t group = 0; group < SpeakermanConfig::MAX_GROUPS; group++) {
@@ -397,6 +398,8 @@ namespace speakerman {
 		config.subOutput= SpeakermanConfig::DEFAULT_SUB_OUTPUT;
 		config.subDelay= SpeakermanConfig::DEFAULT_SUB_DELAY;
 		config.inputOffset = SpeakermanConfig::DEFAULT_INPUT_OFFSET;
+		config.thresholdsScale = SpeakermanConfig::DEFAULT_THRESHOLDS_SCALE;
+		config.crossovers = SpeakermanConfig::DEFAULT_CROSSOVERS;
 
 		for (size_t group = 0; group < SpeakermanConfig::MAX_GROUPS; group++) {
 			GroupConfig &groupConfig = config.group[group];
@@ -481,6 +484,9 @@ namespace speakerman {
 		}
 		else if (isKey(key, config->initial, -1, -1, SpeakermanConfig::KEY_CROSSOVERS)) {
 			readNumber(config->config.crossovers, key, value, SpeakermanConfig::MIN_CROSSOVERS, SpeakermanConfig::MAX_CROSSOVERS, true);
+		}
+		else if (isKey(key, config->initial, -1, -1, SpeakermanConfig::KEY_THRESHOLDS_SCALE)) {
+			readNumber(config->config.thresholdsScale, key, value, SpeakermanConfig::MIN_THRESHOLDS_SCALE, SpeakermanConfig::MAX_THRESHOLDS_SCALE, true);
 		}
 		return speakerman::config::CallbackResult::CONTINUE;
 	}
@@ -590,6 +596,7 @@ namespace speakerman {
 		config.inputOffset= UNSET_SIZE;
 		config.crossovers = UNSET_SIZE;
 		config.inputOffset= UNSET_SIZE;
+		config.thresholdsScale = UNSET_FLOAT;
 
 		SpeakermanConfigCallbackData data { config, initial };
 		auto result = reader.read(stream, readGlobalCallback, &data);
@@ -604,6 +611,7 @@ namespace speakerman {
 		setDefault(config.subOutput, UNSET_SIZE, basedUpon.subOutput, getConfigKey(-1, -1, SpeakermanConfig::KEY_SUB_OUTPUT));
 		setDefault(config.crossovers, UNSET_SIZE, basedUpon.crossovers, getConfigKey(-1, -1, SpeakermanConfig::KEY_CROSSOVERS));
 		setDefault(config.inputOffset, UNSET_SIZE, basedUpon.inputOffset, getConfigKey(-1, -1, SpeakermanConfig::KEY_INPUT_OFFSET));
+		setDefault(config.thresholdsScale, UNSET_FLOAT, basedUpon.thresholdsScale, getConfigKey(-1, -1, SpeakermanConfig::KEY_THRESHOLDS_SCALE));
 
 		for (size_t g = 0; g < config.groups; g++) {
 			GroupConfigCallbackData data { config.group[g], g, initial };
@@ -687,6 +695,7 @@ namespace speakerman {
 		output << getConfigKey(-1, -1, SpeakermanConfig::KEY_SUB_OUTPUT) << assgn << dump.subOutput << endl;
 		output << getConfigKey(-1, -1, SpeakermanConfig::KEY_INPUT_OFFSET) << assgn << dump.inputOffset << endl;
 		output << getConfigKey(-1, -1, SpeakermanConfig::KEY_CROSSOVERS) << assgn << dump.crossovers << endl;
+		output << getConfigKey(-1, -1, SpeakermanConfig::KEY_THRESHOLDS_SCALE) << assgn << dump.thresholdsScale << endl;
 
 		for (size_t group = 0; group < dump.groups; group++) {
 			const GroupConfig &groupConfig = dump.group[group];

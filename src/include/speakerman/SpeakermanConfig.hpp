@@ -125,6 +125,10 @@ namespace speakerman {
 		static constexpr size_t DEFAULT_INPUT_OFFSET = 0;
 		static constexpr size_t MAX_INPUT_OFFSET = MAX_GROUPS *  MAX_GROUP_CHANNELS;
 
+		static constexpr double MIN_THRESHOLDS_SCALE = 0.1;
+		static constexpr double DEFAULT_THRESHOLDS_SCALE = 1.0;
+		static constexpr double MAX_THRESHOLDS_SCALE = 10.0;
+
 		static constexpr size_t KEY_GROUP_COUNT = 0;
 		static constexpr size_t KEY_CHANNELS = 1;
 		static constexpr size_t KEY_SUB_THRESHOLD = 2;
@@ -132,6 +136,7 @@ namespace speakerman {
 		static constexpr size_t KEY_SUB_OUTPUT = 4;
 		static constexpr size_t KEY_CROSSOVERS = 5;
 		static constexpr size_t KEY_INPUT_OFFSET = 6;
+		static constexpr size_t KEY_THRESHOLDS_SCALE = 7;
 
 		static constexpr const char * KEY_SNIPPET_GROUP_COUNT = "groups";
 		static constexpr const char * KEY_SNIPPET_CHANNELS = "group-channels";
@@ -140,6 +145,7 @@ namespace speakerman {
 		static constexpr const char * KEY_SNIPPET_SUB_OUTPUT = "sub-output";
 		static constexpr const char * KEY_SNIPPET_CROSSOVERS = "crossovers";
 		static constexpr const char * KEY_SNIPPET_INPUT_OFFSET = "input-offset";
+		static constexpr const char * KEY_SNIPPET_THRESHOLDS_SCALE = "thresholds-scale";
 
 		GroupConfig group[MAX_GROUPS];
 		size_t groups;
@@ -149,6 +155,7 @@ namespace speakerman {
 		size_t inputOffset;
 		double relativeSubThreshold;
 		double subDelay;
+		double thresholdsScale;
 		long long timeStamp;
 	};
 
