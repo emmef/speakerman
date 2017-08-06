@@ -130,6 +130,11 @@ namespace helpers_tdap {
 	{
 		using FillBitsToRight<SIZE_T, constExpr ? 0 : sizeof(SIZE_T), constExpr>::fill;
 
+		static constexpr SIZE_T unchecked_aligned(SIZE_T value, SIZE_T alignment)
+		{
+			return (value | (alignment - 1)) + 1;
+		}
+
 	public:
 
 		static constexpr bool minus_one(const SIZE_T value)
@@ -165,6 +170,35 @@ namespace helpers_tdap {
 		{
 			return (fill(value & ((powerOfTwo - 1) ^ -1)) | value) & (powerOfTwo - 1);
 		}
+
+		/**
+		 * Returns the value if it is aligned to power_of_two, the first higher
+		 * value that is aligned to power_of_two or zero if the provided power of two
+		 * is not actually a power of two.
+		 *
+		 * @param value Value to be aligned
+		 * @param power_of_two The power of two to align to
+		 * @return the aligned value
+		 */
+		static constexpr SIZE_T aligned_with(const SIZE_T value, const SIZE_T power_of_two)
+		{
+			return is(power_of_two) ? unchecked_aligned(value, power_of_two) : 0;
+		}
+
+		/**
+		 * Returns the pointer value if it is aligned to power_of_two, the first higher
+		 * pointer value that is aligned to power_of_two or NULL if the provided power of two
+		 * is not actually a power of two.
+		 *
+		 * @param pointer Pointer to be aligned
+		 * @param power_of_two The power of two to align to
+		 * @return the aligned value
+		 */
+		template<typename T> static constexpr T * ptr_aligned_with(T* pointer, const SIZE_T power_of_two)
+		{
+			return is(power_of_two) ? static_cast<T*>(unchecked_aligned(static_cast<SIZE_T>(pointer), power_of_two)) : 0;
+		}
+
 	};
 
 } /* End of name space helpers_tdap */
