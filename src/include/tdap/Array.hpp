@@ -45,16 +45,16 @@ template <typename T>
 class RefArray;
 
 template <typename T>
-class Array : public FixedCapArrayTraits<T, Array<T>>
+class Array : public ArrayTraits<T, Array<T>>
 {
 	static_assert(TriviallyCopyable<T>::value, "Type must be trivial to copy, move or destroy and have standard layout");
-	friend class FixedCapArrayTraits<T, Array<T>>;
 	friend class ArrayTraits<T, Array<T>>;
-	using Parent = FixedCapArrayTraits<T, Array<T>>;
+	using Parent = ArrayTraits<T, Array<T>>;
+        using Data = typename std::aligned_storage<sizeof(T), alignof(T)>::type;
 
 	size_t capacity_;
 	size_t size_;
-	T * data_;
+    	Data *data_;
 
 	static size_t validCapacity(size_t size)
 	{
@@ -69,27 +69,27 @@ class Array : public FixedCapArrayTraits<T, Array<T>>
 
 	T& _traitRefAt(size_t i)
 	{
-		return data_[i];
+		return *reinterpret_cast<T *>(data_ + i);
 	}
 
 	const T& _traitRefAt(size_t i) const
 	{
-		return data_[i];
+		return *reinterpret_cast<const T *>(data_ + i);
 	}
 
 	T * _traitUnsafeData()
 	{
-		return &data_[0];
+		return reinterpret_cast<T *>(data_);
 	}
 
 	const T * _traitUnsafeData() const
 	{
-		return &data_[0];
+		return reinterpret_cast<const T *>(data_);
 	}
 
 	T * _traitPlus(size_t i) const
 	{
-		return data_ + i;
+		return reinterpret_cast<T *>(data_ + 1);
 	}
 
 	void _traitSetSize(size_t newSize)
@@ -108,10 +108,11 @@ class Array : public FixedCapArrayTraits<T, Array<T>>
 	}
 
 public:
-	using ArrayTraits<T, Array<T>>::copy;
+    using ArrayTraits<T, Array<T>>::copy;
+    using ArrayTraits<T, Array<T>>::validSize;
 
-	Array(size_t capacity) : capacity_(validCapacity(capacity)), size_(capacity_), data_(new T[capacity_]) { }
-	Array(size_t capacity, size_t size) : capacity_(validCapacity(capacity)), size_(Parent::validSize(size)), data_(new T[capacity_]) { }
+	Array(size_t capacity) : capacity_(validCapacity(capacity)), size_(capacity_), data_(new Data[capacity_]) { }
+	Array(size_t capacity, size_t size) : capacity_(validCapacity(capacity)), size_(Parent::validSize(size)), data_(new Data[capacity_]) { }
 
 	Array(Array<T> &&source) : capacity_(source.capacity_), size_(source.size_), data_(source.data_)
 	{
@@ -121,23 +122,23 @@ public:
 	}
 
 	template<typename ...A>
-	Array(const ArrayTraits<T, A...> &source) : capacity_(source.size()), size_(capacity_), data_(new T[capacity_])
+	Array(const ArrayTraits<T, A...> &source) : capacity_(source.size()), size_(capacity_), data_(new Data[capacity_])
 	{
 		copy(source);
 	}
 
 	Array(const Array<T> &source, ConstructionPolicy policy) :
-		capacity_(policy == ConstructionPolicy::INHERIT_CAPACITY ? source.capacity_: source.size_), size_(source.size_), data_(new T[capacity_])
+		capacity_(policy == ConstructionPolicy::INHERIT_CAPACITY ? source.capacity_: source.size_), size_(source.size_), data_(new Data[capacity_])
 	{
 		copy(source);
 	}
 
 	Array(const Array<T> &source) : Array(source, ConstructionPolicy::SIZE_BECOMES_CAPACITY) {}
 
-//	void setSize(size_t newSize)
-//	{
-//		size_ = validSize(newSize);
-//	}
+	void setSize(size_t newSize)
+	{
+		size_ = validSize(newSize);
+	}
 
 	template<typename ...A>
 	void operator = (const ArrayTraits<T, A...> &source)

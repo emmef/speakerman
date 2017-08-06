@@ -44,6 +44,14 @@ struct ArrayTraits
 		return static_cast<const Sub *>(this)->_traitGetCapacity();
 	}
 
+	size_t validSize(size_t size)
+	{
+		if (size <= capacity()) {
+			return size;
+		}
+		throw std::invalid_argument("Array: invalid size ");
+	}
+
 	size_t elementSize() const
 	{
 		return sizeof(T);
@@ -249,7 +257,7 @@ private:
 		}
 	};
 
-	template<typename T, class Sub>
+	template<typename T, size_t CAPACITY, class Sub>
 	struct FixedCapArrayTraits : public ArrayTraits<T, Sub>
 	{
 		void setSize(size_t newSize)
@@ -257,9 +265,14 @@ private:
 			static_cast<Sub *>(this)->_traitSetSize(validSize(newSize));
 		}
 
-		size_t validSize(size_t size)
+		static constexpr size_t capacity()
 		{
-			if (size <= ArrayTraits<T, Sub>::capacity()) {
+			return CAPACITY;
+		}
+
+		static size_t validSize(size_t size)
+		{
+			if (size <= capacity()) {
 				return size;
 			}
 			throw std::invalid_argument("Array: invalid size ");

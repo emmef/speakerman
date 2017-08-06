@@ -31,36 +31,36 @@ template <typename T, size_t SIZE>
 class FixedSizeArray : public FixedSizeArrayTraits<T, SIZE, FixedSizeArray<T, SIZE>>
 {
 	static_assert(TriviallyCopyable<T>::value, "Type must be trivial to copy, move or destroy and have standard layout");
-	friend class ArrayTraits<T, FixedSizeArray<T, SIZE>>;
 
-	T data_[SIZE];
+	friend class ArrayTraits<T, FixedSizeArray<T, SIZE>>;
+    	typename std::aligned_storage<sizeof(T), alignof(T)>::type data_[SIZE];
 
 	size_t _traitGetSize() const { return SIZE; }
 	size_t _traitGetCapacity() const { return SIZE; }
 
 	T& _traitRefAt(size_t i)
 	{
-		return data_[IndexPolicy::array(i, SIZE)];
+		return *reinterpret_cast<T *>(data_ + i);
 	}
 
 	const T& _traitRefAt(size_t i) const
 	{
-		return data_[IndexPolicy::array(i, SIZE)];
+		return *reinterpret_cast<const T *>(data_ + i);
 	}
 
 	T * _traitUnsafeData()
 	{
-		return &data_[0];
+		return reinterpret_cast<T *>(data_);
 	}
 
 	const T * _traitUnsafeData() const
 	{
-		return &data_[0];
+		return reinterpret_cast<const T *>(data_);
 	}
 
 	T * _traitPlus(size_t i) const
 	{
-		return data_ + i;
+		return reinterpret_cast<const T *>(data_ + i);
 	}
 
 	static constexpr bool _traitHasTrivialAddressing() { return true; }

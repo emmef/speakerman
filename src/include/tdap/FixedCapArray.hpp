@@ -29,44 +29,44 @@
 namespace tdap {
 
 template <typename T, size_t CAPACITY>
-class FixedCapArray : public FixedCapArrayTraits<T, FixedCapArray<T, CAPACITY>>
+class FixedCapArray : public FixedCapArrayTraits<T, CAPACITY, FixedCapArray<T, CAPACITY>>
 {
 	static_assert(TriviallyCopyable<T>::value, "Type must be trivial to copy, move or destroy and have standard layout");
 	static_assert(CAPACITY > 0 && Power2::constant::next(CAPACITY - 1) >= CAPACITY, "Size must be valid");
 	static constexpr size_t MAXSIZE = Power2::constant::next(CAPACITY);
 	friend class ArrayTraits<T, FixedCapArray<T, CAPACITY>>;
-	friend class FixedCapArrayTraits<T, FixedCapArray<T, CAPACITY>>;
-	using FixedCapArrayTraits<T, FixedCapArray<T, CAPACITY>>::validSize;
+	friend class FixedCapArrayTraits<T, CAPACITY,FixedCapArray<T, CAPACITY>>;
+	using FixedCapArrayTraits<T, CAPACITY, FixedCapArray<T, CAPACITY>>::validSize;
 
-	size_t size_ = 0;
-	T data_[MAXSIZE];
+    	size_t size_ = 0;
+	typename std::aligned_storage<sizeof(T), alignof(T)>::type data_[MAXSIZE];
 
 	size_t _traitGetSize() const { return size_; }
 	size_t _traitGetCapacity() const { return MAXSIZE; }
 
 	T& _traitRefAt(size_t i)
 	{
-		return data_[i];
+		return *reinterpret_cast<T *>(data_ + i);
 	}
 
 	const T& _traitRefAt(size_t i) const
 	{
-		return data_[i];
+		return *reinterpret_cast<const T *>(data_ + i);
 	}
 
 	T * _traitUnsafeData()
 	{
-		return &data_[0];
+		return *reinterpret_cast<T *>(data_);
 	}
 
 	const T * _traitUnsafeData() const
 	{
-		return &data_[0];
+		return *reinterpret_cast<const T *>(data_);
 	}
 
 	T * _traitPlus(size_t i) const
 	{
-		return data_ + i;
+		return reinterpret_cast<T *>(data_ + i);
 	}
 
 
