@@ -27,70 +27,75 @@
 #include <iostream>
 #include <speakerman/SocketStream.hpp>
 
-namespace speakerman
-{
-	enum class server_socket_state
-	{
-		CLOSED,
-		LISTENING,
-		WORKING,
-		SHUTTING_DOWN
-	};
+namespace speakerman {
+    enum class server_socket_state
+    {
+        CLOSED,
+        LISTENING,
+        WORKING,
+        SHUTTING_DOWN
+    };
 
-	enum class server_worker_result
-	{
-		CONTINUE,
-		STOP
-	};
+    enum class server_worker_result
+    {
+        CONTINUE,
+        STOP
+    };
 
-	int open_server_socket(const char* service, int timeoutSeconds, int backLog, int* errorCode);
+    int open_server_socket(const char *service, int timeoutSeconds, int backLog, int *errorCode);
 
-	class server_socket
-	{
-	public:
-		using State = server_socket_state;
-		using Result = server_worker_result;
-		using Lock = std::unique_lock<std::mutex>;
-		using Stream = socket_stream;
+    class server_socket
+    {
+    public:
+        using State = server_socket_state;
+        using Result = server_worker_result;
+        using Lock = std::unique_lock<std::mutex>;
+        using Stream = socket_stream;
 
-		typedef server_worker_result (*server_socket_worker)(
-				socket_stream &stream, const struct sockaddr &address, const server_socket &server, void *data);
+        typedef server_worker_result (*server_socket_worker)(
+                socket_stream &stream, const struct sockaddr &address, const server_socket &server, void *data);
 
-	public:
-		server_socket() { }
-		server_socket(const char* service, int timeoutSeconds, int backLog,
-				int* errorCode);
+    public:
+        server_socket()
+        {}
 
-		bool open(const char* service, int timeoutSeconds, int backLog,
-				int* errorCode);
+        server_socket(const char *service, int timeoutSeconds, int backLog,
+                      int *errorCode);
 
-		const char * const service() const { return service_; }
+        bool open(const char *service, int timeoutSeconds, int backLog,
+                  int *errorCode);
 
-		State state() const;
+        const char *const service() const
+        { return service_; }
 
-		bool isOpen() const { return state() != State::CLOSED; }
+        State state() const;
 
-		bool isWorking() const { return state() == State::WORKING; }
+        bool isOpen() const
+        { return state() != State::CLOSED; }
 
-		bool work(int *errorCode, server_socket_worker worker, void * data);
+        bool isWorking() const
+        { return state() == State::WORKING; }
 
-		void close();
+        bool work(int *errorCode, server_socket_worker worker, void *data);
 
-		~server_socket();
+        void close();
 
-	private:
+        ~server_socket();
 
-		std::mutex mutex_;
-		std::condition_variable condition_;
-		int sockfd_ = -1;
-		const char *service_ = nullptr;
-		State state_ = State::CLOSED;
+    private:
 
-		bool await_work_done(int timeOutSeconds, Lock &lock, int *errorCode);
-		void close(Lock &lock);
-		bool enterWork(int *errorCode);
-	};
+        std::mutex mutex_;
+        std::condition_variable condition_;
+        int sockfd_ = -1;
+        const char *service_ = nullptr;
+        State state_ = State::CLOSED;
 
+        bool await_work_done(int timeOutSeconds, Lock &lock, int *errorCode);
+
+        void close(Lock &lock);
+
+        bool enterWork(int *errorCode);
+    };
 
 
 } /* End of namespace speakerman */

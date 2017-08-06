@@ -30,124 +30,133 @@
 
 namespace tdap {
 
-template<typename T>
-static constexpr bool isMutexType()
-{
-	return
-			std::is_same<std::mutex, T>::value ||
-			std::is_same<std::timed_mutex, T>::value ||
-			std::is_same<std::recursive_mutex, T>::value ||
-			std::is_same<std::recursive_timed_mutex, T>::value;
-}
+    template<typename T>
+    static constexpr bool isMutexType()
+    {
+        return
+                std::is_same<std::mutex, T>::value ||
+                std::is_same<std::timed_mutex, T>::value ||
+                std::is_same<std::recursive_mutex, T>::value ||
+                std::is_same<std::recursive_timed_mutex, T>::value;
+    }
 
 
-template<typename M>
-class Guard
-{
-	static_assert(isMutexType<M>(), "Expected mutex type parameter M");
+    template<typename M>
+    class Guard
+    {
+        static_assert(isMutexType<M>(), "Expected mutex type parameter M");
 
-	M &mutex_;
-public:
-	Guard(M &mutex) : mutex_(mutex)
-	{
-		mutex_.lock();
-	}
-	~Guard()
-	{
-		mutex_.unlock();
-	}
-};
+        M &mutex_;
+    public:
+        Guard(M &mutex) : mutex_(mutex)
+        {
+            mutex_.lock();
+        }
 
-template<typename M, typename S>
-class ExpectedStateGuard
-{
-	static_assert(TriviallyCopyable<S>::value, "Expected type S that is trivial to copy");
+        ~Guard()
+        {
+            mutex_.unlock();
+        }
+    };
 
-	Guard<M> guard;
-	S &actual_;
-	bool setOnExit_;
-	S exitState_;
+    template<typename M, typename S>
+    class ExpectedStateGuard
+    {
+        static_assert(TriviallyCopyable<S>::value, "Expected type S that is trivial to copy");
 
-public:
-	ExpectedStateGuard(M &mutex, S expectedState, S &actualState) :
-		guard(mutex), actual_(actualState), setOnExit_(false)
-	{
-		if (actualState != expectedState) {
-			throw std::runtime_error("ExpectStateGuard: not in expected state");
-		}
-	}
-	void setOnExit(S value)
-	{
-		setOnExit_ = true;
-		exitState_ = value;
-	}
-	void setActual(S value)
-	{
-		actual_ = value;
-	}
-	~ExpectedStateGuard()
-	{
-		if (setOnExit_) {
-			actual_ = exitState_;
-			setOnExit_ = false;
-		}
-	}
-};
+        Guard<M> guard;
+        S &actual_;
+        bool setOnExit_;
+        S exitState_;
 
-class TryEnter
-{
-	std::atomic_flag &flag_;
-	bool enter_;
-public:
-	TryEnter(std::atomic_flag &flag) : flag_(flag)
-	{
-		enter_ = !flag_.test_and_set();
-	}
-	bool entered() const
-	{
-		return enter_;
-	}
-	void failOnNotEntered() const
-	{
-		if (!enter_) {
-			throw std::runtime_error("Busy");
-		}
-	}
-	~TryEnter()
-	{
-		if (enter_) {
-			flag_.clear();
-		}
-	}
-};
+    public:
+        ExpectedStateGuard(M &mutex, S expectedState, S &actualState) :
+                guard(mutex), actual_(actualState), setOnExit_(false)
+        {
+            if (actualState != expectedState) {
+                throw std::runtime_error("ExpectStateGuard: not in expected state");
+            }
+        }
 
-class SpinlockEnter
-{
-	std::atomic_flag &flag_;
-public:
-	SpinlockEnter(std::atomic_flag &flag) : flag_(flag)
-	{
-		while(flag_.test_and_set());
-	}
-	~SpinlockEnter()
-	{
-		flag_.clear();
-	}
-};
+        void setOnExit(S value)
+        {
+            setOnExit_ = true;
+            exitState_ = value;
+        }
 
-struct Guards
-{
-	template<typename M>
-	static Guard<M> guard(M &mutex)
-	{
-		return Guard<M>(mutex);
-	}
-	template<typename M, typename S>
-	static ExpectedStateGuard<M, S> create(M &mutex, S expected, S &actual)
-	{
-		return ExpectedStateGuard<M, S>(mutex, expected, actual);
-	}
-};
+        void setActual(S value)
+        {
+            actual_ = value;
+        }
+
+        ~ExpectedStateGuard()
+        {
+            if (setOnExit_) {
+                actual_ = exitState_;
+                setOnExit_ = false;
+            }
+        }
+    };
+
+    class TryEnter
+    {
+        std::atomic_flag &flag_;
+        bool enter_;
+    public:
+        TryEnter(std::atomic_flag &flag) : flag_(flag)
+        {
+            enter_ = !flag_.test_and_set();
+        }
+
+        bool entered() const
+        {
+            return enter_;
+        }
+
+        void failOnNotEntered() const
+        {
+            if (!enter_) {
+                throw std::runtime_error("Busy");
+            }
+        }
+
+        ~TryEnter()
+        {
+            if (enter_) {
+                flag_.clear();
+            }
+        }
+    };
+
+    class SpinlockEnter
+    {
+        std::atomic_flag &flag_;
+    public:
+        SpinlockEnter(std::atomic_flag &flag) : flag_(flag)
+        {
+            while (flag_.test_and_set()) {}
+        }
+
+        ~SpinlockEnter()
+        {
+            flag_.clear();
+        }
+    };
+
+    struct Guards
+    {
+        template<typename M>
+        static Guard<M> guard(M &mutex)
+        {
+            return Guard<M>(mutex);
+        }
+
+        template<typename M, typename S>
+        static ExpectedStateGuard<M, S> create(M &mutex, S expected, S &actual)
+        {
+            return ExpectedStateGuard<M, S>(mutex, expected, actual);
+        }
+    };
 
 
 } /* End of name space tdap */

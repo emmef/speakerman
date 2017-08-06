@@ -31,134 +31,149 @@
 #include <speakerman/SpeakermanConfig.hpp>
 #include <speakerman/SingleThreadFileCache.hpp>
 
-namespace speakerman
-{
-using namespace std;
-using namespace std::chrono;
+namespace speakerman {
+    using namespace std;
+    using namespace std::chrono;
 
-	static long long current_millis()
-	{
-		return system_clock::now().time_since_epoch().count() / 1000000;
-	}
+    static long long current_millis()
+    {
+        return system_clock::now().time_since_epoch().count() / 1000000;
+    }
 
-	static long relative_milliseconds()
-	{
-		static long long START = current_millis();
+    static long relative_milliseconds()
+    {
+        static long long START = current_millis();
 
-		return current_millis() - START;
-	}
+        return current_millis() - START;
+    }
 
-	struct LevelEntry
-	{
-		DynamicProcessorLevels levels;
-		bool set;
-		long long stamp;
-		LevelEntry() : set(false) {}
-		LevelEntry(DynamicProcessorLevels lvl) :
-			levels(lvl), set(true), stamp(current_millis()) { }
-	};
+    struct LevelEntry
+    {
+        DynamicProcessorLevels levels;
+        bool set;
+        long long stamp;
 
-	class LevelEntryBuffer
-	{
-		mutex m;
-		static constexpr size_t SIZE = 128;
-		static constexpr size_t MASK = SIZE - 1;
-		static_assert(tdap::Power2::constant::is(SIZE), "Size must be power of two");
-		LevelEntry entries[SIZE];
-		size_t wr_;
+        LevelEntry() : set(false)
+        {}
 
-		static size_t prev(size_t n)
-		{
-			return (n + SIZE - 1) & MASK;
-		}
+        LevelEntry(DynamicProcessorLevels lvl) :
+                levels(lvl), set(true), stamp(current_millis())
+        {}
+    };
 
-		static size_t next(size_t n)
-		{
-			return (n + 1) & MASK;
-		}
+    class LevelEntryBuffer
+    {
+        mutex m;
+        static constexpr size_t SIZE = 128;
+        static constexpr size_t MASK = SIZE - 1;
+        static_assert(tdap::Power2::constant::is(SIZE), "Size must be power of two");
+        LevelEntry entries[SIZE];
+        size_t wr_;
 
-	public:
+        static size_t prev(size_t n)
+        {
+            return (n + SIZE - 1) & MASK;
+        }
 
-		void put(const DynamicProcessorLevels &levels)
-		{
-			unique_lock<mutex> lock(m);
-			wr_ = prev(wr_);
-			entries[wr_] = LevelEntry(levels);
-		}
+        static size_t next(size_t n)
+        {
+            return (n + 1) & MASK;
+        }
 
-		void get(long long lastChecked, LevelEntry &target)
-		{
-			unique_lock<mutex> lock(m);
-			target = entries[wr_];
-			if (lastChecked <= 0) {
-				return;
-			}
-			size_t read = wr_;
-			read = next(read);
-			LevelEntry entry = entries[read];
-			while (read != wr_ && entry.set && entry.stamp > lastChecked) {
-				target.levels += entry.levels;
-				read = next(read);
-				entry = entries[read];
-			}
-		}
-	};
+    public:
 
+        void put(const DynamicProcessorLevels &levels)
+        {
+            unique_lock<mutex> lock(m);
+            wr_ = prev(wr_);
+            entries[wr_] = LevelEntry(levels);
+        }
 
-	class web_server : protected http_message
-	{
-	public:
-		using Result = server_worker_result;
-		using State = server_socket_state;
-		using Stream = server_socket::Stream;
-		static constexpr size_t URL_LENGTH = 1023;
-		static constexpr const char *COOKIE_TIME_STAMP = "levelTimeStamp";
-		static constexpr size_t COOKIE_TIME_STAMP_LENGTH = strlen(COOKIE_TIME_STAMP);
-
-		web_server(SpeakerManagerControl& speakerManager);
-
-		bool open(const char* service, int timeoutSeconds, int backLog, int* errorCode);
-
-		const char * const service() const { return socket_.service(); }
-
-		State state() const { return socket_.state(); }
-
-		bool isOpen() const { return state() != State::CLOSED; }
-
-		bool isWorking() const { return state() == State::WORKING; }
-
-		bool work(int *errorCode);
-
-		void close();
-
-		~web_server(){}
-
-	protected:
-		virtual bool content_stream_delete() const override { return false; }
-		virtual const char * on_url(const char* url) override;
-		virtual void on_header(const char* header, const char* value) override;
-		virtual void handle_request() override;
-	private:
-		SpeakerManagerControl &manager_;
-		file_entry indexHtmlFile;
-		file_entry cssFile;
-		file_entry javaScriptFile;
-		file_entry faviconFile;
-		server_socket socket_;
-		LevelEntryBuffer level_buffer;
-		char url_[URL_LENGTH + 1];
-		std::thread level_fetch_thread;
-		long long levelTimeStamp = 0;
-		static void thread_static_function(web_server *);
-		void thread_function();
+        void get(long long lastChecked, LevelEntry &target)
+        {
+            unique_lock<mutex> lock(m);
+            target = entries[wr_];
+            if (lastChecked <= 0) {
+                return;
+            }
+            size_t read = wr_;
+            read = next(read);
+            LevelEntry entry = entries[read];
+            while (read != wr_ && entry.set && entry.stamp > lastChecked) {
+                target.levels += entry.levels;
+                read = next(read);
+                entry = entries[read];
+            }
+        }
+    };
 
 
-		Result accept_work(Stream &stream, const struct sockaddr& address, const server_socket& socket);
+    class web_server : protected http_message
+    {
+    public:
+        using Result = server_worker_result;
+        using State = server_socket_state;
+        using Stream = server_socket::Stream;
+        static constexpr size_t URL_LENGTH = 1023;
+        static constexpr const char *COOKIE_TIME_STAMP = "levelTimeStamp";
+        static constexpr size_t COOKIE_TIME_STAMP_LENGTH = strlen(COOKIE_TIME_STAMP);
 
-		static Result worker_function(
-				Stream &stream, const struct sockaddr& address,
-				const server_socket& socket, void* data);
-	};
+        web_server(SpeakerManagerControl &speakerManager);
+
+        bool open(const char *service, int timeoutSeconds, int backLog, int *errorCode);
+
+        const char *const service() const
+        { return socket_.service(); }
+
+        State state() const
+        { return socket_.state(); }
+
+        bool isOpen() const
+        { return state() != State::CLOSED; }
+
+        bool isWorking() const
+        { return state() == State::WORKING; }
+
+        bool work(int *errorCode);
+
+        void close();
+
+        ~web_server()
+        {}
+
+    protected:
+        virtual bool content_stream_delete() const override
+        { return false; }
+
+        virtual const char *on_url(const char *url) override;
+
+        virtual void on_header(const char *header, const char *value) override;
+
+        virtual void handle_request() override;
+
+    private:
+        SpeakerManagerControl &manager_;
+        file_entry indexHtmlFile;
+        file_entry cssFile;
+        file_entry javaScriptFile;
+        file_entry faviconFile;
+        server_socket socket_;
+        LevelEntryBuffer level_buffer;
+        char url_[URL_LENGTH + 1];
+        std::thread level_fetch_thread;
+        long long levelTimeStamp = 0;
+
+        static void thread_static_function(web_server *);
+
+        void thread_function();
+
+
+        Result accept_work(Stream &stream, const struct sockaddr &address, const server_socket &socket);
+
+        static Result worker_function(
+                Stream &stream, const struct sockaddr &address,
+                const server_socket &socket, void *data);
+    };
 
 } /* End of namespace speakerman */
 

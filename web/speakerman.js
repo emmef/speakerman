@@ -248,7 +248,7 @@ function sendLevelRequest()
 			xHttpRequest.onloadend = function() {
 				xHttpRequest = null;
 				window.setTimeout(function() {sendLevelRequest(); }, 75);
-			}
+			};
 			xHttpRequest.send();
 		}
 	//}

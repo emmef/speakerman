@@ -24,52 +24,66 @@
 
 namespace speakerman {
 
-	class SignalHandler
-	{
-		int int_get_signal() const;
-		bool int_is_set() const;
-		int int_raise_signal(int signal) const;
-		void int_check_raised() const;
-		SignalHandler();
-	public:
-		static const SignalHandler &instance();
-		static int get_signal();
-		static bool is_set();
-		static int raise_signal(int signal);
-		static void check_raised();
-	};
+    class SignalHandler
+    {
+        int int_get_signal() const;
 
-	/**
-	 * This is NOT an exception and must be caught separately
-	 */
-	class signal_exception
-	{
-		friend class SignalHandler;
-		static constexpr int LENGTH = 32;
-		int signal_;
-		char message_[LENGTH];
-		signal_exception(int signal, bool user_raised);
-	public:
-		const char* what() const;
-		int signal() const { return signal_; }
-		void handle() const;
-		void handle(const char *description) const;
-	};
+        bool int_is_set() const;
 
-	template<typename T>
-	void signal_aware_thread_method_data(void (thread_method)(T &data), T &data, const char *thread_description)
-	{
-		if (thread_method) {
-			try
-			{
-				thread_method(data);
-			}
-			catch(const signal_exception &e)
-			{
-				e.handle(thread_description);
-			}
-		}
-	}
+        int int_raise_signal(int signal) const;
+
+        void int_check_raised() const;
+
+        SignalHandler();
+
+    public:
+        static const SignalHandler &instance();
+
+        static int get_signal();
+
+        static bool is_set();
+
+        static int raise_signal(int signal);
+
+        static void check_raised();
+    };
+
+    /**
+     * This is NOT an exception and must be caught separately
+     */
+    class signal_exception
+    {
+        friend class SignalHandler;
+
+        static constexpr int LENGTH = 32;
+        int signal_;
+        char message_[LENGTH];
+
+        signal_exception(int signal, bool user_raised);
+
+    public:
+        const char *what() const;
+
+        int signal() const
+        { return signal_; }
+
+        void handle() const;
+
+        void handle(const char *description) const;
+    };
+
+    template<typename T>
+    void signal_aware_thread_method_data(void (thread_method)(T &data), T &data, const char *thread_description)
+    {
+        if (thread_method) {
+            try {
+                thread_method(data);
+            }
+            catch (const signal_exception &e) {
+                e.handle(thread_description);
+            }
+        }
+    }
 
 } /* End of namespace speakerman */
 

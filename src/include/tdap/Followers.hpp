@@ -27,253 +27,263 @@
 
 namespace tdap {
 
-using namespace std;
+    using namespace std;
+
 /**
  * Follows rises in input and holds those for a number of samples. After that,
  * follow the (lower) input.
  */
-template< typename S>
-class HoldMax
-{
-	static_assert(is_arithmetic<S>::value, "Sample type S must be arithmetic");
-	size_t holdSamples;
-	size_t toHold;
-	S holdValue;
+    template<typename S>
+    class HoldMax
+    {
+        static_assert(is_arithmetic<S>::value, "Sample type S must be arithmetic");
+        size_t holdSamples;
+        size_t toHold;
+        S holdValue;
 
-public:
-	HoldMax(size_t holdForSamples, S initialHoldValue = 0) :
-		holdSamples(holdForSamples), toHold(0), holdValue(initialHoldValue) {}
+    public:
+        HoldMax(size_t holdForSamples, S initialHoldValue = 0) :
+                holdSamples(holdForSamples), toHold(0), holdValue(initialHoldValue)
+        {}
 
-	void resetHold()
-	{
-		toHold = 0;
-	}
+        void resetHold()
+        {
+            toHold = 0;
+        }
 
-	void setHoldCount(size_t newCount)
-	{
-		holdSamples = newCount;
-		if (toHold > holdSamples) {
-			toHold = holdSamples;
-		}
-	}
+        void setHoldCount(size_t newCount)
+        {
+            holdSamples = newCount;
+            if (toHold > holdSamples) {
+                toHold = holdSamples;
+            }
+        }
 
-	size_t getHoldSamples() const {
-		return holdSamples;
-	}
+        size_t getHoldSamples() const
+        {
+            return holdSamples;
+        }
 
-	S apply(S input)
-	{
-		if (input > holdValue) {
-			toHold = holdSamples;
-			holdValue = input;
-			return holdValue;
-		}
-		if (toHold > 0) {
-			toHold--;
-			return holdValue;
-		}
-		return input;
-	}
-};
+        S apply(S input)
+        {
+            if (input > holdValue) {
+                toHold = holdSamples;
+                holdValue = input;
+                return holdValue;
+            }
+            if (toHold > 0) {
+                toHold--;
+                return holdValue;
+            }
+            return input;
+        }
+    };
 
 /**
  * Follows rises in input and holds those for a number of samples. After that,
  * follows the (lower) input in an integrated fashion.
  */
-template<typename S, typename C>
-class HoldMaxRelease
-{
-	static_assert(is_arithmetic<S>::value, "Sample type S must be arithmetic");
+    template<typename S, typename C>
+    class HoldMaxRelease
+    {
+        static_assert(is_arithmetic<S>::value, "Sample type S must be arithmetic");
 
-	size_t holdSamples;
-	size_t toHold;
-	S holdValue;
-	IntegratorFilter<C> integrator_;
+        size_t holdSamples;
+        size_t toHold;
+        S holdValue;
+        IntegratorFilter<C> integrator_;
 
-public:
-	HoldMaxRelease(size_t holdForSamples, C integrationSamples, S initialHoldValue = 0) :
-		holdSamples(holdForSamples), toHold(0), holdValue(initialHoldValue), integrator_(integrationSamples) {}
+    public:
+        HoldMaxRelease(size_t holdForSamples, C integrationSamples, S initialHoldValue = 0) :
+                holdSamples(holdForSamples), toHold(0), holdValue(initialHoldValue), integrator_(integrationSamples)
+        {}
 
-	void resetHold()
-	{
-		toHold = 0;
-	}
+        void resetHold()
+        {
+            toHold = 0;
+        }
 
-	void setHoldCount(size_t newCount)
-	{
-		holdSamples = newCount;
-		if (toHold > holdSamples) {
-			toHold = holdSamples;
-		}
-	}
+        void setHoldCount(size_t newCount)
+        {
+            holdSamples = newCount;
+            if (toHold > holdSamples) {
+                toHold = holdSamples;
+            }
+        }
 
-	S apply(S input)
-	{
-		if (input > holdValue) {
-			toHold = holdSamples;
-			holdValue = input;
-			integrator_.setOutput(input);
-			return holdValue;
-		}
-		if (toHold > 0) {
-			toHold--;
-			return holdValue;
-		}
-		return integrator_.integrate(input);
-	}
+        S apply(S input)
+        {
+            if (input > holdValue) {
+                toHold = holdSamples;
+                holdValue = input;
+                integrator_.setOutput(input);
+                return holdValue;
+            }
+            if (toHold > 0) {
+                toHold--;
+                return holdValue;
+            }
+            return integrator_.integrate(input);
+        }
 
-	IntegratorFilter<C> &integrator()
-	{
-		return integrator_;
-	}
-};
+        IntegratorFilter<C> &integrator()
+        {
+            return integrator_;
+        }
+    };
 
-template<typename S, typename C>
-class HoldMaxIntegrated
-{
-	static_assert(is_arithmetic<S>::value, "Sample type S must be arithmetic");
-	HoldMax<S> holdMax;
-	IntegratorFilter<C> integrator_;
+    template<typename S, typename C>
+    class HoldMaxIntegrated
+    {
+        static_assert(is_arithmetic<S>::value, "Sample type S must be arithmetic");
+        HoldMax<S> holdMax;
+        IntegratorFilter<C> integrator_;
 
-public:
-	HoldMaxIntegrated(size_t holdForSamples, C integrationSamples, S initialHoldValue = 0) :
-		holdMax(holdForSamples, initialHoldValue), integrator_(integrationSamples, initialHoldValue) {}
+    public:
+        HoldMaxIntegrated(size_t holdForSamples, C integrationSamples, S initialHoldValue = 0) :
+                holdMax(holdForSamples, initialHoldValue), integrator_(integrationSamples, initialHoldValue)
+        {}
 
-	void resetHold()
-	{
-		holdMax.resetHold();
-	}
+        void resetHold()
+        {
+            holdMax.resetHold();
+        }
 
-	void setHoldCount(size_t newCount)
-	{
-		holdMax.setHoldCount(newCount);
-	}
+        void setHoldCount(size_t newCount)
+        {
+            holdMax.setHoldCount(newCount);
+        }
 
-	S apply(S input)
-	{
-		return integrator_.integrate(holdMax.apply(input));
-	}
+        S apply(S input)
+        {
+            return integrator_.integrate(holdMax.apply(input));
+        }
 
-	IntegratorFilter<C> &integrator()
-	{
-		return integrator_;
-	}
-};
+        IntegratorFilter<C> &integrator()
+        {
+            return integrator_;
+        }
+    };
 
-template<typename S>
-class HoldMaxDoubleIntegrated
-{
-	static_assert(is_arithmetic<S>::value, "Sample type S must be arithmetic");
-	HoldMax<S> holdMax;
-	IntegrationCoefficients<S> coeffs;
-	S i1, i2;
+    template<typename S>
+    class HoldMaxDoubleIntegrated
+    {
+        static_assert(is_arithmetic<S>::value, "Sample type S must be arithmetic");
+        HoldMax<S> holdMax;
+        IntegrationCoefficients<S> coeffs;
+        S i1, i2;
 
-public:
-	HoldMaxDoubleIntegrated(size_t holdForSamples, S integrationSamples, S initialHoldValue = 0) :
-		holdMax(holdForSamples, initialHoldValue), coeffs(integrationSamples),
-		i1(initialHoldValue), i2(initialHoldValue) {}
-	HoldMaxDoubleIntegrated() : HoldMaxDoubleIntegrated(15, 10, 1.0) {}
+    public:
+        HoldMaxDoubleIntegrated(size_t holdForSamples, S integrationSamples, S initialHoldValue = 0) :
+                holdMax(holdForSamples, initialHoldValue), coeffs(integrationSamples),
+                i1(initialHoldValue), i2(initialHoldValue)
+        {}
 
-	void resetHold()
-	{
-		holdMax.resetHold();
-	}
+        HoldMaxDoubleIntegrated() : HoldMaxDoubleIntegrated(15, 10, 1.0)
+        {}
 
-	void setMetrics(double integrationSamples, size_t holdCount)
-	{
-		holdMax.setHoldCount(holdCount);
-		coeffs.setCharacteristicSamples(integrationSamples);
-	}
+        void resetHold()
+        {
+            holdMax.resetHold();
+        }
 
-	S apply(S input)
-	{
-		return coeffs.integrate(coeffs.integrate(holdMax.apply(input), i1), i2);
-	}
+        void setMetrics(double integrationSamples, size_t holdCount)
+        {
+            holdMax.setHoldCount(holdCount);
+            coeffs.setCharacteristicSamples(integrationSamples);
+        }
 
-	S setValue(S x)
-	{
-		i1 = i2 = x;
-	}
+        S apply(S input)
+        {
+            return coeffs.integrate(coeffs.integrate(holdMax.apply(input), i1), i2);
+        }
 
-	S applyWithMinimum(S input, S minimum)
-	{
-		return coeffs.integrate(coeffs.integrate(holdMax.apply(Values::max(input, minimum)), i1), i2);
-	}
-};
+        S setValue(S x)
+        {
+            i1 = i2 = x;
+        }
 
-template<typename C>
-class HoldMaxAttackRelease
-{
-	static_assert(is_arithmetic<C>::value, "Sample type S must be arithmetic");
-	HoldMax<C> holdMax;
-	AttackReleaseFilter<C> integrator_;
+        S applyWithMinimum(S input, S minimum)
+        {
+            return coeffs.integrate(coeffs.integrate(holdMax.apply(Values::max(input, minimum)), i1), i2);
+        }
+    };
 
-public:
-	HoldMaxAttackRelease(size_t holdForSamples, C attackSamples, C releaseSamples, C initialHoldValue = 0) :
-		holdMax(holdForSamples, initialHoldValue), integrator_(attackSamples, releaseSamples, initialHoldValue) {}
+    template<typename C>
+    class HoldMaxAttackRelease
+    {
+        static_assert(is_arithmetic<C>::value, "Sample type S must be arithmetic");
+        HoldMax<C> holdMax;
+        AttackReleaseFilter<C> integrator_;
 
-	void resetHold()
-	{
-		holdMax.resetHold();
-	}
+    public:
+        HoldMaxAttackRelease(size_t holdForSamples, C attackSamples, C releaseSamples, C initialHoldValue = 0) :
+                holdMax(holdForSamples, initialHoldValue), integrator_(attackSamples, releaseSamples, initialHoldValue)
+        {}
 
-	void setHoldCount(size_t newCount)
-	{
-		holdMax.setHoldCount(newCount);
-	}
+        void resetHold()
+        {
+            holdMax.resetHold();
+        }
 
-	C apply(C input)
-	{
-		return integrator_.integrate(holdMax.apply(input));
-	}
+        void setHoldCount(size_t newCount)
+        {
+            holdMax.setHoldCount(newCount);
+        }
 
-	AttackReleaseFilter<C> &integrator()
-	{
-		return integrator_;
-	}
-};
+        C apply(C input)
+        {
+            return integrator_.integrate(holdMax.apply(input));
+        }
 
-template<typename C>
-class SmoothHoldMaxAttackRelease
-{
-	static_assert(is_arithmetic<C>::value, "Sample type S must be arithmetic");
-	HoldMax<C> holdMax;
-	AttackReleaseSmoothFilter<C> integrator_;
+        AttackReleaseFilter<C> &integrator()
+        {
+            return integrator_;
+        }
+    };
 
-public:
-	SmoothHoldMaxAttackRelease(size_t holdForSamples, C attackSamples, C releaseSamples, C initialHoldValue = 0) :
-		holdMax(holdForSamples, initialHoldValue), integrator_(attackSamples, releaseSamples, initialHoldValue) {}
+    template<typename C>
+    class SmoothHoldMaxAttackRelease
+    {
+        static_assert(is_arithmetic<C>::value, "Sample type S must be arithmetic");
+        HoldMax<C> holdMax;
+        AttackReleaseSmoothFilter<C> integrator_;
 
-	void resetHold()
-	{
-		holdMax.resetHold();
-	}
+    public:
+        SmoothHoldMaxAttackRelease(size_t holdForSamples, C attackSamples, C releaseSamples, C initialHoldValue = 0) :
+                holdMax(holdForSamples, initialHoldValue), integrator_(attackSamples, releaseSamples, initialHoldValue)
+        {}
 
-	void setHoldCount(size_t newCount)
-	{
-		holdMax.setHoldCount(newCount);
-	}
+        void resetHold()
+        {
+            holdMax.resetHold();
+        }
 
-	C apply(C input)
-	{
-		return integrator_.integrate(holdMax.apply(input));
-	}
+        void setHoldCount(size_t newCount)
+        {
+            holdMax.setHoldCount(newCount);
+        }
 
-	void setValue(C x)
-	{
-		integrator_.setOutput(x);
-	}
+        C apply(C input)
+        {
+            return integrator_.integrate(holdMax.apply(input));
+        }
 
-	size_t getHoldSamples() const
-	{
-		return holdMax.getHoldSamples();
-	}
+        void setValue(C x)
+        {
+            integrator_.setOutput(x);
+        }
 
-	AttackReleaseSmoothFilter<C> &integrator()
-	{
-		return integrator_;
-	}
-};
+        size_t getHoldSamples() const
+        {
+            return holdMax.getHoldSamples();
+        }
+
+        AttackReleaseSmoothFilter<C> &integrator()
+        {
+            return integrator_;
+        }
+    };
 
 } /* End of name space tdap */
 

@@ -27,47 +27,53 @@
 
 namespace tdap {
 
-template <typename T, size_t SIZE>
-class FixedSizeArray : public FixedSizeArrayTraits<T, SIZE, FixedSizeArray<T, SIZE>>
-{
-	static_assert(TriviallyCopyable<T>::value, "Type must be trivial to copy, move or destroy and have standard layout");
+    template<typename T, size_t SIZE>
+    class FixedSizeArray : public FixedSizeArrayTraits<T, SIZE, FixedSizeArray<T, SIZE>>
+    {
+        static_assert(TriviallyCopyable<T>::value,
+                      "Type must be trivial to copy, move or destroy and have standard layout");
 
-	friend class ArrayTraits<T, FixedSizeArray<T, SIZE>>;
-    	typename std::aligned_storage<sizeof(T), alignof(T)>::type data_[SIZE];
+        friend class ArrayTraits<T, FixedSizeArray<T, SIZE>>;
 
-	size_t _traitGetSize() const { return SIZE; }
-	size_t _traitGetCapacity() const { return SIZE; }
+        typename std::aligned_storage<sizeof(T), alignof(T)>::type data_[SIZE];
 
-	T& _traitRefAt(size_t i)
-	{
-		return *reinterpret_cast<T *>(data_ + i);
-	}
+        size_t _traitGetSize() const
+        { return SIZE; }
 
-	const T& _traitRefAt(size_t i) const
-	{
-		return *reinterpret_cast<const T *>(data_ + i);
-	}
+        size_t _traitGetCapacity() const
+        { return SIZE; }
 
-	T * _traitUnsafeData()
-	{
-		return reinterpret_cast<T *>(data_);
-	}
+        T &_traitRefAt(size_t i)
+        {
+            return *reinterpret_cast<T *>(data_ + i);
+        }
 
-	const T * _traitUnsafeData() const
-	{
-		return reinterpret_cast<const T *>(data_);
-	}
+        const T &_traitRefAt(size_t i) const
+        {
+            return *reinterpret_cast<const T *>(data_ + i);
+        }
 
-	T * _traitPlus(size_t i) const
-	{
-		return reinterpret_cast<const T *>(data_ + i);
-	}
+        T *_traitUnsafeData()
+        {
+            return reinterpret_cast<T *>(data_);
+        }
 
-	static constexpr bool _traitHasTrivialAddressing() { return true; }
+        const T *_traitUnsafeData() const
+        {
+            return reinterpret_cast<const T *>(data_);
+        }
 
-public:
+        T *_traitPlus(size_t i) const
+        {
+            return reinterpret_cast<const T *>(data_ + i);
+        }
 
-};
+        static constexpr bool _traitHasTrivialAddressing()
+        { return true; }
+
+    public:
+
+    };
 
 } /* End of name space tdap */
 

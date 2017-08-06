@@ -26,43 +26,51 @@
 
 namespace speakerman {
 
-class Mutex;
+    class Mutex;
 
-class Guard {
-	std::recursive_mutex *mutex;
-	friend class Mutex;
+    class Guard
+    {
+        std::recursive_mutex *mutex;
 
-	Guard(std::recursive_mutex *m) :
-		mutex(m)
-	{
-		m->lock();
-	};
-	Guard &operator &();
-public:
-	Guard(Guard &&original) : mutex(original.mutex)
-	{
-		original.mutex = nullptr;
-		// Mutex already locked
-	}
-	~Guard()
-	{
-		if (mutex) {
-			std::recursive_mutex *m = mutex;
-			mutex = nullptr;
-			m->unlock();
-		}
-	}
-};
+        friend class Mutex;
 
-class Mutex {
-	std::recursive_mutex mutex;
-	friend class Guard;
-public:
-	Guard guard()
-	{
-		return Guard(&mutex);
-	}
-};
+        Guard(std::recursive_mutex *m) :
+                mutex(m)
+        {
+            m->lock();
+        };
+
+        Guard &operator&();
+
+    public:
+        Guard(Guard &&original) : mutex(original.mutex)
+        {
+            original.mutex = nullptr;
+            // Mutex already locked
+        }
+
+        ~Guard()
+        {
+            if (mutex) {
+                std::recursive_mutex *m = mutex;
+                mutex = nullptr;
+                m->unlock();
+            }
+        }
+    };
+
+    class Mutex
+    {
+        std::recursive_mutex mutex;
+
+        friend class Guard;
+
+    public:
+        Guard guard()
+        {
+            return Guard(&mutex);
+        }
+    };
 
 
 

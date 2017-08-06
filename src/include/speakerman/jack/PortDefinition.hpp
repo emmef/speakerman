@@ -30,94 +30,102 @@
 
 namespace speakerman {
 
-using namespace tdap;
-using namespace std;
+    using namespace tdap;
+    using namespace std;
 
-enum class PortDirection
-{
-	IN, OUT
-};
+    enum class PortDirection
+    {
+        IN, OUT
+    };
 
-enum class PortIsTerminal
-{
-	NO, YES
-};
+    enum class PortIsTerminal
+    {
+        NO, YES
+    };
 
-const char * const port_direction_name(PortDirection direction);
+    const char *const port_direction_name(PortDirection direction);
 
 /**
  * Conveniently defines an audio port.
  * Please take into account that this class DOES NOT OWN the name of the port.
  */
-struct PortDefinition
-{
-	struct Data
-	{
-		const char * name;
-		PortDirection direction;
-		PortIsTerminal terminal;
+    struct PortDefinition
+    {
+        struct Data
+        {
+            const char *name;
+            PortDirection direction;
+            PortIsTerminal terminal;
 
-		unsigned long int flags() const;
-		const char * type() const { return JACK_DEFAULT_AUDIO_TYPE; }
-	};
+            unsigned long int flags() const;
 
-	static Data validated(Data data);
+            const char *type() const
+            { return JACK_DEFAULT_AUDIO_TYPE; }
+        };
 
-	const Data data;
+        static Data validated(Data data);
 
-	static PortDefinition input(const char *name);
-	static PortDefinition output(const char *name);
-	PortDefinition terminal_port() const;
-	PortDefinition renamed(const char * newName) const;
-	PortDefinition(const PortDefinition::Data source);
+        const Data data;
 
-private:
+        static PortDefinition input(const char *name);
 
-	PortDefinition(const char * name, PortDirection direction, PortIsTerminal terminal);
-};
+        static PortDefinition output(const char *name);
 
-class PortDefinitions
-{
-	Array<PortDefinition::Data> definitions;
-	Array<char> nameStorage;
+        PortDefinition terminal_port() const;
 
-	static size_t validSize(size_t size, size_t maxPorts);
+        PortDefinition renamed(const char *newName) const;
 
-	void addValidated(PortDefinition data);
+        PortDefinition(const PortDefinition::Data source);
 
-public:
-	PortDefinitions(size_t maxPorts, size_t nameStorageSize);
+    private:
 
-	PortDefinitions(size_t maxPorts);
+        PortDefinition(const char *name, PortDirection direction, PortIsTerminal terminal);
+    };
 
-	PortDefinitions();
+    class PortDefinitions
+    {
+        Array<PortDefinition::Data> definitions;
+        Array<char> nameStorage;
 
-	PortDefinitions(const PortDefinitions& source, ConstructionPolicy policy);
+        static size_t validSize(size_t size, size_t maxPorts);
 
-	size_t portCount() const { return definitions.size(); }
+        void addValidated(PortDefinition data);
 
-	size_t maxPorts() const { return definitions.capacity(); }
+    public:
+        PortDefinitions(size_t maxPorts, size_t nameStorageSize);
 
-	int indexOf(const char* name) const;
+        PortDefinitions(size_t maxPorts);
 
-	int indexOf(const char* name, PortDirection direction) const;
+        PortDefinitions();
 
-	const char* ensuredNewName(const char* name) const;
+        PortDefinitions(const PortDefinitions &source, ConstructionPolicy policy);
 
-	void add(PortDefinition definition);
+        size_t portCount() const
+        { return definitions.size(); }
 
-	void addInput(const char* name);
+        size_t maxPorts() const
+        { return definitions.capacity(); }
 
-	void addOutput(const char* name);
+        int indexOf(const char *name) const;
 
-	const PortDefinition::Data getByName(const char* name) const;
+        int indexOf(const char *name, PortDirection direction) const;
 
-	const PortDefinition::Data* getByNamePtr(const char* name) const;
+        const char *ensuredNewName(const char *name) const;
 
-	const PortDefinition::Data& operator [](size_t index) const;
+        void add(PortDefinition definition);
 
-	const PortDefinition operator ()(size_t index) const;
-};
+        void addInput(const char *name);
+
+        void addOutput(const char *name);
+
+        const PortDefinition::Data getByName(const char *name) const;
+
+        const PortDefinition::Data *getByNamePtr(const char *name) const;
+
+        const PortDefinition::Data &operator[](size_t index) const;
+
+        const PortDefinition operator()(size_t index) const;
+    };
 
 
 } /* End of namespace speakerman */

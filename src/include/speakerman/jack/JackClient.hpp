@@ -32,180 +32,203 @@
 
 namespace speakerman {
 
-using namespace std;
-using namespace tdap;
-enum class ClientState { NONE, CLOSED, OPEN, CONFIGURED, ACTIVE, SHUTTING_DOWN };
+    using namespace std;
+    using namespace tdap;
+    enum class ClientState
+    {
+        NONE, CLOSED, OPEN, CONFIGURED, ACTIVE, SHUTTING_DOWN
+    };
 
-const char * client_state_name(ClientState state);
-bool client_state_defined(ClientState state);
-bool client_state_is_shutdown_state(ClientState state);
+    const char *client_state_name(ClientState state);
 
-struct ShutDownInfo
-{
-	jack_status_t status;
-	const char *reason;
-	bool isSet;
+    bool client_state_defined(ClientState state);
 
-	static constexpr ShutDownInfo empty()
-	{
-		return { static_cast<jack_status_t>(0), nullptr, false };
-	}
-	static ShutDownInfo withReason(const char *reason)
-	{
-		return { static_cast<jack_status_t>(0), reason, true };
-	}
-	static ShutDownInfo withReasonAndCode(jack_status_t code, const char *reason)
-	{
-		return { code, reason, true };
-	}
-	bool isEmpty() { return !isSet; }
-};
+    bool client_state_is_shutdown_state(ClientState state);
 
-class JackClient;
+    struct ShutDownInfo
+    {
+        jack_status_t status;
+        const char *reason;
+        bool isSet;
 
-struct CreateClientResult
-{
-	JackClient * client;
-	jack_status_t status;
-	const char * name;
+        static constexpr ShutDownInfo empty()
+        {
+            return {static_cast<jack_status_t>(0), nullptr, false};
+        }
 
-	bool success() { return (client); }
+        static ShutDownInfo withReason(const char *reason)
+        {
+            return {static_cast<jack_status_t>(0), reason, true};
+        }
 
-	JackClient * getClient()
-	{
-		if (success()) {
-			return client;
-		}
-		throw std::runtime_error("No jack client created");
-	}
-};
+        static ShutDownInfo withReasonAndCode(jack_status_t code, const char *reason)
+        {
+            return {code, reason, true};
+        }
 
-class JackClient
-{
-	ClientState state_ = ClientState::CLOSED;
-	mutex mutex_;
-	condition_variable awaitShutdownCondition_;
-	thread awaitShutdownThread_;
-	bool awaitShutdownThreadRunning_ = false;
-	volatile bool shutDownOnSignal = false;
+        bool isEmpty()
+        { return !isSet; }
+    };
 
-	jack_client_t *client_ = nullptr;
-	ShutDownInfo shutdownInfo_ {static_cast<jack_status_t>(0), nullptr, false};
-	string name_;
-	JackProcessor *processor_ = nullptr;
-	ProcessingMetrics metrics_;
-	long xRuns;
-	long long lastXrunProcessingCycle;
+    class JackClient;
 
-	static void awaitShutdownCaller(JackClient* client);
+    struct CreateClientResult
+    {
+        JackClient *client;
+        jack_status_t status;
+        const char *name;
 
-	static void jackShutdownCallback(void* client);
+        bool success()
+        { return (client); }
 
-	static void jackInfoShutdownCallback(jack_status_t code, const char* reason, void* client);
+        JackClient *getClient()
+        {
+            if (success()) {
+                return client;
+            }
+            throw std::runtime_error("No jack client created");
+        }
+    };
 
-	static int jackBufferSizeCallback(jack_nframes_t frames, void* client);
+    class JackClient
+    {
+        ClientState state_ = ClientState::CLOSED;
+        mutex mutex_;
+        condition_variable awaitShutdownCondition_;
+        thread awaitShutdownThread_;
+        bool awaitShutdownThreadRunning_ = false;
+        volatile bool shutDownOnSignal = false;
 
-	static int jackSampleRateCallback(jack_nframes_t rate, void* client);
+        jack_client_t *client_ = nullptr;
+        ShutDownInfo shutdownInfo_{static_cast<jack_status_t>(0), nullptr, false};
+        string name_;
+        JackProcessor *processor_ = nullptr;
+        ProcessingMetrics metrics_;
+        long xRuns;
+        long long lastXrunProcessingCycle;
 
-	static int jackXrunCallback(void* client);
+        static void awaitShutdownCaller(JackClient *client);
 
-	void registerCallbacks();
+        static void jackShutdownCallback(void *client);
 
-	void awaitShutdownAndCloseUnsafe(unique_lock<mutex>& lock);
+        static void jackInfoShutdownCallback(jack_status_t code, const char *reason, void *client);
 
-	void awaitShutDownAndClose();
+        static int jackBufferSizeCallback(jack_nframes_t frames, void *client);
 
-	bool notifyShutdownUnsafe(ShutDownInfo info, unique_lock<mutex>& lock);
+        static int jackSampleRateCallback(jack_nframes_t rate, void *client);
 
-	void onShutdown(ShutDownInfo info);
+        static int jackXrunCallback(void *client);
 
-	void closeUnsafe();
+        void registerCallbacks();
 
-	static void jack_portnames_free(const char** names);
-	
-	static void suppress_message(const char *msg) { }
-	
-	class MessageSuppress {
-	public:
-		void suppress() { jack_set_error_function(suppress_message); jack_set_info_function(suppress_message); }
-		~MessageSuppress() { jack_set_error_function(nullptr); jack_set_info_function(nullptr); }
-	};
+        void awaitShutdownAndCloseUnsafe(unique_lock<mutex> &lock);
 
-protected:
-	virtual void registerAdditionalCallbacks(jack_client_t* client);
+        void awaitShutDownAndClose();
 
-	JackClient(jack_client_t* client);
+        bool notifyShutdownUnsafe(ShutDownInfo info, unique_lock<mutex> &lock);
 
-	int onMetricsUpdate(ProcessingMetrics m);
+        void onShutdown(ShutDownInfo info);
 
-	int onSampleRateChange(jack_nframes_t rate);
+        void closeUnsafe();
 
-	int onBufferSizeChange(jack_nframes_t size);
+        static void jack_portnames_free(const char **names);
+
+        static void suppress_message(const char *msg)
+        {}
+
+        class MessageSuppress
+        {
+        public:
+            void suppress()
+            {
+                jack_set_error_function(suppress_message);
+                jack_set_info_function(suppress_message);
+            }
+
+            ~MessageSuppress()
+            {
+                jack_set_error_function(nullptr);
+                jack_set_info_function(nullptr);
+            }
+        };
+
+    protected:
+        virtual void registerAdditionalCallbacks(jack_client_t *client);
+
+        JackClient(jack_client_t *client);
+
+        int onMetricsUpdate(ProcessingMetrics m);
+
+        int onSampleRateChange(jack_nframes_t rate);
+
+        int onBufferSizeChange(jack_nframes_t size);
 
 
-public:
+    public:
 
-	virtual int onXRun();
+        virtual int onXRun();
 
-	template<typename ...A>
-	static CreateClientResult create(const char *serverName, jack_options_t options, A... args)
-	{
-		MessageSuppress suppress;
-		jack_status_t lastState = static_cast<JackStatus>(0);
-		long sleepMillis = 100;
-		suppress.suppress();
-		for (int i = 1; i <= 10; i ++) {
-			jack_client_t *c = jack_client_open(serverName, options, &lastState, args...);
-			if (c) {
-				return { new JackClient(c), static_cast<JackStatus>(0), serverName };
-			}
-			std::cerr << "JackClient::create() attempt " << i << " failed with status " << lastState << " (sleep " << sleepMillis << "msec." << std::endl;
-			std::this_thread::sleep_for(std::chrono::milliseconds(sleepMillis));
-			sleepMillis *= 1.7;
-		}
-		return { nullptr, lastState, serverName};
-	}
+        template<typename ...A>
+        static CreateClientResult create(const char *serverName, jack_options_t options, A... args)
+        {
+            MessageSuppress suppress;
+            jack_status_t lastState = static_cast<JackStatus>(0);
+            long sleepMillis = 100;
+            suppress.suppress();
+            for (int i = 1; i <= 10; i++) {
+                jack_client_t *c = jack_client_open(serverName, options, &lastState, args...);
+                if (c) {
+                    return {new JackClient(c), static_cast<JackStatus>(0), serverName};
+                }
+                std::cerr << "JackClient::create() attempt " << i << " failed with status " << lastState << " (sleep "
+                          << sleepMillis << "msec." << std::endl;
+                std::this_thread::sleep_for(std::chrono::milliseconds(sleepMillis));
+                sleepMillis *= 1.7;
+            }
+            return {nullptr, lastState, serverName};
+        }
 
-	static CreateClientResult createDefault(const char *serverName)
-	{
-		MessageSuppress suppress;
-		jack_status_t lastState = static_cast<JackStatus>(0);
-		long sleepMillis = 100;
-		suppress.suppress();
-		for (int i = 1; i <= 9; i ++) {
-			jack_client_t *c = jack_client_open(serverName, JackOptions::JackNullOption, &lastState);
-			if (c) {
-				return { new JackClient(c), static_cast<JackStatus>(0), serverName };
-			}
-			std::cerr << "JackClient::create() attempt " << i << " failed with status " << lastState << " (sleep " << sleepMillis << "ms.)" << std::endl;
-			std::this_thread::sleep_for(std::chrono::milliseconds(sleepMillis));
-			sleepMillis *= 1.7;
-		}
-		return { nullptr, lastState, serverName};
-	}
+        static CreateClientResult createDefault(const char *serverName)
+        {
+            MessageSuppress suppress;
+            jack_status_t lastState = static_cast<JackStatus>(0);
+            long sleepMillis = 100;
+            suppress.suppress();
+            for (int i = 1; i <= 9; i++) {
+                jack_client_t *c = jack_client_open(serverName, JackOptions::JackNullOption, &lastState);
+                if (c) {
+                    return {new JackClient(c), static_cast<JackStatus>(0), serverName};
+                }
+                std::cerr << "JackClient::create() attempt " << i << " failed with status " << lastState << " (sleep "
+                          << sleepMillis << "ms.)" << std::endl;
+                std::this_thread::sleep_for(std::chrono::milliseconds(sleepMillis));
+                sleepMillis *= 1.7;
+            }
+            return {nullptr, lastState, serverName};
+        }
 
-	const string& name() const;
+        const string &name() const;
 
-	bool setProcessor(JackProcessor& processor);
+        bool setProcessor(JackProcessor &processor);
 
-	void setActive();
+        void setActive();
 
-	ClientState getState();
+        ClientState getState();
 
-	void notifyShutdown(const char* reason);
+        void notifyShutdown(const char *reason);
 
-	ShutDownInfo awaitClose();
+        ShutDownInfo awaitClose();
 
-	static PortNames portNames(jack_client_t* client, const char* namePattern,
-			const char* typePattern, unsigned long flags);
+        static PortNames portNames(jack_client_t *client, const char *namePattern,
+                                   const char *typePattern, unsigned long flags);
 
-	PortNames portNames(const char* namePattern, const char* typePattern,
-			unsigned long flags);
+        PortNames portNames(const char *namePattern, const char *typePattern,
+                            unsigned long flags);
 
-	ShutDownInfo close();
+        ShutDownInfo close();
 
-	virtual ~JackClient();
-};
+        virtual ~JackClient();
+    };
 
 
 } /* End of namespace speakerman */

@@ -40,62 +40,64 @@
 namespace tdap {
 
 #ifdef TDAP_DEBUG_FACILITY
-	static int debugArrayRegisterCount(bool add, int &count)
-	{
-		static constexpr unsigned MAX_COUNTS = 100;
-		static unsigned number = 0;
-		static int *array[MAX_COUNTS];
+    static int debugArrayRegisterCount(bool add, int &count)
+    {
+            static constexpr unsigned MAX_COUNTS = 100;
+            static unsigned number = 0;
+            static int *array[MAX_COUNTS];
 
-		if (add) {
-			if (number < MAX_COUNTS) {
-				array[number++] = &count;
-				return 1;
-			}
-			return 0;
-		}
-		else {
+            if (add) {
+                    if (number < MAX_COUNTS) {
+                            array[number++] = &count;
+                            return 1;
+                    }
+                    return 0;
+            }
+            else {
 #	ifdef TDAP_DEBUG_FACILITY_VERBOSE
-			std::cout << "TDAP_DEBUG_FACILITY: reset all counts" << std::endl;
+                    std::cout << "TDAP_DEBUG_FACILITY: reset all counts" << std::endl;
 #	endif
-			for (unsigned i = 0; i < number; i++) {
-				*array[i] = 0;
-			}
-			return 1;
-		}
-	}
-	static void debugArrayResetCounts()
-	{
-		int dummy;
-		debugArrayRegisterCount(false, dummy);
-	}
+                    for (unsigned i = 0; i < number; i++) {
+                            *array[i] = 0;
+                    }
+                    return 1;
+            }
+    }
+    static void debugArrayResetCounts()
+    {
+            int dummy;
+            debugArrayRegisterCount(false, dummy);
+    }
 #	ifdef TDAP_DEBUG_FACILITY_VERBOSE
 #		define TDAP_DEBUG_DEF_COUNT(name) \
-		static int debug##name##Count = 0; \
-		static inline void debug##name##Call() { \
-			static const int delta = debugArrayRegisterCount(true, debug##name##Count); \
-			debug##name##Count += delta; \
-			std::cout << "\t" << #name << "(" << debug##name##Count << ")" << std::endl; \
-		}\
-		static inline void debug##name##Zero() { \
-			debug##name##Count = 0; \
-		}
+                static int debug##name##Count = 0; \
+                static inline void debug##name##Call() { \
+                        static const int delta = debugArrayRegisterCount(true, debug##name##Count); \
+                        debug##name##Count += delta; \
+                        std::cout << "\t" << #name << "(" << debug##name##Count << ")" << std::endl; \
+                }\
+                static inline void debug##name##Zero() { \
+                        debug##name##Count = 0; \
+                }
 #	else
 #		define TDAP_DEBUG_DEF_COUNT(name) \
-		static int debug##name##Count = 0; \
-		static inline void debug##name##Call() { \
-			static const int delta = debugArrayRegisterCount(true, debug##name##Count); \
-			debug##name##Count += delta; \
-		}\
-		static inline void debug##name##Zero() { \
-			debug##name##Count = 0; \
-		}
+                static int debug##name##Count = 0; \
+                static inline void debug##name##Call() { \
+                        static const int delta = debugArrayRegisterCount(true, debug##name##Count); \
+                        debug##name##Count += delta; \
+                }\
+                static inline void debug##name##Zero() { \
+                        debug##name##Count = 0; \
+                }
 #	endif
 #else
 #	define TDAP_DEBUG_DEF_COUNT(name) \
-	static inline void debug##name##Zero() { } \
-	static inline void debug##name##Call() { }
+        static inline void debug##name##Zero() { } \
+        static inline void debug##name##Call() { }
 
-	static inline void debugArrayResetCounts() { }
+    static inline void debugArrayResetCounts()
+    {}
+
 #endif
 
 } /* End of name space tdap */

@@ -25,28 +25,34 @@
 #include <string>
 #include <speakerman/Stream.hpp>
 
-namespace speakerman
-{
+namespace speakerman {
 
-class file_entry : public input_stream
-{
-	std::string name_;
-	char *data_ = nullptr;
-	size_t size_ = 0;
-	size_t capacity_ = 0;
-	size_t readPos_ = 0;
-	long long fileStamp_;
-	long long lastChecked_;
-public:
-	file_entry(const char* name);
-	void reset();
-	virtual int read();
-	virtual signed long read(void* buff, size_t offs, size_t length);
-	virtual void close();
-	size_t size() const { return size_; }
-	~file_entry();
+    class file_entry : public input_stream
+    {
+        std::string name_;
+        char *data_ = nullptr;
+        size_t size_ = 0;
+        size_t capacity_ = 0;
+        size_t readPos_ = 0;
+        long long fileStamp_;
+        long long lastChecked_;
+    public:
+        file_entry(const char *name);
 
-};
+        void reset();
+
+        virtual int read();
+
+        virtual signed long read(void *buff, size_t offs, size_t length);
+
+        virtual void close();
+
+        size_t size() const
+        { return size_; }
+
+        ~file_entry();
+
+    };
 
 
 } /* End of namespace speakerman */

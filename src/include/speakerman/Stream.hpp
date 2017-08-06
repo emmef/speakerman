@@ -25,127 +25,167 @@
 #include <cstddef>
 #include <type_traits>
 
-namespace speakerman
-{
-	struct stream_result
-	{
-		static constexpr int END_OF_STREAM = -1;
-		static constexpr int INTERRUPTED = END_OF_STREAM - 1;
-		static constexpr int INVALID_HANDLE = END_OF_STREAM - 2;
-		static constexpr int RESET_BY_PEER = END_OF_STREAM - 3;
-		static constexpr int INVALID_ARGUMENT = END_OF_STREAM - 4;
-		static constexpr int DATA_TRUNCATED = END_OF_STREAM - 5;
-	};
+namespace speakerman {
+    struct stream_result
+    {
+        static constexpr int END_OF_STREAM = -1;
+        static constexpr int INTERRUPTED = END_OF_STREAM - 1;
+        static constexpr int INVALID_HANDLE = END_OF_STREAM - 2;
+        static constexpr int RESET_BY_PEER = END_OF_STREAM - 3;
+        static constexpr int INVALID_ARGUMENT = END_OF_STREAM - 4;
+        static constexpr int DATA_TRUNCATED = END_OF_STREAM - 5;
+    };
 
-	int last_stream_result();
-	void set_stream_result(int result);
-	size_t last_operation_count();
-	void set_last_operation_count(size_t count);
+    int last_stream_result();
 
-	class closeable
-	{
-	public:
-		virtual void close() = 0;
-		virtual ~closeable() = default;
-	};
+    void set_stream_result(int result);
 
-	class input_stream : public closeable
-	{
-	public:
-		virtual int read() = 0;
-		virtual signed long read(void* buff, size_t offs, size_t length);
-		virtual signed long read_line(char* line, size_t line_size = 1024);
-		virtual ~input_stream() = default;
-	};
+    size_t last_operation_count();
 
-	signed long read_from_stream(input_stream &stream, void* buff, size_t offs, size_t length);
-	signed long read_line_from_stream(input_stream &stream, char* line, size_t line_size);
+    void set_last_operation_count(size_t count);
 
-	class output_stream : public closeable
-	{
-	public:
-		virtual int write(char c) = 0;
-		virtual signed long write(const void *buff, size_t offs, size_t length);
-		virtual signed long write_string(const char*string, size_t length = 1024);
-		virtual void flush() = 0;
-		virtual ~output_stream() = default;
-	};
+    class closeable
+    {
+    public:
+        virtual void close() = 0;
 
-	signed long write_to_stream(output_stream & stream, const void* buff, size_t offs, size_t length);
-	signed long write_string_to_stream(output_stream & stream, const char* string, size_t length);
+        virtual ~closeable() = default;
+    };
 
-	template<typename T>
-	class managable_input_stream : public input_stream
-	{
-	public:
-		virtual void set_config(const T &config) = 0;
-	};
+    class input_stream : public closeable
+    {
+    public:
+        virtual int read() = 0;
 
-	template<typename T, class Y>
-	class managed_input_stream : public input_stream
-	{
-		using Stream = managable_input_stream<T>;
-		static_assert(std::is_base_of<Stream,Y>::value, "Type parameter must be subclass of manageable_input_stream of same type");
-		Stream stream_;
-		void cleanup() {
-			stream_.close();
-		}
-	public:
-		virtual int read() { return stream_.read(); }
-		virtual signed long read(void* buff, size_t offs, size_t length) { return stream_.read(buff, offs, length); }
-		virtual signed long read_line(char* line, size_t line_size) { return stream_.read_line(line, line_size); }
-		void set_config(const T& config) {
-			cleanup();
-			stream_.set_config(config);
-		}
-		virtual ~managed_input_stream() { cleanup(); }
-	};
-	template<typename T>
-	class managable_output_stream : public output_stream
-	{
-	public:
-		virtual void set_config(const T &config) = 0;
-	};
+        virtual signed long read(void *buff, size_t offs, size_t length);
+
+        virtual signed long read_line(char *line, size_t line_size = 1024);
+
+        virtual ~input_stream() = default;
+    };
+
+    signed long read_from_stream(input_stream &stream, void *buff, size_t offs, size_t length);
+
+    signed long read_line_from_stream(input_stream &stream, char *line, size_t line_size);
+
+    class output_stream : public closeable
+    {
+    public:
+        virtual int write(char c) = 0;
+
+        virtual signed long write(const void *buff, size_t offs, size_t length);
+
+        virtual signed long write_string(const char *string, size_t length = 1024);
+
+        virtual void flush() = 0;
+
+        virtual ~output_stream() = default;
+    };
+
+    signed long write_to_stream(output_stream &stream, const void *buff, size_t offs, size_t length);
+
+    signed long write_string_to_stream(output_stream &stream, const char *string, size_t length);
+
+    template<typename T>
+    class managable_input_stream : public input_stream
+    {
+    public:
+        virtual void set_config(const T &config) = 0;
+    };
+
+    template<typename T, class Y>
+    class managed_input_stream : public input_stream
+    {
+        using Stream = managable_input_stream<T>;
+        static_assert(std::is_base_of<Stream, Y>::value,
+                      "Type parameter must be subclass of manageable_input_stream of same type");
+        Stream stream_;
+
+        void cleanup()
+        {
+            stream_.close();
+        }
+
+    public:
+        virtual int read()
+        { return stream_.read(); }
+
+        virtual signed long read(void *buff, size_t offs, size_t length)
+        { return stream_.read(buff, offs, length); }
+
+        virtual signed long read_line(char *line, size_t line_size)
+        { return stream_.read_line(line, line_size); }
+
+        void set_config(const T &config)
+        {
+            cleanup();
+            stream_.set_config(config);
+        }
+
+        virtual ~managed_input_stream()
+        { cleanup(); }
+    };
+
+    template<typename T>
+    class managable_output_stream : public output_stream
+    {
+    public:
+        virtual void set_config(const T &config) = 0;
+    };
 
 
-	class file_owner
-	{
-		int file_descriptor_;
-		bool owns_file_;
-	protected:
-		int file_descriptor() const { return file_descriptor_; }
-		virtual void close_file() = 0;
-		virtual void before_close_file() = 0;
-		virtual void on_file_set() = 0;
+    class file_owner
+    {
+        int file_descriptor_;
+        bool owns_file_;
+    protected:
+        int file_descriptor() const
+        { return file_descriptor_; }
 
-		void cleanup_file();
-	public:
-		file_owner();
+        virtual void close_file() = 0;
 
-		void set_file(int file_descriptor, bool owns_file);
-		virtual ~file_owner();
-	};
+        virtual void before_close_file() = 0;
 
-	class buffer_stream : public output_stream, public input_stream
-	{
-		size_t capacity_;
-		char * data_;
-		size_t read_;
-		size_t write_;
-	protected :
-		char* data() const;
-	public:
-		buffer_stream(size_t capacity);
-		virtual int read() override final;
-		virtual int write(char c) override final;
-		virtual void flush() override final;
-		virtual void close() override final;
+        virtual void on_file_set() = 0;
 
-		virtual ~buffer_stream();
-		size_t readable_size() const;
-		size_t maximum_size() const;
-		size_t allocated_size() const;
-	};
+        void cleanup_file();
+
+    public:
+        file_owner();
+
+        void set_file(int file_descriptor, bool owns_file);
+
+        virtual ~file_owner();
+    };
+
+    class buffer_stream : public output_stream, public input_stream
+    {
+        size_t capacity_;
+        char *data_;
+        size_t read_;
+        size_t write_;
+    protected :
+        char *data() const;
+
+    public:
+        buffer_stream(size_t capacity);
+
+        virtual int read() override final;
+
+        virtual int write(char c) override final;
+
+        virtual void flush() override final;
+
+        virtual void close() override final;
+
+        virtual ~buffer_stream();
+
+        size_t readable_size() const;
+
+        size_t maximum_size() const;
+
+        size_t allocated_size() const;
+    };
 
 
 } /* End of namespace speakerman */

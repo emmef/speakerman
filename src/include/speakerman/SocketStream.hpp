@@ -28,92 +28,130 @@
 #include <cstdio>
 #include <speakerman/Stream.hpp>
 
-namespace speakerman
-{
-	static constexpr size_t STREAM_BUFFER_SIZE = 1024;
+namespace speakerman {
+    static constexpr size_t STREAM_BUFFER_SIZE = 1024;
 
-	class socket_input_stream : public file_owner, input_stream
-	{
-		char buffer_[STREAM_BUFFER_SIZE];
-		int pos_;
-		int mark_;
-		bool blocking_;
+    class socket_input_stream : public file_owner, input_stream
+    {
+        char buffer_[STREAM_BUFFER_SIZE];
+        int pos_;
+        int mark_;
+        bool blocking_;
 
-		int unsafe_read();
-	protected:
-		virtual void close_file() override;
-		virtual void before_close_file() override;
-		virtual void on_file_set() override;
+        int unsafe_read();
 
-	public:
-		socket_input_stream(int file_descriptor, bool owns_file);
-		socket_input_stream();
+    protected:
+        virtual void close_file() override;
 
-		void set_bocking(bool value);
-		bool get_bocking();
-		bool canReadFromBuffer() const;
-		virtual int read() override;
-		virtual void close() override;
-		~socket_input_stream();
-	};
+        virtual void before_close_file() override;
 
-	class socket_stream;
-	class socket_output_stream : public file_owner, output_stream
-	{
-		char buffer_[STREAM_BUFFER_SIZE];
-		size_t pos_;
-		friend class socket_stream;
+        virtual void on_file_set() override;
 
-		int unsafe_send(size_t offset, size_t count, bool do_throw);
-		int unsafe_flush(bool do_throw);
-		int unsafe_write(char c);
-		void unsafe_set_file(int fd);
-	protected:
-		virtual void close_file() override;
-		virtual void before_close_file() override;
-		virtual void on_file_set() override;
+    public:
+        socket_input_stream(int file_descriptor, bool owns_file);
 
-	public:
-		socket_output_stream(int fd, bool owns_file);
-		socket_output_stream();
+        socket_input_stream();
 
-		bool canWriteToBuffer() const;
-		virtual int write(char c) override;
-		int write_string(const char *str, size_t max_len, size_t *written);
-		virtual void flush() override;
-		virtual void close() override;
-		~socket_output_stream();
-	};
+        void set_bocking(bool value);
 
-	class socket_stream : public input_stream, public output_stream
-	{
-		socket_input_stream istream;
-		socket_output_stream ostream;
+        bool get_bocking();
 
-	public:
-		socket_stream(int fd, bool owns_file) { set_file(fd, owns_file); }
-		socket_stream() : socket_stream(-1, false) {}
+        bool canReadFromBuffer() const;
 
-		virtual int read() { return istream.read(); }
-		virtual void close() {	istream.close(); ostream.close(); }
-		virtual int write(char c) { return ostream.write(c); }
-		virtual void flush() { ostream.flush(); }
+        virtual int read() override;
 
-		int set_file(int fd, bool owns_file)
-		{
-			istream.set_file(fd, false);
-			ostream.set_file(fd, owns_file);
-			return 0;
-		}
+        virtual void close() override;
 
-		bool canReadFromBuffer() const { return istream.canReadFromBuffer(); }
+        ~socket_input_stream();
+    };
 
-		bool canWriteToBuffer() const { return ostream.canWriteToBuffer(); }
+    class socket_stream;
 
-		virtual ~socket_stream() {
+    class socket_output_stream : public file_owner, output_stream
+    {
+        char buffer_[STREAM_BUFFER_SIZE];
+        size_t pos_;
 
-		}
-	};
+        friend class socket_stream;
+
+        int unsafe_send(size_t offset, size_t count, bool do_throw);
+
+        int unsafe_flush(bool do_throw);
+
+        int unsafe_write(char c);
+
+        void unsafe_set_file(int fd);
+
+    protected:
+        virtual void close_file() override;
+
+        virtual void before_close_file() override;
+
+        virtual void on_file_set() override;
+
+    public:
+        socket_output_stream(int fd, bool owns_file);
+
+        socket_output_stream();
+
+        bool canWriteToBuffer() const;
+
+        virtual int write(char c) override;
+
+        int write_string(const char *str, size_t max_len, size_t *written);
+
+        virtual void flush() override;
+
+        virtual void close() override;
+
+        ~socket_output_stream();
+    };
+
+    class socket_stream : public input_stream, public output_stream
+    {
+        socket_input_stream istream;
+        socket_output_stream ostream;
+
+    public:
+        socket_stream(int fd, bool owns_file)
+        { set_file(fd, owns_file); }
+
+        socket_stream() : socket_stream(-1, false)
+        {}
+
+        virtual int read()
+        { return istream.read(); }
+
+        virtual void close()
+        {
+            istream.close();
+            ostream.close();
+        }
+
+        virtual int write(char c)
+        { return ostream.write(c); }
+
+        virtual void flush()
+        { ostream.flush(); }
+
+        int set_file(int fd, bool owns_file)
+        {
+            istream.set_file(fd, false);
+            ostream.set_file(fd, owns_file);
+            return 0;
+        }
+
+        bool canReadFromBuffer() const
+        { return istream.canReadFromBuffer(); }
+
+        bool canWriteToBuffer() const
+        { return ostream.canWriteToBuffer(); }
+
+        virtual ~socket_stream()
+        {
+
+        }
+    };
 } /* End of namespace speakerman */
 
 #endif /* SMS_SPEAKERMAN_SOCKET_STREAM_GUARD_H_ */

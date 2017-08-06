@@ -27,87 +27,91 @@
 
 namespace tdap {
 
-template<typename T>
-class ValueRange
-{
-	static_assert(std::is_arithmetic<T>::value, "Value type T must be arithmetic");
-	ValueRange() :
-		superRange_(*this),
-		min_(std::numeric_limits<T>::lowest()),
-		max_(std::numeric_limits<T>::max()) { }
+    template<typename T>
+    class ValueRange
+    {
+        static_assert(std::is_arithmetic<T>::value, "Value type T must be arithmetic");
 
-	const ValueRange<T> &superRange_;
-	const T min_;
-	const T max_;
+        ValueRange() :
+                superRange_(*this),
+                min_(std::numeric_limits<T>::lowest()),
+                max_(std::numeric_limits<T>::max())
+        {}
 
-public:
-	static const ValueRange<T> &absolute()
-	{
-		static ValueRange range;
-		return range;
-	}
+        const ValueRange<T> &superRange_;
+        const T min_;
+        const T max_;
 
-	ValueRange(const ValueRange &superRange, T min, T max) :
-		superRange_(superRange),
-		min_(superRange_.getStartIfValid(min, max)),
-		max_(max) { }
+    public:
+        static const ValueRange<T> &absolute()
+        {
+            static ValueRange range;
+            return range;
+        }
 
-	ValueRange(T min, T max) : ValueRange(absolute(), min, max) { }
+        ValueRange(const ValueRange &superRange, T min, T max) :
+                superRange_(superRange),
+                min_(superRange_.getStartIfValid(min, max)),
+                max_(max)
+        {}
 
-	const ValueRange<T> &superRange() const
-	{
-		return superRange_;
-	}
+        ValueRange(T min, T max) : ValueRange(absolute(), min, max)
+        {}
 
-	T getMinimum() const
-	{
-		return min_;
-	}
+        const ValueRange<T> &superRange() const
+        {
+            return superRange_;
+        }
 
-	T getMaximum() const
-	{
-		return max_;
-	}
+        T getMinimum() const
+        {
+            return min_;
+        }
 
-	T getBetween(T value) const
-	{
-		return Value<T>::force_between(value, min_, max_);
-	}
+        T getMaximum() const
+        {
+            return max_;
+        }
 
-	bool isBetween(T value) const
-	{
-		return value >= min_ && value <= max_;
-	}
+        T getBetween(T value) const
+        {
+            return Value<T>::force_between(value, min_, max_);
+        }
 
-	bool isSubRange(T start, T end) const
-	{
-		return start < end && start >= min_ && end <= max_;
-	}
+        bool isBetween(T value) const
+        {
+            return value >= min_ && value <= max_;
+        }
 
-	T getValid(T value) const
-	{
-		if (isBetween(value)) {
-			return value;
-		}
-		throw std::invalid_argument("ValueRange: time not within range");
-	}
+        bool isSubRange(T start, T end) const
+        {
+            return start < end && start >= min_ && end <= max_;
+        }
 
-	T getStartIfValid(T start, T end) const
-	{
-		if (isSubRange(start, end)) {
-			return start;
-		}
-		throw std::invalid_argument("ValueRange::getStartIfValid(): invalid range");
-	}
+        T getValid(T value) const
+        {
+            if (isBetween(value)) {
+                return value;
+            }
+            throw std::invalid_argument("ValueRange: time not within range");
+        }
 
-	T getEndIfValid(T start, T end) const
-	{
-		if (isSubRange(start, end)) {
-			return start;
-		}
-		throw std::invalid_argument("ValueRange::getStartIfValid(): invalid range");
-	}
-};
+        T getStartIfValid(T start, T end) const
+        {
+            if (isSubRange(start, end)) {
+                return start;
+            }
+            throw std::invalid_argument("ValueRange::getStartIfValid(): invalid range");
+        }
+
+        T getEndIfValid(T start, T end) const
+        {
+            if (isSubRange(start, end)) {
+                return start;
+            }
+            throw std::invalid_argument("ValueRange::getStartIfValid(): invalid range");
+        }
+    };
 
 } /* End of name space tdap */
 
