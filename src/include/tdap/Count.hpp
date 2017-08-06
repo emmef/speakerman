@@ -78,7 +78,7 @@ struct CountOfSize
 	 */
 	static constexpr size_t sum(size_t cnt1, size_t cnt2)
 	{
-		return cnt1 <= max() && cnt2 <= max() && cnt1 + cnt2 <= max() ? cnt1 + cnt2 : 0;
+		return cnt1 <= max() && cnt2 <= max() && (max() - cnt1) >= cnt2 ? cnt1 + cnt2 : 0;
 	}
 
 	/**
@@ -125,6 +125,11 @@ struct CountOfSize
 		return is_valid_sum(cnt1, cnt2) && is_valid_sum(cnt3, cnt4) && is_valid_sum(cnt1 + cnt2, cnt3 + cnt4);
 	}
 
+
+    static constexpr size_t aligned_with(size_t value, size_t alignment)
+    {
+        return alignment != 0 ? value % alignment != 0 ? value + alignment - (value % alignment): value : 0;
+    }
 };
 
 template<typename E>
