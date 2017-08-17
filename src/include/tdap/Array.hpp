@@ -64,11 +64,10 @@ namespace tdap {
         friend class ArrayTraits<T, Array<T>>;
 
         using Parent = ArrayTraits<T, Array<T>>;
-        using Data = typename std::aligned_storage<sizeof(T), alignof(T)>::type;
 
         size_t capacity_;
         size_t size_;
-        Data *data_;
+        T *data_;
 
         static size_t validCapacity(size_t size)
         {
@@ -106,7 +105,7 @@ namespace tdap {
 
         T *_traitPlus(size_t i) const
         {
-            return reinterpret_cast<T *>(data_ + 1);
+            return reinterpret_cast<T *>(data_ + i);
         }
 
         void _traitSetSize(size_t newSize)
@@ -129,11 +128,11 @@ namespace tdap {
         using ArrayTraits<T, Array<T>>::copy;
         using ArrayTraits<T, Array<T>>::validSize;
 
-        Array(size_t capacity) : capacity_(validCapacity(capacity)), size_(capacity_), data_(new Data[capacity_])
+        Array(size_t capacity) : capacity_(validCapacity(capacity)), size_(capacity_), data_(new T[capacity_])
         {}
 
         Array(size_t capacity, size_t size) : capacity_(validCapacity(capacity)), size_(Parent::validSize(size)),
-                                              data_(new Data[capacity_])
+                                              data_(new T[capacity_])
         {}
 
         Array(Array<T> &&source) : capacity_(source.capacity_), size_(source.size_), data_(source.data_)
@@ -145,14 +144,14 @@ namespace tdap {
 
         template<typename ...A>
         Array(const ArrayTraits<T, A...> &source) : capacity_(source.size()), size_(capacity_),
-                                                    data_(new Data[capacity_])
+                                                    data_(new T[capacity_])
         {
             copy(source);
         }
 
         Array(const Array<T> &source, ConstructionPolicy policy) :
                 capacity_(policy == ConstructionPolicy::INHERIT_CAPACITY ? source.capacity_ : source.size_),
-                size_(source.size_), data_(new Data[capacity_])
+                size_(source.size_), data_(new T[capacity_])
         {
             copy(source);
         }

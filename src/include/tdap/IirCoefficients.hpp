@@ -303,7 +303,7 @@ namespace tdap {
         }
 
     private:
-        C data[TOTAL_COEEFS];
+        alignas(Count<C>::align()) C data[TOTAL_COEEFS];
     };
 
 
@@ -642,6 +642,77 @@ namespace tdap {
             return new MultiChannelFilter(*this);
         }
     };
+
+    template<typename S, size_t ORDER, size_t CHANNELS, bool FLUSH = false, size_t ALIGN = Count<S>::align()>
+    struct MultiFilterData
+    {
+        static_assert(is_arithmetic<S>::value, "Value type should be arithmetic");
+        static_assert(ORDER > 0, "ORDER of filter must be positive");
+        static_assert(CHANNELS > 0, "CHANNELS of filter must be positive");
+        static constexpr size_t HISTORY = IirCoefficients::historyForOrder(ORDER);
+
+
+        struct alignas(ALIGN) Vector : public FixedSizeArray<S, HISTORY> {
+            using FixedSizeArray<S, HISTORY>::operator=;
+            template<typename ...A>
+            Vector(const FixedSizeArrayTraits<S, HISTORY, A...> &source) : FixedSizeArray<S, HISTORY>(source)
+            {}
+            Vector(const S value) : FixedSizeArray<S, HISTORY>(value)
+            {}
+        };
+
+        static_assert(Count<Vector>::is_valid_sum(CHANNELS, CHANNELS, CHANNELS), "CHANNELS must theoretically fit in memory");
+
+        FixedSizeIirCoefficients<S, ORDER> coeff;
+        Vector xHistory[CHANNELS];
+        Vector yHistory[CHANNELS];
+
+        void zero()
+        {
+            for (size_t i = 0; i < CHANNELS; i++) {
+                xHistory[i].zero();
+                yHistory[i].zero();
+            }
+        }
+
+        MultiFilterData()
+        {
+            zero();
+        }
+
+        template<typename ...A>
+        inline void filter(
+                FixedSizeArrayTraits<S, CHANNELS, A...> &target,
+                const FixedSizeArrayTraits<S, CHANNELS, A...> &source)
+        {
+            Vector Y = 0.0;
+            const Vector input = source;
+            Vector X = input; // source is xN0
+            Vector yN0 = 0.0;
+            size_t i, j;
+            Vector xN1;
+            Vector yN1;
+            for (i = 0, j = 1; i < ORDER; i++, j++) {
+                xN1 = xHistory[i];
+                yN1 = yHistory[i];
+                xHistory[i] = X;
+                X = xN1;
+                yHistory[i] = Y;
+                Y = yN1;
+                yN0 += xN1 * coeff.getC(j);
+                yN0 += yN1 * coeff.getD(j);
+            }
+            yN0 += input * coeff.getC(0);
+
+            if (FLUSH) {
+                Denormal::flush(yN0);
+            }
+            yHistory[0] = yN0;
+
+            target = yN0;
+        }
+    };
+
 
 
 } /* End of name space tdap */

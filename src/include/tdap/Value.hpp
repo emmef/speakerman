@@ -26,6 +26,7 @@
 #include <limits>
 #include <stdexcept>
 #include <type_traits>
+#include <cmath>
 
 namespace tdap {
 

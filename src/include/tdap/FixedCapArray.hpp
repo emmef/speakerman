@@ -29,7 +29,7 @@
 namespace tdap {
 
     template<typename T, size_t CAPACITY>
-    class FixedCapArray : public FixedCapArrayTraits<T, CAPACITY, FixedCapArray<T, CAPACITY>>
+    class alignas(Count<T>::align) FixedCapArray : public FixedCapArrayTraits<T, CAPACITY, FixedCapArray<T, CAPACITY>>
     {
         static_assert(TriviallyCopyable<T>::value,
                       "Type must be trivial to copy, move or destroy and have standard layout");
@@ -43,7 +43,7 @@ namespace tdap {
         using FixedCapArrayTraits<T, CAPACITY, FixedCapArray<T, CAPACITY>>::validSize;
 
         size_t size_ = 0;
-        typename std::aligned_storage<sizeof(T), alignof(T)>::type data_[MAXSIZE];
+        T alignas(alignof(Count<T>::align)) data_[MAXSIZE];
 
         size_t _traitGetSize() const
         { return size_; }
@@ -53,29 +53,28 @@ namespace tdap {
 
         T &_traitRefAt(size_t i)
         {
-            return *reinterpret_cast<T *>(data_ + i);
+            return data_[i];
         }
 
         const T &_traitRefAt(size_t i) const
         {
-            return *reinterpret_cast<const T *>(data_ + i);
+            return data_[i];
         }
 
         T *_traitUnsafeData()
         {
-            return *reinterpret_cast<T *>(data_);
+            return data_;
         }
 
         const T *_traitUnsafeData() const
         {
-            return *reinterpret_cast<const T *>(data_);
+            return data_;
         }
 
         T *_traitPlus(size_t i) const
         {
-            return reinterpret_cast<T *>(data_ + i);
+            return data_ + i;
         }
-
 
         void _traitSetSize(size_t newSize)
         {

@@ -30,10 +30,147 @@
 #include <tdap/IndexPolicy.hpp>
 
 namespace tdap {
+    template<typename T, size_t N, class Sub>
+    struct FixedSizeArrayTraits;
+
+    template <typename T, size_t N, class Sub, int arithmeticType>
+    struct OptionalArithmeticArrayTraits
+    {
+
+    };
+
+    template <typename T, size_t N, class Sub>
+    struct OptionalArithmeticArrayTraits<T, N, Sub, 0>
+    {
+
+    };
+
+    template <typename T, size_t N, class Sub>
+    struct OptionalArithmeticArrayTraits<T, N, Sub, 2>
+    {
+        template<typename ...A>
+        Sub operator * (const FixedSizeArrayTraits<T, N, A...> &source) const
+        {
+            Sub result;
+            for (size_t i = 0; i < static_cast<const Sub *>(this)->size(); i++) {
+                result[i] = source[i] * static_cast<const Sub *>(this)->operator[](i);
+            }
+            return result;
+        }
+
+        Sub operator * (const T times) const
+        {
+            Sub result;
+            for (size_t i = 0; i < static_cast<const Sub *>(this)->size(); i++) {
+                result[i] = static_cast<const Sub *>(this)->operator[](i) * times;
+            }
+            return result;
+        }
+
+        template<typename ...A>
+        Sub operator + (const FixedSizeArrayTraits<T, N, A...> &source) const
+        {
+            Sub result;
+            for (size_t i = 0; i < static_cast<const Sub *>(this)->size(); i++) {
+                result[i] = static_cast<const Sub *>(this)->operator[](i) + source[i];
+            }
+            return result;
+        }
+
+        template<typename ...A>
+        Sub operator - (const FixedSizeArrayTraits<T, N, A...> &source) const
+        {
+            Sub result;
+            for (size_t i = 0; i < static_cast<const Sub *>(this)->size(); i++) {
+                result[i] = static_cast<const Sub *>(this)->operator[](i) - source[i];
+            }
+            return result;
+        }
+
+        Sub operator / (const T divideBy) const
+        {
+            Sub result;
+            for (size_t i = 0; i < static_cast<const Sub *>(this)->size(); i++) {
+                result[i] = static_cast<const Sub *>(this)->operator[](i) / divideBy;
+            }
+            return result;
+        }
+
+        template<typename ...A>
+        void operator *= (const FixedSizeArrayTraits<T, N, A...> &times)
+        {
+            for (size_t i = 0; i < static_cast<const Sub *>(this)->size(); i++) {
+                static_cast<Sub *>(this)->operator[](i) *= times[i];
+            }
+        }
+
+        void operator *= (const T factor)
+        {
+            for (size_t i = 0; i < static_cast<const Sub *>(this)->size(); i++) {
+                static_cast<Sub *>(this)->operator[](i) *= factor;
+            }
+        }
+
+        template<typename ...A>
+        void operator += (const FixedSizeArrayTraits<T, N, A...> &plus)
+        {
+            for (size_t i = 0; i < static_cast<const Sub *>(this)->size(); i++) {
+                static_cast<Sub *>(this)->operator[](i) += plus[i];
+            }
+        }
+
+        template<typename ...A>
+        void operator -= (const FixedSizeArrayTraits<T, N, A...> &minus)
+        {
+            for (size_t i = 0; i < static_cast<const Sub *>(this)->size(); i++) {
+                static_cast<Sub *>(this)->operator[](i) -= minus[i];
+            }
+        }
+
+        void operator /= (const T divideBy)
+        {
+            for (size_t i = 0; i < static_cast<const Sub *>(this)->size(); i++) {
+                static_cast<Sub *>(this)->operator[](i) /= divideBy;
+            }
+        }
+
+        void operator = (const T value)
+        {
+            for (size_t i = 0; i < static_cast<const Sub *>(this)->size(); i++) {
+                static_cast<Sub *>(this)->operator[](i) = value;
+            }
+        }
+
+        template<typename ...A>
+        T in(const FixedSizeArrayTraits<T, N, A...> &times) const
+        {
+            T result = 0.0;
+            for (size_t i = 0; i < static_cast<const Sub *>(this)->size(); i++) {
+                result += static_cast<const Sub *>(this)->operator[](i) * times[i]; 
+            }
+            return result;
+        }
+
+        T in() const
+        {
+            T result = 0.0;
+            for (size_t i = 0; i < static_cast<const Sub *>(this)->size(); i++) {
+                T x = static_cast<const Sub *>(this)->operator[](i);
+                result += x * x;
+            }
+            return result;
+        }
+
+    };
+
+    template <typename T>
+    constexpr int selectArithmeticType()
+    {
+        return std::is_arithmetic<T>::value ? 2 : 0;
+    }
 
     template<typename T, class Sub>
-    struct ArrayTraits
-    {
+    struct ArrayTraits {
         size_t size() const
         {
             return static_cast<const Sub *>(this)->_traitGetSize();
@@ -247,16 +384,21 @@ namespace tdap {
     };
 
     template<typename T, size_t SIZE, class Sub>
-    struct FixedSizeArrayTraits : public ArrayTraits<T, Sub>
+    struct FixedSizeArrayTraits : public ArrayTraits<T, Sub>, public OptionalArithmeticArrayTraits<T, SIZE, Sub, selectArithmeticType<T>()>
     {
         constexpr size_t size() const
+        {
+            return SIZE;
+        }
+
+        constexpr size_t capacity() const
         {
             return SIZE;
         }
     };
 
     template<typename T, size_t CAPACITY, class Sub>
-    struct FixedCapArrayTraits : public ArrayTraits<T, Sub>
+    struct FixedCapArrayTraits : public ArrayTraits<T, Sub>, public OptionalArithmeticArrayTraits<T, CAPACITY, Sub, selectArithmeticType<T>()>
     {
         void setSize(size_t newSize)
         {
@@ -283,7 +425,6 @@ namespace tdap {
         SIZE_BECOMES_CAPACITY,
         INHERIT_CAPACITY
     };
-
 
 } /* End of name space tdap */
 

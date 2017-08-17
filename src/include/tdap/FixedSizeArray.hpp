@@ -28,14 +28,14 @@
 namespace tdap {
 
     template<typename T, size_t SIZE>
-    class FixedSizeArray : public FixedSizeArrayTraits<T, SIZE, FixedSizeArray<T, SIZE>>
+    class alignas(Count<T>::align()) FixedSizeArray : public FixedSizeArrayTraits<T, SIZE, FixedSizeArray<T, SIZE>>
     {
         static_assert(TriviallyCopyable<T>::value,
                       "Type must be trivial to copy, move or destroy and have standard layout");
 
         friend class ArrayTraits<T, FixedSizeArray<T, SIZE>>;
 
-        typename std::aligned_storage<sizeof(T), alignof(T)>::type data_[SIZE];
+        T data_[SIZE];
 
         size_t _traitGetSize() const
         { return SIZE; }
@@ -45,34 +45,56 @@ namespace tdap {
 
         T &_traitRefAt(size_t i)
         {
-            return *reinterpret_cast<T *>(data_ + i);
+            return data_[i];
         }
 
         const T &_traitRefAt(size_t i) const
         {
-            return *reinterpret_cast<const T *>(data_ + i);
+            return data_[i];
         }
 
         T *_traitUnsafeData()
         {
-            return reinterpret_cast<T *>(data_);
+            return data_;
         }
 
         const T *_traitUnsafeData() const
         {
-            return reinterpret_cast<const T *>(data_);
+            return data_;
         }
 
         T *_traitPlus(size_t i) const
         {
-            return reinterpret_cast<const T *>(data_ + i);
+            return data_ + i;
         }
 
         static constexpr bool _traitHasTrivialAddressing()
         { return true; }
 
     public:
+        template<typename ...A>
+        FixedSizeArray(const FixedSizeArrayTraits<T, SIZE, A...> &source)
+        {
+            copy(source);
+        }
+//        FixedSizeArray(const T value)
+//        {
+//            if (value == 0) {
+//                zero();
+//            }
+//            else {
+//                for (size_t i = 0; i < SIZE; i++) {
+//                    _traitRefAt(i) = value;
+//                }
+//            }
+//        }
+        FixedSizeArray() {}
 
+        template<typename ...A>
+        void operator =(const FixedSizeArrayTraits<T, SIZE, A...> &source)
+        {
+            copy(source);
+        }
     };
 
 } /* End of name space tdap */

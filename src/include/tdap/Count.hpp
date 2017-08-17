@@ -25,6 +25,7 @@
 
 #include <limits>
 #include <stdexcept>
+#include <cstddef>
 
 namespace tdap {
 
@@ -138,6 +139,11 @@ namespace tdap {
     template<typename E>
     class Count : public CountOfSize<sizeof(E)>
     {
+    public:
+        static constexpr size_t align()
+        {
+            return std::is_floating_point<E>::value ? alignof(max_align_t) : alignof(E);
+        }
     };
 
 } /* End of name space tdap */
