@@ -96,6 +96,7 @@ namespace speakerman {
     {
         FixedSizeArray <T, SpeakermanConfig::MAX_GROUPS> volume_;
         size_t delay_;
+        bool useSub_;
         T bandRmsScale_[BANDS];
         T limiterScale_;
         T limiterThreshold_;
@@ -120,6 +121,7 @@ namespace speakerman {
 
         size_t delay() const
         { return delay_; }
+        bool useSub() const { return useSub_;  }
 
         const EqualizerFilterData<T> &filterConfig() const
         { return filterConfig_; }
@@ -148,6 +150,7 @@ namespace speakerman {
                 volume_[i] = v < 1e-6 ? 0 : v;
             }
             delay_ = delay;
+            useSub_ = conf.use_sub == 1;
             limiterThreshold_ = SpeakerManLevels::getLimiterThreshold(conf.threshold, sloppyFactor);
             limiterScale_ = 1.0 / limiterThreshold_;
             for (size_t band = 0; band < BANDS; band++) {
@@ -317,8 +320,7 @@ namespace speakerman {
 
         void dump() const
         {
-            std:
-            cout << "Runtime Configuration dump" << std::endl;
+            std::cout << "Runtime Configuration dump" << std::endl;
             std::cout << " sub-limiter: scale=" << subLimiterScale() << "; threshold=" << subLimiterThreshold()
                       << std::endl;
             std::cout << " sub-RMS: scale=" << subRmsScale() << "; threshold=" << subRmsThreshold() << std::endl;
@@ -335,6 +337,7 @@ namespace speakerman {
                 }
                 std::cout << "]" << std::endl;
                 std::cout << "  delay=" << grpConfig.delay() << std::endl;
+                std::cout << "  use-sub=" << grpConfig.useSub() << std::endl;
                 std::cout << "  equalizers=" << grpConfig.filterConfig().count() << std::endl;
                 std::cout << "  limiter: scale=" << grpConfig.limiterScale() << "; threshold="
                           << grpConfig.limiterThreshold() << std::endl;

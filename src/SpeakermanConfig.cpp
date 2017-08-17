@@ -52,7 +52,7 @@ namespace speakerman {
 
 
     static constexpr size_t ID_GLOBAL_CNT = 8;
-    static constexpr size_t ID_GROUP_CNT = 4;
+    static constexpr size_t ID_GROUP_CNT = 5;
     static constexpr size_t ID_EQ_CNT = 3;
 
     static constexpr bool isUserAllowed(ssize_t groupId, ssize_t eqId, size_t fieldId)
@@ -155,6 +155,9 @@ namespace speakerman {
             key = groupKey;
             key += GroupConfig::KEY_SNIPPET_DELAY;
             strings[getOffset(group, -1, GroupConfig::KEY_DELAY)] = key;
+            key = groupKey;
+            key += GroupConfig::KEY_SNIPPET_USE_SUB;
+            strings[getOffset(group, -1, GroupConfig::KEY_USE_SUB)] = key;
 
             string eqBase = groupKey;
             eqBase += EqualizerConfig::KEY_SNIPPET_EQUALIZER;
@@ -187,6 +190,7 @@ namespace speakerman {
     }
 
     static constexpr size_t UNSET_SIZE = -1;
+    static constexpr int UNSET_BOOL = -1;
     static constexpr double UNSET_FLOAT = numeric_limits<double>::infinity();
 
     static constexpr const char *KEY_GROUPS = "/groups";
@@ -334,6 +338,23 @@ namespace speakerman {
         }
         variable = static_cast<T>(tempValue);
         return true;
+    }
+
+    static bool readBool(int &variable, const char *key, const char *value)
+    {
+        if (strncasecmp("true", value, 5) == 0 || strncasecmp("yes", value, 5) == 0 || strncmp("1", value, 2) == 0) {
+            variable = 1;
+            return true;
+        }
+        if (strncasecmp("false", value, 5) == 0 || strncasecmp("no", value, 5) == 0 || strncmp("0", value, 2) == 0) {
+            variable = 0;
+            return true;
+        }
+        if (*value == 0) {
+            return true;
+        }
+        std::cerr << "E: Invalid value for \"" << key << "\": " << value << std::endl;
+        return false;
     }
 
     template<typename T, size_t N>
@@ -526,6 +547,9 @@ namespace speakerman {
         else if (isKey(key, config->initial, config->groupId, -1, GroupConfig::KEY_DELAY)) {
             readNumber(config->config.delay, key, value, GroupConfig::MIN_DELAY, GroupConfig::MAX_DELAY, true);
         }
+        else if (isKey(key, config->initial, config->groupId, -1, GroupConfig::KEY_USE_SUB)) {
+            readBool(config->config.use_sub, key, value);
+        }
         return speakerman::config::CallbackResult::CONTINUE;
     }
 
@@ -587,6 +611,7 @@ namespace speakerman {
             config.volume[i] = UNSET_FLOAT;
         }
         config.delay = UNSET_FLOAT;
+        config.use_sub = UNSET_BOOL;
 
         auto result = reader.read(stream, readGroupCallback, &data);
         if (result != config::ReadResult::SUCCESS && result != config::ReadResult::STOPPED) {
@@ -604,6 +629,8 @@ namespace speakerman {
         }
         setDefault(config.delay, UNSET_FLOAT, defaultConfig.delay,
                    getConfigKey(data.groupId, -1, GroupConfig::KEY_DELAY));
+        setDefault(config.use_sub, UNSET_BOOL, defaultConfig.use_sub,
+                   getConfigKey(data.groupId, -1, GroupConfig::KEY_USE_SUB));
 
         for (size_t eq = 0; eq < GroupConfig::MAX_EQS; eq++) {
             EqConfigCallbackData info{config.eq[eq], data.groupId, eq, data.initial};
@@ -741,6 +768,7 @@ namespace speakerman {
             output << getConfigKey(group, -1, GroupConfig::KEY_EQ_COUNT) << assgn << groupConfig.eqs << endl;
             output << getConfigKey(group, -1, GroupConfig::KEY_THRESHOLD) << assgn << groupConfig.threshold << endl;
             output << getConfigKey(group, -1, GroupConfig::KEY_DELAY) << assgn << groupConfig.delay << endl;
+            output << getConfigKey(group, -1, GroupConfig::KEY_USE_SUB) << assgn << groupConfig.use_sub << endl;
             output << getConfigKey(group, -1, GroupConfig::KEY_VOLUME) << assgn << "[";
             for (size_t i = 0; i < dump.groups; i++) {
                 if (i > 0) {

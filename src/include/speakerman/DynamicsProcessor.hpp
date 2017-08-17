@@ -102,6 +102,9 @@ namespace speakerman {
         static constexpr size_t GROUP_MAX_DELAY_SAMPLES = 0.5 + 192000 * GroupConfig::MAX_DELAY;
         static constexpr size_t LIMITER_MAX_DELAY_SAMPLES = 0.5 + 192000 * LIMITER_MAX_DELAY;
         static constexpr size_t RMS_MAX_DELAY_SAMPLES = 0.5 + 192000 * RMS_MAX_DELAY;
+        static constexpr double CHANNEL_ADD_FACTOR = 1.0 / CHANNELS_PER_GROUP;
+        static constexpr double CHANNEL_RMS_FACTOR = (CHANNEL_ADD_FACTOR);
+
 
         using CrossoverFrequencies = FixedSizeArray<T, CROSSOVERS>;
         using ThresholdValues = FixedSizeArray<T, LIMITERS>;
@@ -353,7 +356,9 @@ namespace speakerman {
 
         void mergeFrequencyBands()
         {
-            output[0] = processInput[0];
+            T sub = processInput[0];
+            output[0] = sub;
+            sub *= CHANNEL_RMS_FACTOR;
             for (size_t channel = 1; channel <= INPUTS; channel++) {
                 T sum = 0.0;
                 size_t max = channel + INPUTS * CROSSOVERS;
@@ -361,6 +366,22 @@ namespace speakerman {
                     sum += processInput[offset];
                 }
                 output[channel] = sum;
+            }
+            // incorrect way of doing this. Needs to be fixed by actually having separate
+            // processor per group.
+            for (size_t group = 0, offset = 1; group < GROUPS; group++) {
+                if (!getConfigData().groupConfig(group).useSub()) {
+                    T sum = 0;
+                    for (size_t channel = 0; channel < CHANNELS_PER_GROUP; channel++) {
+                        sum += output[offset + channel];
+                    }
+                    sum *= CHANNEL_ADD_FACTOR;
+                    sum += sub;
+                    for (size_t channel = 0; channel < CHANNELS_PER_GROUP; channel++) {
+                        output[offset + channel] = sum;
+                    }
+                }
+                offset += CHANNELS_PER_GROUP;
             }
         }
 

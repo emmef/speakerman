@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.6)
 project(speakerman)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -DINSTALL_DIR='\"/usr/local\"'")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -DINSTALL_DIR='\"/usr/local\"'")
 include_directories(include src/include)
 
 
@@ -50,6 +50,7 @@ set(SOURCE_FILES
         src/include/tdap/Noise.hpp
         src/include/tdap/Power2.hpp
         src/include/tdap/Rms.hpp
+        src/include/tdap/Samples.hpp
         src/include/tdap/Transport.hpp
         src/include/tdap/Value.hpp
         src/include/tdap/ValueRange.hpp
@@ -80,3 +81,5 @@ set(LIBRARIES
 link_libraries(jack pthread)
 target_link_libraries(speakerman jack pthread)
 add_executable(test_speakerman test/main.cpp)
+install(TARGETS speakerman RUNTIME DESTINATION bin)
+install(FILES web/index.html web/speakerman.js web/speakerman.css DESTINATION share/speakerman/web)

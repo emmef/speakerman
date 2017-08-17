@@ -62,30 +62,32 @@ namespace speakerman {
         static constexpr size_t MIN_EQS = 0;
         static constexpr size_t DEFAULT_EQS = 0;
         static constexpr size_t MAX_EQS = 2;
+        static constexpr size_t KEY_EQ_COUNT = 0;
+        static constexpr const char *KEY_SNIPPET_EQ_COUNT = "equalizers";
 
         static constexpr double MIN_THRESHOLD = 0.010;
         static constexpr double DEFAULT_THRESHOLD = 0.1;
         static constexpr double MAX_THRESHOLD = 0.5;
+        static constexpr size_t KEY_THRESHOLD = 1;
+        static constexpr const char *KEY_SNIPPET_THRESHOLD = "threshold";
 
         static constexpr double MIN_VOLUME = 0;
         static constexpr double DEFAULT_VOLUME = 1.0;
         static constexpr double MAX_VOLUME = 20.0;
+        static constexpr size_t KEY_VOLUME = 2;
+        static constexpr const char *KEY_SNIPPET_VOLUME = "volume";
 
         static constexpr double MIN_DELAY = 0;
         static constexpr double DEFAULT_DELAY = 0;
         static constexpr double MAX_DELAY = 0.020;
-
-        static constexpr size_t KEY_EQ_COUNT = 0;
-        static constexpr size_t KEY_THRESHOLD = 1;
-        static constexpr size_t KEY_VOLUME = 2;
         static constexpr size_t KEY_DELAY = 3;
+        static constexpr const char *KEY_SNIPPET_DELAY = "delay";
 
+        static constexpr int DEFAULT_USE_SUB = 1;
+        static constexpr size_t KEY_USE_SUB = 4;
+        static constexpr const char *KEY_SNIPPET_USE_SUB = "use-sub";
 
         static constexpr const char *KEY_SNIPPET_GROUP = "group";
-        static constexpr const char *KEY_SNIPPET_EQ_COUNT = "equalizers";
-        static constexpr const char *KEY_SNIPPET_THRESHOLD = "threshold";
-        static constexpr const char *KEY_SNIPPET_VOLUME = "volume";
-        static constexpr const char *KEY_SNIPPET_DELAY = "delay";
 
 
         EqualizerConfig eq[MAX_EQS];
@@ -93,6 +95,7 @@ namespace speakerman {
         double threshold;
         double volume[MAX_SPEAKERMAN_GROUPS];
         double delay;
+        int use_sub;
     };
 
     struct SpeakermanConfig
