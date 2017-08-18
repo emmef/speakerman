@@ -39,7 +39,7 @@ namespace speakerman {
     class ReadConfigException : public runtime_error
     {
     public:
-        ReadConfigException(const char *message) : runtime_error(message)
+        explicit ReadConfigException(const char *message) : runtime_error(message)
         {
 
         }
@@ -69,7 +69,7 @@ namespace speakerman {
                 eqId >= 0 ? true :
                 groupId >= 0 ? true :
                 (fieldId == SpeakermanConfig::KEY_SUB_THRESHOLD || fieldId == SpeakermanConfig::KEY_SUB_DELAY ||
-                 fieldId == SpeakermanConfig::KEY_THRESHOLDS_SCALE);
+                 fieldId == SpeakermanConfig::KEY_GENERATE_NOISE);
     }
 
     static constexpr size_t GROUP_CONFIG_SIZE =
@@ -134,13 +134,13 @@ namespace speakerman {
         strings[getOffset(-1, -1, SpeakermanConfig::KEY_CROSSOVERS)] = SpeakermanConfig::KEY_SNIPPET_CROSSOVERS;
         strings[getOffset(-1, -1, SpeakermanConfig::KEY_INPUT_OFFSET)] = SpeakermanConfig::KEY_SNIPPET_INPUT_OFFSET;
         strings[getOffset(-1, -1,
-                          SpeakermanConfig::KEY_THRESHOLDS_SCALE)] = SpeakermanConfig::KEY_SNIPPET_THRESHOLDS_SCALE;
+                          SpeakermanConfig::KEY_GENERATE_NOISE)] = SpeakermanConfig::KEY_SNIPPET_GENERATE_NOISE;
 
         string key;
         for (size_t group = 0; group < SpeakermanConfig::MAX_GROUPS; group++) {
             string groupKey = GroupConfig::KEY_SNIPPET_GROUP;
             groupKey += "/";
-            groupKey += ('0' + group);
+            groupKey += (char)(group + '0');
             groupKey += "/";
 
             key = groupKey;
@@ -167,7 +167,7 @@ namespace speakerman {
             eqBase += "/";
             for (size_t eq = 0; eq < GroupConfig::MAX_EQS; eq++) {
                 string eqKey = eqBase;
-                eqKey += ('0' + eq);
+                eqKey += (char)('0' + eq);
                 eqKey += "/";
 
                 key = eqKey;
@@ -208,7 +208,7 @@ namespace speakerman {
     static bool fileExists(const char *fileName)
     {
         FILE *f = fopen(fileName, "r");
-        if (f) {
+        if (f != nullptr) {
             fclose(f);
             return true;
         }
@@ -369,7 +369,7 @@ namespace speakerman {
 
         for (size_t i = 0; i < array.size(); i++) {
             Type tempValue;
-            char *endptr = 0;
+            char *endptr = nullptr;
             if (parsePos && *parsePos) {
                 tempValue = ValueManager<T>::parse(parsePos, &endptr);
                 if (tempValue == 0 && !(*endptr == 0 || *endptr == ',' || *endptr == ';')) {
@@ -387,7 +387,7 @@ namespace speakerman {
                     tempValue = Value<Type>::force_between(tempValue, min, max);
                     cerr << "set to " << tempValue << endl;
                 }
-                parsePos = endptr && *endptr ? endptr + 1 : 0;
+                parsePos = endptr && *endptr ? endptr + 1 : nullptr;
             }
             else {
                 tempValue = static_cast<Type>(UNSET_FLOAT);
@@ -426,7 +426,7 @@ namespace speakerman {
         config.subOutput = SpeakermanConfig::DEFAULT_SUB_OUTPUT;
         config.subDelay = SpeakermanConfig::DEFAULT_SUB_DELAY;
         config.inputOffset = SpeakermanConfig::DEFAULT_INPUT_OFFSET;
-        config.thresholdsScale = SpeakermanConfig::DEFAULT_THRESHOLDS_SCALE;
+        config.generateNoise = SpeakermanConfig::DEFAULT_GENERATE_NOISE;
         config.crossovers = SpeakermanConfig::DEFAULT_CROSSOVERS;
 
         for (size_t group = 0; group < SpeakermanConfig::MAX_GROUPS; group++) {
@@ -495,7 +495,7 @@ namespace speakerman {
 
     static speakerman::config::CallbackResult readGlobalCallback(const char *key, const char *value, void *data)
     {
-        SpeakermanConfigCallbackData *config = static_cast<SpeakermanConfigCallbackData *>(data);
+        auto config = static_cast<SpeakermanConfigCallbackData *>(data);
 
         if (isKey(key, config->initial, -1, -1, SpeakermanConfig::KEY_GROUP_COUNT)) {
             readNumber(config->config.groups, key, value, SpeakermanConfig::MIN_GROUPS, SpeakermanConfig::MAX_GROUPS);
@@ -524,16 +524,15 @@ namespace speakerman {
             readNumber(config->config.crossovers, key, value, SpeakermanConfig::MIN_CROSSOVERS,
                        SpeakermanConfig::MAX_CROSSOVERS, true);
         }
-        else if (isKey(key, config->initial, -1, -1, SpeakermanConfig::KEY_THRESHOLDS_SCALE)) {
-            readNumber(config->config.thresholdsScale, key, value, SpeakermanConfig::MIN_THRESHOLDS_SCALE,
-                       SpeakermanConfig::MAX_THRESHOLDS_SCALE, true);
+        else if (isKey(key, config->initial, -1, -1, SpeakermanConfig::KEY_GENERATE_NOISE)) {
+            readBool(config->config.generateNoise, key, value);
         }
         return speakerman::config::CallbackResult::CONTINUE;
     }
 
     static speakerman::config::CallbackResult readGroupCallback(const char *key, const char *value, void *data)
     {
-        GroupConfigCallbackData *config = static_cast<GroupConfigCallbackData *>(data);
+        auto config = static_cast<GroupConfigCallbackData *>(data);
 
         if (isKey(key, config->initial, config->groupId, -1, GroupConfig::KEY_EQ_COUNT)) {
             readNumber(config->config.eqs, key, value, GroupConfig::MIN_EQS, GroupConfig::MAX_EQS);
@@ -563,7 +562,7 @@ namespace speakerman {
 
     static speakerman::config::CallbackResult readEqCallback(const char *key, const char *value, void *data)
     {
-        EqConfigCallbackData *config = static_cast<EqConfigCallbackData *>(data);
+        auto config = static_cast<EqConfigCallbackData *>(data);
 
         if (isKey(key, config->initial, config->groupId, config->eqId, EqualizerConfig::KEY_CENTER)) {
             readNumber(config->config.center, key, value, EqualizerConfig::MIN_CENTER_FREQ,
@@ -662,7 +661,7 @@ namespace speakerman {
         config.inputOffset = UNSET_SIZE;
         config.crossovers = UNSET_SIZE;
         config.inputOffset = UNSET_SIZE;
-        config.thresholdsScale = UNSET_FLOAT;
+        config.generateNoise = UNSET_BOOL;
 
         SpeakermanConfigCallbackData data{config, initial};
         auto result = reader.read(stream, readGlobalCallback, &data);
@@ -684,8 +683,8 @@ namespace speakerman {
                    getConfigKey(-1, -1, SpeakermanConfig::KEY_CROSSOVERS));
         setDefault(config.inputOffset, UNSET_SIZE, basedUpon.inputOffset,
                    getConfigKey(-1, -1, SpeakermanConfig::KEY_INPUT_OFFSET));
-        setDefault(config.thresholdsScale, UNSET_FLOAT, basedUpon.thresholdsScale,
-                   getConfigKey(-1, -1, SpeakermanConfig::KEY_THRESHOLDS_SCALE));
+        setDefault(config.generateNoise, UNSET_BOOL, basedUpon.generateNoise,
+                   getConfigKey(-1, -1, SpeakermanConfig::KEY_GENERATE_NOISE));
 
         for (size_t g = 0; g < config.groups; g++) {
             GroupConfigCallbackData data{config.group[g], g, initial};
@@ -704,13 +703,25 @@ namespace speakerman {
     class StreamOwner
     {
         ifstream &stream;
-    public:
-        StreamOwner(ifstream &owned) : stream(owned)
+        bool owns;
+
+        void operator=(const StreamOwner &source)
         {}
+        void operator=(StreamOwner &&source) noexcept
+        {}
+    public:
+        explicit StreamOwner(ifstream &owned) : stream(owned), owns(true)
+        {}
+        StreamOwner(const StreamOwner &source) : stream(source.stream), owns(false)
+        {}
+        StreamOwner(StreamOwner &&source) noexcept : stream(source.stream), owns(true)
+        {
+            source.owns = false;
+        }
 
         ~StreamOwner()
         {
-            if (stream.is_open()) {
+            if (owns && stream.is_open()) {
                 stream.close();
             }
         }
@@ -772,7 +783,7 @@ namespace speakerman {
         output << getConfigKey(-1, -1, SpeakermanConfig::KEY_SUB_OUTPUT) << assgn << dump.subOutput << endl;
         output << getConfigKey(-1, -1, SpeakermanConfig::KEY_INPUT_OFFSET) << assgn << dump.inputOffset << endl;
         output << getConfigKey(-1, -1, SpeakermanConfig::KEY_CROSSOVERS) << assgn << dump.crossovers << endl;
-        output << getConfigKey(-1, -1, SpeakermanConfig::KEY_THRESHOLDS_SCALE) << assgn << dump.thresholdsScale << endl;
+        output << getConfigKey(-1, -1, SpeakermanConfig::KEY_GENERATE_NOISE) << assgn << dump.generateNoise << endl;
 
         for (size_t group = 0; group < dump.groups; group++) {
             const GroupConfig &groupConfig = dump.group[group];

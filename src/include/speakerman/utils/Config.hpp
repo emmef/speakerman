@@ -149,6 +149,11 @@ namespace speakerman {
             static constexpr size_t MAX_KEY_LENGTH = 127;
             static constexpr size_t MAX_VALUE_LENGTH = 1023;
 
+            Reader()
+            {
+                setStartState();
+            }
+
             ReadResult read(std::istream &stream, configReaderCallback callback, void *data)
             {
                 if (callback == nullptr) {

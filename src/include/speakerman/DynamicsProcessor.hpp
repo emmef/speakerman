@@ -134,7 +134,8 @@ namespace speakerman {
 
     private:
         PinkNoise::Default noise;
-        PinkNoise::Default subNoise;
+        double noiseAvg = 0;
+        IntegrationCoefficients<double> noiseIntegrator;
         FixedSizeArray<T, INPUTS> inputWithVolumeAndNoise;
         FixedSizeArray<T, PROCESSING_CHANNELS> processInput;
         FixedSizeArray<T, OUTPUTS> output;
@@ -199,8 +200,9 @@ namespace speakerman {
                 const FixedSizeArray<T, CROSSOVERS> &crossovers,
                 const SpeakermanConfig &config)
         {
-            noise.setScale(1e-5);
-            subNoise.setScale(1e-5);
+            noise.setScale(config.generateNoise ? 1e-6 : 2.0);
+            noiseAvg = 0.0;
+            noiseIntegrator.setCharacteristicSamples(sampleRate / 20);
             aCurve.setSampleRate(sampleRate);
             crossoverFilter.configure(sampleRate, crossovers);
             for (size_t i = 0; i < GROUPS; i++) {
@@ -253,6 +255,7 @@ namespace speakerman {
         void updateConfig(const ConfigData &data)
         {
             runtime.modify(data);
+            noise.setScale(data.noiseScale());
             groupDelay.setDelay(0, data.subDelay());
             for (size_t group = 0, i = 1; group < GROUPS; group++) {
                 filters_[group].configure(data.groupConfig(group).filterConfig());
@@ -285,9 +288,16 @@ namespace speakerman {
         }
 
     private:
+        double nextNoise()
+        {
+            double n = noise();
+            noiseIntegrator.integrate(n, noiseAvg);
+            return n - noiseAvg;
+        }
+
         void applyVolumeAddNoise(const FixedSizeArray<T, INPUTS> &input)
         {
-            T ns = noise();
+            T ns = nextNoise();
             for (size_t group = 0; group < GROUPS; group++) {
                 const GroupRuntimeData<T, BANDS> &conf = runtime.data().groupConfig(group);
                 auto volume = conf.volume();
@@ -318,9 +328,10 @@ namespace speakerman {
 
         void processSubRms()
         {
-            T x = processInput[0] + subNoise();
+            T x = processInput[0];
             processInput[0] = rmsDelay.setAndGet(0, x);
             x *= runtime.data().subRmsScale();
+//            x = aCurve.filter(0, x);
             T signal;
             T detect = rmsDetector[0].integrate_smooth(x * x, 1.0, signal);
             T gain = 1.0 / detect;

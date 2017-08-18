@@ -35,12 +35,15 @@ namespace speakerman {
     struct EqualizerConfig
     {
         static constexpr double MIN_CENTER_FREQ = 40;
+        static constexpr double DEFAULT_CENTER_FREQ = 1000;
         static constexpr double MAX_CENTER_FREQ = 22000;
 
         static constexpr double MIN_GAIN = 0.10;
+        static constexpr double DEFAULT_GAIN = 1.0;
         static constexpr double MAX_GAIN = 10.0;
 
         static constexpr double MIN_BANDWIDTH = 0.25;
+        static constexpr double DEFAULT_BANDWIDTH = 1;
         static constexpr double MAX_BANDWIDTH = 8.0;
 
         static constexpr size_t KEY_CENTER = 0;
@@ -52,9 +55,9 @@ namespace speakerman {
         static constexpr const char *KEY_SNIPPET_GAIN = "gain";
         static constexpr const char *KEY_SNIPPET_BANDWIDTH = "bandwidth";
 
-        double center;
-        double gain;
-        double bandwidth;
+        double center = DEFAULT_CENTER_FREQ;
+        double gain = DEFAULT_GAIN;
+        double bandwidth = DEFAULT_BANDWIDTH;
     };
 
     struct GroupConfig
@@ -95,12 +98,12 @@ namespace speakerman {
 
 
         EqualizerConfig eq[MAX_EQS];
-        size_t eqs;
-        double threshold;
+        size_t eqs = DEFAULT_EQS;
+        double threshold = DEFAULT_THRESHOLD;
         double volume[MAX_SPEAKERMAN_GROUPS];
-        double delay;
-        int use_sub;
-        int mono;
+        double delay = DEFAULT_DELAY;
+        int use_sub = DEFAULT_USE_SUB;
+        int mono = DEFAULT_MONO;
     };
 
     struct SpeakermanConfig
@@ -133,9 +136,7 @@ namespace speakerman {
         static constexpr size_t DEFAULT_INPUT_OFFSET = 0;
         static constexpr size_t MAX_INPUT_OFFSET = MAX_GROUPS * MAX_GROUP_CHANNELS;
 
-        static constexpr double MIN_THRESHOLDS_SCALE = 0.1;
-        static constexpr double DEFAULT_THRESHOLDS_SCALE = 1.0;
-        static constexpr double MAX_THRESHOLDS_SCALE = 10.0;
+        static constexpr int DEFAULT_GENERATE_NOISE = 0;
 
         static constexpr size_t KEY_GROUP_COUNT = 0;
         static constexpr size_t KEY_CHANNELS = 1;
@@ -144,7 +145,7 @@ namespace speakerman {
         static constexpr size_t KEY_SUB_OUTPUT = 4;
         static constexpr size_t KEY_CROSSOVERS = 5;
         static constexpr size_t KEY_INPUT_OFFSET = 6;
-        static constexpr size_t KEY_THRESHOLDS_SCALE = 7;
+        static constexpr size_t KEY_GENERATE_NOISE = 7;
 
         static constexpr const char *KEY_SNIPPET_GROUP_COUNT = "groups";
         static constexpr const char *KEY_SNIPPET_CHANNELS = "group-channels";
@@ -153,18 +154,18 @@ namespace speakerman {
         static constexpr const char *KEY_SNIPPET_SUB_OUTPUT = "sub-output";
         static constexpr const char *KEY_SNIPPET_CROSSOVERS = "crossovers";
         static constexpr const char *KEY_SNIPPET_INPUT_OFFSET = "input-offset";
-        static constexpr const char *KEY_SNIPPET_THRESHOLDS_SCALE = "thresholds-scale";
+        static constexpr const char *KEY_SNIPPET_GENERATE_NOISE = "generate-noise";
 
         GroupConfig group[MAX_GROUPS];
-        size_t groups;
-        size_t groupChannels;
-        size_t subOutput;
-        size_t crossovers;
-        size_t inputOffset;
-        double relativeSubThreshold;
-        double subDelay;
-        double thresholdsScale;
-        long long timeStamp;
+        size_t groups = DEFAULT_GROUPS;
+        size_t groupChannels = DEFAULT_GROUP_CHANNELS;
+        size_t subOutput = DEFAULT_SUB_OUTPUT;
+        size_t crossovers = DEFAULT_CROSSOVERS;
+        size_t inputOffset = DEFAULT_INPUT_OFFSET;
+        double relativeSubThreshold = DEFAULT_REL_SUB_THRESHOLD;
+        double subDelay = DEFAULT_SUB_DELAY;
+        int generateNoise = DEFAULT_GENERATE_NOISE;
+        long long timeStamp = -1;
     };
 
 

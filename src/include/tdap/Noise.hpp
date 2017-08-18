@@ -86,16 +86,17 @@ namespace tdap {
             size_t index_;        /* Incremented each sample. */
             size_t indexMask_;    /* Index wrapped by ANDing with this mask. */
             double scale_;
-
+            double offset_;
+            IntegrationCoefficients<double> dcCoefficients;
         public:
             Generator(double scale)
             {
+                dcCoefficients.setCharacteristicSamples(96000);
                 random_ = white_();
                 index_ = 0;
                 indexMask_ = (1 << ACCURACY) - 1;
-                /* Calculate maximum possible signed random value. Extra 1 for white noise always added. */
-                int32_t pmax = (ACCURACY + 1) * (1 << (RANDOM_BITS - 1));
-                scale_ = scale / pmax;
+                offset_ = 0;
+                setScale(scale);
                 /* Initialize rows. */
                 for (int i = 0; i < ACCURACY; i++) {
                     rows_[i] = 0;
@@ -108,8 +109,12 @@ namespace tdap {
 
             void setScale(double scale)
             {
+                double usedScale = std::max(1e-20, scale);
+                /* Calculate maximum possible signed random value. Extra 1 for white noise always added. */
                 int32_t pmax = (ACCURACY + 1) * (1 << (RANDOM_BITS - 1));
-                scale_ = scale / pmax;
+                double newScale = usedScale / pmax;
+                offset_ *= newScale * scale_;
+                scale_ = newScale;
             }
 
             double operator()()
@@ -142,7 +147,10 @@ namespace tdap {
                 int32_t sum = runningSum_ + (white_() >> RANDOM_SHIFT);
 
                 /* Scale to range */
-                return scale_ * sum;
+
+                double biasedResult = scale_ * sum;
+                dcCoefficients.integrate(biasedResult, offset_);
+                return biasedResult - offset_;
             }
 
         };

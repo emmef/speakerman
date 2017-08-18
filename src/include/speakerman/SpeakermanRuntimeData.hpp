@@ -200,6 +200,7 @@ namespace speakerman {
         T subRmsThreshold_;
         T subRmsScale_;
         size_t subDelay_;
+        T noiseScale_;
         IntegrationCoefficients <T> controlSpeed_;
 
         void compensateDelays()
@@ -237,6 +238,9 @@ namespace speakerman {
         size_t subDelay() const
         { return subDelay_; }
 
+        T noiseScale() const
+        { return noiseScale_; }
+
         static constexpr size_t groups()
         { return GROUPS; }
 
@@ -250,6 +254,7 @@ namespace speakerman {
             subRmsThreshold_ = 1;
             subRmsScale_ = 1;
             subDelay_ = 0;
+            noiseScale_ = 1e-5;
             for (size_t group = 0; group < GROUPS; group++) {
                 groupConfig_[group].reset();
             }
@@ -290,12 +295,16 @@ namespace speakerman {
             for (size_t i = 0; i < bandWeights.size(); i++) {
                 std::cout << "Band weight[" << i << "]=" << bandWeights[i] << std::endl;
             }
-            std::cout << "Thresholds ara all scaled with a factor " << config.thresholdsScale << std::endl;
+            if (config.generateNoise) {
+                noiseScale_ = 10.0;
+                std::cout << "Generating testing noise" << std::endl;
+            }
+            else {
+                noiseScale_ = 1e-6;
+            }
 
             for (size_t group = 0; group < config.groups; group++) {
                 speakerman::GroupConfig sourceConf = config.group[group];
-
-                sourceConf.threshold *= config.thresholdsScale;
 
                 GroupRuntimeData<T, BANDS> &targetConf = groupConfig_[group];
                 targetConf.setFilterConfig(EqualizerFilterData<T>::createConfigured(sourceConf, sampleRate));
