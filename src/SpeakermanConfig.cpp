@@ -52,7 +52,7 @@ namespace speakerman {
 
 
     static constexpr size_t ID_GLOBAL_CNT = 8;
-    static constexpr size_t ID_GROUP_CNT = 5;
+    static constexpr size_t ID_GROUP_CNT = 6;
     static constexpr size_t ID_EQ_CNT = 3;
 
     static constexpr bool isUserAllowed(ssize_t groupId, ssize_t eqId, size_t fieldId)
@@ -158,6 +158,9 @@ namespace speakerman {
             key = groupKey;
             key += GroupConfig::KEY_SNIPPET_USE_SUB;
             strings[getOffset(group, -1, GroupConfig::KEY_USE_SUB)] = key;
+            key = groupKey;
+            key += GroupConfig::KEY_SNIPPET_MONO;
+            strings[getOffset(group, -1, GroupConfig::KEY_MONO)] = key;
 
             string eqBase = groupKey;
             eqBase += EqualizerConfig::KEY_SNIPPET_EQUALIZER;
@@ -434,6 +437,8 @@ namespace speakerman {
                 groupConfig.volume[i] = i == group ? GroupConfig::DEFAULT_VOLUME : 0;
             }
             groupConfig.delay = GroupConfig::DEFAULT_DELAY;
+            groupConfig.use_sub = 1;
+            groupConfig.mono = 0;
             for (size_t eq = 0; eq < GroupConfig::MAX_EQS; eq++) {
                 EqualizerConfig &eqConfig = groupConfig.eq[eq];
                 eqConfig.center = 20000;
@@ -550,6 +555,9 @@ namespace speakerman {
         else if (isKey(key, config->initial, config->groupId, -1, GroupConfig::KEY_USE_SUB)) {
             readBool(config->config.use_sub, key, value);
         }
+        else if (isKey(key, config->initial, config->groupId, -1, GroupConfig::KEY_MONO)) {
+            readBool(config->config.mono, key, value);
+        }
         return speakerman::config::CallbackResult::CONTINUE;
     }
 
@@ -612,6 +620,7 @@ namespace speakerman {
         }
         config.delay = UNSET_FLOAT;
         config.use_sub = UNSET_BOOL;
+        config.mono = UNSET_BOOL;
 
         auto result = reader.read(stream, readGroupCallback, &data);
         if (result != config::ReadResult::SUCCESS && result != config::ReadResult::STOPPED) {
@@ -631,6 +640,8 @@ namespace speakerman {
                    getConfigKey(data.groupId, -1, GroupConfig::KEY_DELAY));
         setDefault(config.use_sub, UNSET_BOOL, defaultConfig.use_sub,
                    getConfigKey(data.groupId, -1, GroupConfig::KEY_USE_SUB));
+        setDefault(config.mono, UNSET_BOOL, defaultConfig.mono,
+                   getConfigKey(data.groupId, -1, GroupConfig::KEY_MONO));
 
         for (size_t eq = 0; eq < GroupConfig::MAX_EQS; eq++) {
             EqConfigCallbackData info{config.eq[eq], data.groupId, eq, data.initial};
@@ -769,6 +780,7 @@ namespace speakerman {
             output << getConfigKey(group, -1, GroupConfig::KEY_THRESHOLD) << assgn << groupConfig.threshold << endl;
             output << getConfigKey(group, -1, GroupConfig::KEY_DELAY) << assgn << groupConfig.delay << endl;
             output << getConfigKey(group, -1, GroupConfig::KEY_USE_SUB) << assgn << groupConfig.use_sub << endl;
+            output << getConfigKey(group, -1, GroupConfig::KEY_MONO) << assgn << groupConfig.mono << endl;
             output << getConfigKey(group, -1, GroupConfig::KEY_VOLUME) << assgn << "[";
             for (size_t i = 0; i < dump.groups; i++) {
                 if (i > 0) {

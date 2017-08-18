@@ -86,6 +86,10 @@ namespace speakerman {
         static constexpr int DEFAULT_USE_SUB = 1;
         static constexpr size_t KEY_USE_SUB = 4;
         static constexpr const char *KEY_SNIPPET_USE_SUB = "use-sub";
+        
+        static constexpr int DEFAULT_MONO = 0;
+        static constexpr size_t KEY_MONO = 5;
+        static constexpr const char *KEY_SNIPPET_MONO = "mono";
 
         static constexpr const char *KEY_SNIPPET_GROUP = "group";
 
@@ -96,6 +100,7 @@ namespace speakerman {
         double volume[MAX_SPEAKERMAN_GROUPS];
         double delay;
         int use_sub;
+        int mono;
     };
 
     struct SpeakermanConfig

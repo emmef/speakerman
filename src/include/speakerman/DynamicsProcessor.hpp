@@ -369,19 +369,22 @@ namespace speakerman {
             }
             // incorrect way of doing this. Needs to be fixed by actually having separate
             // processor per group.
-            for (size_t group = 0, offset = 1; group < GROUPS; group++) {
-                if (!getConfigData().groupConfig(group).useSub()) {
+            for (size_t group = 0, offset = 1; group < GROUPS; group++, offset += CHANNELS_PER_GROUP) {
+                if (getConfigData().groupConfig(group).isMono()) {
                     T sum = 0;
                     for (size_t channel = 0; channel < CHANNELS_PER_GROUP; channel++) {
                         sum += output[offset + channel];
                     }
                     sum *= CHANNEL_ADD_FACTOR;
-                    sum += sub;
                     for (size_t channel = 0; channel < CHANNELS_PER_GROUP; channel++) {
                         output[offset + channel] = sum;
                     }
                 }
-                offset += CHANNELS_PER_GROUP;
+                if (!getConfigData().groupConfig(group).useSub()) {
+                    for (size_t channel = 0; channel < CHANNELS_PER_GROUP; channel++) {
+                        output[offset + channel] += sub;
+                    }
+                }
             }
         }
 
