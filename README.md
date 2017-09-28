@@ -10,7 +10,7 @@ Speakerman hae these goals:
 - to function as crossover. For now: all groups share the same sub-low group (< 80 Hz)
 
 ## Perception
-Human hearing is complex. It doesn't care about peaks &ndash; unless they are damagingly loud &ndash; but rather about the _energy_ in the signal. Which, naturally, depends on both frequency and how that energy is spread over time. A loud hum is pretty annoying. But a punchy kick drum wants to make you dance, even if it has the same energy _when measured over a smaller interval_. This is all _very Funny_, but darn annoying when designing a perceptive limiter. How is it possible to measure the perceived loudness of a signal and how to keep it under control without harming the experience?
+Human hearing is complex. It doesn't care about peaks_ &ndash; unless they are damagingly loud &ndash; but rather about the _energy_ in the signal. Which, naturally, depends on both frequency and how that energy is spread over time. A loud hum is pretty annoying. But a punchy kick drum wants to make you dance, even if it has the same energy _when measured over a smaller interval_. This is all _very Funny_, but darn annoying when designing a perceptive limiter. How is it possible to measure the perceived loudness of a signal and how to keep it under control without harming the experience?
 
 In addition, it is necessary to constrain specific frequency ranges to different levels. This means the input will be split into multiple frequency bands, that will be individually limited in perceived loudness. All except the sub-low frequency band will be added back together in the end. 
 
@@ -32,7 +32,7 @@ The outcome of all this analysis plus a lot of listening is this:
 - For measurement windows of less than 30 millisecond an approximate ITU-468 time-dependency-weighted measuring is done with a [pure RMS measurement](rms-measurement).
 - For measurement windows bwtween 30 and 400 millseconds, a time weighted dependency is done such that 400 ms. weights about 1.4 times more than 400 milliseconds and the The RMS measurement is tweaked to detect rises in the signal faster (see [RMS measurement](rms-measurement)).
 - The maximum of all these measurements is taken as the perceived loudness
-- The perceived loudness will function as input to a reciprocal amplifier (per group and for the sub-low) when it is above the limiter threshold. These is a small trick applied to the loudness measuring so that no weird clicks or pops appear.
+- The perceived loudness will function as input to a reciprocal amplifier (per group and for the sub-low) when it is above the limiter threshold_. These is a small trick applied to the loudness measuring so that no weird clicks or pops appear.
 
 ## RMS measurement
 Measurement of RMS values if done by a moving window containing squared sample values. Naturally, the signal that provides the samples already went through the frequency sensitivity curve filter. The pure measurement calculates the average value of the window, takes the square root and then uses a double integrator to smooth the result. The fast-attack measurement first applies the integrator and then the square root. A little math shows that fast rises in energy level will be tracked better that way.
@@ -41,7 +41,7 @@ Measurement of RMS values if done by a moving window containing squared sample v
 Some speakers ore not good. Each group can use two [parametric equalizer](https://en.wikipedia.org/wiki/Equalization_(audio)#Parametric_equalizer) to fix that.
 
 ## Limiters
-Perceived loudness has little to do with peaks. But amplifiers and digital to analog converters care about peaks. That is why each group also applies a relatively neat limiter as the last stage.
+Perceived loudness has little to do with peaks_. But amplifiers and digital to analog converters care about peaks_. That is why each group also applies a relatively neat limiter as the last stage.
 
 ## Summary
 * Per group: 
@@ -49,7 +49,7 @@ Perceived loudness has little to do with peaks. But amplifiers and digital to an
   * The sub low band of all groups is summed and considered a separate group
   * For each frequency band
     * he loudness is measured using above mechanisms. 
-    * A reciprocal amplifier is applied so that the output loudness is never above the threshold
+    * A reciprocal amplifier is applied so that the output loudness is never above the threshold_
   * All frequency bands are summed together
 * To each group (ecxept the sub low group) a parametric equalizer can be applied
 * To each group a hard limiter is applied

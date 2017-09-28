@@ -236,7 +236,7 @@ namespace tdap {
                 }
                 return;
             }
-            throw invalid_argument("Value not below threshold");
+            throw invalid_argument("Value not below threshold_");
         }
 
         void operator=(const IirCoefficients &source)

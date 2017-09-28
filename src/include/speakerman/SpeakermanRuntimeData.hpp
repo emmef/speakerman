@@ -336,9 +336,9 @@ namespace speakerman {
         void dump() const
         {
             std::cout << "Runtime Configuration dump" << std::endl;
-            std::cout << " sub-limiter: scale=" << subLimiterScale() << "; threshold=" << subLimiterThreshold()
+            std::cout << " sub-limiter: scale=" << subLimiterScale() << "; threshold_=" << subLimiterThreshold()
                       << std::endl;
-            std::cout << " sub-RMS: scale=" << subRmsScale() << "; threshold=" << subRmsThreshold() << std::endl;
+            std::cout << " sub-RMS: scale=" << subRmsScale() << "; threshold_=" << subRmsThreshold() << std::endl;
             std::cout << " sub-delay=" << subDelay() << std::endl;
             for (size_t group = 0; group < GROUPS; group++) {
                 const GroupRuntimeData<T, bands()> &grpConfig = groupConfig(group);
@@ -355,7 +355,7 @@ namespace speakerman {
                 std::cout << "  use-sub=" << grpConfig.useSub() << std::endl;
                 std::cout << "  mono=" << grpConfig.isMono() << std::endl;
                 std::cout << "  equalizers=" << grpConfig.filterConfig().count() << std::endl;
-                std::cout << "  limiter: scale=" << grpConfig.limiterScale() << "; threshold="
+                std::cout << "  limiter: scale=" << grpConfig.limiterScale() << "; threshold_="
                           << grpConfig.limiterThreshold() << std::endl;
                 for (size_t band = 0; band < bands(); band++) {
                     std::cout << "   band " << band << " RMS: scale=" << grpConfig.bandRmsScale(band) << std::endl;

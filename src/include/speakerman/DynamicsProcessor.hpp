@@ -143,13 +143,11 @@ namespace speakerman {
 
         Crossovers::Filter<double, T, INPUTS, CROSSOVERS> crossoverFilter;
         ACurves::Filter<T, PROCESSING_CHANNELS> aCurve;
-        using Detector = AdvancedRms::Detector<T>;
+        using Detector = PerceptiveRms<T, 16, 11>;
 
         Detector *rmsDetector;
 
-        FixedSizeArray<HoldMaxDoubleIntegrated<T>, LIMITERS> limiter;
         RmsDelay rmsDelay;
-        LimiterDelay limiterDelay;
         GroupDelay groupDelay;
         EqualizerFilter<double, CHANNELS_PER_GROUP> filters_[GROUPS];
 
@@ -207,26 +205,15 @@ namespace speakerman {
             crossoverFilter.configure(sampleRate, crossovers);
             for (size_t i = 0; i < GROUPS; i++) {
                 signalIntegrator[i].coefficients.setCharacteristicSamples(
-                        AdvancedRms::PERCEPTIVE_FAST_WINDOWSIZE * sampleRate);
+                        8 * sampleRate);
             }
-
-
-            // Limiter delay and integration constants
-            T limiterIntegrationSamples = 0.0005 * sampleRate;
-            size_t limiterHoldSamples = 0.5 + 3 * limiterIntegrationSamples;
-            for (size_t i = 0; i < LIMITERS; i++) {
-                limiter[i].setMetrics(limiterIntegrationSamples, limiterHoldSamples);
-            }
-            limiterDelay.setDelay(limiterHoldSamples);
-            limiterDelay.setChannels(DELAY_CHANNELS);
-
             // Rms detector confiuration
-            rmsDetector[0].userConfigure(rmsUserSubConfig(), sampleRate);
+            rmsDetector[0].configure(sampleRate, PerceptiveMetrics::PERCEPTIVE_SECONDS, 4, 0.2);
             AdvancedRms::UserConfig rmsConfig = rmsUserConfig();
             for (size_t i = 1; i < DETECTORS; i++) {
-                rmsDetector[i].userConfigure(rmsConfig, sampleRate);
+                rmsDetector[i].configure(sampleRate, PerceptiveMetrics::PERCEPTIVE_SECONDS, 4, 0.2);
             }
-            size_t rmsDelaySamples = rmsDetector[1].getHoldSamples();
+            size_t rmsDelaySamples = PerceptiveMetrics::PEAK_HOLD_SECONDS * sampleRate;
             rmsDelay.setDelay(rmsDelaySamples);
             rmsDelay.setChannels(PROCESSING_CHANNELS);
             auto weights = Crossovers::weights(crossovers, sampleRate);
@@ -271,6 +258,7 @@ namespace speakerman {
                 const FixedSizeArray<T, INPUTS> &input,
                 FixedSizeArray<T, OUTPUTS> &target)
         {
+//            static int count = 0;
             ZFPUState state;
             runtime.approach();
             applyVolumeAddNoise(input);
@@ -280,11 +268,21 @@ namespace speakerman {
             levels.next();
             rmsDelay.next();
             mergeFrequencyBands();
-            processChannelsFilters();
-            processSubLimiter(target);
-            processChannelsLimiter(target);
-            limiterDelay.next();
+            processChannelsFilters(target);
+            target[0] = output[0];
             groupDelay.next();
+//            T sum = 0;
+//            for (size_t i = 0; i < OUTPUTS; i++) {
+//                sum += target[i] * target[i];
+//            }
+//            T avg = signalIntegrator[0].integrate(sum);
+//            if (count < 2000000) {
+//                count++;
+//            }
+//            else {
+//                count = 0;
+//                cout << "LVL=" << sqrt(avg) << endl;
+//            }
         }
 
     private:
@@ -311,7 +309,6 @@ namespace speakerman {
             }
         }
 
-
         void moveToProcessingChannels(const FixedSizeArray<T, CROSSOVER_OUPUTS> &multi)
         {
             // Sum all lowest frequency bands
@@ -332,10 +329,9 @@ namespace speakerman {
             processInput[0] = rmsDelay.setAndGet(0, x);
             x *= runtime.data().subRmsScale();
 //            x = aCurve.filter(0, x);
-            T signal;
-            T detect = rmsDetector[0].integrate_smooth(x * x, 1.0, signal);
+            T detect = rmsDetector[0].add_square_get_detection(x * x, 1.0);
             T gain = 1.0 / detect;
-            levels.addValues(0, gain, signal);
+            levels.addValues(0, gain, detect);
             processInput[0] *= gain;
         }
 
@@ -353,10 +349,9 @@ namespace speakerman {
                         y *= scaleForUnity;
                         squareSum += y * y;
                     }
-                    T signal;
-                    T detect = rmsDetector[detector].integrate_smooth(squareSum, 1.0, signal);
+                    T detect = rmsDetector[detector].add_square_get_detection(squareSum, 1.0);
                     T gain = 1.0 / detect;
-                    levels.addValues(1 + group, gain, signal);
+                    levels.addValues(1 + group, gain, detect);
                     for (size_t offset = baseOffset; offset < nextOffset; offset++) {
                         processInput[offset] *= gain;
                     }
@@ -399,51 +394,19 @@ namespace speakerman {
             }
         }
 
-        void processChannelsFilters()
+        void processChannelsFilters(FixedSizeArray<T, OUTPUTS> &target)
         {
             for (size_t group = 0, offs = 1; group < GROUPS; group++) {
                 auto filter = filters_[group].filter();
                 for (size_t channel = 0; channel < CHANNELS_PER_GROUP; channel++, offs++) {
-                    output[offs] = filter->filter(channel, output[offs]);
+                    target[offs] = filter->filter(channel, output[offs]);
                 }
             }
         }
 
         void processSubLimiter(FixedSizeArray<T, OUTPUTS> &target)
         {
-            T scale = runtime.data().subLimiterScale();
-            T threshold = runtime.data().subLimiterThreshold();
-            T x = output[0];
-            output[0] = limiterDelay.setAndGet(0, x);
-            x *= scale;
-            T detect = limiter[0].applyWithMinimum(fabs(x), 1.0);
-            T gain = 1.0 / detect;
-            T out = Values::clamp(gain * output[0], -threshold, threshold);
-            target[0] = groupDelay.setAndGet(0, out);
-        }
-
-        void processChannelsLimiter(FixedSizeArray<T, OUTPUTS> &target)
-        {
-            for (size_t group = 0, groupDelayChannel = 1, limiterDelayChannel = 1; group < GROUPS; group++) {
-                const size_t startOffs = 1 + group * CHANNELS_PER_GROUP;
-                T peak = 0.0;
-                for (size_t channel = 0, offset = startOffs;
-                     channel < CHANNELS_PER_GROUP; channel++, offset++, limiterDelayChannel++) {
-                    T x = output[offset];
-                    output[offset] = limiterDelay.setAndGet(limiterDelayChannel, x);
-                    peak = Values::max(peak, fabs(x));
-                }
-                T scale = runtime.data().groupConfig(group).limiterScale();
-                T threshold = runtime.data().groupConfig(group).limiterThreshold();
-                peak *= scale;
-                T detect = limiter[group + 1].applyWithMinimum(peak, 1.0);
-                T gain = 1.0 / detect;
-                for (size_t channel = 0, offset = startOffs;
-                     channel < CHANNELS_PER_GROUP; channel++, offset++, groupDelayChannel++) {
-                    T out = Values::clamp(gain * output[offset], -threshold, threshold);
-                    target[offset] = groupDelay.setAndGet(groupDelayChannel, out);
-                }
-            }
+            target[0] = output[0];
         }
     };
 

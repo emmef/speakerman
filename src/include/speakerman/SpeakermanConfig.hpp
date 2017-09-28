@@ -32,6 +32,38 @@
 namespace speakerman {
     static constexpr size_t MAX_SPEAKERMAN_GROUPS = 4;
 
+    template<typename T>
+    struct UnsetValue
+    {
+
+    };
+
+    template<>
+    struct UnsetValue<size_t>
+    {
+        static constexpr size_t value = static_cast<size_t>(-1);
+    };
+
+    template<>
+    struct UnsetValue<double>
+    {
+        static constexpr double value =
+                std::numeric_limits<double>::quiet_NaN();
+    };
+
+    template<>
+    struct UnsetValue<int>
+    {
+        static constexpr int value = -1;
+    };
+
+    template<typename T>
+    static void unset_config_value(T &value)
+    {
+        value = UnsetValue<T>::value;
+    }
+
+
     struct EqualizerConfig
     {
         static constexpr double MIN_CENTER_FREQ = 40;
@@ -54,6 +86,17 @@ namespace speakerman {
         static constexpr const char *KEY_SNIPPET_CENTER = "center";
         static constexpr const char *KEY_SNIPPET_GAIN = "gain";
         static constexpr const char *KEY_SNIPPET_BANDWIDTH = "bandwidth";
+
+        static EqualizerConfig defaultConfig()
+        {
+            EqualizerConfig result;
+            return result;
+        }
+
+        static EqualizerConfig unsetConfig()
+        {
+            return { UnsetValue<double>::value, UnsetValue<double>::value, UnsetValue<double>::value};
+        }
 
         double center = DEFAULT_CENTER_FREQ;
         double gain = DEFAULT_GAIN;
@@ -89,7 +132,7 @@ namespace speakerman {
         static constexpr int DEFAULT_USE_SUB = 1;
         static constexpr size_t KEY_USE_SUB = 4;
         static constexpr const char *KEY_SNIPPET_USE_SUB = "use-sub";
-        
+
         static constexpr int DEFAULT_MONO = 0;
         static constexpr size_t KEY_MONO = 5;
         static constexpr const char *KEY_SNIPPET_MONO = "mono";
@@ -104,6 +147,32 @@ namespace speakerman {
         double delay = DEFAULT_DELAY;
         int use_sub = DEFAULT_USE_SUB;
         int mono = DEFAULT_MONO;
+
+        static GroupConfig defaultConfig(size_t group_id)
+        {
+            GroupConfig result;
+            for (size_t i = 0; i < MAX_SPEAKERMAN_GROUPS; i++) {
+                result.volume[i] == i == group_id ? DEFAULT_VOLUME : 0;
+            }
+            return result;
+        }
+
+        static GroupConfig unsetConfig()
+        {
+            GroupConfig result;
+            for (size_t i = 0; i < MAX_EQS; i++) {
+                result.eq[i] = EqualizerConfig::unsetConfig();
+            }
+            for (size_t i = 0; i < MAX_SPEAKERMAN_GROUPS; i++) {
+                unset_config_value(result.volume[i]);
+            }
+            unset_config_value(result.threshold);
+            unset_config_value(result.delay);
+            unset_config_value(result.use_sub);
+            unset_config_value(result.mono);
+            return result;
+        }
+
     };
 
     struct SpeakermanConfig
@@ -126,7 +195,8 @@ namespace speakerman {
 
         static constexpr size_t MIN_SUB_OUTPUT = 0;
         static constexpr size_t DEFAULT_SUB_OUTPUT = 1;
-        static constexpr size_t MAX_SUB_OUTPUT = MAX_GROUPS * MAX_GROUP_CHANNELS + 1;
+        static constexpr size_t MAX_SUB_OUTPUT =
+                MAX_GROUPS * MAX_GROUP_CHANNELS + 1;
 
         static constexpr size_t MIN_CROSSOVERS = 1;
         static constexpr size_t DEFAULT_CROSSOVERS = 3;
@@ -134,7 +204,8 @@ namespace speakerman {
 
         static constexpr size_t MIN_INPUT_OFFSET = 0;
         static constexpr size_t DEFAULT_INPUT_OFFSET = 0;
-        static constexpr size_t MAX_INPUT_OFFSET = MAX_GROUPS * MAX_GROUP_CHANNELS;
+        static constexpr size_t MAX_INPUT_OFFSET =
+                MAX_GROUPS * MAX_GROUP_CHANNELS;
 
         static constexpr int DEFAULT_GENERATE_NOISE = 0;
 
@@ -166,6 +237,35 @@ namespace speakerman {
         double subDelay = DEFAULT_SUB_DELAY;
         int generateNoise = DEFAULT_GENERATE_NOISE;
         long long timeStamp = -1;
+
+        static SpeakermanConfig defaultConfig()
+        {
+            SpeakermanConfig result;
+            for (size_t i = 0; i < MAX_SPEAKERMAN_GROUPS; i++) {
+                result.group[i] = GroupConfig::defaultConfig(i);
+            }
+            return result;
+        }
+
+        static SpeakermanConfig unsetConfig()
+        {
+            SpeakermanConfig result;
+            for (size_t i = 0; i < MAX_SPEAKERMAN_GROUPS; i++) {
+                result.group[i] = GroupConfig::unsetConfig();
+            }
+            unset_config_value(result.groups);
+            unset_config_value(result.groupChannels);
+            unset_config_value(result.subOutput);
+            unset_config_value(result.crossovers);
+            unset_config_value(result.inputOffset);
+            unset_config_value(result.relativeSubThreshold);
+            unset_config_value(result.subDelay);
+            unset_config_value(result.generateNoise);
+            result.timeStamp = -1;
+
+            return result;
+        }
+
     };
 
 
@@ -191,7 +291,8 @@ namespace speakerman {
         DynamicProcessorLevels() : channels_(0), count_(0)
         {};
 
-        DynamicProcessorLevels(size_t groups, size_t crossovers) : channels_(groups + 1), count_(0)
+        DynamicProcessorLevels(size_t groups, size_t crossovers) : channels_(
+                groups + 1), count_(0)
         {}
 
         size_t groups() const
@@ -206,7 +307,8 @@ namespace speakerman {
             for (size_t i = 0; i < count; i++) {
                 gains_[i] = Values::min(gains_[i], levels.gains_[i]);
                 avg_gains_[i] += levels.avg_gains_[i];
-                signal_square_[i] = Values::max(signal_square_[i], levels.signal_square_[i]);
+                signal_square_[i] = Values::max(signal_square_[i],
+                                                levels.signal_square_[i]);
                 avg_signal_square_[i] += levels.avg_signal_square_[i];
             }
             count_ += levels.count_;
@@ -240,7 +342,9 @@ namespace speakerman {
 
         double getAverageGain(size_t group) const
         {
-            return count_ > 0 ? avg_gains_[IndexPolicy::array(group, channels_)] / count_ : 0;
+            return count_ > 0 ?
+                   avg_gains_[IndexPolicy::array(group, channels_)] / count_
+                              : 0;
         }
 
         double getSignal(size_t group) const
@@ -250,7 +354,9 @@ namespace speakerman {
 
         double getAverageSignal(size_t group) const
         {
-            return count_ > 0 ? sqrt(avg_signal_square_[IndexPolicy::array(group, channels_)] / count_) : 0;
+            return count_ > 0 ? sqrt(
+                    avg_signal_square_[IndexPolicy::array(group, channels_)] /
+                    count_) : 0;
         }
     };
 
@@ -260,10 +366,12 @@ namespace speakerman {
 
         virtual const SpeakermanConfig &getConfig() const = 0;
 
-        virtual bool applyConfigAndGetLevels(const SpeakermanConfig &config, DynamicProcessorLevels *levels,
+        virtual bool applyConfigAndGetLevels(const SpeakermanConfig &config,
+                                             DynamicProcessorLevels *levels,
                                              std::chrono::milliseconds timeoutMillis) = 0;
 
-        virtual bool getLevels(DynamicProcessorLevels *levels, std::chrono::milliseconds timeoutMillis) = 0;
+        virtual bool getLevels(DynamicProcessorLevels *levels,
+                               std::chrono::milliseconds timeoutMillis) = 0;
 
         virtual ~SpeakerManagerControl() = default;
     };
@@ -278,11 +386,13 @@ namespace speakerman {
 
     SpeakermanConfig readSpeakermanConfig(bool initial);
 
-    SpeakermanConfig readSpeakermanConfig(const SpeakermanConfig &basedUpon, bool initial);
+    SpeakermanConfig
+    readSpeakermanConfig(const SpeakermanConfig &basedUpon, bool initial);
 
     SpeakermanConfig getDefaultConfig();
 
-    void dumpSpeakermanConfig(const SpeakermanConfig &dump, std::ostream &output);
+    void
+    dumpSpeakermanConfig(const SpeakermanConfig &dump, std::ostream &output);
 
     long long getFileTimeStamp(const char *fileName);
 

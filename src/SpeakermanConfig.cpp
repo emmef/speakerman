@@ -192,17 +192,14 @@ namespace speakerman {
         return getConfigString(getOffset(groupId, eqId, fieldId));
     }
 
-    static constexpr size_t UNSET_SIZE = -1;
-    static constexpr int UNSET_BOOL = -1;
-    static constexpr double UNSET_FLOAT = numeric_limits<double>::infinity();
 
     static constexpr const char *KEY_GROUPS = "/groups";
     static constexpr const char *KEY_GROUP_CHANNELS = "/group-channels";
-    static constexpr const char *KEY_THRESHOLD_SUB_RELATIVE = "/sub-relative-threshold";
+    static constexpr const char *KEY_THRESHOLD_SUB_RELATIVE = "/sub-relative-threshold_";
 
     static constexpr const char *KEY_GROUP_PREFIX = "group/";
     static constexpr const char *KEY_GROUP_EQS = "/equalizers";
-    static constexpr const char *KEY_GROUP_THRESHOLD = "/threshold";
+    static constexpr const char *KEY_GROUP_THRESHOLD = "/threshold_";
     static constexpr const char *KEY_GROUP_VOLUME = "/volume";
 
     static bool fileExists(const char *fileName)
@@ -390,7 +387,7 @@ namespace speakerman {
                 parsePos = endptr && *endptr ? endptr + 1 : nullptr;
             }
             else {
-                tempValue = static_cast<Type>(UNSET_FLOAT);
+                tempValue = UnsetValue<T>::value;
             }
 
             array[i] = static_cast<T>(tempValue);
@@ -400,9 +397,9 @@ namespace speakerman {
     }
 
     template<typename T>
-    static void setDefault(T &value, T unsetValue, T defaultValue, const char *key)
+    static void setDefault(T &value, T defaultValue)
     {
-        if (value != unsetValue) {
+        if (value != UnsetValue<T>::value) {
             return;
         }
         value = defaultValue;
@@ -414,52 +411,6 @@ namespace speakerman {
             return strncmp(key, getConfigKey(groupId, eqId, fieldId), config::Reader::MAX_KEY_LENGTH) == 0;
         }
         return false;
-    }
-
-    static SpeakermanConfig generateDefaultConfig()
-    {
-        SpeakermanConfig config;
-
-        config.groups = SpeakermanConfig::DEFAULT_GROUPS;
-        config.groupChannels = SpeakermanConfig::DEFAULT_GROUP_CHANNELS;
-        config.relativeSubThreshold = SpeakermanConfig::DEFAULT_REL_SUB_THRESHOLD;
-        config.subOutput = SpeakermanConfig::DEFAULT_SUB_OUTPUT;
-        config.subDelay = SpeakermanConfig::DEFAULT_SUB_DELAY;
-        config.inputOffset = SpeakermanConfig::DEFAULT_INPUT_OFFSET;
-        config.generateNoise = SpeakermanConfig::DEFAULT_GENERATE_NOISE;
-        config.crossovers = SpeakermanConfig::DEFAULT_CROSSOVERS;
-
-        for (size_t group = 0; group < SpeakermanConfig::MAX_GROUPS; group++) {
-            GroupConfig &groupConfig = config.group[group];
-            groupConfig.eqs = GroupConfig::DEFAULT_EQS;
-            groupConfig.threshold = GroupConfig::DEFAULT_THRESHOLD;
-            for (size_t i = 0; i < SpeakermanConfig::MAX_GROUPS; i++) {
-                groupConfig.volume[i] = i == group ? GroupConfig::DEFAULT_VOLUME : 0;
-            }
-            groupConfig.delay = GroupConfig::DEFAULT_DELAY;
-            groupConfig.use_sub = 1;
-            groupConfig.mono = 0;
-            for (size_t eq = 0; eq < GroupConfig::MAX_EQS; eq++) {
-                EqualizerConfig &eqConfig = groupConfig.eq[eq];
-                eqConfig.center = 20000;
-                eqConfig.gain = 10;
-                eqConfig.bandwidth = 2;
-            }
-        }
-
-        return config;
-    }
-
-    static const SpeakermanConfig &getDefaultConfigRef()
-    {
-        static SpeakermanConfig config = generateDefaultConfig();
-
-        return config;
-    }
-
-    SpeakermanConfig getDefaultConfig()
-    {
-        return getDefaultConfigRef();
     }
 
     static void resetStream(istream &stream)
@@ -533,7 +484,6 @@ namespace speakerman {
     static speakerman::config::CallbackResult readGroupCallback(const char *key, const char *value, void *data)
     {
         auto config = static_cast<GroupConfigCallbackData *>(data);
-
         if (isKey(key, config->initial, config->groupId, -1, GroupConfig::KEY_EQ_COUNT)) {
             readNumber(config->config.eqs, key, value, GroupConfig::MIN_EQS, GroupConfig::MAX_EQS);
         }
@@ -586,9 +536,6 @@ namespace speakerman {
         }
         resetStream(stream);
         EqualizerConfig &config = data.config;
-        config.center = UNSET_FLOAT;
-        config.gain = UNSET_FLOAT;
-        config.bandwidth = UNSET_FLOAT;
 
         auto result = reader.read(stream, readEqCallback, &data);
         if (result != config::ReadResult::SUCCESS && result != config::ReadResult::STOPPED) {
@@ -596,12 +543,9 @@ namespace speakerman {
         }
 
         const EqualizerConfig &defaulConfig = basedUpon.group[data.groupId].eq[data.eqId];
-        setDefault(config.center, UNSET_FLOAT, defaulConfig.center,
-                   getConfigKey(data.groupId, data.eqId, EqualizerConfig::KEY_CENTER));
-        setDefault(config.gain, UNSET_FLOAT, defaulConfig.gain,
-                   getConfigKey(data.groupId, data.eqId, EqualizerConfig::KEY_GAIN));
-        setDefault(config.bandwidth, UNSET_FLOAT, defaulConfig.bandwidth,
-                   getConfigKey(data.groupId, data.eqId, EqualizerConfig::KEY_BANDWIDTH));
+        setDefault(config.center, defaulConfig.center);
+        setDefault(config.gain, defaulConfig.gain);
+        setDefault(config.bandwidth, defaulConfig.bandwidth);
     }
 
     static void
@@ -612,14 +556,6 @@ namespace speakerman {
         }
         resetStream(stream);
         GroupConfig &config = data.config;
-        config.eqs = UNSET_SIZE;
-        config.threshold = UNSET_FLOAT;
-        for (size_t i = 0; i < SpeakermanConfig::MAX_GROUPS; i++) {
-            config.volume[i] = UNSET_FLOAT;
-        }
-        config.delay = UNSET_FLOAT;
-        config.use_sub = UNSET_BOOL;
-        config.mono = UNSET_BOOL;
 
         auto result = reader.read(stream, readGroupCallback, &data);
         if (result != config::ReadResult::SUCCESS && result != config::ReadResult::STOPPED) {
@@ -627,22 +563,16 @@ namespace speakerman {
         }
 
         const GroupConfig &defaultConfig = basedUpon.group[data.groupId];
-        setDefault(config.eqs, UNSET_SIZE, defaultConfig.eqs,
-                   getConfigKey(data.groupId, -1, GroupConfig::KEY_EQ_COUNT));
-        setDefault(config.threshold, UNSET_FLOAT, defaultConfig.threshold,
-                   getConfigKey(data.groupId, -1, GroupConfig::KEY_THRESHOLD));
+        setDefault(config.eqs, defaultConfig.eqs);
+        setDefault(config.threshold, defaultConfig.threshold);
         for (size_t i = 0; i < SpeakermanConfig::MAX_GROUPS; i++) {
-            setDefault(config.volume[i], UNSET_FLOAT, defaultConfig.volume[i],
-                       getConfigKey(data.groupId, -1, GroupConfig::KEY_VOLUME));
+            setDefault(config.volume[i], defaultConfig.volume[i]);
         }
-        setDefault(config.delay, UNSET_FLOAT, defaultConfig.delay,
-                   getConfigKey(data.groupId, -1, GroupConfig::KEY_DELAY));
-        setDefault(config.use_sub, UNSET_BOOL, defaultConfig.use_sub,
-                   getConfigKey(data.groupId, -1, GroupConfig::KEY_USE_SUB));
-        setDefault(config.mono, UNSET_BOOL, defaultConfig.mono,
-                   getConfigKey(data.groupId, -1, GroupConfig::KEY_MONO));
+        setDefault(config.delay, defaultConfig.delay);
+        setDefault(config.use_sub, defaultConfig.use_sub);
+        setDefault(config.mono, defaultConfig.mono);
 
-        for (size_t eq = 0; eq < GroupConfig::MAX_EQS; eq++) {
+        for (size_t eq = 0; eq < config.eqs; eq++) {
             EqConfigCallbackData info{config.eq[eq], data.groupId, eq, data.initial};
             readEq(info, stream, reader, basedUpon);
         }
@@ -653,15 +583,6 @@ namespace speakerman {
                 bool initial)
     {
         resetStream(stream);
-        config.groups = UNSET_SIZE;
-        config.groupChannels = UNSET_SIZE;
-        config.relativeSubThreshold = UNSET_FLOAT;
-        config.subDelay = UNSET_FLOAT;
-        config.subOutput = UNSET_SIZE;
-        config.inputOffset = UNSET_SIZE;
-        config.crossovers = UNSET_SIZE;
-        config.inputOffset = UNSET_SIZE;
-        config.generateNoise = UNSET_BOOL;
 
         SpeakermanConfigCallbackData data{config, initial};
         auto result = reader.read(stream, readGlobalCallback, &data);
@@ -669,22 +590,14 @@ namespace speakerman {
             throw runtime_error("Parse error");
         }
 
-        setDefault(config.groups, UNSET_SIZE, basedUpon.groups,
-                   getConfigKey(-1, -1, SpeakermanConfig::KEY_GROUP_COUNT));
-        setDefault(config.groupChannels, UNSET_SIZE, basedUpon.groupChannels,
-                   getConfigKey(-1, -1, SpeakermanConfig::KEY_CHANNELS));
-        setDefault(config.relativeSubThreshold, UNSET_FLOAT, basedUpon.relativeSubThreshold,
-                   getConfigKey(-1, -1, SpeakermanConfig::KEY_SUB_THRESHOLD));
-        setDefault(config.subDelay, UNSET_FLOAT, basedUpon.subDelay,
-                   getConfigKey(-1, -1, SpeakermanConfig::KEY_SUB_DELAY));
-        setDefault(config.subOutput, UNSET_SIZE, basedUpon.subOutput,
-                   getConfigKey(-1, -1, SpeakermanConfig::KEY_SUB_OUTPUT));
-        setDefault(config.crossovers, UNSET_SIZE, basedUpon.crossovers,
-                   getConfigKey(-1, -1, SpeakermanConfig::KEY_CROSSOVERS));
-        setDefault(config.inputOffset, UNSET_SIZE, basedUpon.inputOffset,
-                   getConfigKey(-1, -1, SpeakermanConfig::KEY_INPUT_OFFSET));
-        setDefault(config.generateNoise, UNSET_BOOL, basedUpon.generateNoise,
-                   getConfigKey(-1, -1, SpeakermanConfig::KEY_GENERATE_NOISE));
+        setDefault(config.groups, basedUpon.groups);
+        setDefault(config.groupChannels, basedUpon.groupChannels);
+        setDefault(config.relativeSubThreshold, basedUpon.relativeSubThreshold);
+        setDefault(config.subDelay, basedUpon.subDelay);
+        setDefault(config.subOutput, basedUpon.subOutput);
+        setDefault(config.crossovers, basedUpon.crossovers);
+        setDefault(config.inputOffset, basedUpon.inputOffset);
+        setDefault(config.generateNoise, basedUpon.generateNoise);
 
         for (size_t g = 0; g < config.groups; g++) {
             GroupConfigCallbackData data{config.group[g], g, initial};
@@ -696,7 +609,7 @@ namespace speakerman {
     actualReadConfig(SpeakermanConfig &config, istream &stream, const SpeakermanConfig &basedUpon, bool initial)
     {
         config::Reader reader;
-
+        config = SpeakermanConfig::unsetConfig();
         readGlobals(config, stream, reader, basedUpon, initial);
     }
 
@@ -746,11 +659,12 @@ namespace speakerman {
     {
         SpeakermanConfig result;
         ifstream stream;
-        stream.open(configFileName());
         long long stamp = getFileTimeStamp(configFileName());
+        stream.open(configFileName());
 
         StreamOwner owner(stream);
         if (!stream.is_open()) {
+            cerr << "Stream not open..." << endl;
             return basedUpon;
         }
         try {
@@ -760,13 +674,14 @@ namespace speakerman {
             cerr << "E: " << e.what() << endl;
             return basedUpon;
         }
+        dumpSpeakermanConfig(result, cout);
         result.timeStamp = stamp;
         return result;
     }
 
     SpeakermanConfig readSpeakermanConfig(bool initial)
     {
-        SpeakermanConfig basedUpon = getDefaultConfigRef();
+        SpeakermanConfig basedUpon = SpeakermanConfig::defaultConfig();
         return readSpeakermanConfig(basedUpon, initial);
     }
 
@@ -801,7 +716,7 @@ namespace speakerman {
             }
             output << "]" << endl;
 
-            for (size_t eq = 0; eq < GroupConfig::MAX_EQS; eq++) {
+            for (size_t eq = 0; eq < std::min(GroupConfig::MAX_EQS, groupConfig.eqs); eq++) {
                 const EqualizerConfig &eqConfig = groupConfig.eq[eq];
                 output << getConfigKey(group, eq, EqualizerConfig::KEY_CENTER) << assgn << eqConfig.center << endl;
                 output << getConfigKey(group, eq, EqualizerConfig::KEY_GAIN) << assgn << eqConfig.gain << endl;

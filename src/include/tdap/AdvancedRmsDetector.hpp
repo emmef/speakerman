@@ -108,41 +108,38 @@ namespace tdap {
             size_t followAttackSamples;
             size_t followReleaseSamples;
             size_t followHoldSamples;
-            size_t trueRmsLevels;
 
             void calculate(UserConfig userConfig, double sampleRate)
             {
                 UserConfig config = userConfig.validate();
-                double largeRc = 2 * PERCEPTIVE_SLOW_WINDOWSIZE;
-                followAttackSamples = 0.5 + sampleRate * followRcRange().getBetween(userConfig.minRc / 2);
-                followHoldSamples = followAttackSamples * 4;
-                followReleaseSamples = 0.5 + sampleRate * PERCEPTIVE_FAST_WINDOWSIZE / 4;
+                double largeRc = PERCEPTIVE_SLOW_WINDOWSIZE;
+                followAttackSamples = 0.5 + sampleRate * userConfig.minRc;
+                followHoldSamples = 0.5 + sampleRate * 0.005;
+                followReleaseSamples = 0.5 + sampleRate * 0.010;
 
-                double smallRc = largeRc / pow(2, RC_TIMES - 1);
+                double smallRc = largeRc * pow(0.5, RC_TIMES - 1);
                 smallWindowSamples = smallRc * sampleRate;
                 size_t i = 0;
                 double rc = smallRc;
-                while (Values::relative_distance(rc, PERCEPTIVE_FAST_WINDOWSIZE) > 0.5) {
-                    scale[i++] = pow(rc / PERCEPTIVE_FAST_WINDOWSIZE, 0.25);
-                    rc *= 2.0;
+
+                for (int i = 0; i < RC_TIMES; i++, rc *= 2.0) {
+                    if (i == 0) {
+                        scale[i] = 0.25;
+                    }
+                    else if (Values::relative_distance(rc, PERCEPTIVE_SLOW_WINDOWSIZE) < 0.1) {
+                        scale[i] = 1.0;
+                    }
+                    else if (rc < PERCEPTIVE_SLOW_WINDOWSIZE) {
+                        scale[i] = pow(rc / PERCEPTIVE_SLOW_WINDOWSIZE, 0.25);
+                    }
+                    else  {
+                        scale[i] = std::min(pow(PERCEPTIVE_SLOW_WINDOWSIZE / rc, 0.5), 1.0);
+                    }
                 }
-                scale[i++] = 1.0;
-                trueRmsLevels = i;
-                rc *= 2.0;
-                double lastRc = 1.0;
-                while (Values::relative_distance(rc, largeRc) > 0.5) {
-                    lastRc = pow(rc / PERCEPTIVE_FAST_WINDOWSIZE, 0.105);
-                    scale[i++] = lastRc;
-                    rc *= 2.0;
+                rc = smallRc;
+                for (size_t i = 0; i < RC_TIMES; i++, rc *= 2.0) {
+                        std::cout << "RC " << (1000 * rc) << " ms. level=" << scale[i] << std::endl;
                 }
-                while (i < RC_TIMES) {
-                    scale[i++] = 1;//pow(PERCEPTIVE_FAST_WINDOWSIZE / rc, 0.25);
-                    rc *= 2.0;
-                }
-//			rc = smallRc;
-//			for (size_t i = 0; i < RC_TIMES; i++, rc *= 2.0) {
-//				std::cout << "RC " << (1000 * rc) << " ms. level=" << scale[i] << std::endl;
-//			}
             }
         };
 
@@ -195,7 +192,6 @@ namespace tdap {
                         config.followAttackSamples,
                         config.followReleaseSamples,
                         0);
-                filter_.configure_true_levels(config.trueRmsLevels);
                 filter_.setSmallWindowAndRc(config.smallWindowSamples, 4, 2);
                 filter_.setIntegrators(0.01);
                 for (size_t i = 0; i < RuntimeConfig<T>::RC_TIMES; i++) {
@@ -213,12 +209,6 @@ namespace tdap {
             size_t getHoldSamples() const
             {
                 return follower_.getHoldSamples();
-            }
-
-            T integrate_smooth(T squareInput, T minOutput)
-            {
-                T value = filter_.addSquareGetValue(squareInput, minOutput);
-                return follower_.apply(value);
             }
 
             T integrate_smooth(T squareInput, T minOutput, T &squaredSignal)
