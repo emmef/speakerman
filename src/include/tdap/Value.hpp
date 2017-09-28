@@ -100,7 +100,7 @@ namespace tdap {
                 if (value < threshold) {
                     return value;
                 }
-                throw std::invalid_argument("Value not below threshold");
+                throw std::invalid_argument("Value not below threshold_");
             }
 
             inline static T
@@ -109,7 +109,7 @@ namespace tdap {
                 if (value <= threshold) {
                     return value;
                 }
-                throw std::invalid_argument("Value not below or equal to threshold");
+                throw std::invalid_argument("Value not below or equal to threshold_");
             }
 
             inline static const R

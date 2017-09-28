@@ -42,6 +42,15 @@ namespace tdap {
         const T min_;
         const T max_;
 
+
+        T getStartIfValid(T start, T end) const
+        {
+            if (isSubRange(start, end)) {
+                return start;
+            }
+            throw std::invalid_argument("ValueRange::getStartIfValid(): invalid range");
+        }
+
     public:
         static const ValueRange<T> &absolute()
         {
@@ -94,14 +103,6 @@ namespace tdap {
                 return value;
             }
             throw std::invalid_argument("ValueRange: time not within range");
-        }
-
-        T getStartIfValid(T start, T end) const
-        {
-            if (isSubRange(start, end)) {
-                return start;
-            }
-            throw std::invalid_argument("ValueRange::getStartIfValid(): invalid range");
         }
 
         T getEndIfValid(T start, T end) const

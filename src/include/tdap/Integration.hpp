@@ -182,8 +182,7 @@ namespace tdap {
         Coefficient historyMultiply = 0;
         Coefficient inputMultiply = 1.0;
     public:
-        IntegrationCoefficients()
-        {}
+        IntegrationCoefficients() = default;
 
         IntegrationCoefficients(double characteristicSamples) :
                 historyMultiply(Integration::get_history_multiplier(characteristicSamples)),
@@ -213,7 +212,7 @@ namespace tdap {
 
         double getCharacteristicSamples() const
         {
-            return historyMultiplyInverse(historyMultiply);
+            return Integration::get_samples_from_history_multiply(historyMultiply);
         }
 
         template<typename Value>
@@ -267,6 +266,7 @@ namespace tdap {
         IntegrationCoefficients<Coefficient> releaseCoeffs;
         Coefficient output;
 
+        AttackReleaseFilter() = default;
         AttackReleaseFilter(Coefficient attackSamples, Coefficient releaseSamples, Coefficient initialOutput = 0.0) :
                 attackCoeffs(attackSamples), releaseCoeffs(releaseSamples), output(initialOutput)
         {}
@@ -297,6 +297,7 @@ namespace tdap {
                 filter(attackSamples, releaseSamples, initialOutput), output(initialOutput)
         {}
 
+        AttackReleaseSmoothFilter() = default;
 
         template<typename Value>
         Value integrate(const Value input)
@@ -311,6 +312,206 @@ namespace tdap {
             output = newOutput;
         }
     };
+
+    template <typename F>
+    struct HoldMax
+    {
+        F max_ = 0;
+        size_t hold_count_ = 0;
+        size_t count_down_ = 0;
+
+        template<typename V>
+        F get_value(const V input, const V integrated_value)
+        {
+            if (input > max_) {
+                count_down_ = hold_count_;
+                max_ = input;
+                return input;
+            }
+            if (count_down_ > 0) {
+                count_down_--;
+                return max_;
+            }
+            max_ = integrated_value;
+            return input;
+        }
+
+        void reset()
+        {
+            max_ = 0;
+            count_down_ = 0;
+        }
+
+        HoldMax() = default;
+        HoldMax(size_t hold_count, F initial_held_value) : max_(initial_held_value), hold_count_(hold_count), count_down_(0)
+        {}
+    };
+
+    template<typename F>
+    struct Integrator
+    {
+        static_assert(std::is_floating_point<F>::value, "F must be a floating-point type");
+
+        IntegrationCoefficients<F> coefficients_;
+        F output_ = 0;
+
+        template<typename V>
+        V integrate(const V input)
+        {
+            return coefficients_.integrate(input, output_);
+        }
+
+        template<typename V>
+        V integrate(const V input, V &output) const
+        {
+            return coefficients_.integrate(input, output);
+        }
+
+        template<typename V>
+        void set_output(const V new_output)
+        {
+            output_ = new_output;
+        }
+    };
+
+    template<typename F>
+    struct SmoothIntegrator
+    {
+        static_assert(std::is_floating_point<F>::value, "F must be a floating-point type");
+
+        Integrator<F> filter_;
+        F output_ = 0;
+
+        template<typename V>
+        V integrate(const V input, V &pre_smooth_output, V &post_smooth_output) const
+        {
+            return filter_.integrate(filter_.integrate(input, pre_smooth_output), post_smooth_output);
+        }
+
+        template<typename V>
+        V integrate(const V input)
+        {
+            return filter_.integrate(filter_.integrate(input), output_);
+        }
+
+        template<typename V>
+        void set_output(V new_output)
+        {
+            filter_.set_output(new_output);
+            output_ = new_output;
+        }
+    };
+
+    template<typename F>
+    struct SmoothHoldMaxIntegrator
+    {
+        static_assert(std::is_floating_point<F>::value, "F must be a floating-point type");
+
+        SmoothIntegrator<F> filter_;
+        HoldMax<F> hold_max_;
+
+        template<typename V>
+        V integrate(const V input)
+        {
+            return filter_.integrate(hold_max_.get_value(input, filter_.output_));
+        }
+
+        template<typename V>
+        void set_output(V new_output)
+        {
+            filter_.set_output(new_output);
+            hold_max_.reset();
+        }
+
+        void set_hold_count(size_t hold_count)
+        {
+            hold_max_.hold_count_ = hold_count;
+        }
+    };
+
+    template<typename F>
+    struct AttackReleaseIntegrator
+    {
+        static_assert(std::is_floating_point<F>::value, "F must be a floating-point type");
+
+        IntegrationCoefficients<F> attack_;
+        IntegrationCoefficients<F> release_;
+        F output_;
+
+        template<typename V>
+        V integrate(const V input, V &output)
+        {
+            return input > output ? attack_.integrate(input, output) : release_.integrate(input, output);
+        }
+
+        template<typename V>
+        V integrate(const V input)
+        {
+            return integrate(output_);
+        }
+
+        template<typename V>
+        void setOutput(V new_output)
+        {
+            output_ = new_output;
+        }
+    };
+
+    template<typename F>
+    struct SmoothAttackReleaseIntegrator
+    {
+        static_assert(std::is_floating_point<F>::value, "F must be a floating-point type");
+
+        AttackReleaseIntegrator<F> filter_;
+        F output_;
+
+        template<typename V>
+        V integrate(const V input, V &pre_smooth_output, V &post_smooth_output)
+        {
+            return filter_.integrate(filter_.integrate(input, pre_smooth_output), post_smooth_output);
+        }
+
+        template<typename V>
+        V integrate(const V input)
+        {
+            return filter_.integrate(filter_.integrate(input), output_);
+        }
+
+        template<typename V>
+        void setOutput(const V new_output)
+        {
+            filter_.setOutput(new_output);
+            output_ = new_output;
+        }
+    };
+
+    template<typename F>
+    struct SmoothHoldMaxAttackReleaseIntegrator
+    {
+        static_assert(std::is_floating_point<F>::value, "F must be a floating-point type");
+
+        SmoothAttackReleaseIntegrator<F> filter_;
+        HoldMax<F> hold_max_;
+
+        template<typename V>
+        V integrate(const V input)
+        {
+            return filter_.integrate(hold_max_.get_value(input, filter_.output_));
+        }
+
+        template<typename V>
+        void setOutput(const V new_output)
+        {
+            filter_.setOutput(new_output);
+            hold_max_.reset();
+        }
+
+        void set_hold_count(size_t hold_count)
+        {
+            hold_max_.hold_count_ = hold_count;
+        }
+    };
+
 
 
 } /* End of name space tdap */
