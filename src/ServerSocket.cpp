@@ -157,21 +157,16 @@ namespace speakerman {
                 return true;
             }
             time(&now);
-            if (now >= end) {
-                error = ETIMEDOUT;
-                break;
-            }
             int sleep_suggestion = (sleep_time + 1) * 3 / 2;
             int sleep_end = now + sleep_suggestion;
             int actual_end = end < sleep_end ? end : sleep_end;
             sleep_time = actual_end - now;
             if (sleep_time > 0) {
-                std::cout << "bind-wait sleeps for " << sleep_time << " seconds" << std::endl;
+//                std::cout << "bind-wait sleeps for " << sleep_time << " seconds" << std::endl;
                 sleep(sleep_time);
             }
             else {
-                error = ETIMEDOUT;
-                break;
+                sleep_time = 1;
             }
         }
         if (errorCode) {
