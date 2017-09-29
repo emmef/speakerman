@@ -312,6 +312,7 @@ namespace tdap {
 
     public:
         static constexpr double INTEGRATOR_WINDOW_SIZE_RATIO = 0.25;
+        static constexpr double MINIMUM_INTEGRATION_TO_WINDOW_RATIO = 0.01;
 
         BucketIntegratedRms() = default;
 
@@ -340,6 +341,11 @@ namespace tdap {
         size_t get_window_size() const
         {
             return rms_.getWindowSize();
+        }
+
+        size_t get_integration_time() const
+        {
+            return coeffs_.getCharacteristicSamples();
         }
 
         void zero(S value)
@@ -403,6 +409,8 @@ namespace tdap {
 
         static constexpr double INTEGRATOR_WINDOW_SIZE_RATIO =
                 BucketIntegratedRms<S, BUCKETS>::INTEGRATOR_WINDOW_SIZE_RATIO;
+        static constexpr double MINIMUM_INTEGRATION_TO_WINDOW_RATIO =
+                BucketIntegratedRms<S, BUCKETS>::MINIMUM_INTEGRATION_TO_WINDOW_RATIO;
 
         using Rms = BucketIntegratedRms<S, BUCKETS>;
         FixedSizeArray <Rms, LEVELS> rms_;
@@ -438,7 +446,7 @@ namespace tdap {
                                           bigger_weight));
             size_t extra_levels = bigger_levels + smaller_levels;
             while (extra_levels < levels - 1) {
-                if (biggest_window > PERCEPTIVE_SECONDS) {
+                if (biggest_window > PERCEPTIVE_SECONDS * 1.3) {
                     bigger_levels++;
                 }
                 else {
@@ -453,13 +461,14 @@ namespace tdap {
 
         void configure(size_t sample_rate, S biggest_window, S peak_to_rms,
                        S integration_to_window_size = INTEGRATOR_WINDOW_SIZE_RATIO,
-                       size_t levels = LEVELS)
+                       size_t levels = LEVELS, S initial_value = 0.0)
         {
             used_levels_ = Value<size_t>::force_between(levels, 3, LEVELS);
             double peak_scale = 1.0 / Value<S>::force_between(peak_to_rms, 2, 10);
             double biggest = get_biggest_window_size(biggest_window);
             double integration_factor = Value<S>::force_between(
-                    integration_to_window_size, 0.1, 1);
+                    integration_to_window_size, MINIMUM_INTEGRATION_TO_WINDOW_RATIO, 1);
+            S initial_avererage = Value<S>::force_between(initial_value, 0.0, 100.0);
             size_t bigger_levels;
             size_t smaller_levels;
             determine_number_of_levels(biggest, levels, bigger_levels,
@@ -475,14 +484,16 @@ namespace tdap {
                                pow(PEAK_PERCEPTIVE_RATIO, exponent * 0.25);
                 double rc = window_size * integration_factor;
                 rms_[level].setWindowSizeAndRc(window_size * sample_rate,
-                                               rc * sample_rate);
+                                               Value<double>::max(1, rc * sample_rate));
                 rms_[level].set_output_scale(scale);
+                rms_[level].setValue(initial_avererage);
             }
 
             rms_[smaller_levels].setWindowSizeAndRc(
                     PERCEPTIVE_SECONDS * sample_rate,
                     PERCEPTIVE_SECONDS * sample_rate * integration_factor);
             rms_[smaller_levels].set_output_scale(1.0);
+            rms_[smaller_levels].setValue(initial_avererage);
 
             for (size_t level = smaller_levels + 1;
                  level < used_levels_; level++) {
@@ -494,16 +505,20 @@ namespace tdap {
                 double rc = window_size * integration_factor;
                 rms_[level].setWindowSizeAndRc(window_size * sample_rate,
                                                rc * sample_rate);
+                rms_[level].setValue(initial_avererage);
             }
 
             for (size_t level = 0; level < used_levels_; level++) {
                 double window_size =
                         1.0 * rms_[level].get_window_size() / sample_rate;
+                double integration_time =
+                        1.0 * rms_[level].get_integration_time() / sample_rate;
                 double scale = rms_[level].get_output_scale();
                 cout
                         << "RMS[" << level
                         << "] window=" << window_size
-                        << "s; scale=" << scale << endl;
+                        << "; integration=" << integration_time
+                        << "; scale=" << scale << endl;
             }
 
             follower_ = SmoothHoldMaxAttackRelease<S>(

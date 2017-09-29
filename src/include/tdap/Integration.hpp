@@ -212,7 +212,7 @@ namespace tdap {
 
         double getCharacteristicSamples() const
         {
-            return Integration::get_samples_from_history_multiply(historyMultiply);
+            return Integration::get_samples_from_history_multiply<Coefficient>(historyMultiply);
         }
 
         template<typename Value>
