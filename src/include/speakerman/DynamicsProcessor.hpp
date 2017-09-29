@@ -143,7 +143,7 @@ namespace speakerman {
 
         Crossovers::Filter<double, T, INPUTS, CROSSOVERS> crossoverFilter;
         ACurves::Filter<T, PROCESSING_CHANNELS> aCurve;
-        using Detector = PerceptiveRms<T, 16, 11>;
+        using Detector = PerceptiveRms<T, 16, 16>;
 
         Detector *rmsDetector;
 
@@ -208,10 +208,15 @@ namespace speakerman {
                         8 * sampleRate);
             }
             // Rms detector confiuration
-            rmsDetector[0].configure(sampleRate, PerceptiveMetrics::PERCEPTIVE_SECONDS, 4, 0.2);
+            rmsDetector[0].configure(sampleRate, PerceptiveMetrics::PERCEPTIVE_SECONDS, 4, 0.3, 3);
             AdvancedRms::UserConfig rmsConfig = rmsUserConfig();
-            for (size_t i = 1; i < DETECTORS; i++) {
-                rmsDetector[i].configure(sampleRate, PerceptiveMetrics::PERCEPTIVE_SECONDS, 4, 0.2);
+            for (size_t band = 0, detector = 1; band < CROSSOVERS; band++) {
+                T win_size = 1.5 * PerceptiveMetrics::PERCEPTIVE_SECONDS;
+                T ratio = 0.18 / (0.7 + band);
+                size_t levels = (band + 2) * 6 / CROSSOVERS;
+                for (size_t group = 0; group < GROUPS; group++, detector++) {
+                    rmsDetector[detector].configure(sampleRate, win_size, 4, ratio, levels);
+                }
             }
             size_t rmsDelaySamples = PerceptiveMetrics::PEAK_HOLD_SECONDS * sampleRate;
             rmsDelay.setDelay(rmsDelaySamples);
