@@ -116,8 +116,9 @@ function ensureMeterGroup(groupElementName) {
                     if (i >= gainA) {
                         r = 255;
                     }
-                    else if (i == gainP) {
-                        r = 192;
+                    else if (i >= gainP) {
+                        r = 144;
+                        g = 128;
                     }
                     this.elements[i].style.backgroundColor = "rgb(" + r + "," + g + "," + b + ")";
                 }
@@ -171,53 +172,6 @@ function setMeters(levels)
     for (; i < meterGroups.groups.length; i++) {
         meterGroups.groups[i].hide();
     }
-	// var i;
-	// for (i = 0; i < 4; i++) {
-	// 	var subGainAverage = integrate(subOldValues, levels.subGainAverage, 0.1);
-	// 	var subGain = Math.min(levels.subGain, subGainAverage);
-	// 	var subAvgGainPercentage = getSignalInDbPercent(subGainAverage, limitMinGain, limitPower);
-	// 	var subGainPercentage = getSignalInDbPercent(subGain, limitMinGain, limitPower);
-    //
-	// 	if (levels.group && levels.group[i]) {
-	// 		var group = levels.group[i];
-	// 		var prefix = "group_" + i;
-	// 		var subAvg = document.getElementById(prefix);
-	// 		var sub = document.getElementById(prefix + "_sub");
-	// 		var mainAvg = document.getElementById(prefix + "_main_avg");
-	// 		var main = document.getElementById(prefix + "_main");
-	// 		var signal = document.getElementById(prefix + "_signal");
-	//
-	// 		var mainGainAverage = integrate(mainAvg, group.gainAverage, 0.1);
-	// 		var mainGain = Math.min(group.gain, mainGainAverage);
-	// 		var signalValue = integrate(signal, group.level, 0.8) * Math.min(subGainAverage, mainGainAverage);
-	//
-	// 		var signalPercentage = getSignalInDbPercent(signalValue, peakMinimumSignal, signalPower);
-	//
-	// 		if (subAvg) {
-	// 			subAvg.style.backgroundColor = getRgbValue(subAvgGainPercentage, 255, 0, 64, minimumColorPercentage);
-	// 		}
-	// 		if (sub) {
-	// 			sub.style.backgroundColor = getRgbValue(subGainPercentage, 255, 0, 64, minimumColorPercentage);
-	// 		}
-	// 		if (mainAvg) {
-	// 			var mainAvgGainPercentage = getSignalInDbPercent(mainGainAverage, limitMinGain, limitPower);
-	// 			mainAvg.style.backgroundColor = getRgbValue(mainAvgGainPercentage, 255, 0, 0, minimumColorPercentage);
-	// 		}
-	// 		if (main) {
-	// 			var mainGainPercentage = getSignalInDbPercent(mainGain, limitMinGain, limitPower);
-	// 			main.style.backgroundColor = getRgbValue(mainGainPercentage, 255, 0, 0, minimumColorPercentage);
-	// 		}
-	// 		if (signal) {
-	// 			signal.style.backgroundColor = getRgbValue(signalPercentage, 0, 255, 0, minimumColorPercentage);
-	// 		}
-	// 	}
-	// 	else {
-	// 		var prefix = "group_" + i;
-	// 		var group = document.getElementById(prefix);
-	// 		group.style.display = "none";
-	// 		group.style.visibility =
-	// 	}
-	// }
 }
 
 function handleRequest() 
