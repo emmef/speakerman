@@ -208,14 +208,14 @@ namespace speakerman {
                         8 * sampleRate);
             }
             // Rms detector confiuration
-            rmsDetector[0].configure(sampleRate, PerceptiveMetrics::PERCEPTIVE_SECONDS, 4, 0.3, 3);
+            rmsDetector[0].configure(sampleRate, PerceptiveMetrics::PERCEPTIVE_SECONDS, 4, 0.1, 3, 100.0);
             AdvancedRms::UserConfig rmsConfig = rmsUserConfig();
             for (size_t band = 0, detector = 1; band < CROSSOVERS; band++) {
-                T win_size = 1.5 * PerceptiveMetrics::PERCEPTIVE_SECONDS;
-                T ratio = 0.18 / (0.7 + band);
-                size_t levels = (band + 2) * 6 / CROSSOVERS;
+                T win_size = PerceptiveMetrics::PERCEPTIVE_SECONDS;
+                T ratio = 0.025 / (0.1 + band);
+                size_t levels = (0.5 + band) * 16 / CROSSOVERS;
                 for (size_t group = 0; group < GROUPS; group++, detector++) {
-                    rmsDetector[detector].configure(sampleRate, win_size, 4, ratio, levels);
+                    rmsDetector[detector].configure(sampleRate, win_size, 4, ratio, levels, 100.0);
                 }
             }
             size_t rmsDelaySamples = PerceptiveMetrics::PEAK_HOLD_SECONDS * sampleRate;
