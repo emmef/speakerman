@@ -157,23 +157,17 @@ namespace speakerman {
                 return true;
             }
             time(&now);
-            int sleep_suggestion = (sleep_time + 1) * 3 / 2;
+            int sleep_suggestion = 1;//(sleep_time + 1) * 3 / 2;
             int sleep_end = now + sleep_suggestion;
             int actual_end = end < sleep_end ? end : sleep_end;
             sleep_time = actual_end - now;
             if (sleep_time > 0) {
-//                std::cout << "bind-wait sleeps for " << sleep_time << " seconds" << std::endl;
                 sleep(sleep_time);
             }
             else {
                 sleep_time = 1;
             }
         }
-        if (errorCode) {
-            *errorCode = error;
-            return false;
-        }
-        throw std::runtime_error(strerror(error));
     }
 
     static struct addrinfo create_hints()
