@@ -29,7 +29,7 @@
 #include <cmath>
 
 #include <tdap/FixedSizeArray.hpp>
-#include <tdap/Integration.hpp>
+#include <tdap/Followers.hpp>
 #include <tdap/Power2.hpp>
 
 namespace tdap {
@@ -387,9 +387,9 @@ namespace tdap {
     struct PerceptiveMetrics
     {
         static constexpr double PERCEPTIVE_SECONDS = 0.400;
-        static constexpr double PEAK_SECONDS = 0.0004;
-        static constexpr double PEAK_HOLD_SECONDS = 0.0050;
-        static constexpr double PEAK_RELEASE_SECONDS = 0.0100;
+        static constexpr double PEAK_SECONDS = 0.0003;
+        static constexpr double PEAK_HOLD_SECONDS = 0.0016;//0.0050
+        static constexpr double PEAK_RELEASE_SECONDS = 0.0032; // 0.0100
         static constexpr double MAX_SECONDS = 10.0000;
         static constexpr double PEAK_PERCEPTIVE_RATIO =
                 PEAK_SECONDS / PERCEPTIVE_SECONDS;
@@ -411,15 +411,12 @@ namespace tdap {
 
         S get_biggest_window_size(S biggest_window) const
         {
-            S limited_window = std::min(MAX_SECONDS, limited_window);
+            S limited_window = std::min(MAX_SECONDS, biggest_window);
 
             if (limited_window < PERCEPTIVE_SECONDS) {
                 return PERCEPTIVE_SECONDS;
             }
-            double big_to_perceptive_log =
-                    (log(limited_window) - log(PERCEPTIVE_SECONDS)) /
-                    M_LN2;
-            if (big_to_perceptive_log < 0.5) {
+            if (limited_window < PERCEPTIVE_SECONDS * 1.4) {
                 return PERCEPTIVE_SECONDS;
             }
             return limited_window;
@@ -434,13 +431,13 @@ namespace tdap {
             double smaller_weight =
                     log(PERCEPTIVE_SECONDS) - log(PEAK_SECONDS);
             // apart frm perceptive window, we always have used_levels - 1 available windows to divide for
-            bigger_levels = bigger_weight * (LEVELS - 1) /
+            bigger_levels = bigger_weight * (levels - 1) /
                             (smaller_weight + bigger_weight);
-            smaller_levels = std::max(1.0, smaller_weight * (LEVELS - 1) /
+            smaller_levels = std::max(1.0, smaller_weight * (levels - 1) /
                                          (smaller_weight +
                                           bigger_weight));
             size_t extra_levels = bigger_levels + smaller_levels;
-            while (extra_levels < LEVELS - 1) {
+            while (extra_levels < levels - 1) {
                 if (biggest_window > PERCEPTIVE_SECONDS) {
                     bigger_levels++;
                 }
@@ -491,7 +488,7 @@ namespace tdap {
                  level < used_levels_; level++) {
                 double exponent = 1.0 * (level - smaller_levels) /
                                   (used_levels_ - 1 - smaller_levels);
-                double window_size = biggest *
+                double window_size = PERCEPTIVE_SECONDS *
                                      pow(biggest / PERCEPTIVE_SECONDS,
                                          exponent);
                 double rc = window_size * integration_factor;
