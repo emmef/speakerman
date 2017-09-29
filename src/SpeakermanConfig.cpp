@@ -236,7 +236,7 @@ namespace speakerman {
     static string internalGetWebSiteDirectory()
     {
         static const char *prefix = getInstallBaseDirectory();
-        std::cout << "Test " << prefix << std::endl;
+
         if (prefix == nullptr) {
             return "";
         }
