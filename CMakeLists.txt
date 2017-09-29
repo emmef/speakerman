@@ -63,7 +63,6 @@ set(SOURCE_FILES
         src/Names.cpp
         src/Port.cpp
         src/PortDefinition.cpp
-        src/ProcessingUnit.cpp
         src/ServerSocket.cpp
         src/SignalHandler.cpp
         src/SingleThreadFileCache.cpp
