@@ -2,6 +2,7 @@
 // Created by michel on 10-9-16.
 //
 
+#include <jack/jack.h>
 #include <iostream>
 #include <tdap/Delay.hpp>
 #include <tdap/Rms.hpp>
