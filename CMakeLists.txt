@@ -1,7 +1,9 @@
 cmake_minimum_required(VERSION 3.6)
 project(speakerman)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -DINSTALL_DIR='\"/usr/local\"'")
+set(CMAKE_CXX_STANDARD 14)
+
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DINSTALL_DIR='\"/usr/local\"'")
 include_directories(include src/include)
 
 
@@ -17,7 +19,6 @@ set(SOURCE_FILES
         src/include/speakerman/utils/Mutex.hpp
         src/include/speakerman/DynamicsProcessor.hpp
         src/include/speakerman/HttpMessage.hpp
-        src/include/speakerman/ProcessingUnit.hpp
         src/include/speakerman/ServerSocket.hpp
         src/include/speakerman/SingleThreadFileCache.hpp
         src/include/speakerman/SocketStream.hpp
@@ -82,3 +83,4 @@ target_link_libraries(speakerman jack pthread)
 add_executable(test_speakerman test/main.cpp)
 install(TARGETS speakerman RUNTIME DESTINATION bin)
 install(FILES web/index.html web/speakerman.js web/speakerman.css DESTINATION share/speakerman/web)
+install(FILES service/speakerman.service DESTINATION /lib/systemd/system)
