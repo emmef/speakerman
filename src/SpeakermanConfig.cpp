@@ -27,9 +27,9 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <tdap/Value.hpp>
-#include <tdap/IndexPolicy.hpp>
 #include <tdap/FixedSizeArray.hpp>
 #include <speakerman/SpeakermanConfig.hpp>
+#include <speakerman/utils/Config.hpp>
 
 namespace speakerman {
 
@@ -39,7 +39,8 @@ namespace speakerman {
     class ReadConfigException : public runtime_error
     {
     public:
-        explicit ReadConfigException(const char *message) : runtime_error(message)
+        explicit ReadConfigException(const char *message) : runtime_error(
+                message)
         {
 
         }
@@ -49,158 +50,751 @@ namespace speakerman {
             return ReadConfigException("Could not reset file read position");
         }
     };
+    template<typename T>
+    struct UnsetValue
+    {
+
+    };
+
+    template<>
+    struct UnsetValue<size_t>
+    {
+        static constexpr size_t value = static_cast<size_t>(-1);
+
+        static bool is(size_t test)
+        {
+            return test == value;
+        }
+    };
 
 
-    static constexpr size_t ID_GLOBAL_CNT = 8;
-    static constexpr size_t ID_GROUP_CNT = 6;
-    static constexpr size_t ID_EQ_CNT = 3;
+    template<>
+    struct UnsetValue<double>
+    {
+        static constexpr double value =
+                std::numeric_limits<double>::quiet_NaN();
 
-    static constexpr bool isUserAllowed(ssize_t groupId, ssize_t eqId, size_t fieldId)
+        union Tester {
+            long long l;
+            double f;
+
+            Tester(double v) : l(0) { f = v; }
+
+            bool operator == (const Tester &other) const
+            { return l == other.l; }
+        };
+
+        static bool is(double test)
+        {
+            static const Tester sNan = { std::numeric_limits<double>::signaling_NaN() };
+            static const Tester qNan = { value };
+            Tester t {test};
+            return t == sNan || t == qNan;
+        }
+
+    };
+
+    template<>
+    struct UnsetValue<int>
+    {
+        static constexpr int value = -1;
+
+        static bool is(size_t test)
+        {
+            return test == value;
+        }
+    };
+
+    template<typename T>
+    static void unset_config_value(T &value)
+    {
+        value = UnsetValue<T>::value;
+    }
+
+    template<typename T>
+    static bool set_if_unset_config_value(T &value, T value_if_unset)
+    {
+        if (UnsetValue<T>::is(value)) {
+            value = value_if_unset;
+            return true;
+        }
+        return false;
+    }
+
+    template<typename T>
+    static bool
+    set_if_unset_or_invalid_config_value(T &value, T value_if_unset, T minimum,
+                                         T maximum)
+    {
+        if (UnsetValue<T>::is(value) || value < minimum ||
+            value > maximum) {
+            value = value_if_unset;
+            return true;
+        }
+        return false;
+    }
+
+    template<typename T>
+    static bool unset_if_invalid(T &value, T minimum, T maximum)
+    {
+        if (value < minimum || value > maximum) {
+            value = UnsetValue<T>::value;
+            return true;
+        }
+        return false;
+    }
+
+    template<typename T>
+    static void box_if_out_of_range(T &value, T minimum, T maximum)
+    {
+        if (UnsetValue<T>::is(value)) {
+            return;
+        }
+        if (value < minimum) {
+            value = minimum;
+        }
+        else if (value > maximum) {
+            value = maximum;
+        }
+    }
+
+    template<typename T>
+    static void
+    box_if_out_of_range(T &value, T value_if_unset, T minimum, T maximum)
+    {
+        if (UnsetValue<T>::is(value)) {
+            value = value_if_unset;
+        }
+        else if (value < minimum) {
+            value = minimum;
+        }
+        else if (value > maximum) {
+            value = maximum;
+        }
+    }
+
+
+
+    template<typename T, int type>
+    struct ValueParser_
+    {
+
+    };
+
+    template<typename T>
+    struct ValueParser_<T, 1>
+    {
+        static_assert(is_integral<T>::value,
+                      "Expected integral type parameter");
+        using V = long long int;
+
+        static bool parse(T &field, const char *value, char *&end)
+        {
+            V parsed = strtoll(value, &end, 10);
+            if (*end == '\0' || config::isWhiteSpace(*end) || config::isCommentStart(*end)) {
+                field = tdap::Value<T>::force_between(
+                        parsed,
+                        std::numeric_limits<T>::lowest(),
+                        std::numeric_limits<T>::max());
+                return true;
+            }
+            cerr << "Error parsing integer" << endl;
+            return false;
+        }
+    };
+
+    template<typename T>
+    struct ValueParser_<T, 2>
+    {
+        static_assert(is_integral<T>::value,
+                      "Expected integral type parameter");
+        using V = int;
+
+        static bool
+        matches(const char *keyword, const char *value, const char *end)
+        {
+            size_t scan_length = end - value;
+            size_t key_length = strnlen(keyword, 128);
+            if (scan_length < key_length) {
+                return false;
+            }
+
+            return strncasecmp(keyword, value, key_length) == 0 &&
+                   value[key_length] == '\0' ||
+                   config::isWhiteSpace(value[key_length]);
+        }
+
+        static bool parse(T &field, const char *value, char *&end)
+        {
+            for (end = const_cast<char*>(value); config::isAlphaNum(*end); end++) {}
+
+            if (matches("true", value, end) || matches("1", value, end) ||
+                matches("yes", value, end)) {
+                field = 1;
+                return true;
+            }
+            if (matches("false", value, end) || matches("0", value, end) ||
+                matches("no", value, end)) {
+                field = 0;
+                return true;
+            }
+            cerr << "Error parsing boolean" << endl;
+            return false;
+        }
+    };
+
+    template<typename T>
+    struct ValueParser_<T, 3>
+    {
+        static_assert(is_floating_point<T>::value,
+                      "Expected floating point type parameter");
+        using V = long double;
+
+        static bool parse(T &field, const char *value, char *&end)
+        {
+            V parsed = strtold(value, &end);
+            if (*end == '\0' || config::isWhiteSpace(*end) || config::isCommentStart(*end)) {
+                field = tdap::Value<V>::force_between(
+                        parsed,
+                        std::numeric_limits<T>::lowest(),
+                        std::numeric_limits<T>::max());
+                return true;
+            }
+            cerr << "Error parsing float" << endl;
+            return false;
+        }
+    };
+
+    template<typename T>
+    static constexpr int get_value_parser_type()
     {
         return
-                eqId >= 0 ? false : // eq happens after limiter do not allowed
-                groupId >= 0 ? fieldId == GroupConfig::KEY_VOLUME : // volume happens before limiter so is allowed
-                false;
+                std::is_floating_point<T>::value ? 3 :
+                std::is_same<int, T>::value ? 2 :
+                std::is_integral<T>::value ? 1 : 4;
+
     }
 
-    static constexpr bool isRuntimeAllowed(ssize_t groupId, ssize_t eqId, size_t fieldId)
+    template<typename T>
+    struct ValueParser
+            : public ValueParser_<T, get_value_parser_type<T>()>
     {
-        return
-                eqId >= 0 ? true :
-                groupId >= 0 ? true :
-                (fieldId == SpeakermanConfig::KEY_SUB_THRESHOLD || fieldId == SpeakermanConfig::KEY_SUB_DELAY ||
-                 fieldId == SpeakermanConfig::KEY_GENERATE_NOISE);
-    }
 
-    static constexpr size_t GROUP_CONFIG_SIZE =
-            GroupConfig::MAX_EQS * ID_EQ_CNT + ID_GROUP_CNT;
-    static constexpr size_t GLOBAL_SIZE =
-            ID_GLOBAL_CNT + SpeakermanConfig::MAX_GROUPS * GROUP_CONFIG_SIZE;
-    static constexpr ssize_t INDEX_NEGATIVE = -2 * static_cast<ssize_t>(GLOBAL_SIZE);
+    };
 
-    static ssize_t getGroupOffsetUnsafe(ssize_t eqId, size_t fieldId)
+    template<typename T, size_t N>
+    static int read_value_array(FixedSizeArray<T, N> &values, const char *value,
+                                char *&end)
     {
-        return
-                eqId < 0 ? (fieldId < ID_GROUP_CNT ? fieldId : INDEX_NEGATIVE) :
-                eqId >= GroupConfig::MAX_EQS ? INDEX_NEGATIVE :
-                ID_GROUP_CNT + eqId * ID_EQ_CNT + (fieldId < ID_EQ_CNT ? fieldId : INDEX_NEGATIVE);
-    }
+        using Parser = ValueParser<T>;
+        const char *read_from = value;
+        size_t i;
+        for (i = 0; i < N; i++) {
+            T parsed;
+            if (!Parser::parse(parsed, read_from, end)) {
+                return -1;
+            }
+            values[i] = parsed;
+            bool hadDelimiter = false;
+            while (config::isWhiteSpace(*end) || *end == ';' || *end == ',') {
+                if (*end == ';' || *end == ',') {
+                    if (hadDelimiter) {
+                        return -1;
+                    }
+                    hadDelimiter = true;
+                }
+                end++;
+            }
+            if (*end == '\0' || config::isCommentStart(*end)) {
+                break;
+            }
+            read_from = end;
+        }
+        return i + 1;
+    };
 
-    static ssize_t getOffsetUnsafe(ssize_t groupId, ssize_t eqId, size_t fieldId)
+    using CountValueParser = ValueParser<size_t>;
+    using BooleanValueParser = ValueParser<bool>;
+    using FloatValueParser = ValueParser<double>;
+
+    class VariableReader
     {
-        return
-                groupId < 0 ? (fieldId < ID_GLOBAL_CNT ? fieldId : INDEX_NEGATIVE) :
-                groupId >= SpeakermanConfig::MAX_GROUPS ? INDEX_NEGATIVE :
-                ID_GLOBAL_CNT + groupId * GROUP_CONFIG_SIZE + getGroupOffsetUnsafe(eqId, fieldId);
-    }
+        bool runtime_changeable_ = false;
+    protected:
+        virtual void read(SpeakermanConfig &config, const char *key,
+                          const char *value) const = 0;
 
-    static ssize_t getOffset(ssize_t groupId, ssize_t eqId, size_t fieldId)
+        virtual void copy(SpeakermanConfig &config, const SpeakermanConfig &basedUpon) const = 0;
+
+    public:
+        bool runtime_changeable() const
+        { return runtime_changeable_; }
+
+        virtual void write(const SpeakermanConfig &config, const char *key, ostream &stream) const = 0;
+
+        VariableReader(bool runtime_changeable) : runtime_changeable_(
+                runtime_changeable)
+        {}
+
+        bool read(SpeakermanConfig &config, const char *key,
+                          const char *value, const SpeakermanConfig &basedUpon) const
+        {
+            if (&config == &basedUpon || runtime_changeable_) {
+                read(config, key, value);
+                return true;
+            }
+            else {
+                copy(config, basedUpon);
+            }
+            cout << "Ignoring (not runtime changeable): " << key << endl;
+            return false;
+        }
+
+        virtual ~VariableReader() = default;
+    };
+
+    template<size_t SIZE>
+    class PositionedVariableReader : public VariableReader
     {
-        ssize_t result = getOffsetUnsafe(groupId, eqId, fieldId);
-        if (result >= 0 && result < GLOBAL_SIZE) {
-            return result;
-        }
-        cerr << "E: getOffset(" << groupId << "," << eqId << "," << fieldId << "): " << result;
-        if (result < 0) {
-            cerr << ": Invalid combination of arguments" << endl;
-            throw std::invalid_argument("Invalid combination of arguments");
-        }
-        if (result >= GLOBAL_SIZE) {
-            cerr << ": Internal error with result " << endl;
-            throw std::logic_error("Wrongly calculated index");
-        }
-    }
+        size_t offset_;
 
-    static const char *getConfigString(size_t idx)
+        static size_t long
+        valid_offset(const SpeakermanConfig &config, const void *field)
+        {
+            const char *config_address = static_cast<const char *>(static_cast<const void *>(&config));
+            const char *field_address = static_cast<const char *>(field);
+            if (field_address >= config_address) {
+                size_t offset = field_address - config_address;
+                if (offset <= sizeof(SpeakermanConfig) - SIZE) {
+                    return offset;
+                }
+            }
+            throw std::invalid_argument("Invalid variable offset");
+        }
+
+    protected:
+        size_t offset() const
+        {
+            return offset_;
+        }
+
+        void * variable(SpeakermanConfig &config) const
+        {
+            char *config_address = static_cast<char *>(static_cast<void *>(&config));
+            return static_cast<void*>(config_address + offset_);
+        }
+
+        const void * variable(const SpeakermanConfig &config) const
+        {
+            const char *config_address = static_cast<const char *>(static_cast<const void *>(&config));
+            return static_cast<const void*>(config_address + offset_);
+        }
+
+        void copy(SpeakermanConfig &config, const SpeakermanConfig &basedUpon) const
+        {
+            memcpy(variable(config), variable(basedUpon), SIZE);
+        }
+
+
+    public:
+        PositionedVariableReader(bool runtime_changeable, const SpeakermanConfig &config, const void *field) :
+                VariableReader(runtime_changeable),
+                offset_(valid_offset(config, field))
+        {
+
+        }
+    };
+
+    template<typename T>
+    class TypedVariableReader : public PositionedVariableReader<sizeof(T)>
     {
-        static bool flag = false;
-        static mutex m;
-        static string strings[GLOBAL_SIZE];
-        IndexPolicy::force(idx, GLOBAL_SIZE);
+        using PositionedVariableReader<sizeof(T)>::variable;
+    protected:
+        void read(SpeakermanConfig &config, const char *key,
+                  const char *value) const override
+        {
 
-        if (flag) {
-            return strings[idx].c_str();
+            T &field = *static_cast<T *>(variable(config));
+            char *end = const_cast<char *>(value);
+            if (!ValueParser<T>::parse(field, value, end)) {
+                cerr << "Error parsing \"" << key << "\" @" << (end - value)
+                     << ": " << value << endl;
+            }
         }
-        unique_lock<mutex> lock(m);
-        if (flag) {
-            return strings[idx].c_str();
+    public:
+        TypedVariableReader(bool runtime_changeable, const SpeakermanConfig &config, const T &field)
+                : PositionedVariableReader<sizeof(T)>(runtime_changeable, config, &field)
+        {};
+
+        void write(const SpeakermanConfig &config, const char *key, ostream &stream) const
+        {
+            const T &field = *static_cast<const T *>(variable(config));
+            if (!UnsetValue<T>::is(field)) {
+                stream << key << " = " << field << endl;
+            }
         }
+    };
 
-        strings[getOffset(-1, -1, SpeakermanConfig::KEY_GROUP_COUNT)] = SpeakermanConfig::KEY_SNIPPET_GROUP_COUNT;
-        strings[getOffset(-1, -1, SpeakermanConfig::KEY_CHANNELS)] = SpeakermanConfig::KEY_SNIPPET_CHANNELS;
-        strings[getOffset(-1, -1, SpeakermanConfig::KEY_SUB_THRESHOLD)] = SpeakermanConfig::KEY_SNIPPET_SUB_THRESHOLD;
-        strings[getOffset(-1, -1, SpeakermanConfig::KEY_SUB_DELAY)] = SpeakermanConfig::KEY_SNIPPET_SUB_DELAY;
-        strings[getOffset(-1, -1, SpeakermanConfig::KEY_SUB_OUTPUT)] = SpeakermanConfig::KEY_SNIPPET_SUB_OUTPUT;
-        strings[getOffset(-1, -1, SpeakermanConfig::KEY_CROSSOVERS)] = SpeakermanConfig::KEY_SNIPPET_CROSSOVERS;
-        strings[getOffset(-1, -1, SpeakermanConfig::KEY_INPUT_OFFSET)] = SpeakermanConfig::KEY_SNIPPET_INPUT_OFFSET;
-        strings[getOffset(-1, -1,
-                          SpeakermanConfig::KEY_GENERATE_NOISE)] = SpeakermanConfig::KEY_SNIPPET_GENERATE_NOISE;
+    template<typename T, size_t N>
+    class TypedArrayVariableReader : public PositionedVariableReader<N * sizeof(T)>
+    {
+        using PositionedVariableReader<N * sizeof(T)>::variable;
+    protected:
 
-        string key;
-        for (size_t group = 0; group < SpeakermanConfig::MAX_GROUPS; group++) {
-            string groupKey = GroupConfig::KEY_SNIPPET_GROUP;
-            groupKey += "/";
-            groupKey += (char)(group + '0');
-            groupKey += "/";
+        void read(SpeakermanConfig &config, const char *key,
+                  const char *value) const override
+        {
+            FixedSizeArray<T, N> fieldValues;
+            T *field = static_cast<T *>(variable(config));
+            char *end = const_cast<char*>(value);
+            int count = read_value_array(fieldValues, value, end);
+            if (count < 0) {
+                cerr << "Error parsing \"" << key << "\" @" << (end - value)
+                     << ": " << value << endl;
+                return;
+            }
 
-            key = groupKey;
-            key += GroupConfig::KEY_SNIPPET_EQ_COUNT;
-            strings[getOffset(group, -1, GroupConfig::KEY_EQ_COUNT)] = key;
-            key = groupKey;
-            key += GroupConfig::KEY_SNIPPET_THRESHOLD;
-            strings[getOffset(group, -1, GroupConfig::KEY_THRESHOLD)] = key;
-            key = groupKey;
-            key += GroupConfig::KEY_SNIPPET_VOLUME;
-            strings[getOffset(group, -1, GroupConfig::KEY_VOLUME)] = key;
-            key = groupKey;
-            key += GroupConfig::KEY_SNIPPET_DELAY;
-            strings[getOffset(group, -1, GroupConfig::KEY_DELAY)] = key;
-            key = groupKey;
-            key += GroupConfig::KEY_SNIPPET_USE_SUB;
-            strings[getOffset(group, -1, GroupConfig::KEY_USE_SUB)] = key;
-            key = groupKey;
-            key += GroupConfig::KEY_SNIPPET_MONO;
-            strings[getOffset(group, -1, GroupConfig::KEY_MONO)] = key;
-
-            string eqBase = groupKey;
-            eqBase += EqualizerConfig::KEY_SNIPPET_EQUALIZER;
-            eqBase += "/";
-            for (size_t eq = 0; eq < GroupConfig::MAX_EQS; eq++) {
-                string eqKey = eqBase;
-                eqKey += (char)('0' + eq);
-                eqKey += "/";
-
-                key = eqKey;
-                key += EqualizerConfig::KEY_SNIPPET_CENTER;
-                strings[getOffset(group, eq, EqualizerConfig::KEY_CENTER)] = key;
-                key = eqKey;
-                key += EqualizerConfig::KEY_SNIPPET_GAIN;
-                strings[getOffset(group, eq, EqualizerConfig::KEY_GAIN)] = key;
-                key = eqKey;
-                key += EqualizerConfig::KEY_SNIPPET_BANDWIDTH;
-                strings[getOffset(group, eq, EqualizerConfig::KEY_BANDWIDTH)] = key;
+            size_t i;
+            for (i = 0; i < count; i++) {
+                field[i] = fieldValues[i];
+            }
+            for (; i < N; i++) {
+                field[i] = UnsetValue<T>::value;
             }
         }
 
-        flag = true;
+    public:
+        TypedArrayVariableReader(bool runtime_changeable, const SpeakermanConfig &config,
+                                 const T &field)
+                : PositionedVariableReader<N * sizeof(T)>(runtime_changeable, config, &field)
+        {};
 
-        return strings[idx].c_str();
+        void write(const SpeakermanConfig &config, const char * key, ostream &stream) const
+        {
+            const T *field = static_cast<const T *>(variable(config));
+            bool print = false;
+
+            for (size_t i = 0; i < N; i++) {
+                if (UnsetValue<T>::is(field[i])) {
+                    break;
+                }
+                else {
+                    print = true;
+                    break;
+                }
+            }
+            if (print) {
+                stream << key << " =";
+                for (size_t i = 0; i < N; i++) {
+                    if (UnsetValue<T>::is(field[i])) {
+                        break;
+                    }
+                    else {
+                        stream << " " << field[i];
+                    }
+                }
+                stream << endl;
+            }
+        }
     };
 
-    const char *getConfigKey(ssize_t groupId, ssize_t eqId, size_t fieldId)
+    enum class ReaderStatus
     {
-        return getConfigString(getOffset(groupId, eqId, fieldId));
-    }
+        SKIP,
+        SUCCESS,
+        FAULT
+    };
+
+    class KeyVariableReader
+    {
+        const string key_;
+        const VariableReader *reader_;
+    public:
+        KeyVariableReader(const string &key, VariableReader *reader) :
+            key_(key), reader_(reader) {}
+
+        ~KeyVariableReader()
+        {
+            delete reader_;
+        }
+
+        const string &get_key() const
+        { return key_; }
+
+        static ReaderStatus
+        skip_to_key_start(const char *&result, const char *line)
+        {
+            if (line == nullptr || *line == '\0') {
+                return ReaderStatus::SKIP;
+            }
+            const char *start;
+            for (start = line; *start != '\0' && start - line <= 1024; start++) {
+                char c = *start;
+                if (config::isCommentStart(c)) {
+                    return ReaderStatus::SKIP;
+                }
+                if (config::isAlpha(c)) {
+                    result = start;
+                    return ReaderStatus::SUCCESS;
+                }
+                if (!config::isWhiteSpace(c)) {
+                    cerr << "Unexpected characters @ " << (start - line) << ": "
+                         << line << endl;
+                    break;
+                }
+            }
+            return ReaderStatus::FAULT;
+        }
+
+        ReaderStatus read_key(const char *&after_key, const char *start)
+        {
+            if (strncasecmp(key_.c_str(), start, key_.length()) != 0) {
+                return ReaderStatus::SKIP;
+            }
+            char end = start[key_.length()];
+            if (config::isWhiteSpace(end) || end == '=') {
+                after_key = start + key_.length();
+                return ReaderStatus::SUCCESS;
+            }
+            return ReaderStatus::SKIP;
+        }
+
+        static ReaderStatus
+        skip_assignment(const char *&value, const char *start, const char *line)
+        {
+            const char *rd = start;
+            while (config::isWhiteSpace(*rd)) {
+                rd++;
+            }
+            if (*rd != '=') {
+                cerr << "Unexpected character @ " << (rd - line) << ": " << line
+                     << endl;
+                cout << "1line :" << line << endl;
+                cout << "1start:" << start << endl;
+                return ReaderStatus::FAULT;
+            }
+            rd++;
+            while (config::isWhiteSpace(*rd)) {
+                rd++;
+            }
+            if (*rd == '\0') {
+                cerr << "Unexpected end of line @ " << (rd - line) << ": "
+                     << line << endl;
+                cout << "2line :" << line << endl;
+                cout << "2start:" << start << endl;
+                return ReaderStatus::FAULT;
+            }
+            value = rd;
+            return ReaderStatus::SUCCESS;
+        }
 
 
-    static constexpr const char *KEY_GROUPS = "/groups";
-    static constexpr const char *KEY_GROUP_CHANNELS = "/group-channels";
-    static constexpr const char *KEY_THRESHOLD_SUB_RELATIVE = "/sub-relative-threshold_";
+        bool read(SpeakermanConfig &manager, const string &key, const char *value,
+              const SpeakermanConfig &basedUpon)
+        {
+            return reader_->read(manager, key.c_str(), value, basedUpon);
+        }
 
-    static constexpr const char *KEY_GROUP_PREFIX = "group/";
-    static constexpr const char *KEY_GROUP_EQS = "/equalizers";
-    static constexpr const char *KEY_GROUP_THRESHOLD = "/threshold_";
-    static constexpr const char *KEY_GROUP_VOLUME = "/volume";
+        void write(const SpeakermanConfig & config, ostream &output) const {
+            reader_->write(config, key_.c_str(), output);
+        }
+    };
+
+    class ConfigManager : protected SpeakermanConfig
+    {
+        KeyVariableReader **readers_ = nullptr;
+        size_t capacity_ = 0;
+        size_t size_ = 0;
+
+        void ensure_capacity(size_t new_capacity)
+        {
+            if (new_capacity == 0) {
+                for (size_t i = 0; i < size_; i++) {
+                    if (readers_[i] != nullptr) {
+                        delete readers_[i];
+                        readers_[i] = nullptr;
+                    }
+                }
+                size_ = capacity_ = 0;
+                return;
+            }
+            if (new_capacity <= capacity_) {
+                return;
+            }
+            size_t actual_capacity = max(new_capacity, 3 * max(capacity_, (size_t)7) / 2);
+            size_t moves = min(actual_capacity, size_);
+            KeyVariableReader **new_readers = new KeyVariableReader*[actual_capacity];
+            size_t reader;
+            for (reader = 0; reader < moves; reader++) {
+                new_readers[reader] = readers_[reader];
+            }
+            for (; reader < actual_capacity; reader++) {
+                new_readers[reader] = nullptr;
+            }
+            readers_ = new_readers;
+            capacity_ = actual_capacity;
+        }
+
+        /**
+         * Adds and adopts ownership of a reader.
+         *
+         * @param new_reader The added reader
+         * @throws invalid_argument if reader is nullptr
+         */
+        void add(KeyVariableReader *new_reader)
+        {
+            if (new_reader == nullptr) {
+                throw std::invalid_argument("Cannot add NULL reader");
+            }
+            size_t new_size = size_ + 1;
+            ensure_capacity(new_size);
+            readers_[size_] = new_reader;
+            size_ = new_size;
+        }
+
+        template<typename T> void add_reader(const string &name, bool runtime_changeable, T &field)
+        {
+            cout << "Add reader for \"" << name << "\"; runtime_changeable=" << runtime_changeable << endl;
+            add(new KeyVariableReader(name, new TypedVariableReader<T>(runtime_changeable, *this, field)));
+        }
+
+        template<typename T, size_t N> void add_array_reader(const string &name, bool runtime_changeable, T &field)
+        {
+            cout << "Add reader (array) for \"" << name << "\"; runtime_changeable=" << runtime_changeable << endl;
+            add(new KeyVariableReader(name, new TypedArrayVariableReader<T, N>(runtime_changeable, *this, field)));
+        }
+
+    public:
+
+        ConfigManager()
+        {
+            add_reader(KEY_SNIPPET_GROUP_COUNT, false, groups);
+            add_reader(KEY_SNIPPET_CHANNELS, false, groupChannels);
+            add_reader(KEY_SNIPPET_CROSSOVERS, false, crossovers);
+
+            add_reader(KEY_SNIPPET_SUB_THRESHOLD, true, relativeSubThreshold);
+            add_reader(KEY_SNIPPET_SUB_DELAY, true, subDelay);
+            add_reader(KEY_SNIPPET_SUB_OUTPUT, false, subOutput);
+
+            add_reader(KEY_SNIPPET_GENERATE_NOISE, true, generateNoise);
+            add_reader(KEY_SNIPPET_INPUT_OFFSET, false, inputOffset);
+
+            string key;
+            for (size_t group_idx = 0; group_idx < SpeakermanConfig::MAX_GROUPS; group_idx++) {
+                string groupKey = GroupConfig::KEY_SNIPPET_GROUP;
+                groupKey += "/";
+                groupKey += (char) (group_idx + '0');
+                groupKey += "/";
+
+                key = groupKey;
+                key += GroupConfig::KEY_SNIPPET_EQ_COUNT;
+                add_reader(key, true, group[group_idx].eqs);
+                key = groupKey;
+                key += GroupConfig::KEY_SNIPPET_THRESHOLD;
+                add_reader(key, true, group[group_idx].threshold);
+                key = groupKey;
+                key += GroupConfig::KEY_SNIPPET_VOLUME;
+                add_array_reader<double, MAX_SPEAKERMAN_GROUPS>(key, true, group[group_idx].volume[0]);
+                key = groupKey;
+                key += GroupConfig::KEY_SNIPPET_DELAY;
+                add_reader(key, true, group[group_idx].delay);
+                key = groupKey;
+                key += GroupConfig::KEY_SNIPPET_USE_SUB;
+                add_reader(key, true, group[group_idx].use_sub);
+                key = groupKey;
+                key += GroupConfig::KEY_SNIPPET_MONO;
+                add_reader(key, true, group[group_idx].mono);
+
+                string eqBase = groupKey;
+                eqBase += EqualizerConfig::KEY_SNIPPET_EQUALIZER;
+                eqBase += "/";
+                for (size_t eq_idx = 0; eq_idx < GroupConfig::MAX_EQS; eq_idx++) {
+                    string eqKey = eqBase;
+                    eqKey += (char) ('0' + eq_idx);
+                    eqKey += "/";
+
+                    key = eqKey;
+                    key += EqualizerConfig::KEY_SNIPPET_CENTER;
+                    add_reader(key, true, group[group_idx].eq[eq_idx].center);
+                    key = eqKey;
+                    key += EqualizerConfig::KEY_SNIPPET_GAIN;
+                    add_reader(key, true, group[group_idx].eq[eq_idx].gain);
+                    key = eqKey;
+                    key += EqualizerConfig::KEY_SNIPPET_BANDWIDTH;
+                    add_reader(key, true, group[group_idx].eq[eq_idx].bandwidth);
+                }
+            }
+
+            for (size_t band_idx = 0;
+                 band_idx <= SpeakermanConfig::MAX_CROSSOVERS; band_idx++) {
+                string bandKey = BandConfig::KEY_SNIPPET_BAND;
+                bandKey += "/";
+                bandKey += (char) (band_idx + '0');
+                bandKey += "/";
+
+                key = bandKey;
+                key += BandConfig::KEY_SNIPPET_MAXIMUM_WINDOW_SECONDS;
+                add_reader(key, false, band[band_idx].maximum_window_seconds);
+                key = bandKey;
+                key += BandConfig::KEY_SNIPPET_PERCEPTIVE_TO_MAXIMUM_WINDOW_STEPS;
+                add_reader(key, false, band[band_idx].perceptive_to_maximum_window_steps);
+                key = bandKey;
+                key += BandConfig::KEY_SNIPPET_PERCEPTIVE_TO_PEAK_STEPS;
+                add_reader(key, false, band[band_idx].perceptive_to_peak_steps);
+                key = bandKey;
+                key += BandConfig::KEY_SNIPPET_SMOOTHING_TO_WINDOW_RATIO;
+                add_reader(key, false, band[band_idx].smoothing_to_window_ratio);
+            }
+        }
+
+        size_t size() const
+        { return size_; }
+
+        bool read_line(SpeakermanConfig &config, const char * line, const SpeakermanConfig &basedUpon)
+        {
+            const char *key_start;
+
+            ReaderStatus status = KeyVariableReader::skip_to_key_start(key_start, line);
+            if (status != ReaderStatus::SUCCESS) {
+                return status != ReaderStatus::FAULT;
+            }
+            KeyVariableReader *reader = nullptr;
+            const char *after_key  = nullptr;
+
+            for (size_t i = 0; i < size_; i++) {
+                KeyVariableReader *r = readers_[i];
+                status = r->read_key(after_key, key_start);
+                if (status == ReaderStatus::SUCCESS) {
+                    reader = r;
+                }
+                else if (status != ReaderStatus::SKIP) {
+                    return false;
+                }
+            }
+
+            if (reader == nullptr) {
+                return true;
+            }
+
+            const char * value_start = nullptr;
+            status = KeyVariableReader::skip_assignment(value_start, after_key, line);
+            if (status != ReaderStatus::SUCCESS) {
+                return false;
+            }
+
+            return reader->read(config, reader->get_key(), value_start, basedUpon);
+        }
+
+        void dump(const SpeakermanConfig &config, ostream &stream)
+        {
+            for (size_t i = 0; i < size(); i++) {
+                readers_[i]->write(config, stream);
+            }
+        }
+
+    };
+
+    static ConfigManager config_manager;
 
     static bool fileExists(const char *fileName)
     {
@@ -268,44 +862,6 @@ namespace speakerman {
         return configFileName;
     }
 
-    template<typename T, int type>
-    struct ValueManager__
-    {
-
-    };
-
-    template<typename T>
-    struct ValueManager__<T, 1>
-    {
-        static_assert(is_integral<T>::value, "Expected integral type parameter");
-        using Value = long long int;
-
-        static Value parse(const char *value, char **end)
-        {
-            return strtoll(value, end, 10);
-        }
-    };
-
-    template<typename T>
-    struct ValueManager__<T, 2>
-    {
-        static_assert(is_floating_point<T>::value, "Expected floating point type parameter");
-        using Value = long double;
-
-        static Value parse(const char *value, char **end)
-        {
-            return strtold(value, end);
-        }
-    };
-
-    template<typename T>
-    struct ValueManager : public ValueManager__<T, is_integral<T>::value ? 1 : 2>
-    {
-        using __Value = ValueManager__<T, is_integral<T>::value ? 1 : 2>;
-        using Value = typename __Value::Value;
-        using __Value::parse;
-    };
-
     const char *configFileName()
     {
         static string name = getConfigFileName();
@@ -313,105 +869,6 @@ namespace speakerman {
         return name.c_str();
     }
 
-
-    template<typename T>
-    static bool readNumber(T &variable, const char *key, const char *value, T min, T max, bool forceWithin = false)
-    {
-        char *endptr;
-        using Type = typename ValueManager<T>::Value;
-        Type tempValue = ValueManager<T>::parse(value, &endptr);
-
-        if (*endptr != 0 && !config::isWhiteSpace(*endptr)) {
-            std::cerr << "E: Invalid value for \"" << key << "\": " << value << std::endl;
-            return false;
-        }
-
-        bool outOfRange = tempValue < min || tempValue > max;
-        if (outOfRange) {
-            cerr << "W: value for \"" << key << "\": value " << tempValue << " out of [" << min << ".." << max << "]: ";
-            if (!forceWithin) {
-                cerr << "not set!" << endl;
-                return false;
-            }
-            tempValue = Value<Type>::force_between(tempValue, min, max);
-            cerr << "set to " << tempValue << endl;
-        }
-        variable = static_cast<T>(tempValue);
-        return true;
-    }
-
-    static bool readBool(int &variable, const char *key, const char *value)
-    {
-        if (strncasecmp("true", value, 5) == 0 || strncasecmp("yes", value, 5) == 0 || strncmp("1", value, 2) == 0) {
-            variable = 1;
-            return true;
-        }
-        if (strncasecmp("false", value, 5) == 0 || strncasecmp("no", value, 5) == 0 || strncmp("0", value, 2) == 0) {
-            variable = 0;
-            return true;
-        }
-        if (*value == 0) {
-            return true;
-        }
-        std::cerr << "E: Invalid value for \"" << key << "\": " << value << std::endl;
-        return false;
-    }
-
-    template<typename T, size_t N>
-    static bool
-    readNumbers(FixedSizeArray<T, N> &array, const char *key, const char *value, T min, T max, bool forceWithin = false)
-    {
-        using Type = typename ValueManager<T>::Value;
-        const char *parsePos = value;
-
-        for (size_t i = 0; i < array.size(); i++) {
-            Type tempValue;
-            char *endptr = nullptr;
-            if (parsePos && *parsePos) {
-                tempValue = ValueManager<T>::parse(parsePos, &endptr);
-                if (tempValue == 0 && !(*endptr == 0 || *endptr == ',' || *endptr == ';')) {
-                    std::cerr << "E: Invalid value for \"" << key << "\"[" << i << ": " << parsePos << std::endl;
-                    return false;
-                }
-                bool outOfRange = tempValue < min || tempValue > max;
-                if (outOfRange) {
-                    cerr << "W: value for \"" << key << "\"[" << i << ": value " << tempValue << " out of [" << min
-                         << ".." << max << "]: ";
-                    if (!forceWithin) {
-                        cerr << "not set!" << endl;
-                        return false;
-                    }
-                    tempValue = Value<Type>::force_between(tempValue, min, max);
-                    cerr << "set to " << tempValue << endl;
-                }
-                parsePos = endptr && *endptr ? endptr + 1 : nullptr;
-            }
-            else {
-                tempValue = UnsetValue<T>::value;
-            }
-
-            array[i] = static_cast<T>(tempValue);
-        }
-
-        return true;
-    }
-
-    template<typename T>
-    static void setDefault(T &value, T defaultValue)
-    {
-        if (value != UnsetValue<T>::value) {
-            return;
-        }
-        value = defaultValue;
-    }
-
-    static bool isKey(const char *key, bool initial, ssize_t groupId, ssize_t eqId, size_t fieldId)
-    {
-        if (initial || isRuntimeAllowed(groupId, eqId, fieldId)) {
-            return strncmp(key, getConfigKey(groupId, eqId, fieldId), config::Reader::MAX_KEY_LENGTH) == 0;
-        }
-        return false;
-    }
 
     static void resetStream(istream &stream)
     {
@@ -422,195 +879,44 @@ namespace speakerman {
         }
     }
 
-    typedef struct
+    static void
+    actualReadConfig(SpeakermanConfig &config, istream &stream,
+                     const SpeakermanConfig &basedUpon, bool initial)
     {
-        SpeakermanConfig &config;
-        bool initial;
-    } SpeakermanConfigCallbackData;
+        static constexpr size_t LINE_LENGTH = 1024;
+        char line[LINE_LENGTH + 1];
+        size_t line_pos = 0;
+        config = SpeakermanConfig::unsetConfig();
 
-
-    typedef struct
-    {
-        GroupConfig &config;
-        size_t groupId;
-        bool initial;
-    } GroupConfigCallbackData;
-
-    typedef struct
-    {
-        EqualizerConfig &config;
-        size_t groupId;
-        size_t eqId;
-        bool initial;
-    } EqConfigCallbackData;
-
-    static speakerman::config::CallbackResult readGlobalCallback(const char *key, const char *value, void *data)
-    {
-        auto config = static_cast<SpeakermanConfigCallbackData *>(data);
-
-        if (isKey(key, config->initial, -1, -1, SpeakermanConfig::KEY_GROUP_COUNT)) {
-            readNumber(config->config.groups, key, value, SpeakermanConfig::MIN_GROUPS, SpeakermanConfig::MAX_GROUPS);
-        }
-        else if (isKey(key, config->initial, -1, -1, SpeakermanConfig::KEY_CHANNELS)) {
-            readNumber(config->config.groupChannels, key, value, SpeakermanConfig::MIN_GROUP_CHANNELS,
-                       SpeakermanConfig::MAX_GROUP_CHANNELS);
-        }
-        else if (isKey(key, config->initial, -1, -1, SpeakermanConfig::KEY_SUB_THRESHOLD)) {
-            readNumber(config->config.relativeSubThreshold, key, value, SpeakermanConfig::MIN_REL_SUB_THRESHOLD,
-                       SpeakermanConfig::MAX_REL_SUB_THRESHOLD, true);
-        }
-        else if (isKey(key, config->initial, -1, -1, SpeakermanConfig::KEY_SUB_DELAY)) {
-            readNumber(config->config.subDelay, key, value, SpeakermanConfig::MIN_SUB_DELAY,
-                       SpeakermanConfig::MAX_SUB_DELAY, true);
-        }
-        else if (isKey(key, config->initial, -1, -1, SpeakermanConfig::KEY_SUB_OUTPUT)) {
-            readNumber(config->config.subOutput, key, value, SpeakermanConfig::MIN_SUB_OUTPUT,
-                       SpeakermanConfig::MAX_SUB_OUTPUT, true);
-        }
-        else if (isKey(key, config->initial, -1, -1, SpeakermanConfig::KEY_INPUT_OFFSET)) {
-            readNumber(config->config.inputOffset, key, value, SpeakermanConfig::MIN_INPUT_OFFSET,
-                       SpeakermanConfig::MAX_INPUT_OFFSET, true);
-        }
-        else if (isKey(key, config->initial, -1, -1, SpeakermanConfig::KEY_CROSSOVERS)) {
-            readNumber(config->config.crossovers, key, value, SpeakermanConfig::MIN_CROSSOVERS,
-                       SpeakermanConfig::MAX_CROSSOVERS, true);
-        }
-        else if (isKey(key, config->initial, -1, -1, SpeakermanConfig::KEY_GENERATE_NOISE)) {
-            readBool(config->config.generateNoise, key, value);
-        }
-        return speakerman::config::CallbackResult::CONTINUE;
-    }
-
-    static speakerman::config::CallbackResult readGroupCallback(const char *key, const char *value, void *data)
-    {
-        auto config = static_cast<GroupConfigCallbackData *>(data);
-        if (isKey(key, config->initial, config->groupId, -1, GroupConfig::KEY_EQ_COUNT)) {
-            readNumber(config->config.eqs, key, value, GroupConfig::MIN_EQS, GroupConfig::MAX_EQS);
-        }
-        else if (isKey(key, config->initial, config->groupId, -1, GroupConfig::KEY_THRESHOLD)) {
-            readNumber(config->config.threshold, key, value, GroupConfig::MIN_THRESHOLD, GroupConfig::MAX_THRESHOLD,
-                       true);
-        }
-        else if (isKey(key, config->initial, config->groupId, -1, GroupConfig::KEY_VOLUME)) {
-            FixedSizeArray<double, SpeakermanConfig::MAX_GROUPS> volumes;
-            readNumbers(volumes, key, value, GroupConfig::MIN_VOLUME, GroupConfig::MAX_VOLUME, true);
-            for (size_t i = 0; i < SpeakermanConfig::MAX_GROUPS; i++) {
-                config->config.volume[i] = volumes[i];
+        cout << "Reading config @ " << &config << endl;
+        resetStream(stream);
+        while (true) {
+            char c = static_cast<char>(stream.get());
+            if (stream.eof()) {
+                break;
+            }
+            if (config::isLineDelimiter(c)) {
+                if (line_pos != 0) {
+                    line[std::min(line_pos, LINE_LENGTH)] = '\0';
+                    config_manager.read_line(config, line, initial ? config : basedUpon);
+                    line_pos = 0;
+                }
+            }
+            else if (line_pos < LINE_LENGTH) {
+                line[line_pos++] = c;
+                continue;
+            }
+            else if (line_pos == LINE_LENGTH) {
+                line[LINE_LENGTH] = '\0';
+                config_manager.read_line(config, line, initial ? config : basedUpon);
+                line_pos++;
             }
         }
-        else if (isKey(key, config->initial, config->groupId, -1, GroupConfig::KEY_DELAY)) {
-            readNumber(config->config.delay, key, value, GroupConfig::MIN_DELAY, GroupConfig::MAX_DELAY, true);
+        if (line_pos != 0) {
+            line[std::min(line_pos, LINE_LENGTH)] = '\0';
+            config_manager.read_line(config, line, initial ? config : basedUpon);
         }
-        else if (isKey(key, config->initial, config->groupId, -1, GroupConfig::KEY_USE_SUB)) {
-            readBool(config->config.use_sub, key, value);
-        }
-        else if (isKey(key, config->initial, config->groupId, -1, GroupConfig::KEY_MONO)) {
-            readBool(config->config.mono, key, value);
-        }
-        return speakerman::config::CallbackResult::CONTINUE;
-    }
-
-    static speakerman::config::CallbackResult readEqCallback(const char *key, const char *value, void *data)
-    {
-        auto config = static_cast<EqConfigCallbackData *>(data);
-
-        if (isKey(key, config->initial, config->groupId, config->eqId, EqualizerConfig::KEY_CENTER)) {
-            readNumber(config->config.center, key, value, EqualizerConfig::MIN_CENTER_FREQ,
-                       EqualizerConfig::MAX_CENTER_FREQ);
-        }
-        else if (isKey(key, config->initial, config->groupId, config->eqId, EqualizerConfig::KEY_GAIN)) {
-            readNumber(config->config.gain, key, value, EqualizerConfig::MIN_GAIN, EqualizerConfig::MAX_GAIN, true);
-        }
-        else if (isKey(key, config->initial, config->groupId, config->eqId, EqualizerConfig::KEY_BANDWIDTH)) {
-            readNumber(config->config.bandwidth, key, value, EqualizerConfig::MIN_BANDWIDTH,
-                       EqualizerConfig::MAX_BANDWIDTH, true);
-        }
-        return speakerman::config::CallbackResult::CONTINUE;
-    }
-
-    static void
-    readEq(EqConfigCallbackData &data, istream &stream, config::Reader &reader, const SpeakermanConfig &basedUpon)
-    {
-        if (data.eqId >= GroupConfig::MAX_EQS) {
-            return;
-        }
-        resetStream(stream);
-        EqualizerConfig &config = data.config;
-
-        auto result = reader.read(stream, readEqCallback, &data);
-        if (result != config::ReadResult::SUCCESS && result != config::ReadResult::STOPPED) {
-            throw runtime_error("Parse error");
-        }
-
-        const EqualizerConfig &defaulConfig = basedUpon.group[data.groupId].eq[data.eqId];
-        setDefault(config.center, defaulConfig.center);
-        setDefault(config.gain, defaulConfig.gain);
-        setDefault(config.bandwidth, defaulConfig.bandwidth);
-    }
-
-    static void
-    readGroup(GroupConfigCallbackData &data, istream &stream, config::Reader &reader, const SpeakermanConfig &basedUpon)
-    {
-        if (data.groupId >= SpeakermanConfig::MAX_GROUPS) {
-            return;
-        }
-        resetStream(stream);
-        GroupConfig &config = data.config;
-
-        auto result = reader.read(stream, readGroupCallback, &data);
-        if (result != config::ReadResult::SUCCESS && result != config::ReadResult::STOPPED) {
-            throw runtime_error("Parse error");
-        }
-
-        const GroupConfig &defaultConfig = basedUpon.group[data.groupId];
-        setDefault(config.eqs, defaultConfig.eqs);
-        setDefault(config.threshold, defaultConfig.threshold);
-        for (size_t i = 0; i < SpeakermanConfig::MAX_GROUPS; i++) {
-            setDefault(config.volume[i], defaultConfig.volume[i]);
-        }
-        setDefault(config.delay, defaultConfig.delay);
-        setDefault(config.use_sub, defaultConfig.use_sub);
-        setDefault(config.mono, defaultConfig.mono);
-
-        for (size_t eq = 0; eq < config.eqs; eq++) {
-            EqConfigCallbackData info{config.eq[eq], data.groupId, eq, data.initial};
-            readEq(info, stream, reader, basedUpon);
-        }
-    }
-
-    static void
-    readGlobals(SpeakermanConfig &config, istream &stream, config::Reader &reader, const SpeakermanConfig &basedUpon,
-                bool initial)
-    {
-        resetStream(stream);
-
-        SpeakermanConfigCallbackData data{config, initial};
-        auto result = reader.read(stream, readGlobalCallback, &data);
-        if (result != config::ReadResult::SUCCESS && result != config::ReadResult::STOPPED) {
-            throw runtime_error("Parse error");
-        }
-
-        setDefault(config.groups, basedUpon.groups);
-        setDefault(config.groupChannels, basedUpon.groupChannels);
-        setDefault(config.relativeSubThreshold, basedUpon.relativeSubThreshold);
-        setDefault(config.subDelay, basedUpon.subDelay);
-        setDefault(config.subOutput, basedUpon.subOutput);
-        setDefault(config.crossovers, basedUpon.crossovers);
-        setDefault(config.inputOffset, basedUpon.inputOffset);
-        setDefault(config.generateNoise, basedUpon.generateNoise);
-
-        for (size_t g = 0; g < config.groups; g++) {
-            GroupConfigCallbackData data{config.group[g], g, initial};
-            readGroup(data, stream, reader, basedUpon);
-        }
-    }
-
-    static void
-    actualReadConfig(SpeakermanConfig &config, istream &stream, const SpeakermanConfig &basedUpon, bool initial)
-    {
-        config::Reader reader;
-        config = SpeakermanConfig::unsetConfig();
-        readGlobals(config, stream, reader, basedUpon, initial);
+        config.set_if_unset(basedUpon);
     }
 
     class StreamOwner
@@ -620,14 +926,20 @@ namespace speakerman {
 
         void operator=(const StreamOwner &source)
         {}
+
         void operator=(StreamOwner &&source) noexcept
         {}
+
     public:
         explicit StreamOwner(ifstream &owned) : stream(owned), owns(true)
         {}
-        StreamOwner(const StreamOwner &source) : stream(source.stream), owns(false)
+
+        StreamOwner(const StreamOwner &source) : stream(source.stream),
+                                                 owns(false)
         {}
-        StreamOwner(StreamOwner &&source) noexcept : stream(source.stream), owns(true)
+
+        StreamOwner(StreamOwner &&source) noexcept : stream(source.stream),
+                                                     owns(true)
         {
             source.owns = false;
         }
@@ -655,7 +967,8 @@ namespace speakerman {
         return getFileTimeStamp(configFileName());
     }
 
-    SpeakermanConfig readSpeakermanConfig(const SpeakermanConfig &basedUpon, bool initial)
+    SpeakermanConfig
+    readSpeakermanConfig(const SpeakermanConfig &basedUpon, bool initial)
     {
         SpeakermanConfig result;
         ifstream stream;
@@ -679,53 +992,204 @@ namespace speakerman {
         return result;
     }
 
-    SpeakermanConfig readSpeakermanConfig(bool initial)
+    SpeakermanConfig readSpeakermanConfig()
     {
         SpeakermanConfig basedUpon = SpeakermanConfig::defaultConfig();
-        return readSpeakermanConfig(basedUpon, initial);
+        return readSpeakermanConfig(basedUpon, true);
     }
 
     void dumpSpeakermanConfig(const SpeakermanConfig &dump, ostream &output)
     {
-        const char *assgn = " = ";
         output << "# Speakerman configuration dump" << endl << endl;
-        output << "# Global" << endl;
-        output << getConfigKey(-1, -1, SpeakermanConfig::KEY_GROUP_COUNT) << assgn << dump.groups << endl;
-        output << getConfigKey(-1, -1, SpeakermanConfig::KEY_CHANNELS) << assgn << dump.groupChannels << endl;
-        output << getConfigKey(-1, -1, SpeakermanConfig::KEY_SUB_THRESHOLD) << assgn << dump.relativeSubThreshold
-               << endl;
-        output << getConfigKey(-1, -1, SpeakermanConfig::KEY_SUB_DELAY) << assgn << dump.subDelay << endl;
-        output << getConfigKey(-1, -1, SpeakermanConfig::KEY_SUB_OUTPUT) << assgn << dump.subOutput << endl;
-        output << getConfigKey(-1, -1, SpeakermanConfig::KEY_INPUT_OFFSET) << assgn << dump.inputOffset << endl;
-        output << getConfigKey(-1, -1, SpeakermanConfig::KEY_CROSSOVERS) << assgn << dump.crossovers << endl;
-        output << getConfigKey(-1, -1, SpeakermanConfig::KEY_GENERATE_NOISE) << assgn << dump.generateNoise << endl;
-
-        for (size_t group = 0; group < dump.groups; group++) {
-            const GroupConfig &groupConfig = dump.group[group];
-            output << getConfigKey(group, -1, GroupConfig::KEY_EQ_COUNT) << assgn << groupConfig.eqs << endl;
-            output << getConfigKey(group, -1, GroupConfig::KEY_THRESHOLD) << assgn << groupConfig.threshold << endl;
-            output << getConfigKey(group, -1, GroupConfig::KEY_DELAY) << assgn << groupConfig.delay << endl;
-            output << getConfigKey(group, -1, GroupConfig::KEY_USE_SUB) << assgn << groupConfig.use_sub << endl;
-            output << getConfigKey(group, -1, GroupConfig::KEY_MONO) << assgn << groupConfig.mono << endl;
-            output << getConfigKey(group, -1, GroupConfig::KEY_VOLUME) << assgn << "[";
-            for (size_t i = 0; i < dump.groups; i++) {
-                if (i > 0) {
-                    output << ' ';
-                }
-                output << groupConfig.volume[i];
-            }
-            output << "]" << endl;
-
-            for (size_t eq = 0; eq < std::min(GroupConfig::MAX_EQS, groupConfig.eqs); eq++) {
-                const EqualizerConfig &eqConfig = groupConfig.eq[eq];
-                output << getConfigKey(group, eq, EqualizerConfig::KEY_CENTER) << assgn << eqConfig.center << endl;
-                output << getConfigKey(group, eq, EqualizerConfig::KEY_GAIN) << assgn << eqConfig.gain << endl;
-                output << getConfigKey(group, eq, EqualizerConfig::KEY_BANDWIDTH) << assgn << eqConfig.bandwidth
-                       << endl;
-            }
-        }
-        output << "Timestamp: " << dump.timeStamp << endl;
+        config_manager.dump(dump, output);
     }
 
+    void GroupConfig::set_if_unset(const GroupConfig &config_if_unset)
+    {
+        size_t eq_idx;
+        if (set_if_unset_or_invalid_config_value(eqs, config_if_unset.eqs,
+                                                 MIN_EQS, MAX_EQS)) {
+            for (eq_idx = 0; eq_idx < eqs; eq_idx++) {
+                eq[eq_idx] = config_if_unset.eq[eq_idx];
+            }
+        }
+        else {
+            for (eq_idx = 0; eq_idx < eqs; eq_idx++) {
+                eq[eq_idx].set_if_unset(config_if_unset.eq[eq_idx]);
+            }
+        }
+        for (; eq_idx < MAX_EQS; eq_idx++) {
+            eq[eq_idx] = EqualizerConfig::unsetConfig();
+        }
+
+        for (size_t group = 0; group < MAX_SPEAKERMAN_GROUPS; group++) {
+            set_if_unset_or_invalid_config_value(volume[group],
+                                                 config_if_unset.volume[group],
+                                                 MIN_VOLUME, MAX_VOLUME);
+        }
+
+        box_if_out_of_range(threshold, config_if_unset.threshold,
+                            MIN_THRESHOLD, MAX_THRESHOLD);
+        box_if_out_of_range(delay, config_if_unset.delay, MIN_DELAY,
+                            MAX_DELAY);
+        box_if_out_of_range(use_sub, config_if_unset.use_sub, 0, 1);
+        box_if_out_of_range(mono, config_if_unset.mono, 0, 1);
+    }
+
+    const GroupConfig GroupConfig::defaultConfig(size_t group_id)
+    {
+        GroupConfig result;
+        for (size_t i = 0; i < MAX_SPEAKERMAN_GROUPS; i++) {
+            result.volume[i] == i == group_id ? DEFAULT_VOLUME : 0;
+        }
+        return result;
+    }
+
+    const GroupConfig GroupConfig::unsetConfig()
+    {
+        GroupConfig result;
+        for (size_t i = 0; i < MAX_EQS; i++) {
+            result.eq[i] = EqualizerConfig::unsetConfig();
+        }
+        for (size_t i = 0; i < MAX_SPEAKERMAN_GROUPS; i++) {
+            unset_config_value(result.volume[i]);
+        }
+        unset_config_value(result.eqs);
+        unset_config_value(result.threshold);
+        unset_config_value(result.delay);
+        unset_config_value(result.use_sub);
+        unset_config_value(result.mono);
+        return result;
+    }
+
+    const EqualizerConfig EqualizerConfig::unsetConfig()
+    {
+        return {UnsetValue<double>::value, UnsetValue<double>::value,
+                UnsetValue<double>::value};
+    }
+
+    void
+    EqualizerConfig::set_if_unset(const EqualizerConfig &base_config_if_unset)
+    {
+        if (set_if_unset_or_invalid_config_value(center,
+                                                 base_config_if_unset.center,
+                                                 MIN_CENTER_FREQ,
+                                                 MAX_CENTER_FREQ)) {
+            (*this) = base_config_if_unset;
+        }
+        else {
+            unset_if_invalid(center, MIN_CENTER_FREQ, MAX_CENTER_FREQ);
+            box_if_out_of_range(gain, MIN_GAIN, MAX_GAIN, DEFAULT_GAIN);
+            box_if_out_of_range(bandwidth, MIN_BANDWIDTH, MAX_BANDWIDTH,
+                                DEFAULT_BANDWIDTH);
+        }
+    }
+
+    const BandConfig BandConfig::unsetConfig()
+    {
+        BandConfig result;
+
+        unset_config_value(result.smoothing_to_window_ratio);
+        unset_config_value(result.maximum_window_seconds);
+        unset_config_value(result.perceptive_to_peak_steps);
+        unset_config_value(result.perceptive_to_maximum_window_steps);
+
+        return result;
+    }
+
+    void BandConfig::set_if_unset(const BandConfig &config_if_unset)
+    {
+        box_if_out_of_range(smoothing_to_window_ratio,
+                            config_if_unset.smoothing_to_window_ratio,
+                            MIN_SMOOTHING_TO_WINDOW_RATIO,
+                            MAX_SMOOTHING_TO_WINDOW_RATIO);
+        box_if_out_of_range(maximum_window_seconds,
+                            config_if_unset.maximum_window_seconds,
+                            MIN_MAXIMUM_WINDOW_SECONDS,
+                            MAX_MAXIMUM_WINDOW_SECONDS);
+        box_if_out_of_range(perceptive_to_peak_steps,
+                            config_if_unset.perceptive_to_peak_steps,
+                            MIN_PERCEPTIVE_TO_PEAK_STEPS,
+                            MAX_PERCEPTIVE_TO_PEAK_STEPS);
+        box_if_out_of_range(perceptive_to_maximum_window_steps,
+                            config_if_unset.perceptive_to_maximum_window_steps,
+                            MIN_PERCEPTIVE_TO_MAXIMUM_WINDOW_STEPS,
+                            MAX_PERCEPTIVE_TO_MAXIMUM_WINDOW_STEPS);
+    }
+
+    const SpeakermanConfig SpeakermanConfig::defaultConfig()
+    {
+        SpeakermanConfig result;
+        for (size_t i = 0; i < MAX_SPEAKERMAN_GROUPS; i++) {
+            result.group[i] = GroupConfig::defaultConfig(i);
+        }
+        for (size_t i = 0; i <= MAX_CROSSOVERS; i++) {
+            result.band[i] = BandConfig::defaultConfig();
+        }
+        return result;
+    }
+
+    const SpeakermanConfig SpeakermanConfig::unsetConfig()
+    {
+        SpeakermanConfig result;
+        for (size_t i = 0; i < MAX_SPEAKERMAN_GROUPS; i++) {
+            result.group[i] = GroupConfig::unsetConfig();
+        }
+        for (size_t i = 0; i <= MAX_CROSSOVERS; i++) {
+            result.band[i] = BandConfig::unsetConfig();
+        }
+        unset_config_value(result.groups);
+        unset_config_value(result.groupChannels);
+        unset_config_value(result.subOutput);
+        unset_config_value(result.crossovers);
+        unset_config_value(result.inputOffset);
+        unset_config_value(result.relativeSubThreshold);
+        unset_config_value(result.subDelay);
+        unset_config_value(result.generateNoise);
+        result.timeStamp = -1;
+
+        return result;
+    }
+
+    void SpeakermanConfig::set_if_unset(const SpeakermanConfig &config_if_unset)
+    {
+        size_t group_idx;
+        if (set_if_unset_or_invalid_config_value(groups, config_if_unset.groups, MIN_GROUPS, MAX_GROUPS)) {
+            for (group_idx = 0; group_idx < groups; group_idx++) {
+                group[group_idx] = config_if_unset.group[group_idx];
+            }
+        }
+        else {
+            for (group_idx = 0; group_idx < groups; group_idx++) {
+                group[group_idx].set_if_unset(config_if_unset.group[group_idx]);
+            }
+        }
+        for (; group_idx < MAX_GROUPS; group_idx++) {
+            group[group_idx] = GroupConfig::unsetConfig();
+        }
+
+        size_t band_id;
+        if (set_if_unset_or_invalid_config_value(crossovers, config_if_unset.crossovers, MIN_CROSSOVERS, MAX_CROSSOVERS)) {
+            for (band_id = 0; band_id <= crossovers; band_id++) {
+                band[band_id] = config_if_unset.band[band_id];
+            }
+        }
+        else {
+            for (band_id = 0; band_id <= crossovers; band_id++) {
+                band[band_id].set_if_unset(config_if_unset.band[band_id]);
+            }
+        }
+        for (; band_id <= MAX_CROSSOVERS; band_id++) {
+            band[band_id] = BandConfig::unsetConfig();
+        }
+
+        set_if_unset_or_invalid_config_value(groupChannels, config_if_unset.groupChannels, MIN_GROUP_CHANNELS, MAX_GROUP_CHANNELS);
+        set_if_unset_or_invalid_config_value(subOutput, config_if_unset.subOutput, MIN_SUB_OUTPUT, MAX_SUB_OUTPUT);
+        set_if_unset_or_invalid_config_value(inputOffset, config_if_unset.inputOffset, MIN_INPUT_OFFSET, MAX_INPUT_OFFSET);
+        set_if_unset_or_invalid_config_value(relativeSubThreshold, config_if_unset.relativeSubThreshold, MIN_REL_SUB_THRESHOLD, MAX_REL_SUB_THRESHOLD);
+        set_if_unset_or_invalid_config_value(subDelay, config_if_unset.subDelay, MIN_SUB_DELAY, MAX_SUB_DELAY);
+        set_if_unset_or_invalid_config_value(generateNoise, config_if_unset.generateNoise, 0, 1);
+        timeStamp = -1;
+    }
 } /* End of namespace speakerman */
 

@@ -26,42 +26,10 @@
 #include <ostream>
 #include <tdap/IndexPolicy.hpp>
 #include <tdap/Value.hpp>
-#include <speakerman/utils/Config.hpp>
 #include <cmath>
 
 namespace speakerman {
     static constexpr size_t MAX_SPEAKERMAN_GROUPS = 4;
-
-    template<typename T>
-    struct UnsetValue
-    {
-
-    };
-
-    template<>
-    struct UnsetValue<size_t>
-    {
-        static constexpr size_t value = static_cast<size_t>(-1);
-    };
-
-    template<>
-    struct UnsetValue<double>
-    {
-        static constexpr double value =
-                std::numeric_limits<double>::quiet_NaN();
-    };
-
-    template<>
-    struct UnsetValue<int>
-    {
-        static constexpr int value = -1;
-    };
-
-    template<typename T>
-    static void unset_config_value(T &value)
-    {
-        value = UnsetValue<T>::value;
-    }
 
 
     struct EqualizerConfig
@@ -78,25 +46,18 @@ namespace speakerman {
         static constexpr double DEFAULT_BANDWIDTH = 1;
         static constexpr double MAX_BANDWIDTH = 8.0;
 
-        static constexpr size_t KEY_CENTER = 0;
-        static constexpr size_t KEY_GAIN = 1;
-        static constexpr size_t KEY_BANDWIDTH = 2;
-
         static constexpr const char *KEY_SNIPPET_EQUALIZER = "equalizer";
         static constexpr const char *KEY_SNIPPET_CENTER = "center";
         static constexpr const char *KEY_SNIPPET_GAIN = "gain";
         static constexpr const char *KEY_SNIPPET_BANDWIDTH = "bandwidth";
 
-        static EqualizerConfig defaultConfig()
+        static const EqualizerConfig defaultConfig()
         {
-            EqualizerConfig result;
-            return result;
+            return {};
         }
 
-        static EqualizerConfig unsetConfig()
-        {
-            return { UnsetValue<double>::value, UnsetValue<double>::value, UnsetValue<double>::value};
-        }
+        static const EqualizerConfig unsetConfig();
+        void set_if_unset(const EqualizerConfig &base_config_if_unset);
 
         double center = DEFAULT_CENTER_FREQ;
         double gain = DEFAULT_GAIN;
@@ -108,71 +69,84 @@ namespace speakerman {
         static constexpr size_t MIN_EQS = 0;
         static constexpr size_t DEFAULT_EQS = 0;
         static constexpr size_t MAX_EQS = 2;
-        static constexpr size_t KEY_EQ_COUNT = 0;
         static constexpr const char *KEY_SNIPPET_EQ_COUNT = "equalizers";
 
         static constexpr double MIN_THRESHOLD = 0.010;
         static constexpr double DEFAULT_THRESHOLD = 0.1;
         static constexpr double MAX_THRESHOLD = 0.5;
-        static constexpr size_t KEY_THRESHOLD = 1;
         static constexpr const char *KEY_SNIPPET_THRESHOLD = "threshold";
 
         static constexpr double MIN_VOLUME = 0;
         static constexpr double DEFAULT_VOLUME = 1.0;
         static constexpr double MAX_VOLUME = 20.0;
-        static constexpr size_t KEY_VOLUME = 2;
         static constexpr const char *KEY_SNIPPET_VOLUME = "volume";
 
         static constexpr double MIN_DELAY = 0;
         static constexpr double DEFAULT_DELAY = 0;
         static constexpr double MAX_DELAY = 0.020;
-        static constexpr size_t KEY_DELAY = 3;
         static constexpr const char *KEY_SNIPPET_DELAY = "delay";
 
         static constexpr int DEFAULT_USE_SUB = 1;
-        static constexpr size_t KEY_USE_SUB = 4;
         static constexpr const char *KEY_SNIPPET_USE_SUB = "use-sub";
 
         static constexpr int DEFAULT_MONO = 0;
-        static constexpr size_t KEY_MONO = 5;
         static constexpr const char *KEY_SNIPPET_MONO = "mono";
 
         static constexpr const char *KEY_SNIPPET_GROUP = "group";
 
-
-        EqualizerConfig eq[MAX_EQS];
-        size_t eqs = DEFAULT_EQS;
         double threshold = DEFAULT_THRESHOLD;
         double volume[MAX_SPEAKERMAN_GROUPS];
         double delay = DEFAULT_DELAY;
         int use_sub = DEFAULT_USE_SUB;
         int mono = DEFAULT_MONO;
+        EqualizerConfig eq[MAX_EQS];
+        size_t eqs = DEFAULT_EQS;
 
-        static GroupConfig defaultConfig(size_t group_id)
+        static const GroupConfig defaultConfig(size_t group_id);
+
+        static const GroupConfig unsetConfig();
+
+        void set_if_unset(const GroupConfig &config_if_unset);
+
+    };
+
+    struct BandConfig
+    {
+        static constexpr double MIN_SMOOTHING_TO_WINDOW_RATIO = 0.01;
+        static constexpr double DEFAULT_SMOOTHING_TO_WINDOW_RATIO = 0.1;
+        static constexpr double MAX_SMOOTHING_TO_WINDOW_RATIO = 1.00;
+        static constexpr const char *KEY_SNIPPET_SMOOTHING_TO_WINDOW_RATIO = "smoothing-to-window-ratio";
+
+        static constexpr double MIN_MAXIMUM_WINDOW_SECONDS = 0.4;
+        static constexpr double DEFAULT_MAXIMUM_WINDOW_SECONDS = 0.4;
+        static constexpr double MAX_MAXIMUM_WINDOW_SECONDS = 4.0;
+        static constexpr const char *KEY_SNIPPET_MAXIMUM_WINDOW_SECONDS = "maximum-window-seconds";
+
+        static constexpr size_t MIN_PERCEPTIVE_TO_PEAK_STEPS = 1;
+        static constexpr size_t DEFAULT_PERCEPTIVE_TO_PEAK_STEPS = 4;
+        static constexpr size_t MAX_PERCEPTIVE_TO_PEAK_STEPS = 12;
+        static constexpr const char *KEY_SNIPPET_PERCEPTIVE_TO_PEAK_STEPS = "perceptive-to-peak-steps";
+
+        static constexpr size_t MIN_PERCEPTIVE_TO_MAXIMUM_WINDOW_STEPS = 1;
+        static constexpr size_t DEFAULT_PERCEPTIVE_TO_MAXIMUM_WINDOW_STEPS = 1;
+        static constexpr size_t MAX_PERCEPTIVE_TO_MAXIMUM_WINDOW_STEPS = 4;
+        static constexpr const char *KEY_SNIPPET_PERCEPTIVE_TO_MAXIMUM_WINDOW_STEPS = "perceptive-to-maximum-window-steps";
+
+        static constexpr const char *KEY_SNIPPET_BAND = "band";
+
+        double smoothing_to_window_ratio = DEFAULT_SMOOTHING_TO_WINDOW_RATIO;
+        double maximum_window_seconds = DEFAULT_MAXIMUM_WINDOW_SECONDS;
+        size_t perceptive_to_peak_steps = DEFAULT_PERCEPTIVE_TO_PEAK_STEPS;
+        size_t perceptive_to_maximum_window_steps = DEFAULT_PERCEPTIVE_TO_MAXIMUM_WINDOW_STEPS;
+
+        static const BandConfig defaultConfig()
         {
-            GroupConfig result;
-            for (size_t i = 0; i < MAX_SPEAKERMAN_GROUPS; i++) {
-                result.volume[i] == i == group_id ? DEFAULT_VOLUME : 0;
-            }
-            return result;
+            return {};
         }
 
-        static GroupConfig unsetConfig()
-        {
-            GroupConfig result;
-            for (size_t i = 0; i < MAX_EQS; i++) {
-                result.eq[i] = EqualizerConfig::unsetConfig();
-            }
-            for (size_t i = 0; i < MAX_SPEAKERMAN_GROUPS; i++) {
-                unset_config_value(result.volume[i]);
-            }
-            unset_config_value(result.threshold);
-            unset_config_value(result.delay);
-            unset_config_value(result.use_sub);
-            unset_config_value(result.mono);
-            return result;
-        }
+        static const BandConfig unsetConfig();
 
+        void set_if_unset(const BandConfig &config_if_unset);
     };
 
     struct SpeakermanConfig
@@ -199,7 +173,7 @@ namespace speakerman {
                 MAX_GROUPS * MAX_GROUP_CHANNELS + 1;
 
         static constexpr size_t MIN_CROSSOVERS = 1;
-        static constexpr size_t DEFAULT_CROSSOVERS = 3;
+        static constexpr size_t DEFAULT_CROSSOVERS = 2;
         static constexpr size_t MAX_CROSSOVERS = 3;
 
         static constexpr size_t MIN_INPUT_OFFSET = 0;
@@ -208,15 +182,6 @@ namespace speakerman {
                 MAX_GROUPS * MAX_GROUP_CHANNELS;
 
         static constexpr int DEFAULT_GENERATE_NOISE = 0;
-
-        static constexpr size_t KEY_GROUP_COUNT = 0;
-        static constexpr size_t KEY_CHANNELS = 1;
-        static constexpr size_t KEY_SUB_THRESHOLD = 2;
-        static constexpr size_t KEY_SUB_DELAY = 3;
-        static constexpr size_t KEY_SUB_OUTPUT = 4;
-        static constexpr size_t KEY_CROSSOVERS = 5;
-        static constexpr size_t KEY_INPUT_OFFSET = 6;
-        static constexpr size_t KEY_GENERATE_NOISE = 7;
 
         static constexpr const char *KEY_SNIPPET_GROUP_COUNT = "groups";
         static constexpr const char *KEY_SNIPPET_CHANNELS = "group-channels";
@@ -227,7 +192,6 @@ namespace speakerman {
         static constexpr const char *KEY_SNIPPET_INPUT_OFFSET = "input-offset";
         static constexpr const char *KEY_SNIPPET_GENERATE_NOISE = "generate-noise";
 
-        GroupConfig group[MAX_GROUPS];
         size_t groups = DEFAULT_GROUPS;
         size_t groupChannels = DEFAULT_GROUP_CHANNELS;
         size_t subOutput = DEFAULT_SUB_OUTPUT;
@@ -237,37 +201,18 @@ namespace speakerman {
         double subDelay = DEFAULT_SUB_DELAY;
         int generateNoise = DEFAULT_GENERATE_NOISE;
         long long timeStamp = -1;
+        BandConfig band[MAX_CROSSOVERS + 1];
+        GroupConfig group[MAX_GROUPS];
 
-        static SpeakermanConfig defaultConfig()
-        {
-            SpeakermanConfig result;
-            for (size_t i = 0; i < MAX_SPEAKERMAN_GROUPS; i++) {
-                result.group[i] = GroupConfig::defaultConfig(i);
-            }
-            return result;
-        }
+        static const SpeakermanConfig defaultConfig();
 
-        static SpeakermanConfig unsetConfig()
-        {
-            SpeakermanConfig result;
-            for (size_t i = 0; i < MAX_SPEAKERMAN_GROUPS; i++) {
-                result.group[i] = GroupConfig::unsetConfig();
-            }
-            unset_config_value(result.groups);
-            unset_config_value(result.groupChannels);
-            unset_config_value(result.subOutput);
-            unset_config_value(result.crossovers);
-            unset_config_value(result.inputOffset);
-            unset_config_value(result.relativeSubThreshold);
-            unset_config_value(result.subDelay);
-            unset_config_value(result.generateNoise);
-            result.timeStamp = -1;
+        static const SpeakermanConfig unsetConfig();
 
-            return result;
-        }
-
+        void set_if_unset(const SpeakermanConfig &config_if_unset);
     };
 
+    using tdap::IndexPolicy;
+    using tdap::Values;
 
     class DynamicProcessorLevels
     {
@@ -384,12 +329,10 @@ namespace speakerman {
 
     const char *webDirectory();
 
-    SpeakermanConfig readSpeakermanConfig(bool initial);
+    SpeakermanConfig readSpeakermanConfig();
 
     SpeakermanConfig
     readSpeakermanConfig(const SpeakermanConfig &basedUpon, bool initial);
-
-    SpeakermanConfig getDefaultConfig();
 
     void
     dumpSpeakermanConfig(const SpeakermanConfig &dump, std::ostream &output);
