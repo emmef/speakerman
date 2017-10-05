@@ -70,7 +70,7 @@ namespace tdap {
         {
             double errors[MAX_BUCKETS + 1 - MIN_BUCKETS];
             size_t max_error = window_samples;
-            size_t min_buckets = std::max(MIN_BUCKETS,
+            size_t min_buckets = Value<size_t>::max(MIN_BUCKETS,
                                           minimum_preferred_bucket_count);
 
             double min_error = 1;
@@ -402,7 +402,7 @@ namespace tdap {
     };
 
     template<typename S, size_t BUCKETS, size_t LEVELS>
-    class PerceptiveRms : protected PerceptiveMetrics
+    class PerceptiveRms
     {
         static_assert(Values::is_between(LEVELS, (size_t) 3, (size_t) 16),
                       "Levels must be between 3 and 16");
@@ -419,69 +419,71 @@ namespace tdap {
 
         S get_biggest_window_size(S biggest_window) const
         {
-            S limited_window = std::min(MAX_SECONDS, biggest_window);
+            S limited_window = Value<S>::min(PerceptiveMetrics::MAX_SECONDS, biggest_window);
 
-            if (limited_window < PERCEPTIVE_SECONDS) {
-                return PERCEPTIVE_SECONDS;
-            }
-            if (limited_window < PERCEPTIVE_SECONDS * 1.4) {
-                return PERCEPTIVE_SECONDS;
+            if (limited_window < PerceptiveMetrics::PERCEPTIVE_SECONDS * 1.4) {
+                return PerceptiveMetrics::PERCEPTIVE_SECONDS;
             }
             return limited_window;
         }
 
-        void determine_number_of_levels(double biggest_window, size_t levels,
+        void determine_number_of_levels(double biggest_window,
                                         size_t &bigger_levels,
                                         size_t &smaller_levels)
         {
+            if (bigger_levels == 0 || biggest_window == PerceptiveMetrics::PERCEPTIVE_SECONDS) {
+                smaller_levels = Value<size_t>::min(smaller_levels, LEVELS - 1);
+                bigger_levels = 0;
+                return;
+            }
             double bigger_weight =
-                    log(biggest_window) - log(PERCEPTIVE_SECONDS);
+                    log(biggest_window) - log(PerceptiveMetrics::PERCEPTIVE_SECONDS);
             double smaller_weight =
-                    log(PERCEPTIVE_SECONDS) - log(PEAK_SECONDS);
-            // apart frm perceptive window, we always have used_levels - 1 available windows to divide for
-            bigger_levels = bigger_weight * (levels - 1) /
-                            (smaller_weight + bigger_weight);
-            smaller_levels = std::max(1.0, smaller_weight * (levels - 1) /
-                                         (smaller_weight +
-                                          bigger_weight));
-            size_t extra_levels = bigger_levels + smaller_levels;
-            while (extra_levels < levels - 1) {
-                if (biggest_window > PERCEPTIVE_SECONDS * 1.3) {
+                    log(PerceptiveMetrics::PERCEPTIVE_SECONDS) - log(PerceptiveMetrics::PEAK_SECONDS);
+
+            while (bigger_levels + smaller_levels + 1 > LEVELS) {
+                if (bigger_levels * smaller_weight > smaller_levels * bigger_weight) {
+                    bigger_levels--;
+                }
+                if (biggest_window > PerceptiveMetrics::PERCEPTIVE_SECONDS * 1.3) {
                     bigger_levels++;
                 }
                 else {
                     smaller_levels++;
                 }
-                extra_levels = bigger_levels + smaller_levels;
             }
         }
 
     public:
         PerceptiveRms() : follower_(1, 1, 1, 1) {};
 
-        void configure(size_t sample_rate, S biggest_window, S peak_to_rms,
+        void configure(size_t sample_rate, S peak_to_rms,
+                       size_t steps_to_peak,
+                       S biggest_window, size_t steps_to_biggest,
                        S integration_to_window_size = INTEGRATOR_WINDOW_SIZE_RATIO,
-                       size_t levels = LEVELS, S initial_value = 0.0)
+                       S initial_value = 0.0)
         {
-            used_levels_ = Value<size_t>::force_between(levels, 3, LEVELS);
-            double peak_scale = 1.0 / Value<S>::force_between(peak_to_rms, 2, 10);
+            size_t smaller_levels = Value<size_t >::max(steps_to_peak, 1);
             double biggest = get_biggest_window_size(biggest_window);
+            size_t bigger_levels = biggest == PerceptiveMetrics::PERCEPTIVE_SECONDS ? 0 : Value<size_t >::max(steps_to_biggest, 1);
+            cout << "Levels smaller " << smaller_levels << " bigger " << bigger_levels << endl;
+            if (smaller_levels + bigger_levels + 1 > LEVELS) {
+                throw std::invalid_argument("Rms::configure: too many levels specified");
+            }
+            used_levels_ = smaller_levels + bigger_levels + 1;
+            double peak_scale = 1.0 / Value<S>::force_between(peak_to_rms, 2, 10);
             double integration_factor = Value<S>::force_between(
                     integration_to_window_size, MINIMUM_INTEGRATION_TO_WINDOW_RATIO, 1);
             S initial_avererage = Value<S>::force_between(initial_value, 0.0, 100.0);
-            size_t bigger_levels;
-            size_t smaller_levels;
-            determine_number_of_levels(biggest, levels, bigger_levels,
-                                       smaller_levels);
 
             for (size_t level = 0; level < smaller_levels; level++) {
                 double exponent =
                         1.0 * (smaller_levels - level) / smaller_levels;
-                double window_size = PERCEPTIVE_SECONDS *
-                                     pow(PEAK_PERCEPTIVE_RATIO, exponent);
+                double window_size = PerceptiveMetrics::PERCEPTIVE_SECONDS *
+                                     pow(PerceptiveMetrics::PEAK_PERCEPTIVE_RATIO, exponent);
                 double scale = level == 0 ?
                                peak_scale :
-                               pow(PEAK_PERCEPTIVE_RATIO, exponent * 0.25);
+                               pow(PerceptiveMetrics::PEAK_PERCEPTIVE_RATIO, exponent * 0.25);
                 double rc = window_size * integration_factor;
                 rms_[level].setWindowSizeAndRc(window_size * sample_rate,
                                                Value<double>::max(1, rc * sample_rate));
@@ -490,8 +492,8 @@ namespace tdap {
             }
 
             rms_[smaller_levels].setWindowSizeAndRc(
-                    PERCEPTIVE_SECONDS * sample_rate,
-                    PERCEPTIVE_SECONDS * sample_rate * integration_factor);
+                    PerceptiveMetrics::PERCEPTIVE_SECONDS * sample_rate,
+                    PerceptiveMetrics::PERCEPTIVE_SECONDS * sample_rate * integration_factor);
             rms_[smaller_levels].set_output_scale(1.0);
             rms_[smaller_levels].setValue(initial_avererage);
 
@@ -499,8 +501,8 @@ namespace tdap {
                  level < used_levels_; level++) {
                 double exponent = 1.0 * (level - smaller_levels) /
                                   (used_levels_ - 1 - smaller_levels);
-                double window_size = PERCEPTIVE_SECONDS *
-                                     pow(biggest / PERCEPTIVE_SECONDS,
+                double window_size = PerceptiveMetrics::PERCEPTIVE_SECONDS *
+                                     pow(biggest / PerceptiveMetrics::PERCEPTIVE_SECONDS,
                                          exponent);
                 double rc = window_size * integration_factor;
                 rms_[level].setWindowSizeAndRc(window_size * sample_rate,
@@ -522,9 +524,9 @@ namespace tdap {
             }
 
             follower_ = SmoothHoldMaxAttackRelease<S>(
-                    PEAK_HOLD_SECONDS * sample_rate,
-                    0.5 + 0.5 * PEAK_SECONDS * sample_rate,
-                    PEAK_RELEASE_SECONDS * sample_rate,
+                    PerceptiveMetrics::PEAK_HOLD_SECONDS * sample_rate,
+                    0.5 + 0.5 * PerceptiveMetrics::PEAK_SECONDS * sample_rate,
+                    PerceptiveMetrics::PEAK_RELEASE_SECONDS * sample_rate,
                     10);
         }
 
