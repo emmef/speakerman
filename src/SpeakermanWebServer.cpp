@@ -50,7 +50,8 @@ namespace speakerman {
         static std::chrono::milliseconds wait(1000);
         static std::chrono::milliseconds sleep(50);
         int count = 0;
-        SpeakermanConfig configFileConfig = readSpeakermanConfig(configFileConfig, true);
+
+        SpeakermanConfig configFileConfig = manager_.getConfig();
         DynamicProcessorLevels levels;
         while (true) {
             SignalHandler::check_raised();
