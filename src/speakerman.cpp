@@ -177,9 +177,7 @@ using namespace std;
 
 int main(int count, char *arguments[])
 {
-    configFileConfig = readSpeakermanConfig(true);
-
-    dumpSpeakermanConfig(configFileConfig, std::cout);
+    configFileConfig = readSpeakermanConfig();
 
     cout << "Executing " << arguments[0] << endl;
 
