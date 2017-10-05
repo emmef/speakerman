@@ -224,24 +224,25 @@ namespace speakerman {
             }
             // Rms detector confiuration
             BandConfig bandConfig = config.band[0];
-            rmsDetector[0].configure(sampleRate, 4,
-            rmsDetector[0].configure(sampleRate, 4,
-                                     bandConfig.perceptive_to_peak_steps,
-                                     bandConfig.maximum_window_seconds,
-                                     bandConfig.perceptive_to_maximum_window_steps,
-                                     bandConfig.smoothing_to_window_ratio,
-                                     100.0);
+            rmsDetector[0].configure(
+                    sampleRate, 4,
+                    bandConfig.perceptive_to_peak_steps,
+                    bandConfig.maximum_window_seconds,
+                    bandConfig.perceptive_to_maximum_window_steps,
+                    bandConfig.smoothing_to_window_ratio,
+                    100.0);
             AdvancedRms::UserConfig rmsConfig = rmsUserConfig();
             cout << "ratio=" << 0.1 << std::endl;
             for (size_t band = 0, detector = 1; band < CROSSOVERS; band++) {
                 bandConfig = config.band[band + 1];
                 for (size_t group = 0; group < GROUPS; group++, detector++) {
-                    rmsDetector[detector].configure(sampleRate, 4,
-                                             bandConfig.perceptive_to_peak_steps,
-                                             bandConfig.maximum_window_seconds,
-                                             bandConfig.perceptive_to_maximum_window_steps,
-                                             bandConfig.smoothing_to_window_ratio,
-                                             100.0);
+                    rmsDetector[detector].configure(
+                            sampleRate, 4,
+                            bandConfig.perceptive_to_peak_steps,
+                            bandConfig.maximum_window_seconds,
+                            bandConfig.perceptive_to_maximum_window_steps,
+                            bandConfig.smoothing_to_window_ratio,
+                            100.0);
                 }
             }
             size_t rmsDelaySamples =
