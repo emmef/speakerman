@@ -29,7 +29,7 @@ empty_output
 
 default_start="1000"
 default_end="2300"
-default_level="3"
+default_level="2"
 
 exceeded_allowed()
 {
