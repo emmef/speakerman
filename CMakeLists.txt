@@ -3,7 +3,6 @@ project(speakerman)
 
 set(CMAKE_CXX_STANDARD 14)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DINSTALL_DIR='\"/usr/local\"'")
 include_directories(include src/include)
 
 
@@ -83,4 +82,7 @@ target_link_libraries(speakerman jack pthread)
 add_executable(test_speakerman test/main.cpp)
 install(TARGETS speakerman RUNTIME DESTINATION bin)
 install(FILES web/index.html web/speakerman.js web/speakerman.css DESTINATION share/speakerman/web)
+install(PROGRAMS src/speakerman-watchdog.sh DESTINATION share/speakerman/script)
 install(FILES service/speakerman.service DESTINATION /lib/systemd/system)
+
+add_definitions(-DSPEAKERMAN_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX})
