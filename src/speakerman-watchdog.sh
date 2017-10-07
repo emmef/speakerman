@@ -27,7 +27,7 @@ empty_output()
 
 empty_output
 
-default_start="1000"
+default_start="1100"
 default_end="2300"
 default_level="2"
 
@@ -72,7 +72,6 @@ then
     then
         if test $hoursminutes -lt "$default_end"
         then
-            echo "Working hours..."
             echo "$default_level" >"$OUTPUT_FILE"
         fi
     fi
