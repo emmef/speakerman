@@ -171,7 +171,10 @@ using namespace std;
 
 int main(int count, char *arguments[])
 {
-    configFileConfig = readSpeakermanConfig();
+    {
+        MemoryFence fence;
+        configFileConfig = readSpeakermanConfig();
+    }
 
     cout << "Executing " << arguments[0] << endl;
 

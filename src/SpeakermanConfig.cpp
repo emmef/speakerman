@@ -943,6 +943,7 @@ namespace speakerman {
             config_manager.read_line(config, line, initial ? config : basedUpon);
         }
         config.set_if_unset(basedUpon);
+        config.threshold_scaling = basedUpon.threshold_scaling;
     }
 
 
@@ -1183,6 +1184,7 @@ namespace speakerman {
         set_if_unset_or_invalid_config_value(relativeSubThreshold, config_if_unset.relativeSubThreshold, MIN_REL_SUB_THRESHOLD, MAX_REL_SUB_THRESHOLD);
         set_if_unset_or_invalid_config_value(subDelay, config_if_unset.subDelay, MIN_SUB_DELAY, MAX_SUB_DELAY);
         set_if_unset_or_invalid_config_value(generateNoise, config_if_unset.generateNoise, 0, 1);
+        set_if_unset_or_invalid_config_value(threshold_scaling, config_if_unset.threshold_scaling, MIN_THRESHOLD_SCALING, MAX_THRESHOLD_SCALING);
         timeStamp = -1;
     }
 

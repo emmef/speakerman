@@ -182,9 +182,9 @@ namespace speakerman {
         static constexpr size_t MAX_INPUT_OFFSET =
                 MAX_GROUPS * MAX_GROUP_CHANNELS;
 
-        static constexpr double MIN_THRESHOLD_SCALING = 0;
-        static constexpr double DEFAULT_THRESHOLD_SCALING = 0;
-        static constexpr double MAX_THRESHOLD_SCALING = 6;
+        static constexpr double MIN_THRESHOLD_SCALING = 1;
+        static constexpr double DEFAULT_THRESHOLD_SCALING = 1;
+        static constexpr double MAX_THRESHOLD_SCALING = 5;
 
         static constexpr int DEFAULT_GENERATE_NOISE = 0;
 

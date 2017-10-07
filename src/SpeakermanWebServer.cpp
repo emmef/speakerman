@@ -26,6 +26,7 @@
 #include <speakerman/jack/SignalHandler.hpp>
 #include <speakerman/SpeakermanWebServer.hpp>
 #include <speakerman/utils/Config.hpp>
+#include <tdap/MemoryFence.hpp>
 
 namespace speakerman {
     bool web_server::open(const char *service, int timeoutSeconds, int backLog, int *errorCode)
@@ -120,7 +121,11 @@ namespace speakerman {
         static std::chrono::milliseconds sleep(50);
         int count = 1;
 
-        SpeakermanConfig configFileConfig = manager_.getConfig();
+        SpeakermanConfig configFileConfig;
+        {
+            tdap::MemoryFence fence;
+            configFileConfig = manager_.getConfig();
+        }
         DynamicProcessorLevels levels;
         string range_file;
         string command_line;
