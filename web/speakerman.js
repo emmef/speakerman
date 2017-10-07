@@ -1,7 +1,7 @@
 function createCORSRequest(method, url) {
-  var xhr = new XMLHttpRequest();
-  xhr.open(method, url);
-  return xhr;
+    var xhr = new XMLHttpRequest();
+    xhr.open(method, url);
+    return xhr;
 }
 
 var xHttpRequest = null;
@@ -10,70 +10,131 @@ var averagMinimumSignal = 1e-4;
 var minimumColorPercentage = 0.02;
 var metergroups = undefined;
 
-function getSignalInDbPercent(level, minLvl, pow) {
-	var minLevel = Math.max(minLvl, 1e-6);
-	var absLevel = Math.abs(level);
-	var level = Math.max(minLevel, absLevel);
-	var minLog = Math.abs(Math.log(minLevel));
-	var levelLog = Math.log(level);
-	if (pow) {
-		pow = Math.max(0.25, Math.min(4, pow));
-	}
-	else {
-		pow = 1
-	}
-	var result = (levelLog + minLog) / minLog;
-	if (pow < 1) {
-		result = 1 - result;
-	}
+var RequestMetrics = {
+    min_period: 75,
+    period: 75,
+    max_period: 2000,
+    after_failure_period : 1000,
+    period_scaling: 2,
+    status_count: 0,
+    min_status_count: -2,
+    max_status_count: 2,
+    is_busy: false,
+    enter: function (success) {
+        var self = RequestMetrics;
+        if (self.is_busy === true) {
+            return false;
+        }
+        self.is_busy = success;
+        if (self.is_busy) {
+            var jump = self.status_count < 0;
+            self.status_count = self.status_count <= 0 ? 1 : self.status_count < self.max_status_count ? self.status_count + 1 : self.status_count;
+            if (jump) {
+                self.period = self.after_failure_period;
+            }
+        }
+        else {
+            self.status_count = self.status_count >= 0 ? -1 : self.status_count > self.min_status_count ? self.status_count - 1 : self.status_count;
+        }
+        if (self.status_count > 1) {
+            var period = self.period;
+            self.period = Math.max(self.min_period, self.period / self.period_scaling);
+            if (period !== self.period) {
+                console.log("Speed up refresh");
+            }
+        }
+        else if (self.status_count <= self.min_status_count) {
+            var period = self.period;
+            self.period = Math.min(self.max_period, self.period * self.period_scaling);
+            if (period !== self.period) {
+                console.log("Slowing refresh");
+            }
+        }
+        window.setTimeout(function () {
+            self.setConnectionMessage(self.period < self.max_period)
+        }, self.min_period);
+        return self.is_busy;
+    },
+    release: function () {
+        RequestMetrics.is_busy = false;
+    },
+    setConnectionMessage: function (connection_ok) {
+        var element = document.getElementById("connection-message");
+        if (element) {
+            if (connection_ok) {
+                element.setAttribute("style", "display:none;");
+            }
+            else {
+                element.setAttribute("style", "display: inline;");
+            }
+        }
+    }
+};
 
-	return Math.pow(result, pow);
+function getSignalInDbPercent(level, minLvl, pow) {
+    var minLevel = Math.max(minLvl, 1e-6);
+    var absLevel = Math.abs(level);
+    var level = Math.max(minLevel, absLevel);
+    var minLog = Math.abs(Math.log(minLevel));
+    var levelLog = Math.log(level);
+    if (pow) {
+        pow = Math.max(0.25, Math.min(4, pow));
+    }
+    else {
+        pow = 1
+    }
+    var result = (levelLog + minLog) / minLog;
+    if (pow < 1) {
+        result = 1 - result;
+    }
+
+    return Math.pow(result, pow);
 }
 
 function scaledValue(value, scale) {
-	var boundValue = Math.min(255, Math.max(0, typeof value === 'number' ? value : 0));
-	
-	return Math.round(scale * boundValue);
+    var boundValue = Math.min(255, Math.max(0, typeof value === 'number' ? value : 0));
+
+    return Math.round(scale * boundValue);
 }
 
 function getRgbValue(scale, r, g, b, minNonZero) {
-	var boundScale = Math.min(1.0, Math.max(0.0, typeof scale === 'number' ? scale : 0));
-	var threshold = (!minNonZero) ? 0 : typeof minNonZero != 'number' ? minimumColorPercentage : Math.min(0.5, Math.max(0, minNonZero));
-	var usedScale = boundScale < 0.002 ? 0 : threshold + (1.0 - threshold) * boundScale;
-	
-	return "rgb(" 
-		+ scaledValue(r, usedScale) + ","
-		+ scaledValue(g, usedScale) + ","
-		+ scaledValue(b, usedScale) + ")";
+    var boundScale = Math.min(1.0, Math.max(0.0, typeof scale === 'number' ? scale : 0));
+    var threshold = (!minNonZero) ? 0 : typeof minNonZero !== 'number' ? minimumColorPercentage : Math.min(0.5, Math.max(0, minNonZero));
+    var usedScale = boundScale < 0.002 ? 0 : threshold + (1.0 - threshold) * boundScale;
+
+    return "rgb("
+        + scaledValue(r, usedScale) + ","
+        + scaledValue(g, usedScale) + ","
+        + scaledValue(b, usedScale) + ")";
 }
 
 function integrate(element, val, perc) {
-	var percentage = Math.max(0, Math.min(1, perc));
-	var value = Math.max(0, Math.min(1, val));
-	if (element) {
-		if (element.previousValue) {
-			if (value > element.previousValue) {
-				element.previousValue = value;
-			}
-			else {
-				element.previousValue = percentage * value + (1 - percentage) * element.previousValue;
-			}
-		}
-		else {
-			element.previousValue = value;
-		}
-		return element.previousValue;
-	}
-	return val;
+    var percentage = Math.max(0, Math.min(1, perc));
+    var value = Math.max(0, Math.min(1, val));
+    if (element) {
+        if (element.previousValue) {
+            if (value > element.previousValue) {
+                element.previousValue = value;
+            }
+            else {
+                element.previousValue = percentage * value + (1 - percentage) * element.previousValue;
+            }
+        }
+        else {
+            element.previousValue = value;
+        }
+        return element.previousValue;
+    }
+    return val;
 }
 
 function ensureMeterGroup(groupElementName) {
-	var group = document.getElementById(groupElementName);
-	if (!group) {
-		return null;
-	}
-	var elem = group.getElementsByClassName("meter-level-pixel");
-	if (elem && elem.length && elem.length > 0) {
+    var group = document.getElementById(groupElementName);
+    if (!group) {
+        return null;
+    }
+    var elem = group.getElementsByClassName("meter-level-pixel");
+    if (elem && elem.length && elem.length > 0) {
         return {
             mainElement: group,
             elements: elem,
@@ -107,7 +168,7 @@ function ensureMeterGroup(groupElementName) {
                 this.integratedAvg = 0.2 * Math.sqrt(gainAvg) + 0.8 * this.integratedAvg;
                 this.integratedPeak = 0.25 * Math.sqrt(gain) + 0.75 * this.integratedPeak;
                 var gainA = Math.round(this.elements.length * this.integratedAvg);
-                var gainP =  Math.min(gainA, Math.round(this.elements.length * this.integratedPeak));
+                var gainP = Math.min(gainA, Math.round(this.elements.length * this.integratedPeak));
 
                 var b = sub ? 64 : 0;
                 for (i = 0; i < this.elements.length; i++) {
@@ -123,20 +184,19 @@ function ensureMeterGroup(groupElementName) {
                     this.elements[i].style.backgroundColor = "rgb(" + r + "," + g + "," + b + ")";
                 }
             },
-            hide: function() {
+            hide: function () {
                 this.mainElement.style.visibility = "hidden";
-                this.mainElement.style.display= "none";
+                this.mainElement.style.display = "none";
             }
         };
     }
     return null;
 }
 
-function ensureMeterGroups()
-{
-	if (metergroups) {
-		return metergroups;
-	}
+function ensureMeterGroups() {
+    if (metergroups) {
+        return metergroups;
+    }
     var subMeters = ensureMeterGroup("meter-sub");
     if (!subMeters) {
         return;
@@ -149,15 +209,14 @@ function ensureMeterGroups()
         }
     }
 
-	metergroups = {};
-	metergroups.subMeters = subMeters;
+    metergroups = {};
+    metergroups.subMeters = subMeters;
     metergroups.groups = groups;
 
     return metergroups;
 }
 
-function setMeters(levels) 
-{
+function setMeters(levels) {
     var meterGroups = ensureMeterGroups();
     if (!meterGroups) {
         return;
@@ -172,39 +231,58 @@ function setMeters(levels)
     for (; i < meterGroups.groups.length; i++) {
         meterGroups.groups[i].hide();
     }
+    var element = document.getElementById("threshold-message");
+    if (element) {
+        var level;
+        if (levels.thresholdScale && levels.thresholdScale > 1.0) {
+            level = "+" + Math.round(200 * Math.log(levels.thresholdScale) / Math.log(10)) / 10;
+        }
+        else {
+            level = "0";
+        }
+        element.innerHTML = level + " dB";
+    }
 }
 
-function handleRequest() 
-{
-	if (!xHttpRequest) {
-		//console.log("No request");
-	} // xHttpRequest.readyState == 4 && 
-	else if (xHttpRequest && xHttpRequest.status == 200) {
-		var levels = JSON.parse(xHttpRequest.responseText);
-		setMeters(levels);
-	}
-	else {
-		console.log("No correct response");
-	}
+function handleRequest() {
+    if (xHttpRequest && xHttpRequest.status == 200) {
+        if (RequestMetrics.enter(true)) {
+            var levels = JSON.parse(xHttpRequest.responseText);
+            setMeters(levels);
+            RequestMetrics.release();
+        }
+    }
+    else {
+        RequestMetrics.enter(false);
+    }
 }
 
-	
-function sendLevelRequest() 
-{
-	//try {
-		if (xHttpRequest) {
-			console.log("Postpone");
-		}
-		else {
-			var url = "/levels.json";
-			xHttpRequest = createCORSRequest('GET', url);
-			xHttpRequest.onload = handleRequest;
-			xHttpRequest.onloadend = function() {
-				xHttpRequest = null;
-				window.setTimeout(function() {sendLevelRequest(); }, 75);
-			};
-			xHttpRequest.send();
-		}
-	//}
+
+function sendLevelRequest() {
+    if (xHttpRequest) {
+        console.log("Postpone");
+    }
+    else {
+        var url = "/levels.json";
+        xHttpRequest = createCORSRequest('GET', url);
+        try {
+            xHttpRequest.onload = handleRequest;
+            xHttpRequest.onloadend = function () {
+                xHttpRequest = null;
+                window.setTimeout(function () {
+                    sendLevelRequest();
+                }, RequestMetrics.period);
+            };
+            xHttpRequest.onerror = function () {
+                RequestMetrics.enter(false);
+                return true;
+            };
+            xHttpRequest.send();
+        }
+        catch (exception) {
+            console.log("Something went wrong!");
+            RequestMetrics.enter(false);
+        }
+    }
 }
 
