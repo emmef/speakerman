@@ -213,7 +213,6 @@ namespace speakerman {
                 const FixedSizeArray<T, CROSSOVERS> &crossovers,
                 const SpeakermanConfig &config)
         {
-            noise.setScale(config.generateNoise ? 1e-6 : 2.0);
             noiseAvg = 0.0;
             noiseIntegrator.setCharacteristicSamples(sampleRate / 20);
             aCurve.setSampleRate(sampleRate);
@@ -257,6 +256,7 @@ namespace speakerman {
 
             sampleRate_ = sampleRate;
             runtime.init(createConfigData(config));
+            noise.setScale(runtime.userSet().noiseScale());
         }
 
         const ConfigData &getConfigData() const

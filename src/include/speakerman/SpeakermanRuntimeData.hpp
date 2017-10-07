@@ -293,13 +293,6 @@ namespace speakerman {
             }
             double subBaseThreshold = GroupConfig::MAX_THRESHOLD;
             double peakWeight = Values::force_between(fastestPeakWeight, 0.1, 1.0);
-            if (config.generateNoise) {
-                noiseScale_ = 20.0;
-                std::cout << "Generating testing noise" << std::endl;
-            }
-            else {
-                noiseScale_ = 1e-6;
-            }
             double max_group_threshold = 0;
 
             for (size_t group = 0; group < config.groups; group++) {
@@ -317,6 +310,13 @@ namespace speakerman {
                 targetConf.setLevels(sourceConf, config.threshold_scaling, config.groupChannels, fastestPeakWeight, delay, bandWeights);
 
                 subBaseThreshold = Values::min(subBaseThreshold, groupThreshold);
+            }
+            if (config.generateNoise) {
+                noiseScale_ = 20.0;
+                std::cout << "Generating testing noise" << std::endl;
+            }
+            else {
+                noiseScale_ = subBaseThreshold * 1e-6;
             }
 
             double threshold =
