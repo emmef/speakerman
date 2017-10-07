@@ -269,7 +269,7 @@ namespace speakerman {
             ConfigData data;
             data.configure(config, sampleRate_, relativeBandWeights,
                            rmsUserConfig().peakWeight / 1.5);
-            data.dump();
+//            data.dump();
             return data;
         }
 

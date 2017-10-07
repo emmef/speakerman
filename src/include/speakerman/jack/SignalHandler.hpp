@@ -32,7 +32,7 @@ namespace speakerman {
 
         int int_raise_signal(int signal) const;
 
-        void int_check_raised() const;
+        bool int_check_raised() const;
 
         SignalHandler();
 
@@ -45,7 +45,7 @@ namespace speakerman {
 
         static int raise_signal(int signal);
 
-        static void check_raised();
+        static bool check_raised();
     };
 
     /**

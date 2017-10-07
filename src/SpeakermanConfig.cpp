@@ -19,11 +19,19 @@
  * limitations under the License.
  */
 
+#ifndef SPEAKERMAN_INSTALL_PREFIX
+#error "Need to define install prefix with -DSPEAKERMAN_INSTALL_PREFIX=<>"
+#else
+#define TO_STR2(x) #x
+#define TO_STR(x) TO_STR2(x)
+static constexpr const char * INSTALLATION_PREFIX = TO_STR(SPEAKERMAN_INSTALL_PREFIX);
+#endif
+
+
 #include <string>
 #include <cstring>
 #include <cmath>
 #include <mutex>
-#include <iostream>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <tdap/Value.hpp>
@@ -654,13 +662,11 @@ namespace speakerman {
 
         template<typename T> void add_reader(const string &name, bool runtime_changeable, T &field)
         {
-            cout << "Add reader for \"" << name << "\"; runtime_changeable=" << runtime_changeable << endl;
             add(new KeyVariableReader(name, new TypedVariableReader<T>(runtime_changeable, *this, field)));
         }
 
         template<typename T, size_t N> void add_array_reader(const string &name, bool runtime_changeable, T &field)
         {
-            cout << "Add reader (array) for \"" << name << "\"; runtime_changeable=" << runtime_changeable << endl;
             add(new KeyVariableReader(name, new TypedArrayVariableReader<T, N>(runtime_changeable, *this, field)));
         }
 
@@ -808,7 +814,7 @@ namespace speakerman {
 
     static string internalGetInstallBase()
     {
-        static constexpr const char *prefix = INSTALL_DIR;
+        static constexpr const char *prefix = INSTALLATION_PREFIX;
         if (access(prefix, F_OK) != 0) {
             return "";
         }
@@ -869,6 +875,26 @@ namespace speakerman {
         return name.c_str();
     }
 
+    static string internalGetWatchDogScript()
+    {
+        string watchDog = getInstallBaseDirectory();
+        watchDog += "share/speakerman/script/speakerman-watchdog.sh";
+
+        if (access(watchDog.c_str(), F_OK) == 0) {
+            cout << "Watch-dog script: " << watchDog << endl;
+            return watchDog;
+        }
+
+        return "";
+    }
+
+    const char * getWatchDogScript()
+    {
+        static string script = internalGetWatchDogScript();
+
+        return script.length() > 0 ? script.c_str() : nullptr;
+    }
+
 
     static void resetStream(istream &stream)
     {
@@ -919,38 +945,6 @@ namespace speakerman {
         config.set_if_unset(basedUpon);
     }
 
-    class StreamOwner
-    {
-        ifstream &stream;
-        bool owns;
-
-        void operator=(const StreamOwner &source)
-        {}
-
-        void operator=(StreamOwner &&source) noexcept
-        {}
-
-    public:
-        explicit StreamOwner(ifstream &owned) : stream(owned), owns(true)
-        {}
-
-        StreamOwner(const StreamOwner &source) : stream(source.stream),
-                                                 owns(false)
-        {}
-
-        StreamOwner(StreamOwner &&source) noexcept : stream(source.stream),
-                                                     owns(true)
-        {
-            source.owns = false;
-        }
-
-        ~StreamOwner()
-        {
-            if (owns && stream.is_open()) {
-                stream.close();
-            }
-        }
-    };
 
     long long getFileTimeStamp(const char *fileName)
     {
@@ -1191,5 +1185,34 @@ namespace speakerman {
         set_if_unset_or_invalid_config_value(generateNoise, config_if_unset.generateNoise, 0, 1);
         timeStamp = -1;
     }
+
+    StreamOwner::StreamOwner(std::ifstream &owned) :
+            stream_(owned), owns_(true)
+    {}
+
+    StreamOwner::StreamOwner(const StreamOwner &source) :
+            stream_(source.stream_), owns_(false)
+    {}
+
+    StreamOwner::StreamOwner(StreamOwner &&source) noexcept
+            : stream_(source.stream_), owns_(true)
+    {
+        source.owns_ = false;
+    }
+    StreamOwner StreamOwner::open(const char *file_name)
+    {
+        std::ifstream stream;
+        stream.open(file_name);
+        return StreamOwner(stream);
+    }
+    StreamOwner::~StreamOwner()
+    {
+        if (owns_ && stream_.is_open()) {
+            stream_.close();
+        }
+    }
+    bool StreamOwner::is_open() const { return stream_.is_open(); }
+
+
 } /* End of namespace speakerman */
 

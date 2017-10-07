@@ -73,12 +73,6 @@ Owner<AbstractSpeakerManager> manager;
 SpeakermanConfig configFileConfig;
 static volatile int userInput;
 
-inline static accurate_t frequencyWeight(accurate_t f, accurate_t shelve1, accurate_t shelve2, accurate_t power)
-{
-    accurate_t fRel = pow(f / shelve1, power);
-    accurate_t fShelve2Corr = pow(1.0 / shelve2, power);
-    return (1 + fRel * fShelve2Corr) / (1.0 + fRel);
-}
 
 static void webServer()
 {

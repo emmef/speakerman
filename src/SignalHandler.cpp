@@ -122,11 +122,13 @@ namespace speakerman {
         return previous;
     }
 
-    void SignalHandler::int_check_raised() const
+    bool SignalHandler::int_check_raised() const
     {
-        if (int_is_set()) {
+        bool result = int_is_set();
+        if (result) {
             throw signal_exception(signal_number, user_raised);
         }
+        return result;
     }
 
     int SignalHandler::get_signal()
@@ -144,9 +146,9 @@ namespace speakerman {
         return instance().int_raise_signal(signal);
     }
 
-    void SignalHandler::check_raised()
+    bool SignalHandler::check_raised()
     {
-        instance().int_check_raised();
+        return instance().int_check_raised();
     }
 
 

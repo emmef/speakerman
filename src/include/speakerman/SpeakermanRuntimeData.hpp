@@ -147,7 +147,7 @@ namespace speakerman {
         { filterConfig_ = source; }
 
         template<typename...A>
-        void setLevels(const GroupConfig &conf, size_t channels, double sloppyFactor, size_t delay,
+        void setLevels(const GroupConfig &conf, double threshold_scaling, size_t channels, double sloppyFactor, size_t delay,
                        const ArrayTraits<A...> &relativeBandWeights)
         {
             for (size_t i = 0; i < SpeakermanConfig::MAX_GROUPS; i++) {
@@ -157,13 +157,14 @@ namespace speakerman {
             delay_ = delay;
             useSub_ = conf.use_sub == 1;
             mono_ = conf.mono == 1;
-            limiterThreshold_ = SpeakerManLevels::getLimiterThreshold(conf.threshold, sloppyFactor);
+            double threshold = Value<double>::min(conf.threshold * threshold_scaling, GroupConfig::MAX_THRESHOLD);
+            limiterThreshold_ = SpeakerManLevels::getLimiterThreshold(threshold, sloppyFactor);
             limiterScale_ = 1.0 / limiterThreshold_;
             for (size_t band = 0; band < BANDS; band++) {
                 bandRmsScale_[band] =
-                        1.0 / SpeakerManLevels::getRmsThreshold(conf.threshold, relativeBandWeights[band]);
+                        1.0 / SpeakerManLevels::getRmsThreshold(threshold, relativeBandWeights[band]);
             }
-            signalMeasureFactor_ = 1.0 / (sqrt(channels) * conf.threshold);
+            signalMeasureFactor_ = 1.0 / (sqrt(channels) * threshold);
         }
 
         void adjustDelay(size_t delay)
@@ -292,16 +293,14 @@ namespace speakerman {
             }
             double subBaseThreshold = GroupConfig::MAX_THRESHOLD;
             double peakWeight = Values::force_between(fastestPeakWeight, 0.1, 1.0);
-            for (size_t i = 0; i < bandWeights.size(); i++) {
-                std::cout << "Band weight[" << i << "]=" << bandWeights[i] << std::endl;
-            }
             if (config.generateNoise) {
-                noiseScale_ = 10.0;
+                noiseScale_ = 20.0;
                 std::cout << "Generating testing noise" << std::endl;
             }
             else {
                 noiseScale_ = 1e-6;
             }
+            double max_group_threshold = 0;
 
             for (size_t group = 0; group < config.groups; group++) {
                 speakerman::GroupConfig sourceConf = config.group[group];
@@ -309,14 +308,17 @@ namespace speakerman {
                 GroupRuntimeData<T, BANDS> &targetConf = groupConfig_[group];
                 targetConf.setFilterConfig(EqualizerFilterData<T>::createConfigured(sourceConf, sampleRate));
 
-                double groupThreshold = sourceConf.threshold;
+                double groupThreshold = Value<double>::min(sourceConf.threshold * config.threshold_scaling, GroupConfig::MAX_THRESHOLD);
+                max_group_threshold = Value<double>::max(max_group_threshold, groupThreshold);
+
                 size_t delay = 0.5 + sampleRate *
                                      Values::force_between(sourceConf.delay, GroupConfig::MIN_DELAY,
                                                            GroupConfig::MAX_DELAY);
-                targetConf.setLevels(sourceConf, config.groupChannels, fastestPeakWeight, delay, bandWeights);
+                targetConf.setLevels(sourceConf, config.threshold_scaling, config.groupChannels, fastestPeakWeight, delay, bandWeights);
 
                 subBaseThreshold = Values::min(subBaseThreshold, groupThreshold);
             }
+
             double threshold =
                     Values::force_between(config.relativeSubThreshold, SpeakermanConfig::MIN_REL_SUB_THRESHOLD,
                                           SpeakermanConfig::MAX_REL_SUB_THRESHOLD) *

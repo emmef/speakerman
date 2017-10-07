@@ -22,11 +22,12 @@
 #ifndef SMS_SPEAKERMAN_SPEAKERMANCONFIG_GUARD_H_
 #define SMS_SPEAKERMAN_SPEAKERMANCONFIG_GUARD_H_
 
+#include <iostream>
+#include <fstream>
 #include <chrono>
-#include <ostream>
+#include <cmath>
 #include <tdap/IndexPolicy.hpp>
 #include <tdap/Value.hpp>
-#include <cmath>
 
 namespace speakerman {
     static constexpr size_t MAX_SPEAKERMAN_GROUPS = 4;
@@ -181,6 +182,10 @@ namespace speakerman {
         static constexpr size_t MAX_INPUT_OFFSET =
                 MAX_GROUPS * MAX_GROUP_CHANNELS;
 
+        static constexpr double MIN_THRESHOLD_SCALING = 0;
+        static constexpr double DEFAULT_THRESHOLD_SCALING = 0;
+        static constexpr double MAX_THRESHOLD_SCALING = 6;
+
         static constexpr int DEFAULT_GENERATE_NOISE = 0;
 
         static constexpr const char *KEY_SNIPPET_GROUP_COUNT = "groups";
@@ -201,6 +206,7 @@ namespace speakerman {
         double subDelay = DEFAULT_SUB_DELAY;
         int generateNoise = DEFAULT_GENERATE_NOISE;
         long long timeStamp = -1;
+        double threshold_scaling = DEFAULT_THRESHOLD_SCALING;
         BandConfig band[MAX_CROSSOVERS + 1];
         GroupConfig group[MAX_GROUPS];
 
@@ -329,6 +335,8 @@ namespace speakerman {
 
     const char *webDirectory();
 
+    const char * getWatchDogScript();
+
     SpeakermanConfig readSpeakermanConfig();
 
     SpeakermanConfig
@@ -341,6 +349,26 @@ namespace speakerman {
 
     long long getConfigFileTimeStamp();
 
+    class StreamOwner
+    {
+        std::ifstream &stream_;
+        bool owns_;
+
+        void operator=(const StreamOwner &source)
+        {}
+
+        void operator=(StreamOwner &&source) noexcept
+        {}
+
+    public:
+        explicit StreamOwner(std::ifstream &owned);
+        StreamOwner(const StreamOwner &source);
+        StreamOwner(StreamOwner &&source) noexcept;
+        static StreamOwner open(const char *file_name);
+        bool is_open() const;
+        std::ifstream &stream() const { return stream_; };
+        ~StreamOwner();
+    };
 
 } /* End of namespace speakerman */
 

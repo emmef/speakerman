@@ -139,7 +139,9 @@ namespace speakerman {
         void close();
 
         ~web_server()
-        {}
+        {
+            close();
+        }
 
     protected:
         virtual bool content_stream_delete() const override

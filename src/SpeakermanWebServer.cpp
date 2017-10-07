@@ -20,8 +20,12 @@
  */
 
 #include <cstring>
+#include <iostream>
+#include <sys/types.h>
+#include <unistd.h>
 #include <speakerman/jack/SignalHandler.hpp>
 #include <speakerman/SpeakermanWebServer.hpp>
+#include <speakerman/utils/Config.hpp>
 
 namespace speakerman {
     bool web_server::open(const char *service, int timeoutSeconds, int backLog, int *errorCode)
@@ -45,38 +49,142 @@ namespace speakerman {
         }
     }
 
+    static void create_command_and_file(string &rangeFile, string &command_line)
+    {
+        char number[33];
+        snprintf(number, 33, "%x", rand());
+
+        rangeFile = "/tmp/";
+        rangeFile += number;
+        snprintf(number, 33, "%llx", (long long int)getpid());
+        rangeFile += number;
+        rangeFile += ".ranges";
+
+        command_line = getWatchDogScript();
+        command_line += " ";
+        command_line += rangeFile;
+    }
+
+    struct TemporaryFile
+    {
+        ifstream file_;
+        string name_;
+
+        TemporaryFile(const char *name) :
+                name_(name)
+        {
+            file_.open(name_);
+        }
+
+        bool is_open() const
+        {
+            return file_.is_open();
+        }
+
+        const char * name() const
+        {
+            return name_.c_str();
+        }
+
+        istream &stream()
+        {
+            return file_;
+        }
+
+        ~TemporaryFile()
+        {
+            if (file_.is_open()) {
+                file_.close();
+            }
+        }
+    };
+
+    static void approach_threshold_scaling(double &value, int new_value) {
+        if (new_value > value) {
+            value *= 1.02;
+            if (value > new_value) {
+                value = new_value;
+            }
+        }
+        else if (new_value < value) {
+            value /= 1.02;
+            if (value < new_value) {
+                value = new_value;
+            }
+        }
+    }
+
     void web_server::thread_function()
     {
         static std::chrono::milliseconds wait(1000);
         static std::chrono::milliseconds sleep(50);
-        int count = 0;
+        int count = 1;
 
         SpeakermanConfig configFileConfig = manager_.getConfig();
         DynamicProcessorLevels levels;
-        while (true) {
-            SignalHandler::check_raised();
+        string range_file;
+        string command_line;
+        int threshold_scaling_setting = 1;
+        double threshold_scaling = threshold_scaling_setting;
+        double new_threshold_scaling = threshold_scaling;
+
+        while (!SignalHandler::check_raised()) {
             count++;
-            if (count == 10) {
-                count = 0;
+            bool got_levels = false;
+            if ((count % 10) == 0) {
+                approach_threshold_scaling(new_threshold_scaling, threshold_scaling_setting);
+                bool read = false;
                 auto stamp = getConfigFileTimeStamp();
                 if (stamp != configFileConfig.timeStamp) {
                     cout << "read config!" << std::endl;
-                    bool read = false;
                     try {
-                        configFileConfig = readSpeakermanConfig(configFileConfig, false);
+                        configFileConfig = readSpeakermanConfig(
+                                configFileConfig, false);
                         read = true;
                     }
                     catch (const runtime_error &e) {
-                        cerr << "Error reading configuration: " << e.what() << endl;
+                        cerr << "Error reading configuration: " << e.what()
+                             << endl;
                         configFileConfig.timeStamp = stamp;
                     }
-                    if (read && manager_.applyConfigAndGetLevels(configFileConfig, &levels, wait)) {
-                        level_buffer.put(levels);
-                    }
+                }
+                if (new_threshold_scaling != threshold_scaling) {
+                    threshold_scaling = new_threshold_scaling;
+                    configFileConfig.threshold_scaling = threshold_scaling;
+                    read = true;
+                }
+                if (read && manager_.applyConfigAndGetLevels(configFileConfig, &levels, wait)) {
+                    level_buffer.put(levels);
+                    got_levels = true;
                 }
             }
-            else if (manager_.getLevels(&levels, wait)) {
+            if (!got_levels && manager_.getLevels(&levels, wait)) {
                 level_buffer.put(levels);
+            }
+            if (count == 100) {
+                count = 0;
+                create_command_and_file(range_file, command_line);
+                int old_setting = threshold_scaling_setting;
+                threshold_scaling_setting = 1;
+                if (system(command_line.c_str()) == 0) {
+                    TemporaryFile file{range_file.c_str()};
+                    if (file.is_open()) {
+                        istream &stream = file.stream();
+                        while (!stream.eof()) {
+                            char chr = stream.get();
+                            if (chr >= '1' && chr <= '5') {
+                                threshold_scaling_setting = chr - '0';
+                                break;
+                            }
+                            else if (!config::isWhiteSpace(chr)) {
+                                break;
+                            }
+                        }
+                    }
+                }
+                if (old_setting != threshold_scaling_setting) {
+                    cout << "Threshold scaling set from " << old_setting << " to " << threshold_scaling_setting << endl;
+                }
             }
             this_thread::sleep_for(sleep);
         }
@@ -234,6 +342,9 @@ namespace speakerman {
                 response().write_string("\", \r\n");
                 response().write_string("\t\"subGain\": \"");
                 response().write_string(ftostr(numbers, 30, levels.getGain(0)));
+                response().write_string("\", \r\n");
+                response().write_string("\t\"thresholdScale\": \"");
+                response().write_string(ftostr(numbers, 30, manager_.getConfig().threshold_scaling));
                 response().write_string("\", \r\n");
                 response().write_string("\t\"subAverageGain\": \"");
                 response().write_string(ftostr(numbers, 30, levels.getAverageGain(0)));
