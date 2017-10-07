@@ -72,8 +72,8 @@ then
     then
         if test $hoursminutes -lt "$default_end"
         then
+            echo "Working hours..."
             echo "$default_level" >"$OUTPUT_FILE"
-            return
         fi
     fi
 fi
