@@ -140,6 +140,7 @@ namespace speakerman {
 
         ~web_server()
         {
+            cout << "Closing web server" << endl;
             close();
         }
 

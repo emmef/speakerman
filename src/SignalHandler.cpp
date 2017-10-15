@@ -23,6 +23,7 @@
 #include <atomic>
 #include <csignal>
 #include <cstdio>
+#include <iostream>
 #include <tdap/MemoryFence.hpp>
 
 namespace speakerman {
@@ -32,6 +33,8 @@ namespace speakerman {
 
     static int signal_number = -1;
     static bool user_raised = false;
+    static atomic<long signed> guarded_threads(0);
+
 
     static void set_signal_internal(int signum, bool is_user_raised)
     {
@@ -151,5 +154,49 @@ namespace speakerman {
         return instance().int_check_raised();
     }
 
+
+    CountedThreadGuard::CountedThreadGuard()
+    {
+        guarded_threads.fetch_add(1);
+    }
+
+    CountedThreadGuard::~CountedThreadGuard()
+    {
+        guarded_threads.fetch_sub(1);
+    }
+
+    bool CountedThreadGuard::await_finished(std::chrono::milliseconds timeout)
+    {
+        auto count = timeout.count() / 100;
+        if (count < 10) {
+            count = 10;
+        }
+        std::chrono::milliseconds sleep_duration(count);
+        auto start = std::chrono::steady_clock::now();
+        auto now = start;
+        while ((now - start) < timeout) {
+            if (guarded_threads == 0) {
+                return true;
+            }
+            now = std::chrono::steady_clock::now();
+        }
+        return false;
+    }
+
+    CountedThreadGuard::Await::Await(long millis, const char *wait_message,
+          const char *fail_message) : timeout_(millis),
+                                      wait_message_(wait_message),
+                                      fail_message_(fail_message)
+    {}
+
+    CountedThreadGuard::Await::~Await()
+    {
+        if (wait_message_) {
+            std::cout << wait_message_ << endl;
+        }
+        if (!CountedThreadGuard::await_finished(timeout_) && fail_message_) {
+            std::cerr << fail_message_ << endl;
+        };
+    }
 
 } /* End of namespace speakerman */

@@ -73,14 +73,15 @@ Owner<AbstractSpeakerManager> manager;
 SpeakermanConfig configFileConfig;
 static volatile int userInput;
 
-
 static void webServer()
 {
+    CountedThreadGuard guard;
     web_server server(manager.get());
 
     try {
         server.open("8088", 60, 10, nullptr);
         server.work(nullptr);
+        cout << "Web server exit" << endl;
     }
     catch (const std::exception &e) {
         std::cerr << "Web server error: " << e.what() << std::endl;
@@ -96,10 +97,13 @@ int mainLoop(Owner<JackClient> &owner)
     std::thread webServerThread(webServer);
     webServerThread.detach();
 
-    const std::chrono::milliseconds duration(100);
+    const std::chrono::milliseconds thread_grace_timeout(5000);
+    const std::chrono::milliseconds sleep_time(100);
+    auto t = std::chrono::steady_clock::now();
     try {
         while (true) {
-            this_thread::sleep_for(duration);
+            this_thread::sleep_for(sleep_time);
+            t = std::chrono::steady_clock::now();
             SignalHandler::check_raised();
         }
         cout << "Bye!";
@@ -171,6 +175,7 @@ using namespace std;
 
 int main(int count, char *arguments[])
 {
+    CountedThreadGuard::Await await_thread_termination(5000, "Await thread shutdown...", "Not all threads shut down in time");
     {
         MemoryFence fence;
         configFileConfig = readSpeakermanConfig();

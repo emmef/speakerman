@@ -80,6 +80,7 @@ namespace speakerman {
 
     void JackClient::awaitShutdownCaller(JackClient *client)
     {
+        CountedThreadGuard guard;
         client->awaitShutDownAndClose();
     }
 

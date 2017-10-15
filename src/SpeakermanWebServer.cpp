@@ -42,6 +42,8 @@ namespace speakerman {
 
     void web_server::thread_static_function(web_server *server)
     {
+        CountedThreadGuard guard;
+
         try {
             server->thread_function();
         }

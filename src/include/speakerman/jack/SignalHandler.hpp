@@ -22,6 +22,8 @@
 #ifndef SMS_SPEAKERMAN_SIGNAL_HANDLER_GUARD_H_
 #define SMS_SPEAKERMAN_SIGNAL_HANDLER_GUARD_H_
 
+#include <chrono>
+
 namespace speakerman {
 
     class SignalHandler
@@ -73,7 +75,8 @@ namespace speakerman {
     };
 
     template<typename T>
-    void signal_aware_thread_method_data(void (thread_method)(T &data), T &data, const char *thread_description)
+    void signal_aware_thread_method_data(void (thread_method)(T &data), T &data,
+                                         const char *thread_description)
     {
         if (thread_method) {
             try {
@@ -84,6 +87,26 @@ namespace speakerman {
             }
         }
     }
+
+    struct CountedThreadGuard
+    {
+        CountedThreadGuard();
+
+        ~CountedThreadGuard();
+
+        static bool await_finished(std::chrono::milliseconds timeout);
+
+        class Await
+        {
+            std::chrono::milliseconds timeout_;
+            const char *wait_message_;
+            const char *fail_message_;
+        public:
+            Await(long millis, const char *wait_message,
+                  const char *fail_message);
+            ~Await();
+        };
+    };
 
 } /* End of namespace speakerman */
 

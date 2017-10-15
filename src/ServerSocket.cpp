@@ -148,6 +148,9 @@ namespace speakerman {
         if (setsockopt(sockfd_, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes)) == -1) {
             std::cerr << "Couldn't set socket to reuse address mode: " << strerror(errno) << std::endl;
         }
+        if (setsockopt(sockfd_, SOL_SOCKET, SO_REUSEPORT, &yes, sizeof(yes)) == -1) {
+            std::cerr << "Couldn't set socket to reuse address mode: " << strerror(errno) << std::endl;
+        }
         int error = 0;
         int sleep_time = 1;
         while (true) {
@@ -339,7 +342,7 @@ namespace speakerman {
         State state = state_;
         lock.unlock();
 
-        while (state == State::WORKING) {
+        while (state == State::WORKING && !SignalHandler::check_raised()) {
             SignalHandler::check_raised();
             sockaddr address;
             socklen_t length = sizeof(sockaddr_storage);
