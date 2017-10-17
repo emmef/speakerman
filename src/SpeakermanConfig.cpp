@@ -1074,9 +1074,8 @@ namespace speakerman {
         }
         else {
             unset_if_invalid(center, MIN_CENTER_FREQ, MAX_CENTER_FREQ);
-            box_if_out_of_range(gain, MIN_GAIN, MAX_GAIN, DEFAULT_GAIN);
-            box_if_out_of_range(bandwidth, MIN_BANDWIDTH, MAX_BANDWIDTH,
-                                DEFAULT_BANDWIDTH);
+            box_if_out_of_range(gain, DEFAULT_GAIN, MIN_GAIN, MAX_GAIN);
+            box_if_out_of_range(bandwidth, DEFAULT_BANDWIDTH, MIN_BANDWIDTH, MAX_BANDWIDTH);
         }
     }
 
