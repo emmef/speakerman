@@ -21,6 +21,7 @@
 
 #include <cstring>
 #include <iostream>
+#include <cstdio>
 #include <sys/types.h>
 #include <unistd.h>
 #include <speakerman/jack/SignalHandler.hpp>
@@ -98,6 +99,10 @@ namespace speakerman {
         {
             if (file_.is_open()) {
                 file_.close();
+            }
+            int result = std::remove(name_.c_str());
+            if (result != 0) {
+                cerr << "Could not remove " << name_ << ": " << strerror(errno) << endl;
             }
         }
     };
