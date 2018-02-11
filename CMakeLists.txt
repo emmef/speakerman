@@ -3,7 +3,7 @@ project(speakerman)
 
 set(CMAKE_CXX_STANDARD 14)
 
-include_directories(include src/include)
+include_directories(include src/include /usr/include)
 
 
 set(SOURCE_FILES

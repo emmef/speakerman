@@ -17,20 +17,6 @@ PARENT="$1"
 
 URL="https://emmef.org/limiter/limiter.txt"
 
-empty_output()
-{
-    if test -f "$OUTPUT_FILE"
-    then
-        rm "$OUTPUT_FILE"
-    fi
-}
-
-empty_output
-
-default_start="1100"
-default_end="2300"
-default_level="2"
-
 exceeded_allowed()
 {
 #   $1 is "now" timestamp
@@ -55,7 +41,7 @@ exceeded_allowed()
             if test "$now" -ge "$startstamp" && test "$now" -le "$endstamp"
             then
                 echo "$level" >"$OUTPUT_FILE"
-                return
+                exit
             fi
         fi
     done
@@ -63,16 +49,7 @@ exceeded_allowed()
 
 now=`date +'%Y%m%d%H%M'`
 curl -s "$URL" | exceeded_allowed "$now"
-#cat "/tmp/ranges.txt" | exceeded_allowed "$now"
 if ! test -f "$OUTPUT_FILE"
 then
-    yearmonthday=`echo "$now" | sed -r 's/^([0-9]{8})([0-9]{4})/\1/'`
-    hoursminutes=`echo "$now" | sed -r 's/^([0-9]{8})([0-9]{4})/\2/'`
-    if test $hoursminutes -gt "$default_start"
-    then
-        if test $hoursminutes -lt "$default_end"
-        then
-            echo "$default_level" >"$OUTPUT_FILE"
-        fi
-    fi
+    echo "1" >"$OUTPUT_FILE"
 fi

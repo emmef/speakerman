@@ -120,7 +120,7 @@ namespace speakerman {
 
         static constexpr double MIN_MAXIMUM_WINDOW_SECONDS = 0.4;
         static constexpr double DEFAULT_MAXIMUM_WINDOW_SECONDS = 0.4;
-        static constexpr double MAX_MAXIMUM_WINDOW_SECONDS = 4.0;
+        static constexpr double MAX_MAXIMUM_WINDOW_SECONDS = 8.0;
         static constexpr const char *KEY_SNIPPET_MAXIMUM_WINDOW_SECONDS = "maximum-window-seconds";
 
         static constexpr size_t MIN_PERCEPTIVE_TO_PEAK_STEPS = 1;
