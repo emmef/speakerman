@@ -62,25 +62,35 @@ namespace speakerman {
         const Coefficients &biquad2() const
         { return biquad2_; }
 
-        static EqualizerFilterData<T> createConfigured(const GroupConfig &config, double sampleRate)
+        static EqualizerFilterData<T> createConfigured(size_t eqs, const EqualizerConfig *eq, double sampleRate)
         {
             EqualizerFilterData<T> result;
-            result.configure(config, sampleRate);
+            result.configure(eqs, eq, sampleRate);
             return result;
         }
 
-        void configure(const GroupConfig &config, double sampleRate)
+        void configure(size_t eqs, const EqualizerConfig * const eq, double sampleRate)
         {
-            count_ = config.eqs;
-            if (config.eqs > 0) {
+            count_ = eqs;
+            if (eqs > 0) {
                 auto w1 = biquad1_.wrap();
-                BiQuad::setParametric(w1, sampleRate, config.eq[0].center, config.eq[0].gain, config.eq[0].bandwidth);
-                if (config.eqs > 1) {
+                BiQuad::setParametric(w1, sampleRate, eq[0].center, eq[0].gain, eq[0].bandwidth);
+                if (eqs > 1) {
                     auto w2 = biquad2_.wrap();
-                    BiQuad::setParametric(w2, sampleRate, config.eq[1].center, config.eq[1].gain,
-                                          config.eq[1].bandwidth);
+                    BiQuad::setParametric(w2, sampleRate, eq[1].center, eq[1].gain,
+                                          eq[1].bandwidth);
                 }
             }
+        }
+
+        static EqualizerFilterData<T> createConfigured(const GroupConfig &config, double sampleRate)
+        {
+            return createConfigured(config.eqs, config.eq, sampleRate);
+        }
+
+        static EqualizerFilterData<T> createConfigured(const SpeakermanConfig &config, double sampleRate)
+        {
+            return createConfigured(config.eqs, config.eq, sampleRate);
         }
 
         void reset()
@@ -203,6 +213,7 @@ namespace speakerman {
         size_t subDelay_;
         T noiseScale_;
         IntegrationCoefficients <T> controlSpeed_;
+        EqualizerFilterData<T> filterConfig_;
 
         void compensateDelays()
         {
@@ -248,6 +259,12 @@ namespace speakerman {
         static constexpr size_t bands()
         { return BANDS; }
 
+        const EqualizerFilterData<T> &filterConfig() const
+        { return filterConfig_; }
+
+        void setFilterConfig(const EqualizerFilterData<T> &source)
+        { filterConfig_ = source; }
+
         void reset()
         {
             subLimiterThreshold_ = 1;
@@ -260,6 +277,7 @@ namespace speakerman {
                 groupConfig_[group].reset();
             }
             controlSpeed_.setCharacteristicSamples(5000);
+            filterConfig_.reset();
         }
 
         void init(const SpeakermanRuntimeData<T, GROUPS, BANDS> &source)
@@ -331,6 +349,7 @@ namespace speakerman {
                               Values::force_between(config.subDelay, SpeakermanConfig::MIN_SUB_DELAY,
                                                     SpeakermanConfig::MAX_SUB_DELAY);
             controlSpeed_.setCharacteristicSamples(0.25 * sampleRate);
+            setFilterConfig(EqualizerFilterData<T>::createConfigured(config, sampleRate));
 
             compensateDelays();
         }

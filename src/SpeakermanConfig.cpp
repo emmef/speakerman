@@ -732,7 +732,7 @@ namespace speakerman {
             }
 
             for (size_t band_idx = 0;
-                 band_idx <= SpeakermanConfig::MAX_CROSSOVERS; band_idx++) {
+                band_idx <= SpeakermanConfig::MAX_CROSSOVERS; band_idx++) {
                 string bandKey = BandConfig::KEY_SNIPPET_BAND;
                 bandKey += "/";
                 bandKey += (char) (band_idx + '0');
@@ -750,6 +750,25 @@ namespace speakerman {
                 key = bandKey;
                 key += BandConfig::KEY_SNIPPET_SMOOTHING_TO_WINDOW_RATIO;
                 add_reader(key, false, band[band_idx].smoothing_to_window_ratio);
+            }
+            add_reader(GroupConfig::KEY_SNIPPET_EQ_COUNT, true, eqs);
+            string eqBase = "";
+            eqBase += EqualizerConfig::KEY_SNIPPET_EQUALIZER;
+            eqBase += "/";
+            for (size_t eq_idx = 0; eq_idx < GroupConfig::MAX_EQS; eq_idx++) {
+                string eqKey = eqBase;
+                eqKey += (char) ('0' + eq_idx);
+                eqKey += "/";
+
+                key = eqKey;
+                key += EqualizerConfig::KEY_SNIPPET_CENTER;
+                add_reader(key, true, eq[eq_idx].center);
+                key = eqKey;
+                key += EqualizerConfig::KEY_SNIPPET_GAIN;
+                add_reader(key, true, eq[eq_idx].gain);
+                key = eqKey;
+                key += EqualizerConfig::KEY_SNIPPET_BANDWIDTH;
+                add_reader(key, true, eq[eq_idx].bandwidth);
             }
         }
 
@@ -1120,6 +1139,9 @@ namespace speakerman {
         for (size_t i = 0; i <= MAX_CROSSOVERS; i++) {
             result.band[i] = BandConfig::defaultConfig();
         }
+        for (size_t i = 0; i < MAX_EQS; i++) {
+            result.eq[i] = EqualizerConfig::defaultConfig();
+        }
         return result;
     }
 
@@ -1132,6 +1154,9 @@ namespace speakerman {
         for (size_t i = 0; i <= MAX_CROSSOVERS; i++) {
             result.band[i] = BandConfig::unsetConfig();
         }
+        for (size_t i = 0; i < MAX_EQS; i++) {
+            result.eq[i] = EqualizerConfig::unsetConfig();
+        }
         unset_config_value(result.groups);
         unset_config_value(result.groupChannels);
         unset_config_value(result.subOutput);
@@ -1140,6 +1165,7 @@ namespace speakerman {
         unset_config_value(result.relativeSubThreshold);
         unset_config_value(result.subDelay);
         unset_config_value(result.generateNoise);
+        unset_config_value(result.eqs);
         result.timeStamp = -1;
 
         return result;
@@ -1175,6 +1201,21 @@ namespace speakerman {
         }
         for (; band_id <= MAX_CROSSOVERS; band_id++) {
             band[band_id] = BandConfig::unsetConfig();
+        }
+        size_t eq_idx;
+        if (set_if_unset_or_invalid_config_value(eqs, config_if_unset.eqs,
+                                                 MIN_EQS, MAX_EQS)) {
+            for (eq_idx = 0; eq_idx < eqs; eq_idx++) {
+                eq[eq_idx] = config_if_unset.eq[eq_idx];
+            }
+        }
+        else {
+            for (eq_idx = 0; eq_idx < eqs; eq_idx++) {
+                eq[eq_idx].set_if_unset(config_if_unset.eq[eq_idx]);
+            }
+        }
+        for (; eq_idx < MAX_EQS; eq_idx++) {
+            eq[eq_idx] = EqualizerConfig::unsetConfig();
         }
 
         set_if_unset_or_invalid_config_value(groupChannels, config_if_unset.groupChannels, MIN_GROUP_CHANNELS, MAX_GROUP_CHANNELS);

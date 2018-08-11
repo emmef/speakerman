@@ -175,11 +175,10 @@ using namespace std;
 
 int main(int count, char *arguments[])
 {
+    configFileConfig = readSpeakermanConfig();
+
     CountedThreadGuard::Await await_thread_termination(5000, "Await thread shutdown...", "Not all threads shut down in time");
-    {
-        MemoryFence fence;
-        configFileConfig = readSpeakermanConfig();
-    }
+    MemoryFence::release();
 
     cout << "Executing " << arguments[0] << endl;
 

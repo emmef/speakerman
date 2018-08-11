@@ -159,7 +159,7 @@ namespace speakerman {
 
         RmsDelay rmsDelay;
         GroupDelay groupDelay;
-        EqualizerFilter<double, CHANNELS_PER_GROUP> filters_[GROUPS];
+        EqualizerFilter<double, CHANNELS_PER_GROUP> filters_[GROUPS+1];
 
         Configurable runtime;
         FixedSizeArray<IntegratorFilter<T>, LIMITERS> signalIntegrator;
@@ -287,7 +287,7 @@ namespace speakerman {
                     groupDelay.setDelay(i, delaySamples);
                 }
             }
-
+            filters_[GROUPS].configure(data.filterConfig());
         }
 
         void process(
@@ -370,13 +370,14 @@ namespace speakerman {
         void processSubRms()
         {
             T x = processInput[0];
-            processInput[0] = rmsDelay.setAndGet(0, x);
+            T sub = rmsDelay.setAndGet(0, x);
             x *= runtime.data().subRmsScale();
 //            x = aCurve.filter(0, x);
             T detect = rmsDetector[0].add_square_get_detection(x * x, 1.0);
             T gain = 1.0 / detect;
             levels.addValues(0, gain, detect);
-            processInput[0] *= gain;
+            sub *= gain;
+            processInput[0] = filters_[GROUPS].filter()->filter(0, sub);
         }
 
         void processChannelsRms()

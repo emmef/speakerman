@@ -35,7 +35,7 @@ namespace speakerman {
 
     struct EqualizerConfig
     {
-        static constexpr double MIN_CENTER_FREQ = 40;
+        static constexpr double MIN_CENTER_FREQ = 20;
         static constexpr double DEFAULT_CENTER_FREQ = 1000;
         static constexpr double MAX_CENTER_FREQ = 22000;
 
@@ -152,6 +152,11 @@ namespace speakerman {
 
     struct SpeakermanConfig
     {
+        static constexpr size_t MIN_EQS = 0;
+        static constexpr size_t DEFAULT_EQS = 0;
+        static constexpr size_t MAX_EQS = 2;
+        static constexpr const char *KEY_SNIPPET_EQ_COUNT = "equalizers";
+
         static constexpr size_t MIN_GROUPS = 1;
         static constexpr size_t DEFAULT_GROUPS = 1;
         static constexpr size_t MAX_GROUPS = MAX_SPEAKERMAN_GROUPS;
@@ -209,6 +214,8 @@ namespace speakerman {
         double threshold_scaling = DEFAULT_THRESHOLD_SCALING;
         BandConfig band[MAX_CROSSOVERS + 1];
         GroupConfig group[MAX_GROUPS];
+        EqualizerConfig eq[MAX_EQS];
+        size_t eqs = DEFAULT_EQS;
 
         static const SpeakermanConfig defaultConfig();
 
