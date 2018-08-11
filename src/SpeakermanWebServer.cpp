@@ -107,15 +107,24 @@ namespace speakerman {
         }
     };
 
+    static constexpr int SLEEP_MILLIS = 50;
+    static constexpr int CONFIG_NUMBER_OF_SLEEPS = 10;
+    static constexpr int CONFIG_MILLIS = SLEEP_MILLIS * CONFIG_NUMBER_OF_SLEEPS;
+    static constexpr int WAIT_MILLIS = 1000;
+    static constexpr int SECONDS_PER_6_DB_UP = 30;
+    static constexpr int SECONDS_PER_6_DB_DOWN = 180;
+
     static void approach_threshold_scaling(double &value, int new_value) {
+        static constexpr double FACTOR_UP = std::pow(2.0, 0.001 * CONFIG_MILLIS / SECONDS_PER_6_DB_UP);
+        static constexpr double FACTOR_DOWN = std::pow(0.5, 0.001 * CONFIG_MILLIS / SECONDS_PER_6_DB_DOWN);
         if (new_value > value) {
-            value *= 1.02;
+            value *= FACTOR_UP;
             if (value > new_value) {
                 value = new_value;
             }
         }
         else if (new_value < value) {
-            value /= 1.02;
+            value *= FACTOR_DOWN;
             if (value < new_value) {
                 value = new_value;
             }
@@ -124,8 +133,8 @@ namespace speakerman {
 
     void web_server::thread_function()
     {
-        static std::chrono::milliseconds wait(1000);
-        static std::chrono::milliseconds sleep(50);
+        static std::chrono::milliseconds wait(WAIT_MILLIS);
+        static std::chrono::milliseconds sleep(SLEEP_MILLIS);
         int count = 1;
 
         SpeakermanConfig configFileConfig;
@@ -143,7 +152,7 @@ namespace speakerman {
         while (!SignalHandler::check_raised()) {
             count++;
             bool got_levels = false;
-            if ((count % 10) == 0) {
+            if ((count % CONFIG_NUMBER_OF_SLEEPS) == 0) {
                 approach_threshold_scaling(new_threshold_scaling, threshold_scaling_setting);
                 bool read = false;
                 auto stamp = getConfigFileTimeStamp();
