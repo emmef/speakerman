@@ -30,22 +30,21 @@ exceeded_allowed()
     local endstamp
     local level
     local line
-    local expr_nodashes='([0-9]{12})( *- *)([0-9]{12})( *: *)(1|2|3|4|5|6)'
-    local expr_dashes='([0-9]{4}-[0-9]{2}-[0-9]{2}(T|_| )[0-9]{2}:[0-9]{2})( *- *)([0-9]{4}-[0-9]{2}-[0-9]{2}(T|_| )[0-9]{2}:[0-9]{2})( *: *)(1|2|3|4|5|6)'
+    local expr_nodashes='^([0-9]{12})( *- *)([0-9]{12})( *: *)(1|2|3|4|5|6)(| .*)$'
+    local expr_dashes='^([0-9]{4}-[0-9]{2}-[0-9]{2}(T|_| )[0-9]{2}:[0-9]{2})( *- *)([0-9]{4}-[0-9]{2}-[0-9]{2}(T|_| )[0-9]{2}:[0-9]{2})( *: *)(1|2|3|4|5|6)(| .*)$'
     while read line
     do
-        if echo "$line" | egrep "^$expr_nodashes\$" >/dev/null
+        line=`echo "$line" | sed -r 's/^\s+(.*)$/\1/' | sed -r 's/^([^#]*)(#.*)*$/\1/'`
+        if echo "$line" | egrep "$expr_nodashes" >/dev/null
         then
-            startstamp=`echo "$line" | sed -r "s/^$expr_nodashes/\1/"`
-            endstamp=`echo "$line" | sed -r "s/^$expr_nodashes/\3/"`
-            level=`echo "$line" | sed -r "s/^$expr_nodashes/\5/"`
-            echo "START $startstamp END $endstamp LEVEL $level"
-        elif echo "$line" | egrep "^$expr_dashes\$" >/dev/null
+            startstamp=`echo "$line" | sed -r "s/$expr_nodashes/\1/"`
+            endstamp=`echo "$line" | sed -r "s/$expr_nodashes/\3/"`
+            level=`echo "$line" | sed -r "s/$expr_nodashes/\5/"`
+        elif echo "$line" | egrep "$expr_dashes" >/dev/null
         then
-            startstamp=`echo "$line" | sed -r "s/^$expr_dashes/\1/" | tr -d 'T: \-_'`
-            endstamp=`echo "$line" | sed -r "s/^$expr_dashes/\4/" | tr -d 'T: \-_'`
-            level=`echo "$line" | sed -r "s/^$expr_dashes/\7/"`
-            echo "START $startstamp END $endstamp LEVEL $level"
+            startstamp=`echo "$line" | sed -r "s/$expr_dashes/\1/" | tr -d 'T: \-_'`
+            endstamp=`echo "$line" | sed -r "s/$expr_dashes/\4/" | tr -d 'T: \-_'`
+            level=`echo "$line" | sed -r "s/$expr_dashes/\7/"`
         else
             startstamp=
             endstamp=
