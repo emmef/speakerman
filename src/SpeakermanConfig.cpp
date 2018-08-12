@@ -75,6 +75,26 @@ namespace speakerman {
         }
     };
 
+    template<>
+    struct UnsetValue<char[GroupConfig::NAME_LENGTH+1]>
+    {
+        static constexpr char * value = {0};
+
+        static bool is(const char* test)
+        {
+            int characters = -1;
+            for (size_t i = 0; i < GroupConfig::NAME_LENGTH; i++) {
+                if (test[i] == '\0') {
+                    break;
+                }
+                if (test[i] > ' ') {
+                    return false;
+                }
+            }
+            return true;
+        }
+    };
+
 
     template<>
     struct UnsetValue<double>
@@ -274,12 +294,36 @@ namespace speakerman {
     };
 
     template<typename T>
+    struct ValueParser_<T, 4>
+    {
+        static bool parse(T &field, const char *value, char *&end)
+        {
+            const char * src = value;
+            char * dst = field;
+            while (src != 0 && (dst - field) < GroupConfig::NAME_LENGTH) {
+                char c = *src++;
+                if (c == '\t' || c == ' ') {
+                    if (dst > field) {
+                        *dst++ = ' ';
+                    }
+                }
+                else if (config::isAlphaNum(c) || config::isQuote(c) || strchr(".!|,;:/[]{}*#@~%^()-_+=\\", c) != nullptr) {
+                    *dst++ = c;
+                }
+            }
+            *dst++ = '\0';
+            return true;
+        }
+    };
+
+    template<typename T>
     static constexpr int get_value_parser_type()
     {
         return
                 std::is_floating_point<T>::value ? 3 :
                 std::is_same<int, T>::value ? 2 :
-                std::is_integral<T>::value ? 1 : 4;
+                std::is_integral<T>::value ? 1 :
+                std::is_same<char[GroupConfig::NAME_LENGTH+1], T>::value ? 4 : 5;
 
     }
 
@@ -710,6 +754,9 @@ namespace speakerman {
                 key = groupKey;
                 key += GroupConfig::KEY_SNIPPET_MONO;
                 add_reader(key, true, group[group_idx].mono);
+                key = groupKey;
+                key += GroupConfig::KEY_SNIPPET_NAME;
+                add_reader(key, true, group[group_idx].name);
 
                 string eqBase = groupKey;
                 eqBase += EqualizerConfig::KEY_SNIPPET_EQUALIZER;
@@ -1048,6 +1095,9 @@ namespace speakerman {
                             MAX_DELAY);
         box_if_out_of_range(use_sub, config_if_unset.use_sub, 0, 1);
         box_if_out_of_range(mono, config_if_unset.mono, 0, 1);
+        if (UnsetValue<char[NAME_LENGTH + 1]>::is(name)) {
+            name[0] = 0;
+        }
     }
 
     const GroupConfig GroupConfig::defaultConfig(size_t group_id)
@@ -1056,6 +1106,7 @@ namespace speakerman {
         for (size_t i = 0; i < MAX_SPEAKERMAN_GROUPS; i++) {
             result.volume[i] == i == group_id ? DEFAULT_VOLUME : 0;
         }
+        snprintf(result.name, NAME_LENGTH, "Group %zd", group_id + 1);
         return result;
     }
 
@@ -1073,6 +1124,7 @@ namespace speakerman {
         unset_config_value(result.delay);
         unset_config_value(result.use_sub);
         unset_config_value(result.mono);
+        result.name[0] = 0;
         return result;
     }
 

@@ -94,6 +94,8 @@ namespace speakerman {
         static constexpr const char *KEY_SNIPPET_MONO = "mono";
 
         static constexpr const char *KEY_SNIPPET_GROUP = "group";
+        static constexpr const char *KEY_SNIPPET_NAME = "name";
+        static constexpr size_t NAME_LENGTH = 16;
 
         double threshold = DEFAULT_THRESHOLD;
         double volume[MAX_SPEAKERMAN_GROUPS];
@@ -102,6 +104,7 @@ namespace speakerman {
         int mono = DEFAULT_MONO;
         EqualizerConfig eq[MAX_EQS];
         size_t eqs = DEFAULT_EQS;
+        char name[NAME_LENGTH + 1];
 
         static const GroupConfig defaultConfig(size_t group_id);
 

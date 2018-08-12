@@ -128,15 +128,20 @@ function integrate(element, val, perc) {
     return val;
 }
 
-function ensureMeterGroup(groupElementName) {
-    var group = document.getElementById(groupElementName);
+function ensureMeterGroup(groupElementNumber) {
+    var elementName = typeof(groupElementNumber) == 'string' ? groupElementNumber : "meter-group" + groupElementNumber;
+    var group = document.getElementById(elementName);
     if (!group) {
+        console.log("No group " + "meter-group" + groupElementNumber + " found");
         return null;
     }
     var elem = group.getElementsByClassName("meter-level-pixel");
+    var titleElementList = group.getElementsByClassName("meter-title");
     if (elem && elem.length && elem.length > 0) {
         return {
             mainElement: group,
+            titleElement:titleElementList && titleElementList.length > 0 ? titleElementList[0] : null,
+            groupNumber: groupElementNumber,
             elements: elem,
             integratedAvg: 0,
             integratedPeak: 0,
@@ -164,7 +169,7 @@ function ensureMeterGroup(groupElementName) {
 
                 return Math.round(percentage * this.elements.length);
             },
-            setValues: function (level, levelAvg, gain, gainAvg, sub) {
+            setValues: function (level, levelAvg, gain, gainAvg, sub, name) {
                 this.integratedAvg = 0.2 * Math.sqrt(gainAvg) + 0.8 * this.integratedAvg;
                 this.integratedPeak = 0.25 * Math.sqrt(gain) + 0.75 * this.integratedPeak;
                 var gainA = Math.round(this.elements.length * this.integratedAvg);
@@ -182,6 +187,9 @@ function ensureMeterGroup(groupElementName) {
                         g = 128;
                     }
                     this.elements[i].style.backgroundColor = "rgb(" + r + "," + g + "," + b + ")";
+                }
+                if (!sub && this.titleElement) {
+                   this.titleElement.innerText = name ? name : "Group " + (1 + this.groupNumber);
                 }
             },
             hide: function () {
@@ -203,7 +211,7 @@ function ensureMeterGroups() {
     }
     var groups = [];
     for (i = 0; i < 4; i++) {
-        var groupMeters = ensureMeterGroup("meter-group" + i);
+        var groupMeters = ensureMeterGroup(i);
         if (groupMeters) {
             groups[i] = groupMeters;
         }
@@ -226,7 +234,7 @@ function setMeters(levels) {
     var i = 0;
     for (i = 0; i < groupCount; i++) {
         var grp = levels.group[i];
-        meterGroups.groups[i].setValues(grp.level, grp.averageLevel, grp.gain, grp.averageGain);
+        meterGroups.groups[i].setValues(grp.level, grp.averageLevel, grp.gain, grp.averageGain, false, grp.group_name);
     }
     for (; i < meterGroups.groups.length; i++) {
         meterGroups.groups[i].hide();
