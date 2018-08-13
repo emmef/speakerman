@@ -220,6 +220,10 @@ function ensureMeterGroups() {
     metergroups = {};
     metergroups.subMeters = subMeters;
     metergroups.groups = groups;
+    metergroups.mixMode = "DEF";
+    metergroups.mixModeDef = document.getElementById("mix-mode-def");
+    metergroups.mixModeMix = document.getElementById("mix-mode-mix");
+    metergroups.mixModeSep = document.getElementById("mix-mode-sep");
 
     return metergroups;
 }
@@ -249,6 +253,45 @@ function setMeters(levels) {
             level = "0";
         }
         element.innerHTML = level + " dB";
+    }
+    if (levels.mixMode) {
+        var selected = null;
+        switch (levels.mixMode) {
+            case "mix" :
+                selected = meterGroups.mixModeMix;
+                break;
+            case "sep" :
+                selected = meterGroups.mixModeSep;
+                break;
+            default:
+                selected = meterGroups.mixModeDef;
+        }
+        var modeElements = [meterGroups.mixModeMix, meterGroups.mixModeSep, meterGroups.mixModeDef];
+        for (var i = 0; i < modeElements.length; i++) {
+            modeElements[i].setAttribute("class", modeElements[i] == selected ? "mix-mode-message-enabled" : "mix-mode-message-disabled");
+        }
+    }
+}
+
+function setMixMode(newMode) {
+    var meterGroups = ensureMeterGroups()
+    var url = null;
+    switch (newMode) {
+        case "sep" :
+            url = "/mix-mode-separate";
+            break;
+        case "mix":
+            url = "/mix-mode-mixed";
+            break;
+        default:
+            url = "/mix-mode-default"
+    }
+    var request = createCORSRequest('PUT', url);
+    try {
+        request.send();
+    }
+    catch (exception) {
+        console.log("Set mix mode request failed")
     }
 }
 
