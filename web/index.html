@@ -7,7 +7,9 @@
 </head>
 <body onload="sendLevelRequest()">
     <div id="new_group" class="background">
-        <div id="meter-messages"><span class="threshold-message">Level-up:&nbsp;</span><span id="threshold-message" class="threshold-message">Level up: </span><span id="connection-message" style="display:none">&nbsp;&nbsp;Connection problem</span></div>
+        <div id="meter-messages">Mode:
+            <span class="threshold-message">Level-up:&nbsp;</span><span id="threshold-message" class="threshold-message">Level up: </span><span id="connection-message" style="display:none">&nbsp;&nbsp;Connection problem</span>
+        </div>
         <div id="meter-sub" class="meter-group">
             <p class="meter-title">SUB</p>
             <div class="meter-levels">
@@ -127,35 +129,42 @@
                 <div class="meter-level-pixel">&nbsp;</div>
                 <div class="meter-level-pixel">&nbsp;</div>
             </div>
-            <div id="meter-group3" class="meter-group">
-                <p class="meter-title">GROUP 4</p>
-                <div class="meter-levels">
-                    <div class="meter-level-pixel">&nbsp;</div>
-                    <div class="meter-level-pixel">&nbsp;</div>
-                    <div class="meter-level-pixel">&nbsp;</div>
-                    <div class="meter-level-pixel">&nbsp;</div>
-                    <div class="meter-level-pixel">&nbsp;</div>
-                    <div class="meter-level-pixel">&nbsp;</div>
-                    <div class="meter-level-pixel">&nbsp;</div>
-                    <div class="meter-level-pixel">&nbsp;</div>
-                    <div class="meter-level-pixel">&nbsp;</div>
-                    <div class="meter-level-pixel">&nbsp;</div>
-                    <div class="meter-level-pixel">&nbsp;</div>
-                    <div class="meter-level-pixel">&nbsp;</div>
-                    <div class="meter-level-pixel">&nbsp;</div>
-                    <div class="meter-level-pixel">&nbsp;</div>
-                    <div class="meter-level-pixel">&nbsp;</div>
-                    <div class="meter-level-pixel">&nbsp;</div>
-                    <div class="meter-level-pixel">&nbsp;</div>
-                    <div class="meter-level-pixel">&nbsp;</div>
-                    <div class="meter-level-pixel">&nbsp;</div>
-                    <div class="meter-level-pixel">&nbsp;</div>
-                    <div class="meter-level-pixel">&nbsp;</div>
-                    <div class="meter-level-pixel">&nbsp;</div>
-                    <div class="meter-level-pixel">&nbsp;</div>
-                    <div class="meter-level-pixel">&nbsp;</div>
-                    <div class="meter-level-pixel">&nbsp;</div>
-                </div>
+        </div>
+        <div id="meter-group3" class="meter-group">
+            <p class="meter-title">GROUP 4</p>
+            <div class="meter-levels">
+                <div class="meter-level-pixel">&nbsp;</div>
+                <div class="meter-level-pixel">&nbsp;</div>
+                <div class="meter-level-pixel">&nbsp;</div>
+                <div class="meter-level-pixel">&nbsp;</div>
+                <div class="meter-level-pixel">&nbsp;</div>
+                <div class="meter-level-pixel">&nbsp;</div>
+                <div class="meter-level-pixel">&nbsp;</div>
+                <div class="meter-level-pixel">&nbsp;</div>
+                <div class="meter-level-pixel">&nbsp;</div>
+                <div class="meter-level-pixel">&nbsp;</div>
+                <div class="meter-level-pixel">&nbsp;</div>
+                <div class="meter-level-pixel">&nbsp;</div>
+                <div class="meter-level-pixel">&nbsp;</div>
+                <div class="meter-level-pixel">&nbsp;</div>
+                <div class="meter-level-pixel">&nbsp;</div>
+                <div class="meter-level-pixel">&nbsp;</div>
+                <div class="meter-level-pixel">&nbsp;</div>
+                <div class="meter-level-pixel">&nbsp;</div>
+                <div class="meter-level-pixel">&nbsp;</div>
+                <div class="meter-level-pixel">&nbsp;</div>
+                <div class="meter-level-pixel">&nbsp;</div>
+                <div class="meter-level-pixel">&nbsp;</div>
+                <div class="meter-level-pixel">&nbsp;</div>
+                <div class="meter-level-pixel">&nbsp;</div>
+                <div class="meter-level-pixel">&nbsp;</div>
+            </div>
+        </div>
+        <div id="mix-mode-messages">Group mix-mode:
+            <span id="mix-mode-default" class="mix-mode-message-disabled" onclick="setMixMode('default')" title="Group mix mode: groups follow speaker manager configuration.">DEFAULT</span>
+            <span id="mix-mode-own" class="mix-mode-message-disabled" onclick="setMixMode('own')" title="Group mix mode: each output group only has its corresponding input group in the mix.">OWN</span>
+            <span id="mix-mode-all" class="mix-mode-message-disabled" onclick="setMixMode('all')" title="Group mix mode: all output groups have all input groups in the mix; hence all groups have same mix.">ALL</span>
+            <span id="mix-mode-first" class="mix-mode-message-disabled" onclick="setMixMode('first')" title="Group mix mode: each output group only has first input group in the mix; hence all groups have same mix.">FIRST</span>
         </div>
     </div>
 </body>

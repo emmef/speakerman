@@ -232,6 +232,8 @@ namespace speakerman {
         const SpeakermanConfig with_groups_mixed() const;
 
         const SpeakermanConfig with_groups_separated() const;
+
+        const SpeakermanConfig with_groups_first() const;
     };
 
     using tdap::IndexPolicy;
@@ -331,7 +333,7 @@ namespace speakerman {
     class SpeakerManagerControl
     {
     public:
-        enum class MixMode { AS_CONFIGURED, MIXED, SEPARATE };
+        enum class MixMode { AS_CONFIGURED, ALL, OWN, FIRST };
 
         virtual const SpeakermanConfig &getConfig() const = 0;
 

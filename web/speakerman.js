@@ -220,6 +220,11 @@ function ensureMeterGroups() {
     metergroups = {};
     metergroups.subMeters = subMeters;
     metergroups.groups = groups;
+    metergroups.mixMode = "DEF";
+    metergroups.mixModeDefault = document.getElementById("mix-mode-default");
+    metergroups.mixModeAll = document.getElementById("mix-mode-all");
+    metergroups.mixModeOwn = document.getElementById("mix-mode-own");
+    metergroups.mixModeFirst = document.getElementById("mix-mode-first");
 
     return metergroups;
 }
@@ -249,6 +254,51 @@ function setMeters(levels) {
             level = "0";
         }
         element.innerHTML = level + " dB";
+    }
+    if (levels.mixMode) {
+        var selected = null;
+        switch (levels.mixMode) {
+            case "all" :
+                selected = meterGroups.mixModeAll;
+                break;
+            case "own" :
+                selected = meterGroups.mixModeOwn;
+                break;
+            case "first" :
+                selected = meterGroups.mixModeFirst;
+                break;
+            default:
+                selected = meterGroups.mixModeDefault;
+        }
+        var modeElements = [meterGroups.mixModeAll, meterGroups.mixModeOwn, meterGroups.mixModeDefault, meterGroups.mixModeFirst];
+        for (var i = 0; i < modeElements.length; i++) {
+            modeElements[i].setAttribute("class", modeElements[i] == selected ? "mix-mode-message-enabled" : "mix-mode-message-disabled");
+        }
+    }
+}
+
+function setMixMode(newMode) {
+    var meterGroups = ensureMeterGroups()
+    var url = null;
+    switch (newMode) {
+        case "own" :
+            url = "/mix-mode-own";
+            break;
+        case "all":
+            url = "/mix-mode-all";
+            break;
+        case "first":
+            url = "/mix-mode-first";
+            break;
+        default:
+            url = "/mix-mode-default"
+    }
+    var request = createCORSRequest('PUT', url);
+    try {
+        request.send();
+    }
+    catch (exception) {
+        console.log("Set mix mode request failed")
     }
 }
 

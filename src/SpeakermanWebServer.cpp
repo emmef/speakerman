@@ -190,14 +190,18 @@ namespace speakerman {
                 if (read || mode_change) {
                     SpeakermanConfig usedConfig;
                     switch (current_mix_mode) {
-                        case SpeakerManagerControl::MixMode::SEPARATE:
+                        case SpeakerManagerControl::MixMode::OWN:
                             usedConfig = configFileConfig.with_groups_separated();
                             cout << "Mix mode set to SEPARATED" << std::endl;
 
                             break;
-                        case SpeakerManagerControl::MixMode::MIXED:
+                        case SpeakerManagerControl::MixMode::ALL:
                             usedConfig = configFileConfig.with_groups_mixed();
-                            cout << "Mix mode set to MIXED" << std::endl;
+                            cout << "Mix mode set to ALL" << std::endl;
+                            break;
+                        case SpeakerManagerControl::MixMode::FIRST:
+                            usedConfig = configFileConfig.with_groups_first();
+                            cout << "Mix mode set to FIRST" << std::endl;
                             break;
                         default:
                             usedConfig = configFileConfig;
@@ -442,11 +446,14 @@ namespace speakerman {
                     {
                         MemoryFence fence;
                         switch (mix_mode) {
-                            case SpeakerManagerControl::MixMode::MIXED:
-                                response().write_string("mix");
+                            case SpeakerManagerControl::MixMode::ALL:
+                                response().write_string("all");
                                 break;
-                            case SpeakerManagerControl::MixMode::SEPARATE:
-                                response().write_string("sep");
+                            case SpeakerManagerControl::MixMode::OWN:
+                                response().write_string("own");
+                                break;
+                            case SpeakerManagerControl::MixMode::FIRST:
+                                response().write_string("first");
                                 break;
                             default:
                                 response().write_string("def");
@@ -523,13 +530,17 @@ namespace speakerman {
             set_content_type("text/plain");
             MemoryFence fence;
             auto previous = mix_mode;
-            if (strncasecmp(url_, "/mix-mode-mixed", 32) == 0) {
-                mix_mode = SpeakerManagerControl::MixMode::MIXED;
-                response().write_string("Mix-mode-request: mixed\r\n");
+            if (strncasecmp(url_, "/mix-mode-all", 32) == 0) {
+                mix_mode = SpeakerManagerControl::MixMode::ALL;
+                response().write_string("Mix-mode-request: all\r\n");
             }
-            else if (strncasecmp(url_, "/mix-mode-separate", 32) == 0) {
-                mix_mode = SpeakerManagerControl::MixMode::SEPARATE;
-                response().write_string("Mix-mode-request: separate\r\n");
+            else if (strncasecmp(url_, "/mix-mode-own", 32) == 0) {
+                mix_mode = SpeakerManagerControl::MixMode::OWN;
+                response().write_string("Mix-mode-request: own\r\n");
+            }
+            else if (strncasecmp(url_, "/mix-mode-first", 32) == 0) {
+                mix_mode = SpeakerManagerControl::MixMode::FIRST;
+                response().write_string("Mix-mode-request: first\r\n");
             }
             else if (strncasecmp(url_, "/mix-mode-default", 32) == 0) {
                 mix_mode = SpeakerManagerControl::MixMode::AS_CONFIGURED;
@@ -540,11 +551,14 @@ namespace speakerman {
                 return;
             }
             switch (previous) {
-                case SpeakerManagerControl::MixMode::MIXED:
-                    response().write_string("Mix-mode-old-value: mixed\r\n");
+                case SpeakerManagerControl::MixMode::ALL:
+                    response().write_string("Mix-mode-old-value: all\r\n");
                     break;
-                case SpeakerManagerControl::MixMode::SEPARATE:
-                    response().write_string("Mix-mode-old-value: separate\r\n");
+                case SpeakerManagerControl::MixMode::OWN:
+                    response().write_string("Mix-mode-old-value: own\r\n");
+                    break;
+                case SpeakerManagerControl::MixMode::FIRST:
+                    response().write_string("Mix-mode-old-value: first\r\n");
                     break;
                 default:
                     response().write_string("Mix-mode-old-value: default (as configured)\r\n");

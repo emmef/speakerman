@@ -119,3 +119,22 @@ body {
     font-weight: bold;
 }
 
+.mix-mode-message-disabled, .mix-mode-message-enabled {
+    font-weight: bold;
+    margin-left: 0.5ex;
+    margin-right: 0.5ex;
+}
+
+.mix-mode-message-disabled:hover {
+    text-decoration: underline;
+    color: rgba(0,255,255,0.7);
+}
+
+.mix-mode-message-disabled {
+    color: rgba(0,255,255,0.3);
+    cursor: hand;
+}
+
+.mix-mode-message-enabled {
+    color: rgba(0,255,255,1.0);
+}

@@ -1323,6 +1323,19 @@ namespace speakerman {
         return result;
     }
 
+    const SpeakermanConfig SpeakermanConfig::with_groups_first() const
+    {
+        SpeakermanConfig result = *this;
+
+        for (size_t i = 0; i < groups; i++) {
+            for (size_t j = 0; j < groups; j++) {
+                result.group[i].volume[j] = j == 0 ? group[0].volume[0] : 0;
+            }
+        }
+
+        return result;
+    }
+
     StreamOwner::StreamOwner(std::ifstream &owned) :
             stream_(owned), owns_(true)
     {}
