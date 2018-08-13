@@ -1103,9 +1103,7 @@ namespace speakerman {
     const GroupConfig GroupConfig::defaultConfig(size_t group_id)
     {
         GroupConfig result;
-        for (size_t i = 0; i < MAX_SPEAKERMAN_GROUPS; i++) {
-            result.volume[i] == i == group_id ? DEFAULT_VOLUME : 0;
-        }
+        result = result.with_groups_separated(group_id);
         snprintf(result.name, NAME_LENGTH, "Group %zd", group_id + 1);
         return result;
     }
@@ -1125,6 +1123,25 @@ namespace speakerman {
         unset_config_value(result.use_sub);
         unset_config_value(result.mono);
         result.name[0] = 0;
+        return result;
+    }
+
+    const GroupConfig GroupConfig::with_groups_separated(size_t group_id) const
+    {
+        GroupConfig result = *this;
+        for (size_t i = 0; i < MAX_SPEAKERMAN_GROUPS; i++) {
+            result.volume[i] = i == group_id ? DEFAULT_VOLUME : 0;
+        }
+        return result;
+    }
+
+    const GroupConfig GroupConfig::with_groups_mixed() const
+
+    {
+        GroupConfig result = *this;
+        for (size_t i = 0; i < MAX_SPEAKERMAN_GROUPS; i++) {
+            result.volume[i] = DEFAULT_VOLUME;
+        }
         return result;
     }
 
@@ -1278,6 +1295,32 @@ namespace speakerman {
         set_if_unset_or_invalid_config_value(generateNoise, config_if_unset.generateNoise, 0, 1);
         set_if_unset_or_invalid_config_value(threshold_scaling, config_if_unset.threshold_scaling, MIN_THRESHOLD_SCALING, MAX_THRESHOLD_SCALING);
         timeStamp = -1;
+    }
+
+    const SpeakermanConfig SpeakermanConfig::with_groups_mixed() const
+    {
+        SpeakermanConfig result = *this;
+
+        for (size_t i = 0; i < groups; i++) {
+            for (size_t j = 0; j < groups; j++) {
+                result.group[i].volume[j] = group[j].volume[j];
+            }
+        }
+
+        return result;
+    }
+
+    const SpeakermanConfig SpeakermanConfig::with_groups_separated() const
+    {
+        SpeakermanConfig result = *this;
+
+        for (size_t i = 0; i < groups; i++) {
+            for (size_t j = 0; j < groups; j++) {
+                result.group[i].volume[j] = i == j ? group[j].volume[j] : 0;
+            }
+        }
+
+        return result;
     }
 
     StreamOwner::StreamOwner(std::ifstream &owned) :

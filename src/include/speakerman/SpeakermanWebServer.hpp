@@ -154,7 +154,11 @@ namespace speakerman {
 
         virtual void handle_request() override;
 
+        virtual const char * on_method(const char* method_name) override;
+
     private:
+        enum class Method { GET, PUT };
+
         SpeakerManagerControl &manager_;
         file_entry indexHtmlFile;
         file_entry cssFile;
@@ -165,6 +169,8 @@ namespace speakerman {
         char url_[URL_LENGTH + 1];
         std::thread level_fetch_thread;
         long long levelTimeStamp = 0;
+        Method method = Method::GET;
+        SpeakerManagerControl::MixMode mix_mode = SpeakerManagerControl::MixMode::AS_CONFIGURED;
 
         static void thread_static_function(web_server *);
 

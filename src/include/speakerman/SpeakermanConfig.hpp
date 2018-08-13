@@ -95,7 +95,7 @@ namespace speakerman {
 
         static constexpr const char *KEY_SNIPPET_GROUP = "group";
         static constexpr const char *KEY_SNIPPET_NAME = "name";
-        static constexpr size_t NAME_LENGTH = 16;
+        static constexpr size_t NAME_LENGTH = 32;
 
         double threshold = DEFAULT_THRESHOLD;
         double volume[MAX_SPEAKERMAN_GROUPS];
@@ -112,6 +112,9 @@ namespace speakerman {
 
         void set_if_unset(const GroupConfig &config_if_unset);
 
+        const GroupConfig with_groups_separated(size_t group_id) const;
+
+        const GroupConfig with_groups_mixed() const;
     };
 
     struct BandConfig
@@ -225,6 +228,10 @@ namespace speakerman {
         static const SpeakermanConfig unsetConfig();
 
         void set_if_unset(const SpeakermanConfig &config_if_unset);
+
+        const SpeakermanConfig with_groups_mixed() const;
+
+        const SpeakermanConfig with_groups_separated() const;
     };
 
     using tdap::IndexPolicy;
@@ -324,6 +331,7 @@ namespace speakerman {
     class SpeakerManagerControl
     {
     public:
+        enum class MixMode { AS_CONFIGURED, MIXED, SEPARATE };
 
         virtual const SpeakermanConfig &getConfig() const = 0;
 

@@ -138,9 +138,11 @@ namespace speakerman {
         int count = 1;
 
         SpeakermanConfig configFileConfig;
+        SpeakerManagerControl::MixMode current_mix_mode;
         {
             tdap::MemoryFence fence;
             configFileConfig = manager_.getConfig();
+            current_mix_mode = mix_mode;
         }
         DynamicProcessorLevels levels;
         string range_file;
@@ -153,8 +155,19 @@ namespace speakerman {
             count++;
             bool got_levels = false;
             if ((count % CONFIG_NUMBER_OF_SLEEPS) == 0) {
-                approach_threshold_scaling(new_threshold_scaling, threshold_scaling_setting);
+                approach_threshold_scaling(new_threshold_scaling,
+                                           threshold_scaling_setting);
+
                 bool read = false;
+                bool mode_change = false;
+                {
+                    MemoryFence fence;
+                    if (current_mix_mode != mix_mode) {
+                        current_mix_mode = mix_mode;
+                        mode_change = true;
+                    }
+                }
+
                 auto stamp = getConfigFileTimeStamp();
                 if (stamp != configFileConfig.timeStamp) {
                     cout << "read config!" << std::endl;
@@ -174,10 +187,32 @@ namespace speakerman {
                     configFileConfig.threshold_scaling = threshold_scaling;
                     read = true;
                 }
-                if (read && manager_.applyConfigAndGetLevels(configFileConfig, &levels, wait)) {
-                    level_buffer.put(levels);
-                    got_levels = true;
+                if (read || mode_change) {
+                    SpeakermanConfig usedConfig;
+                    switch (current_mix_mode) {
+                        case SpeakerManagerControl::MixMode::SEPARATE:
+                            usedConfig = configFileConfig.with_groups_separated();
+                            cout << "Mix mode set to SEPARATED" << std::endl;
+
+                            break;
+                        case SpeakerManagerControl::MixMode::MIXED:
+                            usedConfig = configFileConfig.with_groups_mixed();
+                            cout << "Mix mode set to MIXED" << std::endl;
+                            break;
+                        default:
+                            usedConfig = configFileConfig;
+                            cout << "Mix mode set to AS CONFIGURED" << std::endl;
+                            break;
+                    }
+                    if (!read) {
+                        dumpSpeakermanConfig(usedConfig, std::cout);
+                    }
+                    if (manager_.applyConfigAndGetLevels(usedConfig, &levels, wait)) {
+                        level_buffer.put(levels);
+                        got_levels = true;
+                    }
                 }
+
             }
             if (!got_levels && manager_.getLevels(&levels, wait)) {
                 level_buffer.put(levels);
@@ -243,6 +278,22 @@ namespace speakerman {
         handle(stream);
         return Result::CONTINUE;
     }
+
+    const char *web_server::on_method(const char *method_name)
+    {
+        if (strncmp("GET", method_name, 10) == 0)
+        {
+            method = Method::GET;
+            return nullptr;
+        }
+        if (strncmp("PUT", method_name, 10) == 0)
+        {
+            method = Method::PUT;
+            return nullptr;
+        }
+        return method_name;
+    }
+
 
     const char *web_server::on_url(const char *url)
     {
@@ -347,96 +398,159 @@ namespace speakerman {
                 break;
             }
         }
-        if (strncasecmp("/levels.json", url_, 32) == 0) {
-            char numbers[60];
-            LevelEntry entry;
-            level_buffer.get(levelTimeStamp, entry);
-            if (entry.set) {
-                DynamicProcessorLevels levels = entry.levels;
-                snprintf(numbers, 60, "%s=%lli", COOKIE_TIME_STAMP, entry.stamp);
-                set_header("Set-Cookie", numbers);
-                set_header("Access-Control-Allow-Origin", "*");
-                set_content_type("application/json");
-                response().write_string("{\r\n");
-                response().write_string("\t\"elapsedMillis\": \"");
-                response().write_string(itostr(numbers, 30, entry.stamp - levelTimeStamp));
-                response().write_string("\", \r\n");
-                response().write_string("\t\"subGain\": \"");
-                response().write_string(ftostr(numbers, 30, levels.getGain(0)));
-                response().write_string("\", \r\n");
-                response().write_string("\t\"thresholdScale\": \"");
-                response().write_string(ftostr(numbers, 30, manager_.getConfig().threshold_scaling));
-                response().write_string("\", \r\n");
-                response().write_string("\t\"subAverageGain\": \"");
-                response().write_string(ftostr(numbers, 30, levels.getAverageGain(0)));
-                response().write_string("\", \r\n");
-                response().write_string("\t\"subLevel\": \"");
-                response().write_string(ftostr(numbers, 30, levels.getSignal(0)));
-                response().write_string("\", \r\n");
-                response().write_string("\t\"subAverageLevel\": \"");
-                response().write_string(ftostr(numbers, 30, levels.getAverageSignal(0)));
-                response().write_string("\", \r\n");
-                response().write_string("\t\"periods\": \"");
-                response().write_string(itostr(numbers, 30, levels.count()));
-                response().write_string("\", \r\n");
-                response().write_string("\t\"group\" : [\r\n");
-                for (size_t i = 0; i < levels.groups(); i++) {
-                    response().write_string("\t\t{\r\n");
-                    response().write_string("\t\t\t\"group_name\": \"");
-                    response().write_string(manager_.getConfig().group[i].name);
+        if (method == Method::GET) {
+
+            if (strncasecmp("/levels.json", url_, 32) == 0) {
+                char numbers[60];
+                LevelEntry entry;
+                level_buffer.get(levelTimeStamp, entry);
+                if (entry.set) {
+                    DynamicProcessorLevels levels = entry.levels;
+                    snprintf(numbers, 60, "%s=%lli", COOKIE_TIME_STAMP,
+                             entry.stamp);
+                    set_header("Set-Cookie", numbers);
+                    set_header("Access-Control-Allow-Origin", "*");
+                    set_content_type("application/json");
+                    response().write_string("{\r\n");
+                    response().write_string("\t\"elapsedMillis\": \"");
+                    response().write_string(
+                            itostr(numbers, 30, entry.stamp - levelTimeStamp));
                     response().write_string("\", \r\n");
-                    response().write_string("\t\t\t\"gain\": \"");
-                    response().write_string(ftostr(numbers, 30, levels.getGain(i + 1)));
+                    response().write_string("\t\"subGain\": \"");
+                    response().write_string(ftostr(numbers, 30, levels.getGain(0)));
                     response().write_string("\", \r\n");
-                    response().write_string("\t\t\t\"averageGain\": \"");
-                    response().write_string(ftostr(numbers, 30, levels.getAverageGain(i + 1)));
-                    response().write_string("\",\r\n");
-                    response().write_string("\t\t\t\"level\": \"");
-                    response().write_string(ftostr(numbers, 30, levels.getSignal(i + 1)));
-                    response().write_string("\",\r\n");
-                    response().write_string("\t\t\t\"averageLevel\": \"");
-                    response().write_string(ftostr(numbers, 30, levels.getAverageSignal(i + 1)));
-                    response().write_string("\"\r\n");
-                    response().write_string("\t\t}");
-                    if (i < levels.groups() - 1) {
-                        response().write(',');
+                    response().write_string("\t\"thresholdScale\": \"");
+                    response().write_string(ftostr(numbers, 30,
+                                                   manager_.getConfig().threshold_scaling));
+                    response().write_string("\", \r\n");
+                    response().write_string("\t\"subAverageGain\": \"");
+                    response().write_string(
+                            ftostr(numbers, 30, levels.getAverageGain(0)));
+                    response().write_string("\", \r\n");
+                    response().write_string("\t\"subLevel\": \"");
+                    response().write_string(
+                            ftostr(numbers, 30, levels.getSignal(0)));
+                    response().write_string("\", \r\n");
+                    response().write_string("\t\"subAverageLevel\": \"");
+                    response().write_string(
+                            ftostr(numbers, 30, levels.getAverageSignal(0)));
+                    response().write_string("\", \r\n");
+                    response().write_string("\t\"periods\": \"");
+                    response().write_string(itostr(numbers, 30, levels.count()));
+                    response().write_string("\", \r\n");
+                    response().write_string("\t\"mixMode\": \"");
+                    {
+                        MemoryFence fence;
+                        switch (mix_mode) {
+                            case SpeakerManagerControl::MixMode::MIXED:
+                                response().write_string("mix");
+                                break;
+                            case SpeakerManagerControl::MixMode::SEPARATE:
+                                response().write_string("sep");
+                                break;
+                            default:
+                                response().write_string("def");
+                                break;
+                        }
                     }
-                    response().write_string("\r\n");
+                    response().write_string("\", \r\n");
+                    response().write_string("\t\"group\" : [\r\n");
+                    for (size_t i = 0; i < levels.groups(); i++) {
+                        response().write_string("\t\t{\r\n");
+                        response().write_string("\t\t\t\"group_name\": \"");
+                        response().write_string(manager_.getConfig().group[i].name);
+                        response().write_string("\", \r\n");
+                        response().write_string("\t\t\t\"gain\": \"");
+                        response().write_string(
+                                ftostr(numbers, 30, levels.getGain(i + 1)));
+                        response().write_string("\", \r\n");
+                        response().write_string("\t\t\t\"averageGain\": \"");
+                        response().write_string(
+                                ftostr(numbers, 30, levels.getAverageGain(i + 1)));
+                        response().write_string("\",\r\n");
+                        response().write_string("\t\t\t\"level\": \"");
+                        response().write_string(
+                                ftostr(numbers, 30, levels.getSignal(i + 1)));
+                        response().write_string("\",\r\n");
+                        response().write_string("\t\t\t\"averageLevel\": \"");
+                        response().write_string(ftostr(numbers, 30,
+                                                       levels.getAverageSignal(
+                                                               i + 1)));
+                        response().write_string("\"\r\n");
+                        response().write_string("\t\t}");
+                        if (i < levels.groups() - 1) {
+                            response().write(',');
+                        }
+                        response().write_string("\r\n");
+                    }
+                    response().write_string("\t]\r\n");
+                    response().write_string("}\r\n");
                 }
-                response().write_string("\t]\r\n");
-                response().write_string("}\r\n");
+                else {
+                    set_error(http_status::SERVICE_UNAVAILABLE);
+                }
+            }
+            else if (strncasecmp("/favicon.ico", url_, 32) == 0) {
+                set_content_type("text/plain");
+                response().write_string("X", 1);
+                set_success();
+            }
+            else if (strncasecmp(url_, "/index.html", 32) == 0) {
+                set_content_type("text/html");
+                indexHtmlFile.reset();
+                handle_content(indexHtmlFile.size(), &indexHtmlFile);
+            }
+            else if (strncasecmp(url_, "/speakerman.css", 32) == 0) {
+                set_content_type("text/css");
+                cssFile.reset();
+                handle_content(cssFile.size(), &cssFile);
+            }
+            else if (strncasecmp(url_, "/speakerman.js", 32) == 0) {
+                set_content_type("text/javascript");
+                javaScriptFile.reset();
+                handle_content(javaScriptFile.size(), &javaScriptFile);
+            }
+            else if (strncasecmp(url_, "/favicon.ico", 32) == 0) {
+                set_content_type("image/png");
+                faviconFile.reset();
+                handle_content(faviconFile.size(), &faviconFile);
             }
             else {
-                set_error(http_status::SERVICE_UNAVAILABLE);
+                set_error(404);
             }
         }
-        else if (strncasecmp("/favicon.ico", url_, 32) == 0) {
+        else if (method == Method::PUT) {
             set_content_type("text/plain");
-            response().write_string("X", 1);
-            set_success();
-        }
-        else if (strncasecmp(url_, "/index.html", 32) == 0) {
-            set_content_type("text/html");
-            indexHtmlFile.reset();
-            handle_content(indexHtmlFile.size(), &indexHtmlFile);
-        }
-        else if (strncasecmp(url_, "/speakerman.css", 32) == 0) {
-            set_content_type("text/css");
-            cssFile.reset();
-            handle_content(cssFile.size(), &cssFile);
-        }
-        else if (strncasecmp(url_, "/speakerman.js", 32) == 0) {
-            set_content_type("text/javascript");
-            javaScriptFile.reset();
-            handle_content(javaScriptFile.size(), &javaScriptFile);
-        }
-        else if (strncasecmp(url_, "/favicon.ico", 32) == 0) {
-            set_content_type("image/png");
-            faviconFile.reset();
-            handle_content(faviconFile.size(), &faviconFile);
-        }
-        else {
-            set_error(404);
+            MemoryFence fence;
+            auto previous = mix_mode;
+            if (strncasecmp(url_, "/mix-mode-mixed", 32) == 0) {
+                mix_mode = SpeakerManagerControl::MixMode::MIXED;
+                response().write_string("Mix-mode-request: mixed\r\n");
+            }
+            else if (strncasecmp(url_, "/mix-mode-separate", 32) == 0) {
+                mix_mode = SpeakerManagerControl::MixMode::SEPARATE;
+                response().write_string("Mix-mode-request: separate\r\n");
+            }
+            else if (strncasecmp(url_, "/mix-mode-default", 32) == 0) {
+                mix_mode = SpeakerManagerControl::MixMode::AS_CONFIGURED;
+                response().write_string("Mix-mode-request: default (as configured)\r\n");
+            }
+            else {
+                set_error(404);
+                return;
+            }
+            switch (previous) {
+                case SpeakerManagerControl::MixMode::MIXED:
+                    response().write_string("Mix-mode-old-value: mixed\r\n");
+                    break;
+                case SpeakerManagerControl::MixMode::SEPARATE:
+                    response().write_string("Mix-mode-old-value: separate\r\n");
+                    break;
+                default:
+                    response().write_string("Mix-mode-old-value: default (as configured)\r\n");
+                    break;
+            }
         }
     }
 } /* End of namespace speakerman */
+
