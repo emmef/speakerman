@@ -38,6 +38,7 @@ namespace speakerman {
 
     static int closeSocket(int socket)
     {
+        shutdown(socket, 2);
         return close(socket);
     }
 
@@ -220,12 +221,21 @@ namespace speakerman {
         if (sock == -1) {
             return returnFalse(errorCode, -1);
         }
+        // try to set reuse studd
+        int yes = 1;
+        setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int));
+        timeval tv;
+        tv.tv_sec = 2;
+        tv.tv_usec = 0;
+        setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+
         if (!ensure_bind(info, sock, timeoutSeconds, errorCode)) {
             return -1;
         }
         if (listen(sock, backLog) == -1) {
             return returnFalse(errorCode, -1);
         }
+
         return sock.getAndOwn();
     }
 
@@ -303,6 +313,7 @@ namespace speakerman {
         }
         close(lock);
         sockfd_ = socket.getAndOwn();
+
         service_ = service;
         state_ = State::LISTENING;
         condition_.notify_all();
@@ -342,31 +353,56 @@ namespace speakerman {
         State state = state_;
         lock.unlock();
 
-        while (state == State::WORKING && !SignalHandler::check_raised()) {
-            SignalHandler::check_raised();
-            sockaddr address;
-            socklen_t length = sizeof(sockaddr_storage);
-            int acceptDescriptor = accept(sockfd_, &address, &length);
-            if (acceptDescriptor == -1) {
-                return returnFalse(errorCode);
-            }
+        fd_set master;
+        fd_set readers;
+
+        FD_ZERO(&master);
+        FD_ZERO(&readers);
+
+        FD_SET(sockfd_, &master);
+        int max_fd = sockfd_;
+
+        bool raised = false;
+        while (state == State::WORKING && ! raised) {
+            raised = SignalHandler::get_signal();
             timeval tv;
             tv.tv_sec = 2;
             tv.tv_usec = 0;
-            if (setsockopt(acceptDescriptor, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) == -1) {
-                std::cerr << "Cannot set socket timeout: " << strerror(errno) << std::endl;
+            readers = master;
+            if (select(max_fd + 1, &readers, nullptr, nullptr, &tv) == -1) {
+                return returnFalse(errorCode);
             }
-
-            socket_stream stream(acceptDescriptor, true);
-            try {
-                Result r = worker(stream, address, *this, data);
-                if (r == Result::STOP) {
-                    return true;
+            int acceptDescriptor = -1;
+            sockaddr address;
+            socklen_t length = sizeof(sockaddr_storage);
+            for (int i = 0; i <= max_fd; i++) {
+                if (FD_ISSET(i, &readers)) {
+                    if (i == sockfd_) {
+                        acceptDescriptor = accept(sockfd_, &address, &length);
+                        if (acceptDescriptor == -1) {
+                            return returnFalse(errorCode);
+                        }
+                        FD_SET(acceptDescriptor, &master);
+                        if (acceptDescriptor > max_fd) {
+                            max_fd = acceptDescriptor;
+                        }
+                    }
+                    else {
+                        socket_stream stream(i, true);
+                        FD_CLR(i, &master);
+                        try {
+                            Result r = worker(stream, address, *this, data);
+                            if (r == Result::STOP) {
+                                return true;
+                            }
+                        }
+                        catch (const std::exception &e) {
+                            std::cerr << "Error during work on socket: " << e.what() << std::endl;
+                        }
+                    }
                 }
             }
-            catch (const std::exception &e) {
-                std::cerr << "Error during work on socket: " << e.what() << std::endl;
-            }
+
             state = this->state();
         }
         return false;

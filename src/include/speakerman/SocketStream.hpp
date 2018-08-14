@@ -136,8 +136,8 @@ namespace speakerman {
 
         int set_file(int fd, bool owns_file)
         {
-            istream.set_file(fd, false);
-            ostream.set_file(fd, owns_file);
+            istream.set_file(fd, owns_file);
+            ostream.set_file(fd, false);
             return 0;
         }
 

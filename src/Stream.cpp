@@ -178,7 +178,9 @@ namespace speakerman {
     }
 
     file_owner::~file_owner()
-    {}
+    {
+        cleanup_file();
+    }
 
     void file_owner::cleanup_file()
     {
