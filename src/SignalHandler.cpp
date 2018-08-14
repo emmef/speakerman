@@ -23,8 +23,12 @@
 #include <atomic>
 #include <csignal>
 #include <cstdio>
+#include <thread>
 #include <iostream>
+#include <cstring>
+#include <condition_variable>
 #include <tdap/MemoryFence.hpp>
+#include <tdap/Guards.hpp>
 
 namespace speakerman {
 
@@ -33,7 +37,197 @@ namespace speakerman {
 
     static int signal_number = -1;
     static bool user_raised = false;
+
     static atomic<long signed> guarded_threads(0);
+    static atomic<unsigned> thread_numbers(1);
+
+    static size_t next_thread_number()
+    {
+        size_t result = thread_numbers.fetch_add(1);
+        while (result == 0) {
+            thread_numbers.fetch_add(1);
+        }
+    }
+
+    class thread_entry
+    {
+        static constexpr size_t NAME_SIZE = 127;
+
+        char name_[NAME_SIZE + 1];
+        size_t id_;
+
+    public:
+        thread_entry() : id_(0)
+        {
+            name_[0] = 0;
+        }
+
+        void use_entry(const char *thread_name, size_t id)
+        {
+            id_ = id;
+            if (id == 0) {
+                thread_numbers.fetch_add(1);
+            }
+            if (thread_name != nullptr && thread_name[0] != 0) {
+                std::strncpy(name_, thread_name, NAME_SIZE);
+                name_[NAME_SIZE] = 0;
+            }
+            else {
+                snprintf(name_, NAME_SIZE + 1, "Thread[%zu]", id);
+            }
+        }
+
+        void deactivate_entry()
+        {
+            id_ = 0;
+            name_[0] = 0;
+        }
+
+        bool is_acive() const
+        {
+            return id_ > 0;
+        }
+
+        size_t id() const { return id_; }
+
+        void write_to_stream(std::ostream &stream, const char *message)
+        {
+            stream << message << " thread[" << id_ << "]: " << name_ << endl;
+        }
+
+        const char * name() const { return name_; }
+    };
+
+    template<class Mutex>
+    class FakeLock
+    {
+        MemoryFence fence;
+    public:
+        FakeLock(Mutex &mutex) {}
+        ~FakeLock() {}
+    };
+
+    class thread_entries
+    {
+        static constexpr size_t MAX_THREAD_ENTRIES = 128;
+
+        size_t active_thread_count = 0;
+        size_t thread_numbers = 0;
+
+        thread_entry entry_[MAX_THREAD_ENTRIES];
+        using Mutex = std::mutex;
+        using Lock = unique_lock<Mutex>;
+        Mutex mutex_;
+
+        size_t next_thread_number()
+        {
+            size_t number = ++thread_numbers;
+            while (number == 0 || is_active_thread_number(number)) {
+                number = ++thread_numbers;
+            }
+            return number;
+        }
+
+        bool is_active_thread_number(size_t number) const
+        {
+            if (number == 0) {
+                return true;
+            }
+            size_t active_count = 0;
+            for (size_t i = 0; i < MAX_THREAD_ENTRIES && active_count < active_thread_count; i++) {
+                size_t id = entry_[i].id();
+                if (id == number) {
+                    return true;
+                }
+                else if (id != 0) {
+                    active_count++;
+                }
+            }
+
+            return false;
+        }
+    public:
+
+        size_t add_thread(const char *name)
+        {
+            Lock _(mutex_);
+            if (active_thread_count < MAX_THREAD_ENTRIES) {
+                size_t id = next_thread_number();
+                for (size_t slot_number = 0; slot_number < MAX_THREAD_ENTRIES; slot_number++) {
+                    if (!entry_[slot_number].is_acive()) {
+                        entry_[slot_number].use_entry(name, id);
+                        active_thread_count++;
+                        entry_[slot_number].write_to_stream(cout, "Start");
+                        return id;
+                    }
+                }
+            }
+            else {
+                throw std::runtime_error("Too many managed threads");
+            }
+        }
+
+        bool remove_thread(size_t id) {
+            Lock _(mutex_);
+
+            for (size_t slot_number = 0; slot_number < MAX_THREAD_ENTRIES; slot_number++) {
+                if (entry_[slot_number].id() == id) {
+                    entry_[slot_number].write_to_stream(cout, "Exit");
+                    entry_[slot_number].deactivate_entry();
+                    active_thread_count--;
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        bool await(std::chrono::milliseconds timeout)
+        {
+            auto count = timeout.count() / 100;
+            if (count < 10) {
+                count = 10;
+            }
+            std::chrono::milliseconds sleep_duration(count);
+            auto start = std::chrono::steady_clock::now();
+            auto now = start;
+            while ((now - start) < timeout) {
+                {
+                    Lock _(mutex_);
+
+                    if (active_thread_count == 0) {
+                        return true;
+                    }
+                }
+                this_thread::sleep_for(sleep_duration);
+                now = std::chrono::steady_clock::now();
+            }
+            return false;
+        }
+
+        bool await_and_report(std::chrono::milliseconds timeout, const char * start_wait_message)
+        {
+            if (start_wait_message) {
+                cout << start_wait_message << endl;
+            }
+            if (await(timeout)) {
+                return true;
+            }
+            {
+                Lock _(mutex_);
+                cerr << "Timeout: following threads still active:" << endl;
+                size_t active_count = 0;
+                for (size_t i = 0; i < MAX_THREAD_ENTRIES &&
+                                   active_count < active_thread_count; i++) {
+                    if (entry_[i].is_acive()) {
+                        entry_[i].write_to_stream(cerr, "Busy");
+                    }
+                }
+            }
+        }
+
+    };
+
+    static thread_entries THREAD_ENTITIES;
 
 
     static void set_signal_internal(int signum, bool is_user_raised)
@@ -41,6 +235,7 @@ namespace speakerman {
         signal_number = signum;
         user_raised = is_user_raised;
         MemoryFence::release();
+        thread::id x = this_thread::get_id();
     }
 
     extern "C" {
@@ -155,48 +350,20 @@ namespace speakerman {
     }
 
 
-    CountedThreadGuard::CountedThreadGuard()
+    CountedThreadGuard::CountedThreadGuard(const char *thread_name)
     {
-        guarded_threads.fetch_add(1);
+        thread_id = THREAD_ENTITIES.add_thread(thread_name);
     }
 
     CountedThreadGuard::~CountedThreadGuard()
     {
-        guarded_threads.fetch_sub(1);
+        THREAD_ENTITIES.remove_thread(thread_id);
     }
 
-    bool CountedThreadGuard::await_finished(std::chrono::milliseconds timeout)
+    bool CountedThreadGuard::await_finished(std::chrono::milliseconds timeout, const char *wait_message)
     {
-        auto count = timeout.count() / 100;
-        if (count < 10) {
-            count = 10;
-        }
-        std::chrono::milliseconds sleep_duration(count);
-        auto start = std::chrono::steady_clock::now();
-        auto now = start;
-        while ((now - start) < timeout) {
-            if (guarded_threads == 0) {
-                return true;
-            }
-            now = std::chrono::steady_clock::now();
-        }
-        return false;
+        THREAD_ENTITIES.await_and_report(timeout, wait_message);
     }
 
-    CountedThreadGuard::Await::Await(long millis, const char *wait_message,
-          const char *fail_message) : timeout_(millis),
-                                      wait_message_(wait_message),
-                                      fail_message_(fail_message)
-    {}
-
-    CountedThreadGuard::Await::~Await()
-    {
-        if (wait_message_) {
-            std::cout << wait_message_ << endl;
-        }
-        if (!CountedThreadGuard::await_finished(timeout_) && fail_message_) {
-            std::cerr << fail_message_ << endl;
-        };
-    }
 
 } /* End of namespace speakerman */

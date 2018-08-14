@@ -88,24 +88,34 @@ namespace speakerman {
         }
     }
 
-    struct CountedThreadGuard
+    class CountedThreadGuard
     {
-        CountedThreadGuard();
+        size_t thread_id;
+
+    public:
+
+        CountedThreadGuard(const char *thread_name);
 
         ~CountedThreadGuard();
 
-        static bool await_finished(std::chrono::milliseconds timeout);
+        static bool await_finished(std::chrono::milliseconds timeout, const char *wait_message);
+    };
 
-        class Await
+    class AwaitThreadFinishedAfterExit {
+        std::chrono::milliseconds timeout_;
+        const char *wait_message_;
+
+    public:
+        AwaitThreadFinishedAfterExit(long timeout_millis, const char *wait_message) :
+            timeout_(timeout_millis), wait_message_(wait_message)
         {
-            std::chrono::milliseconds timeout_;
-            const char *wait_message_;
-            const char *fail_message_;
-        public:
-            Await(long millis, const char *wait_message,
-                  const char *fail_message);
-            ~Await();
-        };
+
+        }
+
+        ~AwaitThreadFinishedAfterExit()
+        {
+            CountedThreadGuard::await_finished(timeout_, wait_message_);
+        }
     };
 
 } /* End of namespace speakerman */

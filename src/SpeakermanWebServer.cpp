@@ -43,7 +43,7 @@ namespace speakerman {
 
     void web_server::thread_static_function(web_server *server)
     {
-        CountedThreadGuard guard;
+        CountedThreadGuard guard("Web server configuration updater");
 
         try {
             server->thread_function();

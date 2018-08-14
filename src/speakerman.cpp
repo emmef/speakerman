@@ -75,7 +75,7 @@ static volatile int userInput;
 
 static void webServer()
 {
-    CountedThreadGuard guard;
+    CountedThreadGuard guard("Web server listening thread");
     web_server server(manager.get());
 
     try {
@@ -177,7 +177,7 @@ int main(int count, char *arguments[])
 {
     configFileConfig = readSpeakermanConfig();
 
-    CountedThreadGuard::Await await_thread_termination(5000, "Await thread shutdown...", "Not all threads shut down in time");
+    AwaitThreadFinishedAfterExit await(5000, "Await thread shutdown...");
     MemoryFence::release();
 
     cout << "Executing " << arguments[0] << endl;
