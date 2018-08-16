@@ -177,10 +177,10 @@ namespace speakerman {
         void thread_function();
 
 
-        Result accept_work(Stream &stream, const struct sockaddr &address, const server_socket &socket);
+        Result accept_work(Stream &stream, const server_socket &socket);
 
         static Result worker_function(
-                Stream &stream, const struct sockaddr &address,
+                Stream &stream,
                 const server_socket &socket, void *data);
     };
 

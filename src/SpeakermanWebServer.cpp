@@ -192,7 +192,7 @@ namespace speakerman {
                     switch (current_mix_mode) {
                         case SpeakerManagerControl::MixMode::OWN:
                             usedConfig = configFileConfig.with_groups_separated();
-                            cout << "Mix mode set to SEPARATED" << std::endl;
+                            cout << "Mix mode set to OWN" << std::endl;
 
                             break;
                         case SpeakerManagerControl::MixMode::ALL:
@@ -264,10 +264,10 @@ namespace speakerman {
     }
 
     web_server::Result web_server::worker_function(
-            server_socket::Stream &stream, const struct sockaddr &address,
+            server_socket::Stream &stream,
             const server_socket &socket, void *data)
     {
-        return static_cast<web_server *>(data)->accept_work(stream, address, socket);
+        return static_cast<web_server *>(data)->accept_work(stream, socket);
     }
 
     void web_server::close()
@@ -276,7 +276,7 @@ namespace speakerman {
     }
 
     web_server::Result
-    web_server::accept_work(Stream &stream, const struct sockaddr &address, const server_socket &socket)
+    web_server::accept_work(Stream &stream, const server_socket &socket)
     {
         levelTimeStamp = 0;
         handle(stream);
@@ -420,24 +420,13 @@ namespace speakerman {
                     response().write_string(
                             itostr(numbers, 30, entry.stamp - levelTimeStamp));
                     response().write_string("\", \r\n");
-                    response().write_string("\t\"subGain\": \"");
-                    response().write_string(ftostr(numbers, 30, levels.getGain(0)));
-                    response().write_string("\", \r\n");
                     response().write_string("\t\"thresholdScale\": \"");
                     response().write_string(ftostr(numbers, 30,
                                                    manager_.getConfig().threshold_scaling));
                     response().write_string("\", \r\n");
-                    response().write_string("\t\"subAverageGain\": \"");
-                    response().write_string(
-                            ftostr(numbers, 30, levels.getAverageGain(0)));
-                    response().write_string("\", \r\n");
                     response().write_string("\t\"subLevel\": \"");
                     response().write_string(
                             ftostr(numbers, 30, levels.getSignal(0)));
-                    response().write_string("\", \r\n");
-                    response().write_string("\t\"subAverageLevel\": \"");
-                    response().write_string(
-                            ftostr(numbers, 30, levels.getAverageSignal(0)));
                     response().write_string("\", \r\n");
                     response().write_string("\t\"periods\": \"");
                     response().write_string(itostr(numbers, 30, levels.count()));
@@ -467,22 +456,9 @@ namespace speakerman {
                         response().write_string("\t\t\t\"group_name\": \"");
                         response().write_string(manager_.getConfig().group[i].name);
                         response().write_string("\", \r\n");
-                        response().write_string("\t\t\t\"gain\": \"");
-                        response().write_string(
-                                ftostr(numbers, 30, levels.getGain(i + 1)));
-                        response().write_string("\", \r\n");
-                        response().write_string("\t\t\t\"averageGain\": \"");
-                        response().write_string(
-                                ftostr(numbers, 30, levels.getAverageGain(i + 1)));
-                        response().write_string("\",\r\n");
                         response().write_string("\t\t\t\"level\": \"");
                         response().write_string(
                                 ftostr(numbers, 30, levels.getSignal(i + 1)));
-                        response().write_string("\",\r\n");
-                        response().write_string("\t\t\t\"averageLevel\": \"");
-                        response().write_string(ftostr(numbers, 30,
-                                                       levels.getAverageSignal(
-                                                               i + 1)));
                         response().write_string("\"\r\n");
                         response().write_string("\t\t}");
                         if (i < levels.groups() - 1) {

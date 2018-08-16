@@ -38,7 +38,6 @@ namespace speakerman {
 
     static int closeSocket(int socket)
     {
-        shutdown(socket, 2);
         return close(socket);
     }
 
@@ -133,6 +132,9 @@ namespace speakerman {
         operator int() const
         { return sd_; }
 
+        operator int()
+        { return sd_; }
+
         ~socket_owner()
         { close(); }
     };
@@ -222,12 +224,9 @@ namespace speakerman {
             return returnFalse(errorCode, -1);
         }
         // try to set reuse studd
-        int yes = 1;
-        setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int));
-        timeval tv;
-        tv.tv_sec = 2;
-        tv.tv_usec = 0;
-        setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+        set_reuse(sock, true);
+        set_recv_timeout_millis(sock, 2000);
+        set_linger_seconds(sock, 1);
 
         if (!ensure_bind(info, sock, timeoutSeconds, errorCode)) {
             return -1;
@@ -237,6 +236,43 @@ namespace speakerman {
         }
 
         return sock.getAndOwn();
+    }
+
+    bool set_recv_timeout_millis(int sock, long timeout_millis)
+    {
+        if (sock < 0) {
+            return false;
+        }
+        timeval tv = get_time_in_millis(timeout_millis);
+        return setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) == 0;
+    }
+
+    timeval get_time_in_millis(long timeout_millis)
+    {
+        timeval tv;
+        tv.tv_sec = timeout_millis / 1000;
+        tv.tv_usec = 1000 * (timeout_millis % 1000);
+        return tv;
+    }
+
+    bool set_reuse(int sock, bool reuse)
+    {
+        if (sock < 0) {
+            return false;
+        }
+        int yes = reuse ? 1 : 0;
+        return setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes)) == 0;
+    }
+
+    bool set_linger_seconds(int sock, int linger_seconds)
+    {
+        if (sock < 0) {
+            return false;
+        }
+        linger l;
+        l.l_onoff = linger_seconds > 0;
+        l.l_linger = linger_seconds;
+        return setsockopt(sock, SOL_SOCKET, SO_LINGER, &l, sizeof(l)) == 0;
     }
 
     class state_on_close
@@ -313,7 +349,7 @@ namespace speakerman {
         }
         close(lock);
         sockfd_ = socket.getAndOwn();
-
+        selector_.init(sockfd_);
         service_ = service;
         state_ = State::LISTENING;
         condition_.notify_all();
@@ -336,7 +372,7 @@ namespace speakerman {
     bool server_socket::work(int *errorCode, server_socket_worker worker, void *data)
     {
         if (!worker) {
-            throw std::invalid_argument("Worker function cannot be ");
+            throw std::invalid_argument("Worker function cannot be NULL");
         }
         Lock lock(mutex_);
 
@@ -353,52 +389,38 @@ namespace speakerman {
         State state = state_;
         lock.unlock();
 
-        fd_set master;
-        fd_set readers;
-
-        FD_ZERO(&master);
-        FD_ZERO(&readers);
-
-        FD_SET(sockfd_, &master);
-        int max_fd = sockfd_;
+        timeval tv;
+        tv.tv_sec = 2;
+        tv.tv_usec = 0;
 
         bool raised = false;
-        while (state == State::WORKING && ! raised) {
-            raised = SignalHandler::get_signal();
-            timeval tv;
-            tv.tv_sec = 2;
-            tv.tv_usec = 0;
-            readers = master;
-            if (select(max_fd + 1, &readers, nullptr, nullptr, &tv) == -1) {
-                return returnFalse(errorCode);
+        while (state == State::WORKING && !raised) {
+            raised = SignalHandler::is_set();
+
+            socket_selector_iterator iterator = selector_.do_select(tv, raised);
+            if (iterator.error_occured()) {
+                std::cerr << "Error occured during select" << iterator.error_code() << std::endl;
+                if (errorCode) {
+                    *errorCode = iterator.error_code();
+                }
+                return false;
             }
-            int acceptDescriptor = -1;
-            sockaddr address;
-            socklen_t length = sizeof(sockaddr_storage);
-            for (int i = 0; i <= max_fd; i++) {
-                if (FD_ISSET(i, &readers)) {
-                    if (i == sockfd_) {
-                        acceptDescriptor = accept(sockfd_, &address, &length);
-                        if (acceptDescriptor == -1) {
-                            return returnFalse(errorCode);
-                        }
-                        FD_SET(acceptDescriptor, &master);
-                        if (acceptDescriptor > max_fd) {
-                            max_fd = acceptDescriptor;
+            while (iterator.has_next()) {
+                int i = iterator.get_next();
+                if (raised) {
+                    closeSocket(i);
+                }
+                else {
+                    socket_stream stream(i, true);
+                    try {
+                        Result r = worker(stream, *this, data);
+                        if (r == Result::STOP) {
+                            return true;
                         }
                     }
-                    else {
-                        socket_stream stream(i, true);
-                        FD_CLR(i, &master);
-                        try {
-                            Result r = worker(stream, address, *this, data);
-                            if (r == Result::STOP) {
-                                return true;
-                            }
-                        }
-                        catch (const std::exception &e) {
-                            std::cerr << "Error during work on socket: " << e.what() << std::endl;
-                        }
+                    catch (const std::exception &e) {
+                        std::cerr << "Error during work on socket: " << e.what()
+                                  << std::endl;
                     }
                 }
             }
@@ -417,13 +439,20 @@ namespace speakerman {
         if (!await_work_done(1, lock, &error)) {
             std::cerr << "Aborted waiting for work stop: " << strerror(error) << std::endl;
         }
-        if (closeSocket(sockfd_) == 0) {
-            sockfd_ = -1;
-            state_ = State::CLOSED;
-            condition_.notify_all();
-            return;
+        int sdf = sockfd_;
+        sockfd_ = -1;
+        timeval tv;
+        tv.tv_sec = 2;
+        tv.tv_usec = 0;
+        socket_selector_iterator iterator = selector_.do_select(tv, true);
+        while (iterator.has_next()) {
+            closeSocket(iterator.get_next());
         }
-        std::cerr << "Error when closing socket: " << strerror(errno) << std::endl;
+        if (closeSocket(sockfd_) != 0) {
+            std::cerr << "Error when closing socket: " << strerror(errno) << std::endl;
+        }
+        state_ = State::CLOSED;
+        condition_.notify_all();
     }
 
     void server_socket::close()
@@ -520,6 +549,99 @@ namespace speakerman {
         throw std::runtime_error("NULL dereference");
     }
 
+    socket_selector_iterator::socket_selector_iterator(int error_code) : selector_(nullptr), error_code_(error_code) {}
+
+    socket_selector_iterator::socket_selector_iterator(
+            socket_selector *created_by) : selector_(created_by), error_code_(0) {}
+
+
+    bool socket_selector_iterator::error_occured() const
+    {
+        return selector_ == nullptr;
+    }
+
+    int socket_selector_iterator::error_code() const
+    {
+        return error_code_;
+    }
+
+    int socket_selector_iterator::fetch_next()
+    {
+        for (; position_ <= selector_->max_fd_; position_++) {
+            if (FD_ISSET(position_, &selector_->readers) && position_ != selector_->sdf_) {
+                next_descriptor_ = position_++;
+                return next_descriptor_;
+            }
+        }
+        return -1;
+    }
+
+
+    bool socket_selector_iterator::has_next()
+    {
+        return selector_ && (next_descriptor_ != -1 || fetch_next() != -1);
+    }
+
+    int socket_selector_iterator::get_next()
+    {
+        if (has_next()) {
+            int result = next_descriptor_;
+            next_descriptor_ = -1;
+            FD_CLR(result, &selector_->master);
+            return result;
+        }
+        return -1;
+    }
+
+
+    void socket_selector::init(int socket_file_descriptor)
+    {
+        sdf_ = socket_file_descriptor >= 0 ? socket_file_descriptor : -1;
+        max_fd_ = sdf_;
+        FD_ZERO(&master);
+        FD_ZERO(&readers);
+        if (sdf_ > 0) {
+            FD_SET(sdf_, &master);
+        }
+    }
+
+    socket_selector_iterator
+    socket_selector::do_select(timeval tv, bool for_flush)
+    {
+        if (sdf_ < 0) {
+            return socket_selector_iterator(EBADF);
+        }
+        readers = master;
+        int error_code = 0;
+        if (select(max_fd_ + 1, &readers, nullptr, nullptr, &tv) == -1) {
+            returnFalse(&error_code);
+            return socket_selector_iterator(error_code);
+        }
+        if (for_flush) {
+            socket_selector_iterator(this);
+        }
+        int acceptDescriptor = -1;
+        sockaddr address;
+        socklen_t length = sizeof(sockaddr_storage);
+        int read_sockets = 0;
+        for (int i = 0; i <= max_fd_; i++) {
+            if (FD_ISSET(i, &readers) && i == sdf_) {
+                acceptDescriptor = accept(sdf_, &address, &length);
+                if (acceptDescriptor == -1) {
+                    returnFalse(&error_code);
+                    std::cerr << "Could not accept new connection" << std::endl;
+                }
+                else {
+                    FD_SET(acceptDescriptor, &master);
+                    if (acceptDescriptor > max_fd_) {
+                        max_fd_ = acceptDescriptor;
+                    }
+                    set_linger_seconds(acceptDescriptor, tv.tv_sec > 0 ? tv.tv_sec : 0);
+                }
+            }
+        }
+        return socket_selector_iterator(this);
+    }
 
 } /* End of namespace speakerman */
 

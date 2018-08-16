@@ -169,17 +169,23 @@ function ensureMeterGroup(groupElementNumber) {
 
                 return Math.round(percentage * this.elements.length);
             },
-            setValues: function (level, levelAvg, gain, gainAvg, sub, name) {
-                this.integratedAvg = 0.2 * Math.sqrt(gainAvg) + 0.8 * this.integratedAvg;
-                this.integratedPeak = 0.25 * Math.sqrt(gain) + 0.75 * this.integratedPeak;
+            setValues: function (level, sub, name) {
+                this.integratedPeak = level > 1.0 ? 1.0 / level : 1.0;
+                this.integratedAvg = 0.1 * Math.sqrt(this.integratedPeak) + 0.9 * this.integratedAvg;
+
                 var gainA = Math.round(this.elements.length * this.integratedAvg);
                 var gainP = Math.min(gainA, Math.round(this.elements.length * this.integratedPeak));
 
-                var b = sub ? 64 : 0;
                 for (i = 0; i < this.elements.length; i++) {
                     var r = 0;
                     var g = 0;
-                    if (i >= gainA) {
+                    var b = sub ? 64 : 0;
+                    if (i == gainP) {
+                        r = 255;
+                        g = 255;
+                        b = 255;
+                    }
+                    else if (i >= gainA) {
                         r = 255;
                     }
                     else if (i >= gainP) {
@@ -234,12 +240,12 @@ function setMeters(levels) {
     if (!meterGroups) {
         return;
     }
-    meterGroups.subMeters.setValues(levels.subLevel, levels.subAverageLevel, levels.subGain, levels.subAverageGain, true);
+    meterGroups.subMeters.setValues(levels.subLevel, true);
     var groupCount = levels.group && levels.group.length ? levels.group.length : 0;
     var i = 0;
     for (i = 0; i < groupCount; i++) {
         var grp = levels.group[i];
-        meterGroups.groups[i].setValues(grp.level, grp.averageLevel, grp.gain, grp.averageGain, false, grp.group_name);
+        meterGroups.groups[i].setValues(grp.level, false, grp.group_name);
     }
     for (; i < meterGroups.groups.length; i++) {
         meterGroups.groups[i].hide();

@@ -375,7 +375,7 @@ namespace speakerman {
 //            x = aCurve.filter(0, x);
             T detect = rmsDetector[0].add_square_get_detection(x * x, 1.0);
             T gain = 1.0 / detect;
-            levels.addValues(0, gain, detect);
+            levels.addValues(0, detect);
             sub *= gain;
             processInput[0] = filters_[GROUPS].filter()->filter(0, sub);
         }
@@ -400,7 +400,7 @@ namespace speakerman {
                     T detect = rmsDetector[detector].add_square_get_detection(
                             squareSum, 1.0);
                     T gain = 1.0 / detect;
-                    levels.addValues(1 + group, gain, detect);
+                    levels.addValues(1 + group, detect);
                     for (size_t offset = baseOffset;
                          offset < nextOffset; offset++) {
                         processInput[offset] *= gain;

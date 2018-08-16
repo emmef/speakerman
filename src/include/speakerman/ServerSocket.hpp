@@ -43,6 +43,58 @@ namespace speakerman {
     };
 
     int open_server_socket(const char *service, int timeoutSeconds, int backLog, int *errorCode);
+    bool set_linger_seconds(int sock, int linger_seconds);
+    bool set_reuse(int sock, bool reuse);
+    timeval get_time_in_millis(long timeout_millis);
+    bool set_recv_timeout_millis(int sock, long timeout_millis);
+
+    class socket_selector;
+    class socket_selector_iterator
+    {
+        socket_selector *selector_;
+        size_t position_ = 0;
+        int next_descriptor_ = -1;
+        int error_code_;
+
+        int fetch_next();
+        friend class socket_selector;
+
+        socket_selector_iterator(socket_selector *created_by);
+        socket_selector_iterator(int error_code);
+    public:
+        bool error_occured() const;
+        int error_code() const;
+        bool has_next();
+        int get_next();
+
+    };
+
+
+    class socket_selector
+    {
+        fd_set master;
+        fd_set readers;
+        int sdf_ = -1;
+        int max_fd_ = -1;
+        friend class socket_selector_iterator;
+
+    public:
+        socket_selector(int socket_file_descriptor)
+        {
+            init(socket_file_descriptor);
+        }
+
+        socket_selector() : socket_selector(-1) {}
+
+        void reset()
+        {
+            init(-1);
+        }
+
+        void init(int socket_file_descriptor);
+
+        socket_selector_iterator do_select(timeval tv, bool for_flush);
+    };
 
     class server_socket
     {
@@ -53,7 +105,7 @@ namespace speakerman {
         using Stream = socket_stream;
 
         typedef server_worker_result (*server_socket_worker)(
-                socket_stream &stream, const struct sockaddr &address, const server_socket &server, void *data);
+                socket_stream &stream, const server_socket &server, void *data);
 
     public:
         server_socket()
@@ -89,6 +141,7 @@ namespace speakerman {
         int sockfd_ = -1;
         const char *service_ = nullptr;
         State state_ = State::CLOSED;
+        socket_selector selector_;
 
         bool await_work_done(int timeOutSeconds, Lock &lock, int *errorCode);
 
