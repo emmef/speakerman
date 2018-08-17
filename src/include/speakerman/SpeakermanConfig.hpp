@@ -241,20 +241,14 @@ namespace speakerman {
 
     class DynamicProcessorLevels
     {
-        double gains_[SpeakermanConfig::MAX_GROUPS + 1];
-        double avg_gains_[SpeakermanConfig::MAX_GROUPS + 1];
         double signal_square_[SpeakermanConfig::MAX_GROUPS + 1];
-        double avg_signal_square_[SpeakermanConfig::MAX_GROUPS + 1];
         size_t channels_;
         size_t count_;
 
-        void addGainAndSquareSignal(size_t group, double gain, double signal)
+        void addGainAndSquareSignal(size_t group, double signal)
         {
             size_t i = IndexPolicy::array(group, channels_);
-            gains_[i] = Values::min(gains_[i], gain);
-            avg_gains_[i] += gains_[i];
             signal_square_[i] = Values::max(signal_square_[i], signal);
-            avg_signal_square_[i] = signal_square_[i];
         }
 
     public:
@@ -275,11 +269,8 @@ namespace speakerman {
         {
             size_t count = Values::min(channels_, levels.channels_);
             for (size_t i = 0; i < count; i++) {
-                gains_[i] = Values::min(gains_[i], levels.gains_[i]);
-                avg_gains_[i] += levels.avg_gains_[i];
                 signal_square_[i] = Values::max(signal_square_[i],
                                                 levels.signal_square_[i]);
-                avg_signal_square_[i] += levels.avg_signal_square_[i];
             }
             count_ += levels.count_;
         }
@@ -292,41 +283,19 @@ namespace speakerman {
         void reset()
         {
             for (size_t limiter = 0; limiter < channels_; limiter++) {
-                gains_[limiter] = 1.0;
-                avg_gains_[limiter] = 0;
                 signal_square_[limiter] = 0.0;
-                avg_signal_square_[limiter] = 0.0;
             }
             count_ = 0;
         }
 
-        void addValues(size_t group, double gain, double signal)
+        void addValues(size_t group, double signal)
         {
-            addGainAndSquareSignal(group, gain, signal);
-        }
-
-        double getGain(size_t group) const
-        {
-            return gains_[IndexPolicy::array(group, channels_)];
-        }
-
-        double getAverageGain(size_t group) const
-        {
-            return count_ > 0 ?
-                   avg_gains_[IndexPolicy::array(group, channels_)] / count_
-                              : 0;
+            addGainAndSquareSignal(group, signal);
         }
 
         double getSignal(size_t group) const
         {
             return sqrt(signal_square_[IndexPolicy::array(group, channels_)]);
-        }
-
-        double getAverageSignal(size_t group) const
-        {
-            return count_ > 0 ? sqrt(
-                    avg_signal_square_[IndexPolicy::array(group, channels_)] /
-                    count_) : 0;
         }
     };
 
