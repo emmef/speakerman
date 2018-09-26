@@ -143,7 +143,6 @@ function ensureMeterGroup(groupElementNumber) {
             titleElement:titleElementList && titleElementList.length > 0 ? titleElementList[0] : null,
             groupNumber: groupElementNumber,
             elements: elem,
-            integratedAvg: 0,
             integratedPeak: 0,
             getLevelIndex: function (value, minimum) {
                 if (!value || !this.elements || !this.elements.length) {
@@ -170,25 +169,26 @@ function ensureMeterGroup(groupElementNumber) {
                 return Math.round(percentage * this.elements.length);
             },
             setValues: function (level, sub, name) {
-                this.integratedPeak = level > 1.0 ? 1.0 / level : 1.0;
-                this.integratedAvg = 0.1 * Math.sqrt(this.integratedPeak) + 0.9 * this.integratedAvg;
+                var peak = 1.0 / Math.max(1.0, level);
+                this.integratedPeak = 0.1 * Math.sqrt(level) + 0.9 * this.integratedPeak;
+                var average = 1.0 / Math.max(1.0, this.integratedPeak);
 
-                var gainA = Math.round(this.elements.length * this.integratedAvg);
-                var gainP = Math.min(gainA, Math.round(this.elements.length * this.integratedPeak));
+                var averageIndex = Math.round(this.elements.length * average);
+                var peakIndex = Math.round(this.elements.length * peak);
 
                 for (i = 0; i < this.elements.length; i++) {
                     var r = 0;
                     var g = 0;
                     var b = sub ? 64 : 0;
-                    if (i == gainP) {
+                    if (i == peakIndex) {
                         r = 255;
                         g = 255;
                         b = 255;
                     }
-                    else if (i >= gainA) {
+                    else if (i >= averageIndex) {
                         r = 255;
                     }
-                    else if (i >= gainP) {
+                    else if (i >= peakIndex) {
                         r = 144;
                         g = 128;
                     }
