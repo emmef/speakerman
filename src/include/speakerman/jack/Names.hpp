@@ -56,7 +56,10 @@ namespace speakerman {
         static const char *valid_name(const regex &regex, const char *name,
                                       const char *description);
 
+
     public:
+        Names();
+
         static const char *const client_port_separator();
 
         static size_t get_full_size();

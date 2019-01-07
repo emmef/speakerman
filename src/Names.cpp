@@ -22,12 +22,22 @@
 #include <mutex>
 
 #include <tdap/Count.hpp>
+#include <tdap/Allocation.hpp>
 #include <speakerman/jack/Names.hpp>
 
 namespace speakerman {
 
     using namespace std;
     using namespace tdap;
+
+    static Names names_;
+
+    Names::Names()
+    {
+        get_port_regex();
+        get_client_regex();
+        get_full_regex();
+    }
 
     void Names::checkLengthOrThrow(size_t bufferSize, int result)
     {
@@ -110,6 +120,7 @@ namespace speakerman {
     const char *Names::valid_name(const regex &regex, const char *name,
                                   const char *description)
     {
+        consecutive_alloc::Disable disable;
         if (regex_match(name, regex)) {
             return name;
         }
