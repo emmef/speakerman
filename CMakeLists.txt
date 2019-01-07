@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.6)
 project(speakerman)
 
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 
 include_directories(include src/include /usr/include)
 
@@ -27,6 +27,7 @@ set(SOURCE_FILES
         src/include/speakerman/SpeakermanWebServer.hpp
         src/include/speakerman/Stream.hpp
         src/include/tdap/AdvancedRmsDetector.hpp
+        src/include/tdap/Allocation.hpp
         src/include/tdap/Array.hpp
         src/include/tdap/ArrayTraits.hpp
         src/include/tdap/CapacityPolicy.hpp
@@ -56,6 +57,7 @@ set(SOURCE_FILES
         src/include/tdap/ValueRange.hpp
         src/include/tdap/VolumeMatrix.hpp
         src/include/tdap/Weighting.hpp
+        src/Allocation.cpp
         src/ErrorHandler.cpp
         src/HttpMessage.cpp
         src/JackClient.cpp

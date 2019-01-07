@@ -65,14 +65,6 @@ namespace speakerman {
         for (size_t i = 0; i < PRE_ALLOC_STACK_SIZE; i++) {
             mark[i] = 0;
         }
-        size_t lock_size = end_address - static_cast<char *>(mark_addr) - 16;
-        if (mlockall(MCL_CURRENT)) {
-            perror("could not pre-allocate and lock stack memory - XRUNs can be expected");
-        }
-        else {
-            printf("Thread %llu - locked %zu bytes of stack memory @ %p (filled with %i) plus all resident memory\n",
-                   id, lock_size, &mark, mark[0]);
-        }
     }
 
     int JackProcessor::realtimeCallback(jack_nframes_t frames, void *data)

@@ -23,13 +23,14 @@
 #include <cmath>
 #include <iostream>
 #include <thread>
+#include <malloc.h>
+#include <tdap/Allocation.hpp>
 
 #include <speakerman/jack/JackClient.hpp>
 #include <speakerman/jack/SignalHandler.hpp>
 #include <speakerman/SpeakermanConfig.hpp>
 #include <speakerman/SpeakerManager.hpp>
 #include <speakerman/SpeakermanWebServer.hpp>
-#include <malloc.h>
 
 using namespace speakerman;
 using namespace tdap;
@@ -38,23 +39,54 @@ typedef double sample_t;
 typedef double accurate_t;
 
 template<class T>
-class Owner
+class Owner : public ConsecutiveAllocationOwner
 {
     atomic<T *> __client;
+    mutex mutex_;
 
 public:
-    Owner()
+    Owner(size_t block_size) : ConsecutiveAllocationOwner(block_size)
     {
         __client.store(0);
+        lock_memory();
     }
 
-    void set(T *client)
+    template<class A>
+    void set(T *(*function)(const A &), const A& argument)
     {
-        T *previous = __client.exchange(client);
-        if (previous != nullptr) {
-            cout << "Delete client" << endl;
+        unique_lock<mutex> lock(mutex_);
+        set_null(true);
 
+        consecutive_alloc::Enable conseq = enable();
+
+        __client.exchange(function(argument));
+    }
+
+    template<class A>
+    void set(T* (*function)(const A*), const A* argument)
+    {
+        unique_lock<mutex> lock(mutex_);
+        set_null(true);
+
+        consecutive_alloc::Enable conseq = enable();
+
+        __client.exchange(function(argument));
+    }
+
+    void set_null(bool reset)
+    {
+        T *previous = __client.exchange(nullptr);
+        if (previous == nullptr) {
+            return;
+        }
+        {
+            consecutive_alloc::Enable conseq = enable();
+            cout << this << ": Delete client!!!" << endl;
             delete previous;
+            cout << this << ": Delete client!!! -- done!!!" << endl;
+        }
+        if (reset && !reset_allocation()) {
+            throw std::runtime_error("Could not free up memory");
         }
     }
 
@@ -65,11 +97,12 @@ public:
 
     ~Owner()
     {
-        set(nullptr);
+        unique_lock<mutex> lock(mutex_);
+        set_null(false);
     }
 };
 
-Owner<AbstractSpeakerManager> manager;
+ConsecutiveAllocatedObjectOwner<AbstractSpeakerManager> manager(30485760);
 SpeakermanConfig configFileConfig;
 static volatile int userInput;
 
@@ -92,7 +125,7 @@ static void webServer()
     }
 }
 
-int mainLoop(Owner<JackClient> &owner)
+int mainLoop(ConsecutiveAllocatedObjectOwner<JackClient> &owner)
 {
     std::thread webServerThread(webServer);
     webServerThread.detach();
@@ -156,22 +189,41 @@ static AbstractSpeakerManager *createManagerGroup(const SpeakermanConfig &config
     throw invalid_argument("Number of groups must be between 1 and 4");
 }
 
-template<typename F>
-static AbstractSpeakerManager *createManager(const SpeakermanConfig &config)
-{
 
+using namespace std;
+
+AbstractSpeakerManager *create_manager(const SpeakermanConfig &config)
+{
     switch (config.crossovers) {
         case 1:
-            return createManagerGroup<F, 1>(config);
+            return createManagerGroup<double, 1>(config);
         case 2:
-            return createManagerGroup<F, 2>(config);
+            return createManagerGroup<double, 2>(config);
         case 3:
-            return createManagerGroup<F, 3>(config);
+            return createManagerGroup<double, 3>(config);
     }
     throw invalid_argument("Number of crossovers must be between 1 and 3");
 }
 
-using namespace std;
+JackClient * create_client(const char *name)
+{
+    auto result = JackClient::createDefault(name);
+    if (!result.success()) {
+        cerr << "Could not create jack client \"" << name << "\"" << endl;
+    }
+    return result.getClient();
+}
+
+void display_owner_info(ConsecutiveAllocationOwner &owner, const char *message)
+{
+    cout << message;
+    cout << ": consecutive allocation stats: block_size=" << owner.get_block_size();
+    cout << "; allocated=" << owner.get_allocated_bytes();
+    cout << "; consecutive=" << owner.is_consecutive();
+    cout << "; (owner=" << &owner << ")";
+    cout << endl;
+
+}
 
 int main(int count, char *arguments[])
 {
@@ -182,21 +234,17 @@ int main(int count, char *arguments[])
 
     cout << "Executing " << arguments[0] << endl;
 
-    Owner<JackClient> clientOwner;
-    auto result = JackClient::createDefault("Speaker manager");
-    clientOwner.set(result.getClient());
-    manager.set(createManager<double>(configFileConfig));
-    mallopt(M_TRIM_THRESHOLD, -1);
-    mallopt(M_MMAP_MAX, 0);
+    manager.generate<AbstractSpeakerManager,const SpeakermanConfig&>(create_manager, configFileConfig);
 
-    const char *all = ".*";
-    PortNames inputs = clientOwner.get().portNames(all, all, JackPortIsPhysical | JackPortIsOutput);
-    PortNames outputs = clientOwner.get().portNames(all, all, JackPortIsPhysical | JackPortIsOutput);
+    display_owner_info(manager, "Processor");
 
-    if (!clientOwner.get().setProcessor(manager.get())) {
-        std::cerr << "Failed to set processor" << std::endl;
-        return 1;
-    }
+    ConsecutiveAllocatedObjectOwner<JackClient> clientOwner(1048576);
+
+    clientOwner.generate(create_client, "Speaker manager");
+
+    display_owner_info(clientOwner, "Jack client");
+
+    clientOwner.get().setProcessor(manager.get());
 
     std::cout << "activate..." << std::endl;
     clientOwner.get().setActive();
