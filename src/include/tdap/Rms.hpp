@@ -502,7 +502,7 @@ namespace tdap {
         S add_square_get_detection(size_t index, S squared_input, S squared_minimum = 0)
         {
             if (index >= MAX_SIZE) {
-                throw std::out_of_range("Configure RMS: RMS Index outof range");
+                throw std::out_of_range("Configure RMS: RMS Index out of range");
             }
             return rms_[index].add_square_get_detection(squared_input, squared_minimum);
         }
