@@ -116,8 +116,8 @@ namespace tdap {
         class Disable
         {
             bool execute_;
-            operator Disable &() {};
-            operator const Disable &() {};
+            operator Disable &();
+            operator const Disable &();
             Disable &operator*();
             Disable &operator->();
         public:
