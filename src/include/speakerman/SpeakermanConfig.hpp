@@ -72,7 +72,7 @@ namespace speakerman {
         static constexpr size_t MAX_EQS = 2;
         static constexpr const char *KEY_SNIPPET_EQ_COUNT = "equalizers";
 
-        static constexpr double MIN_THRESHOLD = 0.010;
+        static constexpr double MIN_THRESHOLD = 0.001;
         static constexpr double DEFAULT_THRESHOLD = 0.1;
         static constexpr double MAX_THRESHOLD = 0.5;
         static constexpr const char *KEY_SNIPPET_THRESHOLD = "threshold";
@@ -136,7 +136,7 @@ namespace speakerman {
 
         static constexpr size_t MIN_PERCEPTIVE_TO_MAXIMUM_WINDOW_STEPS = 1;
         static constexpr size_t DEFAULT_PERCEPTIVE_TO_MAXIMUM_WINDOW_STEPS = 1;
-        static constexpr size_t MAX_PERCEPTIVE_TO_MAXIMUM_WINDOW_STEPS = 4;
+        static constexpr size_t MAX_PERCEPTIVE_TO_MAXIMUM_WINDOW_STEPS = 7;
         static constexpr const char *KEY_SNIPPET_PERCEPTIVE_TO_MAXIMUM_WINDOW_STEPS = "perceptive-to-maximum-window-steps";
 
         static constexpr const char *KEY_SNIPPET_BAND = "band";
