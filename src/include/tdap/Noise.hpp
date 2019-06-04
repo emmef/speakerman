@@ -24,6 +24,7 @@
 #define TDAP_NOISE_HEADER_GUARD
 
 #include <tdap/Value.hpp>
+#include <tdap/Integration.hpp>
 #include <random>
 
 namespace tdap {

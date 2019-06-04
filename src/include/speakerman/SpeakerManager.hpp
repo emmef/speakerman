@@ -26,7 +26,6 @@
 #include <cmath>
 #include <tdap/Delay.hpp>
 #include <tdap/FixedSizeArray.hpp>
-#include <tdap/AdvancedRmsDetector.hpp>
 #include <tdap/MemoryFence.hpp>
 #include <tdap/Noise.hpp>
 #include <tdap/Weighting.hpp>
@@ -121,7 +120,6 @@ namespace speakerman {
         {
             std::cout << "Updated metrics: {rate:" << metrics.sampleRate << ", bsize:" << metrics.bufferSize << "}"
                       << std::endl;
-            AdvancedRms::UserConfig config = {0.0005, 0.400, 0.5, 1.5};
             processor.setSampleRate(metrics.sampleRate, crossovers(), config_);
             Levels levels(GROUPS, CROSSOVERS);
             levels.reset();

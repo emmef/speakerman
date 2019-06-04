@@ -26,8 +26,6 @@ set(SOURCE_FILES
         src/include/speakerman/SpeakermanRuntimeData.hpp
         src/include/speakerman/SpeakermanWebServer.hpp
         src/include/speakerman/Stream.hpp
-        src/include/tdap/AdvancedRmsDetector.hpp
-        src/include/tdap/Allocation.hpp
         src/include/tdap/Array.hpp
         src/include/tdap/ArrayTraits.hpp
         src/include/tdap/CapacityPolicy.hpp
@@ -50,9 +48,10 @@ set(SOURCE_FILES
         src/include/tdap/MemoryFence.hpp
         src/include/tdap/Noise.hpp
         src/include/tdap/Power2.hpp
-        src/include/tdap/Rms.hpp
+        src/include/tdap/PerceptiveRms.hpp
         src/include/tdap/Samples.hpp
         src/include/tdap/Transport.hpp
+        src/include/tdap/TrueFloatingPointWindowAverage.hpp
         src/include/tdap/Value.hpp
         src/include/tdap/ValueRange.hpp
         src/include/tdap/VolumeMatrix.hpp

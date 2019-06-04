@@ -24,24 +24,54 @@
 
 #include <cmath>
 #include <tdap/Delay.hpp>
-#include <tdap/AdvancedRmsDetector.hpp>
 #include <tdap/MemoryFence.hpp>
 #include <tdap/Weighting.hpp>
 #include <tdap/Noise.hpp>
 #include <tdap/Crossovers.hpp>
 #include <tdap/Transport.hpp>
+#include <tdap/PerceptiveRms.hpp>
 #include <speakerman/SpeakermanRuntimeData.hpp>
-
-#if !defined(__SSE__) && (defined(__amd64__) || defined(__x86_64__))
 #include <xmmintrin.h>
-#define SSE_INSTRUCTIONS_AVAILABLE 1
-#else
-#undef SSE_INSTRUCTIONS_AVAILABLE
-#endif
 
 namespace speakerman {
 
     using namespace tdap;
+
+// RAII FPU state class, sets FTZ and DAZ and rounding, no exceptions 
+// Adapted from code by mystran @ kvraudio
+// http://www.kvraudio.com/forum/viewtopic.php?t=312228&postdays=0&postorder=asc&start=0
+
+    class ZFPUState
+    {
+    private:
+        unsigned int sse_control_store;
+
+    public:
+        enum Rounding
+        {
+            kRoundNearest = 0,
+            kRoundNegative,
+            kRoundPositive,
+            kRoundToZero,
+        };
+
+        ZFPUState(Rounding mode = kRoundToZero)
+        {
+            sse_control_store = _mm_getcsr();
+
+            // bits: 15 = flush to zero | 6 = denormals are zero
+            // bitwise-OR with exception masks 12:7 (exception flags 5:0)
+            // rounding 14:13, 00 = nearest, 01 = neg, 10 = pos, 11 = to zero
+            // The enum above is defined in the same order so just shift it up
+            _mm_setcsr(0x8040 | 0x1f80 | ((unsigned int) mode << 13));
+        }
+
+        ~ZFPUState()
+        {
+            // clear exception flags, just in case (probably pointless)
+            _mm_setcsr(sse_control_store & (~0x3f));
+        }
+    };
 
 
     template<
@@ -123,7 +153,9 @@ namespace speakerman {
 
         Crossovers::Filter<double, T, INPUTS, CROSSOVERS> crossoverFilter;
         ACurves::Filter<T, PROCESSING_CHANNELS> aCurve;
-        PerceptiveRmsSet<T, DETECTORS, 1048760> rmsDetector;
+        using Detector = PerceptiveRms<T, (size_t)(0.5 + 192000 * BandConfig::MAX_MAXIMUM_WINDOW_SECONDS), 16>;
+
+        Detector *rmsDetector;
 
         RmsDelay rmsDelay;
         GroupDelay groupDelay;
@@ -138,38 +170,19 @@ namespace speakerman {
         static constexpr double PERCEIVED_FAST_BURST_POWER = 0.25;
         static constexpr double PERCEIVED_SLOW_BURST_POWER = 0.15;
 
-        static AdvancedRms::UserConfig rmsUserConfig()
-        {
-            static constexpr double SLOW = 0.4;
-            static constexpr double FAST = 0.0005;
-
-            return {FAST, SLOW,
-                    pow(FAST / AdvancedRms::PERCEPTIVE_FAST_WINDOWSIZE,
-                        PERCEIVED_FAST_BURST_POWER),
-                    pow(SLOW / AdvancedRms::PERCEPTIVE_FAST_WINDOWSIZE,
-                        PERCEIVED_SLOW_BURST_POWER)};
-        }
-
-        static AdvancedRms::UserConfig rmsUserSubConfig()
-        {
-            static constexpr double SLOW = 0.4;
-            static constexpr double FAST = 0.005;
-
-            return {FAST, SLOW,
-                    pow(FAST / AdvancedRms::PERCEPTIVE_FAST_WINDOWSIZE,
-                        PERCEIVED_FAST_BURST_POWER),
-                    pow(SLOW / AdvancedRms::PERCEPTIVE_FAST_WINDOWSIZE,
-                        PERCEIVED_SLOW_BURST_POWER)};
-        }
-
     public:
         DynamicProcessorLevels levels;
 
-        DynamicsProcessor() : sampleRate_(0), levels(GROUPS, CROSSOVERS)
+        DynamicsProcessor() : sampleRate_(0), levels(GROUPS, CROSSOVERS),
+                              rmsDetector(new Detector[DETECTORS])
         {
             levels.reset();
         }
 
+        ~DynamicsProcessor()
+        {
+            delete[] rmsDetector;
+        }
 
         void setSampleRate(
                 T sampleRate,
@@ -184,7 +197,26 @@ namespace speakerman {
                 signalIntegrator[i].coefficients.setCharacteristicSamples(
                         8 * sampleRate);
             }
-
+            // Rms detector confiuration
+            BandConfig bandConfig = config.band[0];
+            rmsDetector[0].configure(
+                    sampleRate, 3,
+                    bandConfig.perceptive_to_peak_steps,
+                    bandConfig.maximum_window_seconds,
+                    bandConfig.perceptive_to_maximum_window_steps,
+                    100.0);
+            cout << "ratio=" << 0.1 << std::endl;
+            for (size_t band = 0, detector = 1; band < CROSSOVERS; band++) {
+                bandConfig = config.band[band + 1];
+                for (size_t group = 0; group < GROUPS; group++, detector++) {
+                    rmsDetector[detector].configure(
+                            sampleRate, 3,
+                            bandConfig.perceptive_to_peak_steps,
+                            bandConfig.maximum_window_seconds,
+                            bandConfig.perceptive_to_maximum_window_steps,
+                            100.0);
+                }
+            }
             size_t rmsDelaySamples =
                     PerceptiveMetrics::PEAK_HOLD_SECONDS * sampleRate;
             rmsDelay.setDelay(rmsDelaySamples);
@@ -198,26 +230,6 @@ namespace speakerman {
             sampleRate_ = sampleRate;
             runtime.init(createConfigData(config));
             noise.setScale(runtime.userSet().noiseScale());
-            BandConfig bandConfig = config.band[0];
-
-            rmsDetector.configure(0,
-                                  sampleRate, 4,
-                                  bandConfig.perceptive_to_peak_steps,
-                                  bandConfig.maximum_window_seconds,
-                                  bandConfig.perceptive_to_maximum_window_steps,
-                                  100.0);
-            AdvancedRms::UserConfig rmsConfig = rmsUserConfig();
-            for (size_t band = 0, detector = 1; band < CROSSOVERS; band++) {
-                bandConfig = config.band[band + 1];
-                for (size_t group = 0; group < GROUPS; group++, detector++) {
-                    rmsDetector.configure(detector,
-                                          sampleRate, 4,
-                                          bandConfig.perceptive_to_peak_steps,
-                                          bandConfig.maximum_window_seconds,
-                                          bandConfig.perceptive_to_maximum_window_steps,
-                                          100.0);
-                }
-            }
         }
 
         const ConfigData &getConfigData() const
@@ -229,8 +241,7 @@ namespace speakerman {
         {
             ConfigData data;
             data.configure(config, sampleRate_, relativeBandWeights,
-                           rmsUserConfig().peakWeight / 1.5);
-//            data.dump();
+                           0.25 / 1.5);
             return data;
         }
 
@@ -331,10 +342,10 @@ namespace speakerman {
         void processSubRms()
         {
             T x = processInput[0];
-            T sub = rmsDelay.setAndGet(0, x);
+            T sub = x;//rmsDelay.setAndGet(0, x);
             x *= runtime.data().subRmsScale();
 //            x = aCurve.filter(0, x);
-            T detect = rmsDetector.add_square_get_detection(0, x * x, 1.0);
+            T detect = rmsDetector[0].add_square_get_detection(x * x, 1.0);
             T gain = 1.0 / detect;
             levels.addValues(0, detect);
             sub *= gain;
@@ -353,13 +364,13 @@ namespace speakerman {
                     for (size_t offset = baseOffset;
                          offset < nextOffset; offset++, delay++) {
                         T x = processInput[offset];
-                        processInput[offset] = rmsDelay.setAndGet(delay, x);
+                        processInput[offset] = x;//rmsDelay.setAndGet(delay, x);
                         T y = aCurve.filter(offset, x);
                         y *= scaleForUnity;
                         squareSum += y * y;
                     }
-                    T detect = rmsDetector.add_square_get_detection(
-                            detector, squareSum, 1.0);
+                    T detect = rmsDetector[detector].add_square_get_detection(
+                            squareSum, 1.0);
                     T gain = 1.0 / detect;
                     levels.addValues(1 + group, detect);
                     for (size_t offset = baseOffset;
@@ -416,6 +427,9 @@ namespace speakerman {
                 for (size_t channel = 0;
                      channel < CHANNELS_PER_GROUP; channel++, offs++) {
                     target[offs] = filter->filter(channel, output[offs]);
+                    if (fabs(output[offs]) > 0.99) {
+                        cout << "PEAK" << endl;
+                    }
                 }
             }
         }

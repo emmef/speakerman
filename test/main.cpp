@@ -4,36 +4,45 @@
 
 #include <jack/jack.h>
 #include <iostream>
+#include <cstdio>
 #include <tdap/Delay.hpp>
-#include <tdap/Rms.hpp>
+#include <tdap/PerceptiveRms.hpp>
+#include <tdap/TrueFloatingPointWindowAverage.hpp>
 
 using namespace tdap;
 using namespace std;
 
-void testMultiBucketMean()
+static void testTrueAverage()
 {
-	static constexpr size_t LEVELS = 3;
-	static constexpr size_t BUCKETS = 4;
-	MultiBucketMean<double, BUCKETS, LEVELS> means;
-	cout << "Reset to zero" << endl;
-	means.setValue(0);
-	cout << "Add bucket value of one iteratively" << endl;
+    const size_t maxWindowSize = 1000 * 1000;
+    const size_t errorTimeConstant = maxWindowSize * 100;
+    const double relativeErrorNoise = 1e-6;
+    const double amplitude = 1.0;
+    const size_t largeWindow = 10000;
+    const size_t smallWindow = 1000;
+    const size_t printInterval = 100;
 
-	for (size_t i = 0; i < 10; i++) {
-		means.addBucketValue(1);
-		FixedSizeArray<FixedSizeArray<double, BUCKETS>, LEVELS> buckets = means.getBuckets();
+    TrueFloatingPointMovingAverage<double> average(
+            maxWindowSize, errorTimeConstant, 10, relativeErrorNoise);
 
-		cout << "[" << i << "]" << endl;
+    average.setUsedWindows(2);
+    average.setAverage(amplitude);
 
-		for (size_t level = 0; level < LEVELS; level++) {
-			cout << "\t[" << level << "]";
-			for (size_t bucket = 0; bucket < BUCKETS; bucket++) {
-				cout << " " << buckets[level][bucket];
-			}
-			cout << " (mean=" << means.getMean(level) << ")" << endl;
-		}
-	}
+    average.setWindowSizeAndScale(0, smallWindow, 1.0);
+    average.setWindowSizeAndScale(1, largeWindow, 4.0);
+    average.setAverage(amplitude);
+
+    printf("Start....\n");
+    for (size_t i = 0; i < largeWindow * 4; i++) {
+        const double input = i < largeWindow ? amplitude : 0.0;
+        average.addInput(input);
+        if (i % printInterval == 0) {
+            printf("[%8zu] input=%8.3lf ; avg1=%18.16lf ; avg2=%18.16lf\n",
+                    i, input, average.getAverage(0), average.getAverage(1));
+        }
+    }
 }
+
 
 static void printDelayEntry(const typename MultiChannelAndTimeDelay<int>::Entry &entry)
 {
@@ -81,7 +90,7 @@ void testMultiTimeDelay()
 
 int main(int c, const char *args[])
 {
-	testMultiBucketMean();
-	testMultiTimeDelay();
+//	testMultiTimeDelay();
+	testTrueAverage();
 	return 0;
 }
