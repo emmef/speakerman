@@ -41,18 +41,19 @@ namespace tdap {
     {
         static constexpr double PERCEPTIVE_SECONDS = 0.400;
         static constexpr double PEAK_SECONDS = 0.0003;
-        static constexpr double PEAK_HOLD_SECONDS = 0.0016;//0.0050
+        static constexpr double PEAK_HOLD_SECONDS = 0.0010;//0.0050
         static constexpr double PEAK_RELEASE_SECONDS = 0.0080; // 0.0100
         static constexpr double MAX_SECONDS = 10.0000;
         static constexpr double PEAK_PERCEPTIVE_RATIO =
                 PEAK_SECONDS / PERCEPTIVE_SECONDS;
     };
 
-    template<typename S, size_t BUCKETS, size_t LEVELS>
+    template<typename S, size_t MAX_WINDOW_SAMPLES, size_t LEVELS>
     class PerceptiveRms
     {
         static_assert(Values::is_between(LEVELS, (size_t) 3, (size_t) 16),
                       "Levels must be between 3 and 16");
+
 
         TrueFloatingPointMovingAverage<S> rms_;
 
@@ -97,7 +98,7 @@ namespace tdap {
         }
 
     public:
-        PerceptiveRms() : follower_(1, 1, 1, 1), rms_(BUCKETS, BUCKETS*10, LEVELS, 1e-6) {};
+        PerceptiveRms() : follower_(1, 1, 1, 1), rms_(MAX_WINDOW_SAMPLES, MAX_WINDOW_SAMPLES*10, LEVELS, 1e-6) {};
 
         void configure(size_t sample_rate, S peak_to_rms,
                        size_t steps_to_peak,
@@ -107,7 +108,7 @@ namespace tdap {
             size_t smaller_levels = Value<size_t >::max(steps_to_peak, 1);
             double biggest = get_biggest_window_size(biggest_window);
             size_t bigger_levels = biggest == PerceptiveMetrics::PERCEPTIVE_SECONDS ? 0 : Value<size_t >::max(steps_to_biggest, 1);
-            cout << "Levels smaller " << smaller_levels << " bigger " << bigger_levels << endl;
+            cout << this << " Levels smaller " << smaller_levels << " bigger " << bigger_levels << endl;
             if (smaller_levels + bigger_levels + 1 > LEVELS) {
                 throw std::invalid_argument("Rms::configure: too many levels specified");
             }
@@ -163,7 +164,74 @@ namespace tdap {
             S value = sqrt(rms_.addInputGetMax(square, minimum));
             return follower_.apply(value);
         }
+
+        S add_square_get_unsmoothed(S square, S minimum = 0)
+        {
+            return sqrt(rms_.addInputGetMax(square, minimum));
+        }
+
+
     };
+
+    template<typename S, size_t MAX_WINDOW_SAMPLES, size_t LEVELS, size_t CHANNELS>
+    class PerceptiveRmsGroup
+    {
+        PerceptiveRms<S, MAX_WINDOW_SAMPLES, LEVELS>* rms_;
+        S maximum_unsmoothed_detection;
+        SmoothHoldMaxAttackRelease <S> follower_;
+
+    public:
+        PerceptiveRmsGroup() :
+        rms_(new PerceptiveRms<S, MAX_WINDOW_SAMPLES, LEVELS>[CHANNELS]),
+        maximum_unsmoothed_detection(0.0),
+        follower_(1, 1, 1, 1)
+        {
+            if (rms_ == nullptr) {
+                cout << "RMS not allocated!" << endl;
+            }
+        }
+
+        void configure(size_t sample_rate, S peak_to_rms,
+                       size_t steps_to_peak,
+                       S biggest_window, size_t steps_to_biggest,
+                       S initial_value = 0.0)
+        {
+            for (size_t channel = 0; channel < CHANNELS; channel++) {
+                rms_[IndexPolicy::force(channel, CHANNELS)].configure(
+                        sample_rate, peak_to_rms,steps_to_peak, biggest_window,
+                        steps_to_biggest, initial_value);
+            }
+            follower_ = SmoothHoldMaxAttackRelease<S>(
+                    PerceptiveMetrics::PEAK_HOLD_SECONDS * sample_rate,
+                    0.5 + 0.5 * PerceptiveMetrics::PEAK_SECONDS * sample_rate,
+                    PerceptiveMetrics::PEAK_RELEASE_SECONDS * sample_rate,
+                    10);
+
+        }
+
+        void reset_frame_detection()
+        {
+            maximum_unsmoothed_detection = 0.0;
+        }
+
+        void add_square_for_channel(size_t channel, S square, S minimim = 0.0)
+        {
+            maximum_unsmoothed_detection = Values::max(
+                    maximum_unsmoothed_detection,
+                    rms_[IndexPolicy::force(channel, CHANNELS)].add_square_get_unsmoothed(square, minimim));
+        }
+
+        S get_detection()
+        {
+            return follower_.apply(maximum_unsmoothed_detection);
+        }
+
+        ~PerceptiveRmsGroup()
+        {
+            delete[] rms_;
+        }
+    };
+
 
 } /* End of name space tdap */
 

@@ -89,7 +89,7 @@ namespace speakerman {
         // sub-woofer groupChannels summed, so don't process CROSSOVER_OUPUTS groupChannels
         static constexpr size_t PROCESSING_CHANNELS = 1 + CROSSOVERS * INPUTS;
         // RMS detection are per group, not per channel (and only one for sub)
-        static constexpr size_t DETECTORS = 1 + CROSSOVERS * GROUPS;
+        static constexpr size_t DETECTORS = CROSSOVERS * GROUPS;
         // Limiters are per group and sub
         static constexpr size_t LIMITERS = 1 + GROUPS;
         // Limiters are per group and sub
@@ -154,8 +154,10 @@ namespace speakerman {
         Crossovers::Filter<double, T, INPUTS, CROSSOVERS> crossoverFilter;
         ACurves::Filter<T, PROCESSING_CHANNELS> aCurve;
         using Detector = PerceptiveRms<T, (size_t)(0.5 + 192000 * BandConfig::MAX_MAXIMUM_WINDOW_SECONDS), 16>;
+        using DetectorGroup = PerceptiveRmsGroup<T, (size_t)(0.5 + 192000 * BandConfig::MAX_MAXIMUM_WINDOW_SECONDS), 16, CHANNELS_PER_GROUP>;
 
-        Detector *rmsDetector;
+        Detector subDetector;
+        DetectorGroup *groupDetector;
 
         RmsDelay rmsDelay;
         GroupDelay groupDelay;
@@ -174,14 +176,14 @@ namespace speakerman {
         DynamicProcessorLevels levels;
 
         DynamicsProcessor() : sampleRate_(0), levels(GROUPS, CROSSOVERS),
-                              rmsDetector(new Detector[DETECTORS])
+                              groupDetector(new DetectorGroup[DETECTORS])
         {
             levels.reset();
         }
 
         ~DynamicsProcessor()
         {
-            delete[] rmsDetector;
+            delete[] groupDetector;
         }
 
         void setSampleRate(
@@ -199,17 +201,17 @@ namespace speakerman {
             }
             // Rms detector confiuration
             BandConfig bandConfig = config.band[0];
-            rmsDetector[0].configure(
+            subDetector.configure(
                     sampleRate, 3,
                     bandConfig.perceptive_to_peak_steps,
                     bandConfig.maximum_window_seconds,
                     bandConfig.perceptive_to_maximum_window_steps,
                     100.0);
             cout << "ratio=" << 0.1 << std::endl;
-            for (size_t band = 0, detector = 1; band < CROSSOVERS; band++) {
+            for (size_t band = 0, detector = 0; band < CROSSOVERS; band++) {
                 bandConfig = config.band[band + 1];
                 for (size_t group = 0; group < GROUPS; group++, detector++) {
-                    rmsDetector[detector].configure(
+                    groupDetector[detector].configure(
                             sampleRate, 3,
                             bandConfig.perceptive_to_peak_steps,
                             bandConfig.maximum_window_seconds,
@@ -280,18 +282,6 @@ namespace speakerman {
             processChannelsFilters(target);
             target[0] = output[0];
             groupDelay.next();
-//            T sum = 0;
-//            for (size_t i = 0; i < OUTPUTS; i++) {
-//                sum += target[i] * target[i];
-//            }
-//            T avg = signalIntegrator[0].integrate(sum);
-//            if (count < 2000000) {
-//                count++;
-//            }
-//            else {
-//                count = 0;
-//                cout << "LVL=" << sqrt(avg) << endl;
-//            }
         }
 
     private:
@@ -342,10 +332,10 @@ namespace speakerman {
         void processSubRms()
         {
             T x = processInput[0];
-            T sub = x;//rmsDelay.setAndGet(0, x);
+            T sub = rmsDelay.setAndGet(0, x);
             x *= runtime.data().subRmsScale();
 //            x = aCurve.filter(0, x);
-            T detect = rmsDetector[0].add_square_get_detection(x * x, 1.0);
+            T detect = subDetector.add_square_get_detection(x * x, 1.0);
             T gain = 1.0 / detect;
             levels.addValues(0, detect);
             sub *= gain;
@@ -354,23 +344,23 @@ namespace speakerman {
 
         void processChannelsRms()
         {
-            for (size_t band = 0, delay = 1, baseOffset = 1, detector = 1;
+            for (size_t band = 0, delay = 1, baseOffset = 1, detector = 0;
                  band < CROSSOVERS; band++) {
                 for (size_t group = 0; group < GROUPS; group++, detector++) {
-                    T squareSum = 0.0;
                     T scaleForUnity = runtime.data().groupConfig(
                             group).bandRmsScale(1 + band);
                     size_t nextOffset = baseOffset + CHANNELS_PER_GROUP;
-                    for (size_t offset = baseOffset;
-                         offset < nextOffset; offset++, delay++) {
+                    DetectorGroup &gd = groupDetector[detector];
+                    gd.reset_frame_detection();
+                    for (size_t offset = baseOffset, channel = 0;
+                         offset < nextOffset; offset++, delay++, channel++) {
                         T x = processInput[offset];
-                        processInput[offset] = x;//rmsDelay.setAndGet(delay, x);
+                        processInput[offset] = rmsDelay.setAndGet(delay, x);
                         T y = aCurve.filter(offset, x);
                         y *= scaleForUnity;
-                        squareSum += y * y;
+                        gd.add_square_for_channel(channel, y*y, 1.0);
                     }
-                    T detect = rmsDetector[detector].add_square_get_detection(
-                            squareSum, 1.0);
+                    T detect = gd.get_detection();
                     T gain = 1.0 / detect;
                     levels.addValues(1 + group, detect);
                     for (size_t offset = baseOffset;

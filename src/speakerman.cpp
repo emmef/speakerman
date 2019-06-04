@@ -102,7 +102,7 @@ public:
     }
 };
 
-ConsecutiveAllocatedObjectOwner<AbstractSpeakerManager> manager(30485760);
+ConsecutiveAllocatedObjectOwner<AbstractSpeakerManager> manager(60485760);
 SpeakermanConfig configFileConfig;
 static volatile int userInput;
 
@@ -238,7 +238,7 @@ int main(int count, char *arguments[])
 
     display_owner_info(manager, "Processor");
 
-    ConsecutiveAllocatedObjectOwner<JackClient> clientOwner(1048576);
+    ConsecutiveAllocatedObjectOwner<JackClient> clientOwner(4048576);
 
     clientOwner.generate(create_client, "Speaker manager");
 
