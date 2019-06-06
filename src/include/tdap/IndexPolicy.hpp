@@ -58,10 +58,30 @@ namespace tdap {
             return defaultOperatorIndexPolicy ? force(index, size) : index;
         }
 
-        static size_t method(size_t index, size_t size)
+        static inline size_t method(size_t index, size_t size)
         {
             return defaultMethodIndexPolicy ? force(index, size) : index;
         }
+
+        struct NotGreater {
+            static inline size_t force(size_t index, size_t high_value)
+            {
+                if (index <= high_value) {
+                    return index;
+                }
+                throw std::out_of_range("Index out of range");
+            }
+
+            static inline size_t array(size_t index, size_t high_value)
+            {
+                return defaultOperatorIndexPolicy ? force(index, high_value) : index;
+            }
+
+            static inline size_t method(size_t index, size_t high_value)
+            {
+                return defaultMethodIndexPolicy ? force(index, high_value) : index;
+            }
+        };
     };
 
 

@@ -216,6 +216,9 @@ namespace tdap {
         }
     };
 
+    using Sizes = Value<size_t>;
+    using Floats = Value<double>;
+
     struct Values
     {
         template<typename T>
