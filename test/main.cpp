@@ -14,31 +14,36 @@ using namespace std;
 
 static void testTrueAverage()
 {
-    const size_t maxWindowSize = 1000 * 1000;
+    const size_t maxWindowSize = 100;
     const size_t errorTimeConstant = maxWindowSize * 100;
     const double relativeErrorNoise = 1e-6;
     const double amplitude = 1.0;
-    const size_t largeWindow = 10000;
-    const size_t smallWindow = 1000;
-    const size_t printInterval = 100;
+    const size_t largeWindow = 100;
+    const size_t smallWindow = 10;
+    const size_t printInterval = 1;
 
-    TrueFloatingPointMovingAverage<double> average(
-            maxWindowSize, errorTimeConstant, 10, relativeErrorNoise);
+    TrueFloatingPointWeightedMovingAverage<double> smallAverage(
+            maxWindowSize, errorTimeConstant);
+    TrueFloatingPointWeightedMovingAverage<double> largeAverage(
+            maxWindowSize, errorTimeConstant);
 
-    average.setUsedWindows(2);
-    average.setAverage(amplitude);
+    smallAverage.setAverage(0);
+    largeAverage.setAverage(0);
 
-    average.setWindowSizeAndScale(0, smallWindow, 1.0);
-    average.setWindowSizeAndScale(1, largeWindow, 4.0);
-    average.setAverage(amplitude);
+    smallAverage.setWindowSize(smallWindow);
+    largeAverage.setWindowSize(largeWindow);
 
     printf("Start....\n");
-    for (size_t i = 0; i < largeWindow * 4; i++) {
-        const double input = i < largeWindow ? amplitude : 0.0;
-        average.addInput(input);
+    for (size_t i = 0; i < largeWindow * 5; i++) {
+        const double input = i > largeWindow && i <= 2*largeWindow ? amplitude : 0.0;
+        smallAverage.addInput(input);
+        largeAverage.addInput(input);
         if (i % printInterval == 0) {
-            printf("[%8zu] input=%8.3lf ; avg1=%18.16lf ; avg2=%18.16lf\n",
-                    i, input, average.getAverage(0), average.getAverage(1));
+            printf("%5zu:\n", i);
+//            printf("[%8zu] input=%8.3lf ; avg1=%18.16lf ; avg2=%18.16lf next1=%lg ; next2=%lg\n",
+//                    i, input, smallAverage.getAverage(), largeAverage.getAverage(),
+//                    smallAverage.getNextHistoryValue(),
+//                    largeAverage.getNextHistoryValue());
         }
     }
 }

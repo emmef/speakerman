@@ -68,19 +68,18 @@ set(SOURCE_FILES
         src/SignalHandler.cpp
         src/SingleThreadFileCache.cpp
         src/SocketStream.cpp
-        src/speakerman.cpp
         src/SpeakermanConfig.cpp
         src/SpeakermanWebServer.cpp
         src/Stream.cpp)
 
-add_executable(speakerman ${SOURCE_FILES})
+add_executable(speakerman ${SOURCE_FILES} src/speakerman.cpp)
 set(LIBRARIES
         jack
         pthread
         )
 link_libraries(jack pthread)
 target_link_libraries(speakerman jack pthread)
-add_executable(test_speakerman test/main.cpp)
+add_executable(test_speakerman ${SOURCE_FILES} test/main.cpp)
 install(TARGETS speakerman RUNTIME DESTINATION bin)
 install(FILES web/index.html web/speakerman.js web/speakerman.css DESTINATION share/speakerman/web)
 install(PROGRAMS src/speakerman-watchdog.sh DESTINATION share/speakerman/script)
