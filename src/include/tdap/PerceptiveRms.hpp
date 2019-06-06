@@ -55,7 +55,7 @@ namespace tdap {
                       "Levels must be between 3 and 16");
 
 
-        TrueFloatingPointMovingAverage<S> rms_;
+        TrueFloatingPointWeightedMovingAverageSet<S> rms_;
 
         size_t used_levels_ = LEVELS;
         SmoothHoldMaxAttackRelease <S> follower_;
@@ -117,7 +117,7 @@ namespace tdap {
             double peak_scale = 1.0 / Value<S>::force_between(peak_to_rms, 2, 10);
             cout << "Peak to RMS " << peak_to_rms << " peak scale " << peak_scale << endl;
             S initial_avererage = Value<S>::force_between(initial_value, 0.0, 100.0);
-            rms_.setAverage(0.0);
+            rms_.setAverages(0.0);
 
             for (size_t level = 0; level < smaller_levels; level++) {
                 double exponent =

@@ -38,6 +38,350 @@
 namespace tdap {
     using namespace std;
 
+    template<
+            typename S, size_t SNR_BITS = 20, size_t MIN_ERROR_DECAY_TO_WINDOW_RATIO = 10>
+    struct MetricsForTrueFloatingPointMovingAverageMetyrics
+    {
+        static_assert(
+                std::is_floating_point<S>::value,
+                "Sample type must be floating point");
+
+        static constexpr size_t MIN_SNR_BITS = 4;
+        static constexpr size_t MAX_SNR_BITS = 44;
+        static_assert(
+                SNR_BITS >= MIN_SNR_BITS && SNR_BITS <= MAX_SNR_BITS,
+                "Number of signal-noise-ratio in bits must lie between"
+                TRUE_RMS_QUOTE(MIN_SNR_BITS)
+                " and "
+                TRUE_RMS_QUOTE(MAX_SNR_BITS)
+                ".");
+
+        static constexpr size_t MIN_MIN_ERROR_DECAY_TO_WINDOW_RATIO = 1;
+        static constexpr size_t MAX_MIN_ERROR_DECAY_TO_WINDOW_RATIO = 1000;
+        static_assert(
+                Sizes::is_between(
+                        MIN_ERROR_DECAY_TO_WINDOW_RATIO,
+                        MIN_MIN_ERROR_DECAY_TO_WINDOW_RATIO,
+                        MAX_MIN_ERROR_DECAY_TO_WINDOW_RATIO
+                ),
+                "Minimum error decay to window size ratio must lie between "
+                TRUE_RMS_QUOTE(MIN_MIN_ERROR_DECAY_TO_WINDOW_RATIO)
+                " and "
+                TRUE_RMS_QUOTE(MAX_MIN_ERROR_DECAY_TO_WINDOW_RATIO));
+
+
+        static constexpr size_t MAX_ERR_MITIGATING_DECAY_SAMPLES =
+                Value<double>::min(
+                        0.01 / numeric_limits<S>::epsilon(),
+                        numeric_limits<size_t>::max());
+        static constexpr size_t MAX_WINDOWS_SIZE_BOUNDARY =
+                MAX_ERR_MITIGATING_DECAY_SAMPLES /
+                MIN_ERROR_DECAY_TO_WINDOW_RATIO;
+        static constexpr const char *
+                ERR_MITIGATING_DECAY_SAMPLES_EXCEEDED_MESSAGE =
+                "The decay time-constant (in samples) for error mitigation must be smaller than "
+                TRUE_RMS_QUOTE(MAX_ERR_MITIGATING_DECAY_SAMPLES)
+                ".";
+        static constexpr size_t MIN_MAX_WINDOW_SAMPLES = 64;
+        static constexpr size_t MAX_MAX_WINDOW_SAMPLES = Floats::min(
+                pow(0.5, SNR_BITS + 1) / std::numeric_limits<S>::epsilon(),
+                MAX_WINDOWS_SIZE_BOUNDARY);
+        static constexpr size_t MIN_ERR_MITIGATING_DECAY_SAMPLES =
+                MIN_ERROR_DECAY_TO_WINDOW_RATIO * MIN_MAX_WINDOW_SAMPLES;
+
+
+    public:
+        static constexpr const size_t getMinimumWindowSizeInSamples()
+        {
+            return MIN_MAX_WINDOW_SAMPLES;
+        }
+
+        static constexpr const size_t getMaximumWindowSizeInSamples()
+        {
+            return MAX_MAX_WINDOW_SAMPLES;
+        }
+
+        static bool isValidWindowSizeInSamples(size_t samples)
+        {
+            return Sizes::is_between(
+                    samples,
+                    MIN_MAX_WINDOW_SAMPLES,
+                    MAX_MAX_WINDOW_SAMPLES);
+        }
+
+        static constexpr const char *getWindowSizeInSamplesRangeMessage()
+        {
+            return
+                    "RMS window size in samples must lie between "
+                    TRUE_RMS_QUOTE(MIN_MAX_WINDOW_SAMPLES)
+                    " and "
+                    TRUE_RMS_QUOTE(MAX_MAX_WINDOW_SAMPLES)
+                    " for minimum of "
+                    TRUE_RMS_QUOTE(SNR_BITS)
+                    " bits of signal to error-noise ratio and sample type "
+                    TRUE_RMS_QUOTE(typename S);
+        }
+
+        static size_t validWindowSizeInSamples(size_t samples)
+        {
+            if (isValidWindowSizeInSamples(samples)) {
+                return samples;
+            }
+            throw std::invalid_argument(getWindowSizeInSamplesRangeMessage());
+        }
+
+        static constexpr const size_t getMaximumErrorMitigatingDecaySamples()
+        {
+            return MAX_ERR_MITIGATING_DECAY_SAMPLES;
+        }
+
+        static constexpr const size_t getMinimumErrorMitigatingDecaySamples()
+        {
+            return MIN_ERR_MITIGATING_DECAY_SAMPLES;
+        }
+
+        static bool isValidErrorMitigatingDecaySamples(size_t samples)
+        {
+            return Sizes::is_between(
+                    samples,
+                    MIN_ERR_MITIGATING_DECAY_SAMPLES,
+                    MAX_ERR_MITIGATING_DECAY_SAMPLES);
+        }
+
+        static constexpr const char *
+        getErrorMitigatingDecaySamplesRangeMessage()
+        {
+            return
+                    "Error mitigating decay samples must lie between "
+                    TRUE_RMS_QUOTE(MIN_ERR_MITIGATING_DECAY_SAMPLES)
+                    " and "
+                    TRUE_RMS_QUOTE(MAX_ERR_MITIGATING_DECAY_SAMPLES)
+                    " for sample type "
+                    TRUE_RMS_QUOTE(typename S)
+                    ".";
+        }
+
+        static size_t validErrorMitigatingDecaySamples(size_t samples)
+        {
+            if (isValidErrorMitigatingDecaySamples(samples)) {
+                return samples;
+            }
+            throw std::invalid_argument(
+                    getErrorMitigatingDecaySamplesRangeMessage());
+        }
+
+        static constexpr size_t
+        getMinimumErrorMitigatingDecayToWindowSizeRation()
+        {
+            return MIN_ERROR_DECAY_TO_WINDOW_RATIO;
+        }
+    };
+
+    template<typename S>
+    class WindowForTrueFloatingPointMovingAverage
+    {
+        size_t windowSize_ = 1;
+        S emdFactor_ = 1;
+        S inputFactor_ = 1;
+        S historyFactor_ = 1;
+        size_t readPtr_ = 1;
+        S average_ = 0;
+
+    public:
+
+        static inline size_t
+        getNextPtr(size_t ptr, size_t min, size_t max)
+        {
+            return ptr > min ? ptr - 1 : max;
+        }
+
+        static inline void
+        setNextPtr(size_t &ptr, size_t min, size_t max)
+        {
+            if (ptr > min) {
+                ptr--;
+            }
+            else
+                ptr = max;
+        }
+
+        static inline size_t
+        getRelative(size_t ptr, size_t delta, size_t min, size_t max)
+        {
+            size_t newPtr = ptr + delta;
+            return newPtr <= max ? newPtr : min +
+                                            ((newPtr - min) % (max + 1 - min));
+        }
+
+        S getAverage() const { return average_; }
+
+        size_t getWindowSize() const { return windowSize_; }
+
+        S getEmdFactor() const { return emdFactor_; }
+
+        S getInputFactor() const { return inputFactor_; }
+
+        S getHistoryFactor() const { return historyFactor_; }
+
+        S getScale() const { return 1; }
+
+        size_t getReadPtr() const { return readPtr_; }
+
+        void setAverage(S average)
+        {
+            average_ = average;
+        }
+
+        void setWindowSamples(size_t windowSamples, size_t minPtr,
+                                        size_t maxPtr, size_t writePtr,
+                                        size_t emdSamples)
+        {
+            windowSize_ = windowSamples;
+            emdFactor_ = exp(-1.0 / emdSamples);
+            const double unscaledHistoryDecayFactor =
+                    exp(-1.0 * this->windowSize_ / emdSamples);
+            inputFactor_ = (1.0 - emdFactor_) / (1.0 - unscaledHistoryDecayFactor);
+            historyFactor_ = inputFactor_ * unscaledHistoryDecayFactor;
+            readPtr_ = getRelative(writePtr, windowSize_, minPtr, maxPtr);
+        }
+
+        S
+        addInput(S input, const S *const historyBuffer, size_t minPtr, size_t maxPtr)
+        {
+            double history = historyBuffer[readPtr_];
+            setNextPtr(readPtr_, minPtr, maxPtr);
+            average_ =
+                    emdFactor_ * average_ +
+                    inputFactor_ * input -
+                    historyFactor_ * history;
+//            printf("addInput(%lf, %p, %zu, %zu) : %.18lg = (%.18lf*avg + %.10lg*%lf - %.10lg*%.18lf) -> %.18lg\n",
+//                   input, historyBuffer, minPtr, maxPtr, average_, emdFactor_, inputFactor_, input, historyFactor_, history, getAverage());
+            return getAverage();
+        }
+
+    };
+
+    template<typename S, size_t SNR_BITS = 20, size_t MIN_ERROR_DECAY_TO_WINDOW_RATIO = 10>
+    class HistoryAndEmdForTrueFloatingPointMovingAverage
+    {
+        using Metrics_ = MetricsForTrueFloatingPointMovingAverageMetyrics
+                <S, SNR_BITS, MIN_ERROR_DECAY_TO_WINDOW_RATIO>;
+        using Entry_ = WindowForTrueFloatingPointMovingAverage<S>;
+        const size_t emdSamples_;
+        const size_t endHistory_;
+        S * const history_;
+        size_t writePtr_ = 0;
+
+        static size_t validWindowSize(size_t emdSamples, size_t windowSize)
+        {
+            if (Metrics_::validWindowSizeInSamples(windowSize) < emdSamples / Metrics_::MIN_MIN_ERROR_DECAY_TO_WINDOW_RATIO) {
+                return windowSize;
+            }
+            throw std::invalid_argument("Invalid combination of window size and ratio between that and error mitigating decay samples.");
+        }
+
+    public:
+        HistoryAndEmdForTrueFloatingPointMovingAverage(
+                const size_t historySamples, const size_t emdSamples) :
+                emdSamples_(Metrics_::validErrorMitigatingDecaySamples(emdSamples)),
+                endHistory_(validWindowSize(emdSamples, historySamples) - 1),
+                history_(new S[endHistory_ + 1])
+        {}
+
+        size_t historySize() const { return endHistory_ + 1; }
+        size_t emdSamples() const { return emdSamples_; }
+        size_t startPtr() const { return 0; }
+        size_t endPtr() const { return endHistory_; }
+        size_t writePtr() const { return writePtr_; }
+
+        const S get(size_t index) const
+        {
+            return history_[IndexPolicy::NotGreater::method(index, endHistory_)];
+        }
+        const S get() const
+        {
+            return get(writePtr_);
+        }
+        const S operator[](size_t index) const
+        {
+            return history_[IndexPolicy::NotGreater::array(index, endHistory_)];
+        }
+        size_t getNextPtr() const
+        {
+            return Entry_::getNextPtr(writePtr_, 0, endHistory_);
+        }
+        void set(size_t index, S value)
+        {
+            history_[IndexPolicy::NotGreater::method(index, endHistory_)] = value;
+        }
+        void write(S value)
+        {
+            history_[writePtr_] = value;
+            Entry_::setNextPtr(writePtr_, 0, endHistory_);
+        }
+        S &operator[](size_t index)
+        {
+            return history_[IndexPolicy::NotGreater::array(index, endHistory_)];
+        }
+        void fillWithAverage(const S average)
+        {
+            for (size_t i = 0; i <= endHistory_; i++) {
+                history_[i] = average;
+            }
+        }
+        const S * const history() const { return history_; }
+        S * const history() { return history_; }
+
+        ~HistoryAndEmdForTrueFloatingPointMovingAverage()
+        {
+            delete[] history_;
+        }
+    };
+
+    template<typename S, size_t SNR_BITS = 20, size_t MIN_ERROR_DECAY_TO_WINDOW_RATIO=10>
+    class TrueFloatingPointWeightedMovingAverage
+    {
+        using History =
+                HistoryAndEmdForTrueFloatingPointMovingAverage
+                <S, SNR_BITS, MIN_ERROR_DECAY_TO_WINDOW_RATIO>;
+        using Window =
+                WindowForTrueFloatingPointMovingAverage
+                <S>;
+
+        History history;
+        Window window;
+    public:
+        TrueFloatingPointWeightedMovingAverage(
+                const size_t maxWindowSize,
+                const size_t emdSamples)
+                :
+                history(maxWindowSize, emdSamples)
+        {
+        }
+
+        void setAverage(const double average)
+        {
+            window.setAverage(average);
+            history.fillWithAverage(average);
+        }
+
+        void setWindowSize(const size_t windowSamples)
+        {
+            window.setWindowSamples(windowSamples, history.startPtr(), history.endPtr(), history.writePtr(), history.emdSamples());
+        }
+
+        void addInput(const double input)
+        {
+            window.addInput(input, history.history(), history.startPtr(), history.endPtr());
+            history.write(input);
+        }
+
+        const S getAverage() const { return window.getAverage(); }
+
+        const size_t getReadPtr() const { return window.getReadPtr(); }
+        const size_t getWritePtr() const { return history.writePtr(); }
+        const S getNextHistoryValue() const { return history.history()[window.getReadPtr()]; }
+    };
     /**
      * Implements a true windowed average. This is obtained by adding a new
      * sample to a running average and subtracting the value of exactly the
@@ -58,28 +402,15 @@ namespace tdap {
      * @tparam MAX_SAMPLE_HISTORY the maximum sample history, determining the maximum RMS window size
      * @tparam MAX_RCS the maximum number of characteristic times in this array
      */
-    template<typename S>
-    class TrueFloatingPointMovingAverage
+    template<typename S, size_t SNR_BITS = 20, size_t MIN_ERROR_DECAY_TO_WINDOW_RATIO=10>
+    class TrueFloatingPointWeightedMovingAverageSet
     {
-        static_assert(std::is_floating_point<S>::value, "Sample type must be floating point");
-        static constexpr double MINIMUM_RELATIVE_ERROR_NOISE_LEVEL = 1e-20;
-        static constexpr double MAXIMUM_RELATIVE_ERROR_NOISE_LEVEL = 1e-2;
-        static constexpr const char * ERROR_NOISE_LEVEL_MESSAGE =
-                "The error noise level must lie between "
-                TRUE_RMS_QUOTE(MINIMUM_RELATIVE_ERROR_NOISE_LEVEL)
-                " and "
-                TRUE_RMS_QUOTE(MAXIMUM_RELATIVE_ERROR_NOISE_LEVEL)
-                ".";
-
-        static constexpr size_t MINIMUM_MAXIMUM_WINDOW_SAMPLES = 64;
-
-        static constexpr const char * MAXIMUM_WINDOW_SAMPLES_MESSAGE =
-                "Maximum number/window of RMS samples is not "
-                TRUE_RMS_QUOTE(MINIMUM_MAXIMUM_WINDOW_SAMPLES)
-                " or larger or is too big, resulting in a bigger measurement"
-                " noise threshold than the required (provided) one";
-        static constexpr const char * ERROR_TIME_CONSTANT_MESSAGE =
-                "The decay time-constant (in samples) for error mitigation must be larger than the maximum number/window of RMS samples";
+        using History =
+        HistoryAndEmdForTrueFloatingPointMovingAverage
+                <S, SNR_BITS, MIN_ERROR_DECAY_TO_WINDOW_RATIO>;
+        using Window =
+        WindowForTrueFloatingPointMovingAverage
+                <S>;
 
         static constexpr size_t MINIMUM_TIME_CONSTANTS = 1;
         static constexpr size_t MAXIMUM_TIME_CONSTANTS = 32;
@@ -88,148 +419,58 @@ namespace tdap {
                 TRUE_RMS_QUOTE(MINIMUM_TIME_CONSTANTS) " and "
                 TRUE_RMS_QUOTE(MAXIMUM_TIME_CONSTANTS) ".";
 
-        struct WindowEntry
-        {
-            size_t windowSize_ = 1;
-            S scale_ = 1;
-            S inputFactor_ = 1;
-            S historyDecayFactor_ = 1;
-            size_t readPtr_ = 1;
-            S average_ = 0;
+        using Metrics = MetricsForTrueFloatingPointMovingAverageMetyrics<S, SNR_BITS, MIN_ERROR_DECAY_TO_WINDOW_RATIO>;
 
-            void setAverage(S average)
-            {
-                average_ = average * (1.0 - inputFactor_ + historyDecayFactor_);
-            }
-
-            S getAverage() const
-            {
-                return average_ * scale_;
-            }
+        struct Entry {
+            Window win;
+            S scale;
         };
-
-        Array<S> history_;
-        Array<WindowEntry> window_;
+        const size_t entries_;
         size_t usedWindows_;
-        size_t maxErrorMitigatingTimeContant_;
-        S averageDecayFactor_;
-        size_t writePointer_;
-        size_t maxPtrValue_;
+        Entry * const entry_;
+        History history_;
 
-        static double validRelativeErrorNoise(double relativeError) {
-            if (Values::is_between(relativeError, MINIMUM_RELATIVE_ERROR_NOISE_LEVEL, MAXIMUM_RELATIVE_ERROR_NOISE_LEVEL)) {
-                return relativeError;
-            }
-            throw std::invalid_argument(ERROR_NOISE_LEVEL_MESSAGE);
-        }
-
-        static size_t validMaxWindowSamples(size_t maxWindowSamples, double relativeErrorNoise)
+        static size_t validMaxTimeConstants(size_t constants)
         {
-            size_t maxOperations = Value<double>::min(
-                    validRelativeErrorNoise(relativeErrorNoise) / std::numeric_limits<S>::epsilon(),
-                    Count<S>::max());
-
-            if (Values::is_between(maxWindowSamples, MINIMUM_MAXIMUM_WINDOW_SAMPLES, maxOperations)) {
-                return maxWindowSamples;
+            if (Sizes::is_between(constants, MINIMUM_TIME_CONSTANTS, MAXIMUM_TIME_CONSTANTS)) {
+                return constants;
             }
-            throw std::invalid_argument(MAXIMUM_WINDOW_SAMPLES_MESSAGE);
+            throw std::invalid_argument(TIME_CONSTANT_MESSAGE);
         }
 
-        static size_t validMaxTimeConstants(size_t maxTimeConstants)
+        size_t checkWindowIndex(size_t index) const
         {
-            if (!Values::is_between(maxTimeConstants, MINIMUM_TIME_CONSTANTS, MAXIMUM_TIME_CONSTANTS)) {
-                throw std::invalid_argument(TIME_CONSTANT_MESSAGE);
+            if (index <= getUsedWindows()) {
+                return index;
             }
-            return maxTimeConstants;
+            throw std::out_of_range("Window index greater than configured windows to use");
         }
 
-        static size_t validErrorMitigatingTimeConstant(size_t errorMitigatingTimeConstant, size_t maxWindowSamples)
-        {
-            size_t hardMaximum = Value<double>::min(0.01 / numeric_limits<S>::epsilon(), numeric_limits<size_t>::max());
-            if (errorMitigatingTimeConstant < maxWindowSamples * 10) {
-                throw std::invalid_argument(
-                        "Error mitigating decay time constant must be larger than ten times the maximum RMS window");
-            }
-            if (errorMitigatingTimeConstant > hardMaximum) {
-                throw std::invalid_argument("Error mitigating decay time constant is too large to be properly represented, given the sample type precision");
-            }
-            return errorMitigatingTimeConstant;
-        }
-
-        void nextPtr(size_t &ptr)
-        {
-            if (ptr > 0) {
-                ptr--;
-            }
-            else {
-                ptr = maxPtrValue_;
-            }
-        }
-
-        void setWindowEntrySizeAndScale(WindowEntry &window, size_t windowSamples, S scale) const
-        {
-            window.windowSize_ = windowSamples;
-            const double unscaledHistoryDecayFactor =
-                    Integration::get_history_multiplier(
-                            1.0 * maxErrorMitigatingTimeContant_ / windowSamples);
-
-            window.scale_ = scale;
-            window.inputFactor_ = (1.0 - averageDecayFactor_) *
-                                  (1.0 / (1.0 - unscaledHistoryDecayFactor));
-            window.historyDecayFactor_ =
-                    unscaledHistoryDecayFactor * window.inputFactor_;
-            printf("Window: samples=%-8zu ; scale=%10lg; history-decay=%20.18lf ; input-multiply=%20.18lf ; history-factor=%20.18lf\n",
-                    windowSamples, window.scale_, unscaledHistoryDecayFactor, window.inputFactor_, window.historyDecayFactor_);
-            window.readPtr_ =
-                    (writePointer_ + windowSamples) % history_.capacity();
-            window.setAverage(window.average_);
-        }
-
-        void addInput(WindowEntry &window, S input)
-        {
-            double history = history_[window.readPtr_];
-            nextPtr(window.readPtr_);
-            window.average_ =
-                    averageDecayFactor_ * window.average_ +
-                    window.inputFactor_ * input -
-                    window.historyDecayFactor_ * history;
-        }
-
-        void checkWindowIndex(size_t index) const
-        {
-            if (index > getUsedWindows()) {
-                throw std::out_of_range("Window index greater than configured windows to use");
-            }
-        }
 
     public:
-        TrueFloatingPointMovingAverage(
-                size_t maxWindowSamples, size_t errorMitigatingTimeConstant, size_t maxTimeConstants, double relativeErrorNoiseLevel)
-                :
-                history_(validMaxWindowSamples(maxWindowSamples,relativeErrorNoiseLevel)),
-                window_(validMaxTimeConstants(maxTimeConstants)),
-                maxErrorMitigatingTimeContant_(validErrorMitigatingTimeConstant(errorMitigatingTimeConstant, history_.capacity())),
-                maxPtrValue_(history_.capacity() - 1),
-                usedWindows_(window_.capacity()),
-                writePointer_(0)
+
+        TrueFloatingPointWeightedMovingAverageSet(
+                size_t maxWindowSamples, size_t errorMitigatingTimeConstant, size_t maxTimeConstants, S average) :
+                entries_(validMaxTimeConstants(maxTimeConstants)),
+                usedWindows_(entries_),
+                entry_(new Entry[entries_]),
+                history_(maxWindowSamples, errorMitigatingTimeConstant)
         {
-            averageDecayFactor_ = Integration::get_history_multiplier(1.0 * maxErrorMitigatingTimeContant_);
-            printf("Average-decay (%zu samples): %20.18lf\n", maxErrorMitigatingTimeContant_, averageDecayFactor_);
+            history_.fillWithAverage(average);
+            for (size_t i = 0; i < entries_; i++) {
+                entry_[i].win.setAverage(0);
+                setWindowSizeAndScale(i, i * maxWindowSamples / entries_, 1.0);
+            }
         }
 
-        size_t getMaxWindows() const { return window_.capacity(); }
+        size_t getMaxWindows() const { return entries_; }
         size_t getUsedWindows() const { return usedWindows_; }
-        size_t getMaxWindowSamples() const { return history_.capacity(); }
+        size_t getMaxWindowSamples() const { return history_.historySize(); }
 
         void setUsedWindows(size_t windows)
         {
-            if (windows > 0 && windows <= window_.capacity()) {
+            if (windows > 0 && windows <= getMaxWindows()) {
                 usedWindows_ = windows;
-                for (size_t i = 0; i < usedWindows_; i++) {
-                    WindowEntry &window = window_[i];
-                    window.readPtr_ =
-                            (writePointer_ + window.windowSize_) % history_.capacity();
-                }
             }
             else {
                 throw std::out_of_range(
@@ -239,92 +480,82 @@ namespace tdap {
 
         void setWindowSizeAndScale(size_t index, size_t windowSamples, S scale)
         {
-            checkWindowIndex(index);
-            if (windowSamples > history_.capacity()) {
+            if (windowSamples > getMaxWindowSamples()) {
                 throw std::out_of_range("Window size in samples is larger than configured maximum at construction.");
             }
-            setWindowEntrySizeAndScale(window_[index], windowSamples, scale);
+            Entry &entry = entry_[checkWindowIndex(index)];
+            entry.win.setWindowSamples(
+                    windowSamples, history_.startPtr(), history_.endPtr(),
+                    history_.writePtr(), history_.emdSamples());
+            entry.scale = Floats::force_between(scale, 0, 1e6);
         }
 
-        void setAverage(S average)
+        void setAverages(S average)
         {
-            for (size_t i = 0; i < window_.capacity(); i++) {
-                window_[i].setAverage(average);
+            for (size_t i = 0; i < entries_; i++) {
+                entry_[i].win.setAverage(average);
             }
-            for (size_t i = 0; i < history_.capacity(); i++) {
-                history_[i] = average;
+            for (size_t i = 0; i < history_.historySize(); i++) {
+                history_.set(i, average);
             }
         }
 
         S getAverage(size_t index) const
         {
-            checkWindowIndex(index);
-            return window_.unsafeData()[index].getAverage();
+            const Entry &entry = entry_[checkWindowIndex(index)];
+            return entry.scale * entry.win.getAverage();
         }
 
         size_t getWindowSize(size_t index) const
         {
-            checkWindowIndex(index);
-            return window_[index].windowSize_;
+            return entry_[checkWindowIndex(index)].win.getWindowSize();
         }
 
         S getWindowScale(size_t index) const
         {
             checkWindowIndex(index);
-            return window_[index].scale_;
+            return entry_[index].scale;
+        }
+
+        const S get() const
+        {
+            return history_.get();
         }
 
         void addInput(S input) {
             for (size_t i = 0; i < getUsedWindows(); i++) {
-                addInput(window_[i], input);
+                entry_[i].win.addInput(input, history_.history(), history_.startPtr(), history_.endPtr());
             }
-            history_[writePointer_] = input;
-            nextPtr(writePointer_);
+            history_.write(input);
         }
 
         S addInputGetMax(S input, S minimumValue)
         {
             S average = minimumValue;
             for (size_t i = 0; i < getUsedWindows(); i++) {
-                addInput(window_[i], input);
-                average = Values::max(window_[i].getAverage(), average);
+                Entry &entry = entry_[i];
+                entry.win.addInput(input, history_.history(), history_.startPtr(), history_.endPtr());
+                average = Values::max(entry.scale * entry.win.getAverage(), average);
             }
-            history_[writePointer_] = input;
-            nextPtr(writePointer_);
+            history_.write(input);
             return average;
         }
 
-        S referenceGetRms(S minimumValue)
+        size_t getWritePtr() const
         {
-            S average = minimumValue;
-            for (size_t i = 0; i < getUsedWindows(); i++) {
-                WindowEntry &window = window_[i];
-                S sum = 0.0;
-                for (size_t j = 0; j < window.windowSize_ - 1; j++) {
-                    sum += history_[(window.readPtr + j) % history_.capacity()];
-                }
-                sum /= window.windowSize_;
-                average = Values::max(average, sum);
-            }
-            return average;
+            return history_.writePtr();
         }
 
-        void reset(bool resetHistory, double averageValue, bool resetWindows)
+        size_t getReadPtr(size_t i) const
         {
-            writePointer_ = 0;
-            for (size_t i = 0; i < history_.capacity(); i++) {
-                history_[i] = averageValue;
-            }
-            if (resetWindows) {
-                for (size_t i = 0; i < window_; i++) {
-                    window_.reset(averageValue);
-                }
-            }
+            return entry_[i].win.getReadPtr();
+        }
+
+        ~TrueFloatingPointWeightedMovingAverageSet()
+        {
+            delete[] entry_;
         }
     };
-
-    template<typename S, size_t MAX_SAMPLES, size_t LEVELS>
-    using TrueMultiRcRms = TrueFloatingPointMovingAverage<S>;
 
 } /* End of name space tdap */
 
