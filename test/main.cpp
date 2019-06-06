@@ -27,23 +27,35 @@ static void testTrueAverage()
     TrueFloatingPointWeightedMovingAverage<double> largeAverage(
             maxWindowSize, errorTimeConstant);
 
+    TrueFloatingPointWeightedMovingAverageSet<double> set(
+            maxWindowSize, errorTimeConstant, 2, 0.0);
+
     smallAverage.setAverage(0);
     largeAverage.setAverage(0);
+    set.setAverages(0);
 
+    printf("\nSetting small average:\n");
     smallAverage.setWindowSize(smallWindow);
+    printf("\nSetting large average:\n");
     largeAverage.setWindowSize(largeWindow);
+    printf("\nSetting set, small average:\n");
+    set.setWindowSizeAndScale(0, smallWindow, 1.0);
+    printf("\nSetting set, large average:\n");
+    set.setWindowSizeAndScale(1, largeWindow, 2.0);
 
     printf("Start....\n");
     for (size_t i = 0; i < largeWindow * 5; i++) {
         const double input = i > largeWindow && i <= 2*largeWindow ? amplitude : 0.0;
         smallAverage.addInput(input);
         largeAverage.addInput(input);
+        double setAvg = set.addInputGetMax(input, 0.0);
         if (i % printInterval == 0) {
-            printf("%5zu:\n", i);
-//            printf("[%8zu] input=%8.3lf ; avg1=%18.16lf ; avg2=%18.16lf next1=%lg ; next2=%lg\n",
-//                    i, input, smallAverage.getAverage(), largeAverage.getAverage(),
-//                    smallAverage.getNextHistoryValue(),
-//                    largeAverage.getNextHistoryValue());
+            printf("[%5zu] input=%8.3lf ; avg1=%18.16lf ; avg2=%18.16lf ; set1=%18.16lf ; set2=%18.16lf ; setMax=%18.16lf\n",
+                    i,
+                    input,
+                    smallAverage.getAverage(), largeAverage.getAverage(),
+                    set.getAverage(0), set.getAverage(1),
+                    setAvg);
         }
     }
 }

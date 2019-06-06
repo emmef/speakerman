@@ -178,99 +178,245 @@ namespace tdap {
     };
 
     template<typename S>
+    class WindowForTrueFloatingPointMovingAverage;
+
+    template<typename S>
+    class BaseHistoryAndEmdForTrueFloatingPointMovingAverage
+    {
+        const size_t historySamples_;
+        S * const history_;
+        const size_t emdSamples_;
+        const S emdFactor_;
+        size_t historyEndPtr_;
+        size_t writePtr_ = 0;
+
+    protected:
+        BaseHistoryAndEmdForTrueFloatingPointMovingAverage(
+                const size_t historySamples, const size_t emdSamples)
+                :
+                historySamples_(historySamples),
+                history_(new S[historySamples]),
+                emdSamples_(emdSamples),
+                emdFactor_(exp( -1.0 / emdSamples)),
+                historyEndPtr_(historySamples - 1),
+                writePtr_(0)
+        {}
+        inline void setNextPtr(size_t &ptr) const
+        {
+            if (ptr > 0) {
+                ptr--;
+            }
+            else
+                ptr = historyEndPtr_;
+        }
+
+    public:
+
+        size_t historySize() const { return historySamples_; }
+        size_t emdSamples() const { return emdSamples_; }
+        size_t writePtr() const { return writePtr_; }
+        size_t maxWindowSamples() const { return historyEndPtr_ + 1; }
+        S emdFactor() const { return emdFactor_; }
+
+        inline size_t getRelative(size_t delta) const
+        {
+            return (writePtr_ + delta) % (historyEndPtr_ + 1);
+        }
+        const S getHistoryValue(size_t &readPtr) const
+        {
+            S result = history_[readPtr];
+            setNextPtr(readPtr);
+            return result;
+        }
+        const S get(size_t index) const
+        {
+            return history_[IndexPolicy::NotGreater::method(index, historyEndPtr_)];
+        }
+        const S get() const
+        {
+            return get(writePtr_);
+        }
+        const S operator[](size_t index) const
+        {
+            return history_[IndexPolicy::NotGreater::array(index, historyEndPtr_)];
+        }
+        void set(size_t index, S value)
+        {
+            history_[IndexPolicy::NotGreater::method(index, historyEndPtr_)] = value;
+        }
+        void write(S value)
+        {
+            history_[writePtr_] = value;
+            setNextPtr(writePtr_);
+        }
+        S &operator[](size_t index)
+        {
+            return history_[IndexPolicy::NotGreater::array(index, historyEndPtr_)];
+        }
+        void fillWithAverage(const S average)
+        {
+            for (size_t i = 0; i <= historyEndPtr_; i++) {
+                history_[i] = average;
+            }
+        }
+        const S * const history() const { return history_; }
+        S * const history() { return history_; }
+
+        bool optimiseForMaximumWindowSamples(size_t samples)
+        {
+            size_t newHistoryEnd =
+                    Sizes::force_between(samples, 4, maxWindowSamples()) - 1;
+            if (newHistoryEnd != historyEndPtr_) {
+                historyEndPtr_ = newHistoryEnd;
+                return true;
+            }
+            return false;
+        }
+
+        ~BaseHistoryAndEmdForTrueFloatingPointMovingAverage()
+        {
+            delete[] history_;
+        }
+    };
+
+
+
+    template<typename S>
     class WindowForTrueFloatingPointMovingAverage
     {
-        size_t windowSize_ = 1;
-        S emdFactor_ = 1;
+        const BaseHistoryAndEmdForTrueFloatingPointMovingAverage<S> * history_ = nullptr;
+        size_t windowSamples_ = 1;
         S inputFactor_ = 1;
         S historyFactor_ = 1;
         size_t readPtr_ = 1;
         S average_ = 0;
 
     public:
-
-        static inline size_t
-        getNextPtr(size_t ptr, size_t min, size_t max)
+        WindowForTrueFloatingPointMovingAverage() {}
+        WindowForTrueFloatingPointMovingAverage(
+                const BaseHistoryAndEmdForTrueFloatingPointMovingAverage<S> *history)
+                :
+                history_(history)
         {
-            return ptr > min ? ptr - 1 : max;
         }
 
-        static inline void
-        setNextPtr(size_t &ptr, size_t min, size_t max)
+        void setOwner(const BaseHistoryAndEmdForTrueFloatingPointMovingAverage<S> *history)
         {
-            if (ptr > min) {
-                ptr--;
+            if (history_ == nullptr) {
+                history_ = history;
+                return;
             }
-            else
-                ptr = max;
+            throw std::runtime_error("Window already owned by other history");
         }
 
-        static inline size_t
-        getRelative(size_t ptr, size_t delta, size_t min, size_t max)
+        bool isOwnedBy(const BaseHistoryAndEmdForTrueFloatingPointMovingAverage<S> *owner) const
         {
-            size_t newPtr = ptr + delta;
-            return newPtr <= max ? newPtr : min +
-                                            ((newPtr - min) % (max + 1 - min));
+            bool b = owner == history_;
+            return b;
         }
 
         S getAverage() const { return average_; }
 
-        size_t getWindowSize() const { return windowSize_; }
-
-        S getEmdFactor() const { return emdFactor_; }
-
-        S getInputFactor() const { return inputFactor_; }
-
-        S getHistoryFactor() const { return historyFactor_; }
-
-        S getScale() const { return 1; }
+        size_t windowSamples() const { return windowSamples_; }
 
         size_t getReadPtr() const { return readPtr_; }
+
+        const BaseHistoryAndEmdForTrueFloatingPointMovingAverage<S> * owner() const { return history_; }
 
         void setAverage(S average)
         {
             average_ = average;
         }
-
-        void setWindowSamples(size_t windowSamples, size_t minPtr,
-                                        size_t maxPtr, size_t writePtr,
-                                        size_t emdSamples)
+        void setWindowSamples(size_t windowSamples)
         {
-            windowSize_ = windowSamples;
-            emdFactor_ = exp(-1.0 / emdSamples);
+            if (history_ == nullptr) {
+                throw std::runtime_error("WindowForTrueFloatingPointMovingAverage::setWindowSamples(): window not related to history data");
+            }
+            if (!Sizes::is_between(windowSamples, 1, history_->maxWindowSamples())) {
+                throw std::runtime_error("WindowForTrueFloatingPointMovingAverage: window samples must lie between 1 and history's maximum size");
+            }
+            windowSamples_ = windowSamples;
             const double unscaledHistoryDecayFactor =
-                    exp(-1.0 * this->windowSize_ / emdSamples);
-            inputFactor_ = (1.0 - emdFactor_) / (1.0 - unscaledHistoryDecayFactor);
+                    exp(-1.0 * this->windowSamples_ / history_->emdSamples());
+            inputFactor_ = (1.0 - history_->emdFactor()) / (1.0 - unscaledHistoryDecayFactor);
             historyFactor_ = inputFactor_ * unscaledHistoryDecayFactor;
-            readPtr_ = getRelative(writePtr, windowSize_, minPtr, maxPtr);
+            setReadPtr();
+        }
+        void setReadPtr()
+        {
+            if (windowSamples_ <= history_->maxWindowSamples()) {
+                readPtr_ = history_->getRelative(windowSamples_);
+                return;
+            }
+            throw std::runtime_error("RMS window size cannot be bigger than buffer");
         }
 
-        S
-        addInput(S input, const S *const historyBuffer, size_t minPtr, size_t maxPtr)
+        void addInput(S input)
         {
-            double history = historyBuffer[readPtr_];
-            setNextPtr(readPtr_, minPtr, maxPtr);
+            S history = history_->getHistoryValue(readPtr_);
             average_ =
-                    emdFactor_ * average_ +
+                    history_->emdFactor() * average_ +
                     inputFactor_ * input -
                     historyFactor_ * history;
-//            printf("addInput(%lf, %p, %zu, %zu) : %.18lg = (%.18lf*avg + %.10lg*%lf - %.10lg*%.18lf) -> %.18lg\n",
-//                   input, historyBuffer, minPtr, maxPtr, average_, emdFactor_, inputFactor_, input, historyFactor_, history, getAverage());
-            return getAverage();
         }
-
     };
 
+    template<typename S>
+    class ScaledWindowForTrueFloatingPointMovingAverage :
+            public WindowForTrueFloatingPointMovingAverage<S>
+    {
+        using Super = WindowForTrueFloatingPointMovingAverage<S>;
+        S scale_ = 1;
+    public:
+        ScaledWindowForTrueFloatingPointMovingAverage() { }
+
+        ScaledWindowForTrueFloatingPointMovingAverage(
+                const BaseHistoryAndEmdForTrueFloatingPointMovingAverage<S> &history)
+                :
+                Super(&history)
+        {
+        }
+
+        S setScale(S scale)
+        {
+            if (fabs(scale) < 1e-12) {
+                scale_ = 0.0;
+            }
+            else if (scale > 1e12) {
+                scale_ = scale;
+            }
+            else if (scale < -1e12) {
+                scale_ = -1e12;
+            }
+            else {
+                scale_ = scale;
+            }
+            return scale;
+        }
+
+        const S scale() const { return scale_; }
+
+        void setWindowSamplesAndScale(size_t windowSamples, S scale)
+        {
+            Super::setWindowSamples(windowSamples);
+            setScale(scale);
+        }
+
+        const S getAverage() const { return scale_ * Super::getAverage(); }
+
+        void setOutput(S outputValue)
+        {
+            Super::setAverage(scale_ != 0.0 ? outputValue / scale_ : outputValue);
+        }
+    };
+
+
     template<typename S, size_t SNR_BITS = 20, size_t MIN_ERROR_DECAY_TO_WINDOW_RATIO = 10>
-    class HistoryAndEmdForTrueFloatingPointMovingAverage
+    class HistoryAndEmdForTrueFloatingPointMovingAverage : public BaseHistoryAndEmdForTrueFloatingPointMovingAverage<S>
     {
         using Metrics_ = MetricsForTrueFloatingPointMovingAverageMetyrics
                 <S, SNR_BITS, MIN_ERROR_DECAY_TO_WINDOW_RATIO>;
-        using Entry_ = WindowForTrueFloatingPointMovingAverage<S>;
-        const size_t emdSamples_;
-        const size_t endHistory_;
-        S * const history_;
-        size_t writePtr_ = 0;
+        using Super = BaseHistoryAndEmdForTrueFloatingPointMovingAverage<S>;
 
         static size_t validWindowSize(size_t emdSamples, size_t windowSize)
         {
@@ -283,60 +429,12 @@ namespace tdap {
     public:
         HistoryAndEmdForTrueFloatingPointMovingAverage(
                 const size_t historySamples, const size_t emdSamples) :
-                emdSamples_(Metrics_::validErrorMitigatingDecaySamples(emdSamples)),
-                endHistory_(validWindowSize(emdSamples, historySamples) - 1),
-                history_(new S[endHistory_ + 1])
+                Super(validWindowSize(Metrics_::validErrorMitigatingDecaySamples(emdSamples), historySamples), emdSamples)
         {}
 
-        size_t historySize() const { return endHistory_ + 1; }
-        size_t emdSamples() const { return emdSamples_; }
-        size_t startPtr() const { return 0; }
-        size_t endPtr() const { return endHistory_; }
-        size_t writePtr() const { return writePtr_; }
 
-        const S get(size_t index) const
-        {
-            return history_[IndexPolicy::NotGreater::method(index, endHistory_)];
-        }
-        const S get() const
-        {
-            return get(writePtr_);
-        }
-        const S operator[](size_t index) const
-        {
-            return history_[IndexPolicy::NotGreater::array(index, endHistory_)];
-        }
-        size_t getNextPtr() const
-        {
-            return Entry_::getNextPtr(writePtr_, 0, endHistory_);
-        }
-        void set(size_t index, S value)
-        {
-            history_[IndexPolicy::NotGreater::method(index, endHistory_)] = value;
-        }
-        void write(S value)
-        {
-            history_[writePtr_] = value;
-            Entry_::setNextPtr(writePtr_, 0, endHistory_);
-        }
-        S &operator[](size_t index)
-        {
-            return history_[IndexPolicy::NotGreater::array(index, endHistory_)];
-        }
-        void fillWithAverage(const S average)
-        {
-            for (size_t i = 0; i <= endHistory_; i++) {
-                history_[i] = average;
-            }
-        }
-        const S * const history() const { return history_; }
-        S * const history() { return history_; }
-
-        ~HistoryAndEmdForTrueFloatingPointMovingAverage()
-        {
-            delete[] history_;
-        }
     };
+
 
     template<typename S, size_t SNR_BITS = 20, size_t MIN_ERROR_DECAY_TO_WINDOW_RATIO=10>
     class TrueFloatingPointWeightedMovingAverage
@@ -350,13 +448,23 @@ namespace tdap {
 
         History history;
         Window window;
+
+        void optimiseForMaximumSamples()
+        {
+            if (history.optimiseForMaximumWindowSamples(window.windowSamples())) {
+                window.setReadPtr();
+            }
+        }
+
     public:
         TrueFloatingPointWeightedMovingAverage(
                 const size_t maxWindowSize,
                 const size_t emdSamples)
                 :
-                history(maxWindowSize, emdSamples)
+                history(maxWindowSize, emdSamples),
+                window(&history)
         {
+            window.setWindowSamples(maxWindowSize);
         }
 
         void setAverage(const double average)
@@ -367,12 +475,13 @@ namespace tdap {
 
         void setWindowSize(const size_t windowSamples)
         {
-            window.setWindowSamples(windowSamples, history.startPtr(), history.endPtr(), history.writePtr(), history.emdSamples());
+            window.setWindowSamples(windowSamples);
+            optimiseForMaximumSamples();
         }
 
         void addInput(const double input)
         {
-            window.addInput(input, history.history(), history.startPtr(), history.endPtr());
+            window.addInput(input);
             history.write(input);
         }
 
@@ -409,7 +518,7 @@ namespace tdap {
         HistoryAndEmdForTrueFloatingPointMovingAverage
                 <S, SNR_BITS, MIN_ERROR_DECAY_TO_WINDOW_RATIO>;
         using Window =
-        WindowForTrueFloatingPointMovingAverage
+        ScaledWindowForTrueFloatingPointMovingAverage
                 <S>;
 
         static constexpr size_t MINIMUM_TIME_CONSTANTS = 1;
@@ -421,13 +530,9 @@ namespace tdap {
 
         using Metrics = MetricsForTrueFloatingPointMovingAverageMetyrics<S, SNR_BITS, MIN_ERROR_DECAY_TO_WINDOW_RATIO>;
 
-        struct Entry {
-            Window win;
-            S scale;
-        };
         const size_t entries_;
+        Window *entry_;
         size_t usedWindows_;
-        Entry * const entry_;
         History history_;
 
         static size_t validMaxTimeConstants(size_t constants)
@@ -440,26 +545,39 @@ namespace tdap {
 
         size_t checkWindowIndex(size_t index) const
         {
-            if (index <= getUsedWindows()) {
+            if (index < getUsedWindows()) {
                 return index;
             }
             throw std::out_of_range("Window index greater than configured windows to use");
         }
 
+        void optimiseForMaximumSamples()
+        {
+            size_t maximumSamples = 0;
+            for (size_t i = 0; i < usedWindows_; i++) {
+                maximumSamples = Sizes::max(maximumSamples, entry_[i].windowSamples());
+            }
+            if (history_.optimiseForMaximumWindowSamples(maximumSamples)) {
+                for (size_t i = 0; i < usedWindows_; i++) {
+                    entry_[i].setReadPtr();
+                }
+            }
+        }
 
     public:
 
         TrueFloatingPointWeightedMovingAverageSet(
                 size_t maxWindowSamples, size_t errorMitigatingTimeConstant, size_t maxTimeConstants, S average) :
                 entries_(validMaxTimeConstants(maxTimeConstants)),
+                entry_(new Window[entries_]),
                 usedWindows_(entries_),
-                entry_(new Entry[entries_]),
                 history_(maxWindowSamples, errorMitigatingTimeConstant)
         {
             history_.fillWithAverage(average);
             for (size_t i = 0; i < entries_; i++) {
-                entry_[i].win.setAverage(0);
-                setWindowSizeAndScale(i, i * maxWindowSamples / entries_, 1.0);
+                entry_[i].setOwner(&history_);
+                entry_[i].setAverage(0);
+                entry_[i].setWindowSamplesAndScale((i + 1) * maxWindowSamples / entries_, 1.0);
             }
         }
 
@@ -471,6 +589,7 @@ namespace tdap {
         {
             if (windows > 0 && windows <= getMaxWindows()) {
                 usedWindows_ = windows;
+                optimiseForMaximumSamples();
             }
             else {
                 throw std::out_of_range(
@@ -483,17 +602,14 @@ namespace tdap {
             if (windowSamples > getMaxWindowSamples()) {
                 throw std::out_of_range("Window size in samples is larger than configured maximum at construction.");
             }
-            Entry &entry = entry_[checkWindowIndex(index)];
-            entry.win.setWindowSamples(
-                    windowSamples, history_.startPtr(), history_.endPtr(),
-                    history_.writePtr(), history_.emdSamples());
-            entry.scale = Floats::force_between(scale, 0, 1e6);
+            entry_[checkWindowIndex(index)].setWindowSamplesAndScale(windowSamples, scale);
+            optimiseForMaximumSamples();
         }
 
         void setAverages(S average)
         {
             for (size_t i = 0; i < entries_; i++) {
-                entry_[i].win.setAverage(average);
+                entry_[i].setAverage(average);
             }
             for (size_t i = 0; i < history_.historySize(); i++) {
                 history_.set(i, average);
@@ -502,19 +618,18 @@ namespace tdap {
 
         S getAverage(size_t index) const
         {
-            const Entry &entry = entry_[checkWindowIndex(index)];
-            return entry.scale * entry.win.getAverage();
+            return entry_[checkWindowIndex(index)].getAverage();
         }
 
         size_t getWindowSize(size_t index) const
         {
-            return entry_[checkWindowIndex(index)].win.getWindowSize();
+            return entry_[checkWindowIndex(index)].windowSamples();
         }
 
         S getWindowScale(size_t index) const
         {
             checkWindowIndex(index);
-            return entry_[index].scale;
+            return entry_[index].scale();
         }
 
         const S get() const
@@ -524,18 +639,19 @@ namespace tdap {
 
         void addInput(S input) {
             for (size_t i = 0; i < getUsedWindows(); i++) {
-                entry_[i].win.addInput(input, history_.history(), history_.startPtr(), history_.endPtr());
+                entry_[i].addInput(input);
             }
             history_.write(input);
         }
 
-        S addInputGetMax(S input, S minimumValue)
+        S addInputGetMax(S const input, S minimumValue)
         {
             S average = minimumValue;
             for (size_t i = 0; i < getUsedWindows(); i++) {
-                Entry &entry = entry_[i];
-                entry.win.addInput(input, history_.history(), history_.startPtr(), history_.endPtr());
-                average = Values::max(entry.scale * entry.win.getAverage(), average);
+                Window &entry = entry_[i];
+                entry.addInput(input);
+                const S v1 = entry.getAverage();
+                average = Values::max(v1, average);
             }
             history_.write(input);
             return average;
@@ -548,7 +664,7 @@ namespace tdap {
 
         size_t getReadPtr(size_t i) const
         {
-            return entry_[i].win.getReadPtr();
+            return entry_[i].getReadPtr();
         }
 
         ~TrueFloatingPointWeightedMovingAverageSet()

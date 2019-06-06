@@ -417,9 +417,6 @@ namespace speakerman {
                 for (size_t channel = 0;
                      channel < CHANNELS_PER_GROUP; channel++, offs++) {
                     target[offs] = filter->filter(channel, output[offs]);
-                    if (fabs(output[offs]) > 0.99) {
-                        cout << "PEAK" << endl;
-                    }
                 }
             }
         }
