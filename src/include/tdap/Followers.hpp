@@ -274,6 +274,8 @@ namespace tdap {
                 integrator_(attackSamples, releaseSamples, initialHoldValue)
         {}
 
+        SmoothHoldMaxAttackRelease() = default;
+
         void resetHold()
         {
             holdMax.reset();

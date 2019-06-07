@@ -41,7 +41,7 @@ namespace tdap {
     {
         static constexpr double PERCEPTIVE_SECONDS = 0.400;
         static constexpr double PEAK_SECONDS = 0.0003;
-        static constexpr double PEAK_HOLD_SECONDS = 0.0010;//0.0050
+        static constexpr double PEAK_HOLD_SECONDS = 0.001;//0.0050
         static constexpr double PEAK_RELEASE_SECONDS = 0.0080; // 0.0100
         static constexpr double MAX_SECONDS = 10.0000;
         static constexpr double PEAK_PERCEPTIVE_RATIO =
@@ -115,7 +115,6 @@ namespace tdap {
             used_levels_ = smaller_levels + bigger_levels + 1;
             rms_.setUsedWindows(used_levels_);
             double peak_scale = 1.0 / Value<S>::force_between(peak_to_rms, 2, 10);
-            cout << "Peak to RMS " << peak_to_rms << " peak scale " << peak_scale << endl;
             S initial_avererage = Value<S>::force_between(initial_value, 0.0, 100.0);
             rms_.setAverages(0.0);
 
