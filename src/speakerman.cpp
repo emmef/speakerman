@@ -102,7 +102,7 @@ public:
     }
 };
 
-ConsecutiveAllocatedObjectOwner<AbstractSpeakerManager> manager(60485760);
+ConsecutiveAllocatedObjectOwner<AbstractSpeakerManager> manager(100 * 1000 * 1000);
 SpeakermanConfig configFileConfig;
 static volatile int userInput;
 
