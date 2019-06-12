@@ -2,12 +2,16 @@
 // Created by michel on 10-9-16.
 //
 
+#define PEAK_DETECTION_LOGGING 2
+
 #include <jack/jack.h>
 #include <iostream>
 #include <cstdio>
 #include <tdap/Delay.hpp>
 #include <tdap/PerceptiveRms.hpp>
+#include <tdap/PeakDetection.hpp>
 #include <tdap/TrueFloatingPointWindowAverage.hpp>
+
 
 using namespace tdap;
 using namespace std;
@@ -61,6 +65,102 @@ static void testTrueAverage()
 }
 
 
+template <typename S>
+static void testPeakDetector()
+{
+    static constexpr size_t RANGE = 100;
+    static constexpr size_t THRESHOLD = 25;
+    static constexpr size_t WINDOW = 288;
+    static constexpr size_t RUNLENGTH = WINDOW * 100;
+    static constexpr size_t PERIODS = 5;
+    static constexpr size_t RANDOM_PEAK = 17 * WINDOW / 10;
+
+    PeakMemory<S> memory(288);
+    PeakDetector<S> detector(288, 0.7, 0.3, 1);
+
+    S input[RUNLENGTH];
+    char line[RANGE + 1];
+
+    for (size_t i = 0; i < RUNLENGTH; i++) {
+        input[i] = THRESHOLD * (1.0 + sin(M_2_PI * i / PERIODS) * rand() / RAND_MAX);
+        if (i % RANDOM_PEAK == 0) {
+            input[i] += 50;
+        }
+    }
+
+
+    size_t samples = memory.setSamples(WINDOW);
+    static constexpr const char * DIGIT = " iP*";
+
+    for (size_t i = 0; i < RUNLENGTH; i++) {
+        double in = input[i];
+        double peak = memory.addSampleGetPeak(in);
+        double delayed = (i >= samples) ? input[i - samples] : 0.0;
+        double fault = delayed / peak;
+        if (fault > 1 || (i % WINDOW == 0)) {
+            for (size_t at = 0; at < RANGE; at++) {
+                int dig = 0;
+                if (at == static_cast<size_t>(delayed)) {
+                    dig |= 1;
+                }
+                if (at == static_cast<size_t>(peak)) {
+                    dig |= 2;
+                }
+                line[at] = DIGIT[dig];
+            }
+            line[RANGE] = '\0';
+            if (fault > 0) {
+                printf("[%5zu]\t[%s] %6.04lf\n", i, line, fault);
+            }
+            else {
+                printf("[%5zu]\t[%s] %7s\n", i, line, "");
+            }
+        }
+    }
+
+    memory.setSamples(WINDOW);
+    samples = detector.setSamplesAndThreshold(WINDOW, THRESHOLD);
+
+    printf("\nUsing LIMITER\n\n");
+    static constexpr const char * DIGIT_LIMIT = " io*dddd";
+    double maxFault = 0;
+    for (size_t i = 0; i < RUNLENGTH; i++) {
+        double detect = detector.addSampleGetDetection(input[i]);
+        double in = i >= samples ? input[i - samples] : 0.0;
+        double gain = static_cast<double>(THRESHOLD) / detect;
+        double out = in * gain;
+        double fault = in / detect;
+        maxFault = Floats::max(maxFault, fault);
+        if (fault > 1 || (i % WINDOW == 0)) {
+            for (size_t at = 0; at < RANGE; at++) {
+                int dig = 0;
+                if (at == static_cast<size_t>(in)) {
+                    dig |= 1;
+                }
+                if (at == static_cast<size_t>(out)) {
+                    dig |= 2;
+                }
+                if (at == static_cast<size_t>(detect)) {
+                    dig |= 4;
+                }
+                line[at] = DIGIT_LIMIT[dig];
+            }
+            line[RANGE] = '\0';
+            if (fault > 1) {
+                printf("[%5zu][%s] %6.04lf! %6.02lf in  %6.02lf out   %6.04lf gain   %6.02lf detect\n",
+                       i, line, fault, in, out, gain, detect);
+            }
+            else {
+                printf("[%5zu][%s] %7s %6.02lf in  %6.02lf out   %6.04lf gain   %6.02lf detect\n",
+                       i, line, "", in, out, gain, detect);
+
+            }
+        }
+    }
+    printf("Maximum fault: %lf\n", maxFault);
+}
+
+
 static void printDelayEntry(const typename MultiChannelAndTimeDelay<int>::Entry &entry)
 {
 	cout << "\tdelay=" << entry.delay_ << "; end=" << entry.end_ << "; write=" << entry.write_ << "; read=" << entry.read_ << endl;
@@ -108,6 +208,7 @@ void testMultiTimeDelay()
 int main(int c, const char *args[])
 {
 //	testMultiTimeDelay();
-	testTrueAverage();
+//	testTrueAverage();
+        testPeakDetector<double>();
 	return 0;
 }

@@ -23,13 +23,14 @@
 #define SMS_SPEAKERMAN_SIGNALGROUP_GUARD_H_
 
 #include <cmath>
+#include <tdap/Crossovers.hpp>
 #include <tdap/Delay.hpp>
 #include <tdap/MemoryFence.hpp>
-#include <tdap/Weighting.hpp>
 #include <tdap/Noise.hpp>
-#include <tdap/Crossovers.hpp>
-#include <tdap/Transport.hpp>
+#include <tdap/PeakDetection.hpp>
 #include <tdap/PerceptiveRms.hpp>
+#include <tdap/Transport.hpp>
+#include <tdap/Weighting.hpp>
 #include <speakerman/SpeakermanRuntimeData.hpp>
 #include <xmmintrin.h>
 
@@ -101,6 +102,9 @@ namespace speakerman {
         static constexpr double GROUP_MAX_DELAY = GroupConfig::MAX_DELAY;
         static constexpr double LIMITER_MAX_DELAY = 0.01;
         static constexpr double RMS_MAX_DELAY = 0.01;
+        static constexpr double LIMITER_PREDICTION_SECONDS = 0.003;
+        static constexpr double peakThreshold = 0.97;
+
 
         static constexpr size_t GROUP_MAX_DELAY_SAMPLES =
                 0.5 + 192000 * GroupConfig::MAX_DELAY;
@@ -117,6 +121,8 @@ namespace speakerman {
         using Configurable = SpeakermanRuntimeConfigurable<T, GROUPS, BANDS,
                                                            CHANNELS_PER_GROUP>;
         using ConfigData = SpeakermanRuntimeData<T, GROUPS, BANDS>;
+
+
 
         class GroupDelay : public MultiChannelAndTimeDelay<T>
         {
@@ -142,6 +148,13 @@ namespace speakerman {
             {}
         };
 
+        class Limiter : public PeakDetector<T>
+        {
+        public:
+            Limiter() : PeakDetector<T>(0.5 + 192000 * 0.01, 0.7, 0.333, 7) {}
+            ~Limiter() {}
+        };
+
     private:
         PinkNoise::Default noise;
         double noiseAvg = 0;
@@ -158,6 +171,7 @@ namespace speakerman {
 
         Detector subDetector;
         DetectorGroup *groupDetector;
+        Limiter limiter[LIMITERS];
 
         GroupDelay groupDelay;
         GroupDelay predictionDelay;
@@ -165,16 +179,6 @@ namespace speakerman {
 
 
         Configurable runtime;
-        FixedSizeArray<SmoothHoldMaxAttackRelease<T>, GROUPS> limiter1;
-        FixedSizeArray<SmoothHoldMaxAttackRelease<T>, GROUPS> limiter2;
-        FixedSizeArray<SmoothHoldMaxAttackRelease<T>, GROUPS> limiter3;
-        FixedSizeArray<SmoothHoldMaxAttackRelease<T>, GROUPS> limiter4;
-        FixedSizeArray<SmoothHoldMaxAttackRelease<T>, GROUPS> limiter5;
-        FixedSizeArray<SmoothHoldMaxAttackRelease<T>, GROUPS> limiter6;
-        FixedSizeArray<SmoothHoldMaxAttackRelease<T>, GROUPS> limiter7;
-        FixedSizeArray<SmoothHoldMaxAttackRelease<T>, GROUPS> limiter8;
-        FixedSizeArray<SmoothHoldMaxAttackRelease<T>, GROUPS> limiter9;
-        FixedSizeArray<SmoothHoldMaxAttackRelease<T>, GROUPS> limiter10;
 
         T sampleRate_;
         bool bypass = true;
@@ -230,7 +234,10 @@ namespace speakerman {
             for (size_t band = 1; band <= CROSSOVERS; band++) {
                 relativeBandWeights[band] = weights[2 * band + 1];
             }
-
+            for (size_t l = 0; l < LIMITERS; l++) {
+                limiter[l].setSamplesAndThreshold(sampleRate *
+                                                  LIMITER_PREDICTION_SECONDS, peakThreshold);
+            }
             sampleRate_ = sampleRate;
             runtime.init(createConfigData(config));
             noise.setScale(runtime.userSet().noiseScale());
@@ -254,7 +261,7 @@ namespace speakerman {
             static const double sizeFactor = 0.8;
             runtime.modify(data);
             noise.setScale(data.noiseScale());
-            size_t predictionSamples = sampleRate_ * 0.003;
+            size_t predictionSamples = 0.5 + sampleRate_ * LIMITER_PREDICTION_SECONDS;
             size_t subDelay = data.subDelay();
             size_t minGroupDelay = subDelay;
             for (size_t group = 0; group < GROUPS; group++) {
@@ -266,16 +273,6 @@ namespace speakerman {
             }
 
             for (size_t group = 0, i = 1; group < GROUPS; group++) {
-                setLimiterMetrics(limiter1[group], predictionSamples);
-                setLimiterMetrics(limiter2[group], predictionSamples * pow(sizeFactor, 1));
-                setLimiterMetrics(limiter3[group], predictionSamples * pow(sizeFactor, 2));
-                setLimiterMetrics(limiter4[group], predictionSamples * pow(sizeFactor, 3));
-                setLimiterMetrics(limiter5[group], predictionSamples * pow(sizeFactor, 4));
-                setLimiterMetrics(limiter6[group], predictionSamples * pow(sizeFactor, 5));
-                setLimiterMetrics(limiter7[group], predictionSamples * pow(sizeFactor, 6));
-                setLimiterMetrics(limiter8[group], predictionSamples * pow(sizeFactor, 7));
-                setLimiterMetrics(limiter9[group], predictionSamples * pow(sizeFactor, 8));
-                setLimiterMetrics(limiter10[group], predictionSamples * pow(sizeFactor, 9));
                 filters_[group].configure(data.groupConfig(group).filterConfig());
                 size_t groupDelaySamples = data.groupConfig(group).delay() - minGroupDelay;
                 for (size_t channel = 0; channel < CHANNELS_PER_GROUP; channel++, i++) {
@@ -286,17 +283,6 @@ namespace speakerman {
             groupDelay.setDelay(0, subDelay - minGroupDelay);
             predictionDelay.setDelay(0, predictionSamples);
             filters_[GROUPS].configure(data.filterConfig());
-        }
-
-        void setLimiterMetrics(SmoothHoldMaxAttackRelease<T> &lim, size_t holdSamples)
-        {
-            size_t baseSamples = Sizes::max(holdSamples, 3);
-            size_t attackSamples = Sizes::max(sampleRate_ * 0.0001, 0.5 * baseSamples);
-            size_t releaseSamples = Sizes::force_between(10 * baseSamples, sampleRate_ * 0.001, sampleRate_ * 0.03);
-            lim.integrator().filter.attackCoeffs.setCharacteristicSamples(attackSamples);
-            lim.integrator().filter.releaseCoeffs.setCharacteristicSamples(releaseSamples);
-            lim.setHoldCount(baseSamples);
-            lim.integrator().setOutput(10);
         }
 
         void process(
@@ -319,7 +305,6 @@ namespace speakerman {
         }
 
     private:
-        static constexpr T peakThreshold = 0.95;
 
         double nextNoise()
         {
@@ -445,6 +430,7 @@ namespace speakerman {
             }
         }
 
+#ifdef DYNAMICS_PROCESSOR_LIMITER_ANALYSIS
         struct Analysis {
             const T decay = exp(-1.0 / 1000000);
             const T multiply = 1.0 - decay;
@@ -459,13 +445,11 @@ namespace speakerman {
 
             void analyseTarget(FixedSizeArray <T, OUTPUTS> &target, size_t offs_start)
             {
-
-
                 for (size_t channel = 0, offs = offs_start; channel < CHANNELS_PER_GROUP; channel++, offs++) {
                     counter++;
                     const T x = target[offs];
                     T peak = fabs(x);
-                    if (peak > peakThreshold) {
+                    if (peak > 1.0) {
                         peakCount++;
                         maxPeak = Floats::max(maxPeak, peak);
                     }
@@ -492,6 +476,11 @@ namespace speakerman {
             }
         } analysis;
 
+#define DO_DYNAMICS_PROCESSOR_LIMITER_ANALYSIS(TARGET,OFFS) \
+    analysis.analyseTarget(TARGET_OFFS);
+#else
+#define DO_DYNAMICS_PROCESSOR_LIMITER_ANALYSIS(TARGET,OFFS)
+#endif
         void processChannelsFilters(FixedSizeArray<T, OUTPUTS> &target)
         {
 
@@ -504,52 +493,20 @@ namespace speakerman {
                     maxOut = Floats::max(maxOut, fabs(out));
                     target[offs] = predictionDelay.setAndGet(offs, out);
                 }
-                T gain = peakThreshold / limiter1[group].apply(maxOut);
-
-
-                gain = limiterStep(target, &limiter2[group], offs_start, gain);
-                gain = limiterStep(target, &limiter3[group], offs_start, gain);
-                gain = limiterStep(target, &limiter4[group], offs_start, gain);
-                gain = limiterStep(target, &limiter5[group], offs_start, gain);
-                gain = limiterStep(target, &limiter6[group], offs_start, gain);
-                gain = limiterStep(target, &limiter7[group], offs_start, gain);
-                gain = limiterStep(target, &limiter8[group], offs_start, gain);
-                gain = limiterStep(target, &limiter9[group], offs_start, gain);
-                gain = limiterStep(target, &limiter10[group], offs_start, gain);
-                limiterStep(target, nullptr, offs_start, gain);
-//                analysis.analyseTarget(target, offs_start);
+                T limiterGain = peakThreshold / limiter[group].addSampleGetDetection(maxOut);
+                for (size_t channel = 0, offs = offs_start; channel < CHANNELS_PER_GROUP; channel++, offs++) {
+                    target[offs] = Floats::force_between(target[offs] * limiterGain, -0.995, 0.995);
+                }
+                DO_DYNAMICS_PROCESSOR_LIMITER_ANALYSIS(target, offs_start)
             }
         }
 
-
-
-        T limiterStep(
-                FixedSizeArray<T, OUTPUTS> &target,
-                SmoothHoldMaxAttackRelease <T> *lim,
-                size_t offs_start, T gain)
-        {
-            if (lim != nullptr) {
-                T maxOut = peakThreshold;
-                for (size_t channel = 0, offs = offs_start; channel < CHANNELS_PER_GROUP; channel++, offs++) {
-                    T limited = target[offs] * gain;
-                    maxOut = Floats::max(maxOut, fabs(limited));
-                    target[offs] = limited;
-                }
-                return peakThreshold / lim->apply(maxOut);
-            }
-            else {
-                for (size_t channel = 0, offs = offs_start; channel < CHANNELS_PER_GROUP; channel++, offs++) {
-                    const T x = target[offs];
-                    target[offs] = Floats::force_between(x * gain, -peakThreshold, peakThreshold);
-                }
-                return 1;
-            }
-
-        }
 
         void processSubLimiter(FixedSizeArray<T, OUTPUTS> &target)
         {
-            target[0] = groupDelay.setAndGet(0, predictionDelay.setAndGet(0, output[0]));
+            T value = output[0];
+            T limiterGain = peakThreshold / limiter[0].addSampleGetDetection(fabs(value));
+            target[0] = limiterGain * groupDelay.setAndGet(0, predictionDelay.setAndGet(0, value));
         }
     };
 

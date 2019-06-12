@@ -1,5 +1,5 @@
 /*
- * tdap/TrueRms.hpp
+ * tdap/TrueFloatingPointWindowAverage.hpp
  *
  * Part of TdAP
  * Time-domain Audio Processing

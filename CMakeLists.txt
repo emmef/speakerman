@@ -48,6 +48,7 @@ set(SOURCE_FILES
         src/include/tdap/MemoryFence.hpp
         src/include/tdap/Noise.hpp
         src/include/tdap/Power2.hpp
+        src/include/tdap/PeakDetection.hpp
         src/include/tdap/PerceptiveRms.hpp
         src/include/tdap/Samples.hpp
         src/include/tdap/Transport.hpp
