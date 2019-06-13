@@ -2,11 +2,6 @@
 // Created by michel on 10-9-16.
 //
 
-#define PEAK_DETECTION_LOGGING 2
-#define PEAK_DETECTION_CHEAP_MEMORY_LOGGING 4
-#define PEAK_DETECTION_CHEAP_METRICS_LOGGING 5
-
-
 #include <jack/jack.h>
 #include <iostream>
 #include <cstdio>
@@ -73,15 +68,15 @@ static void testPeakDetector()
 {
     static constexpr size_t RANGE = 100;
     static constexpr size_t THRESHOLD = 25;
-    static constexpr size_t WINDOW = 10;
-    static constexpr size_t PRINT_INTERVAL = 1;
+    static constexpr size_t WINDOW = 100;
+    static constexpr size_t PRINT_INTERVAL = 1000;
     static constexpr size_t INTERVAL = Value<size_t >::min(PRINT_INTERVAL, WINDOW);
     static constexpr size_t RUNLENGTH = WINDOW * 100;
     static constexpr size_t PERIODS = 5;
     static constexpr size_t RANDOM_PEAK = 17 * WINDOW / 10;
 
-    CheapPeakMemory<S> memory(288);
-    CheapPeakDetector<S> detector(288, 0.7, 0.3, 1);
+    PeakMemory<S> memory(288);
+    PeakDetector<S> detector(288, 0.5, 0.3, 1);
 
     S input[RUNLENGTH];
     char line[RANGE + 1];
@@ -98,31 +93,31 @@ static void testPeakDetector()
     memory.setSampleCount(WINDOW);
     static constexpr const char * DIGIT = " iP*";
 
-    for (size_t i = 0; i < RUNLENGTH; i++) {
-        double in = input[i];
-        double peak = memory.addSampleGetPeak(in);
-        double delayed = (i >= samples) ? input[i - samples] : 0.0;
-        double fault = delayed / peak;
-        if (fault > 1 || (i % INTERVAL == 0)) {
-            for (size_t at = 0; at < RANGE; at++) {
-                int dig = 0;
-                if (at == static_cast<size_t>(delayed)) {
-                    dig |= 1;
-                }
-                if (at == static_cast<size_t>(peak)) {
-                    dig |= 2;
-                }
-                line[at] = DIGIT[dig];
-            }
-            line[RANGE] = '\0';
-            if (fault > 0) {
-                printf("[%5zu]\t[%s] %6.04lf\n", i, line, fault);
-            }
-            else {
-                printf("[%5zu]\t[%s] %7s\n", i, line, "");
-            }
-        }
-    }
+//    for (size_t i = 0; i < RUNLENGTH; i++) {
+//        double in = input[i];
+//        double peak = memory.addSampleGetPeak(in);
+//        double delayed = (i >= samples) ? input[i - samples] : 0.0;
+//        double fault = delayed / peak;
+//        if (fault > 1 || (i % INTERVAL == 0)) {
+//            for (size_t at = 0; at < RANGE; at++) {
+//                int dig = 0;
+//                if (at == static_cast<size_t>(delayed)) {
+//                    dig |= 1;
+//                }
+//                if (at == static_cast<size_t>(peak)) {
+//                    dig |= 2;
+//                }
+//                line[at] = DIGIT[dig];
+//            }
+//            line[RANGE] = '\0';
+//            if (fault > 0) {
+//                printf("[%5zu]\t[%s] %6.04lf\n", i, line, fault);
+//            }
+//            else {
+//                printf("[%5zu]\t[%s] %7s\n", i, line, "");
+//            }
+//        }
+//    }
 
     memory.setSampleCount(WINDOW);
     samples = detector.setSamplesAndThreshold(WINDOW, THRESHOLD);

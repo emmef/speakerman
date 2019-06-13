@@ -336,6 +336,22 @@ namespace tdap {
             return input;
         }
 
+        template<typename V>
+        F get_value(const V input)
+        {
+            if (input > max_) {
+                count_down_ = hold_count_;
+                max_ = input;
+                return input;
+            }
+            if (count_down_ > 0) {
+                count_down_--;
+                return max_;
+            }
+            max_ = input;
+            return input;
+        }
+
         void reset()
         {
             max_ = 0;

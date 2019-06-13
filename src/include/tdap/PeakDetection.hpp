@@ -238,18 +238,18 @@ namespace tdap {
                 S old = window_[oldestWindowPtr].removeFromOldestGetMaximum(windowSize_);
                 S peak = Floats::max(Floats::max(recent, old), betweenWindowMaximum);
 
-#if PEAK_DETECTION_LOGGING > 3
-                if (is_floating_point<S>::value) {
-                    printf("ADD: [%4zu] %8lf IN  %8lf PEAK  %8lf RECENT %8lf RECENT %8lf OLD \n",
-                           inWindowPtr,
-                           (double)sample, (double)peak, (double)recent, (double)betweenWindowMaximum, (double)old);
-                }
-                else {
-                    printf("ADD: [%4zu] %5zi IN  %5zi PEAK  %5zi RECENT  %5zi BETWEEN  %5zi OLD\n",
-                           inWindowPtr,
-                           (ssize_t)sample, (ssize_t)peak, (ssize_t)recent, (ssize_t)betweenWindowMaximum, (ssize_t)old);
-                }
-#endif
+//#if PEAK_DETECTION_LOGGING > 3
+//                if (is_floating_point<S>::value) {
+//                    printf("ADD: [%4zu] %8lf IN  %8lf PEAK  %8lf RECENT %8lf RECENT %8lf OLD \n",
+//                           inWindowPtr,
+//                           (double)sample, (double)peak, (double)recent, (double)betweenWindowMaximum, (double)old);
+//                }
+//                else {
+//                    printf("ADD: [%4zu] %5zi IN  %5zi PEAK  %5zi RECENT  %5zi BETWEEN  %5zi OLD\n",
+//                           inWindowPtr,
+//                           (ssize_t)sample, (ssize_t)peak, (ssize_t)recent, (ssize_t)betweenWindowMaximum, (ssize_t)old);
+//                }
+//#endif
                 inWindowPtr++;
                 if (inWindowPtr == windowSize_) {
                     next();
@@ -546,26 +546,104 @@ namespace tdap {
         }
     };
 
+#ifdef PEAK_DETECTION_ADD_GET_DETECTION_LOGGING
+#define ADD_GET_DETECTION_LOGGING_(fmt, ...) printf(fmt, ##__VA_ARGS__)
+#else
+#define ADD_GET_DETECTION_LOGGING_
+#endif
+
     template <typename S, class Memory>
     class PeakDetectorBase
     {
-        PeakMemory<S> memory;
+        class CompensatedAttack
+        {
+            S compensation;
+            S previousPeak;
+            S compensatedPeak;
+            S detectedPeak;
+            IntegrationCoefficients<S> coefficients;
+            Memory memory;
+        public:
+            CompensatedAttack(size_t maxSampleCount) : memory(maxSampleCount) {}
+
+            void setTimeConstantAndSamples(size_t timeConstantSamples, size_t samples, S initialValue, PeakMemoryResetType reset = PeakMemoryResetType::RESET)
+            {
+                coefficients.setCharacteristicSamples(timeConstantSamples);
+                S output = 0.0;
+                size_t actualSamples = memory.setSampleCount(samples, reset);
+                for (size_t sample = 0; sample < actualSamples; sample++) {
+                    output += coefficients.inputMultiplier() * (1.0 - output);
+                }
+                compensation = 1.0 / output;
+                previousPeak = initialValue;
+                compensatedPeak = initialValue;
+                detectedPeak = initialValue;
+            }
+
+            S detectWithMemory(const S sample)
+            {
+                ADD_GET_DETECTION_LOGGING_("input=%lf; ", (double)sample);
+                return detectWithoutMemory(applyMemory(sample));
+            }
+
+            S applyMemory(const S sample)
+            {
+                return memory.addSampleGetPeak(sample);
+            }
+
+            S detectWithoutMemory(const S peak)
+            {
+                if (peak < previousPeak) {
+                    compensatedPeak = peak;
+                    previousPeak = peak;
+                }
+                else if (peak > previousPeak) {
+                    compensatedPeak = detectedPeak + compensation * (peak - detectedPeak);
+                    previousPeak = peak;
+                }
+                detectedPeak += coefficients.inputMultiplier() * (compensatedPeak - detectedPeak);
+                ADD_GET_DETECTION_LOGGING_("peak=%lf; compensated=%lf; detected=%lf",
+                        (double)peak, (double)compensatedPeak, (double)detectedPeak);
+                return detectedPeak;
+            }
+
+        };
+
+        CompensatedAttack attackMemory;
+        CompensatedAttack smoothMemory;
         S relativeAttackTimeConstant = 1.0;
         S relativeSmoothingTimeConstant = 1.0;
         S relativeReleaseTimeConstant = 1.0;
-        IntegrationCoefficients<S> attackFollower;
         IntegrationCoefficients<S> releaseFollower;
-        Integrator<S> smoothingFollower;
-        S rawDetection = 1.0;
-        S compensationFactor = 1.0;
+        S releaseDetection = 1.0;
+        S attackCompensation = 1.0;
+        S smoothCompensation = 1.0;
+
         S threshold = 1.0;
+#ifdef PEAK_DETECTION_ADD_GET_DETECTION_LOGGING
+        size_t index = 0;
+#endif
+
+
+        S validRelativeAttackTimeConstant(S relativeAttackTimeConstant, S relativeSmoothingTimeConstant)
+        {
+            if (!Value<S>::is_between(relativeAttackTimeConstant, 0.1, 0.9)) {
+                throw invalid_argument("Attack time constant must be between 10 and 90 percent of the number of samples");
+            }
+            if (!Value<S>::is_between(relativeSmoothingTimeConstant, 0.01, 1.0 - relativeAttackTimeConstant)) {
+                throw invalid_argument("Smoothing time constant must be larger than 1 percent of number of samples while sum of attack and smoothing cannot exceed the total number of samples");
+            }
+            return relativeAttackTimeConstant;
+        }
+
     public:
         PeakDetectorBase(size_t maxSamples, S relativeAttackTimeConstant, S relativeSmoothingTimeConstant, S relativeReleaseTimeConstant)
         :
-        memory(maxSamples),
-        relativeAttackTimeConstant(relativeAttackTimeConstant),
-        relativeSmoothingTimeConstant(relativeSmoothingTimeConstant),
-        relativeReleaseTimeConstant(relativeReleaseTimeConstant)
+                attackMemory(maxSamples),
+                smoothMemory(maxSamples),
+                relativeAttackTimeConstant(validRelativeAttackTimeConstant(relativeAttackTimeConstant, relativeSmoothingTimeConstant)),
+                relativeSmoothingTimeConstant(relativeSmoothingTimeConstant),
+                relativeReleaseTimeConstant(relativeReleaseTimeConstant)
         {
             setSamplesAndThreshold(maxSamples, 1.0);
         }
@@ -574,61 +652,53 @@ namespace tdap {
 
         size_t setSamplesAndThreshold(size_t samples, S peakThreshold, PeakMemoryResetType reset = PeakMemoryResetType::RESET)
         {
-            size_t effectiveSamples = memory.setSampleCount(samples, reset);
-            size_t attackSamples = effectiveSamples * relativeAttackTimeConstant;
-            size_t smoothSamples = effectiveSamples * relativeSmoothingTimeConstant;
-            size_t releaseSamples = effectiveSamples * relativeReleaseTimeConstant;
+            size_t attackSamples = samples * relativeAttackTimeConstant;
+            size_t smoothSamples = samples * relativeSmoothingTimeConstant;
+            size_t attackMemorySamples = samples - smoothSamples;
+            size_t releaseSamples = samples * relativeReleaseTimeConstant;
 
-            attackFollower.setCharacteristicSamples(attackSamples);
-            smoothingFollower.coefficients_.setCharacteristicSamples(smoothSamples);
+            attackMemory.setTimeConstantAndSamples(attackSamples, attackMemorySamples, peakThreshold, reset);
+            smoothMemory.setTimeConstantAndSamples(smoothSamples, smoothSamples + 1, peakThreshold, reset);
+
             releaseFollower.setCharacteristicSamples(releaseSamples);
 
-            compensationFactor = 1;
-            double newCompensationFactor = 10.0;
-            size_t iterations = 0;
-            while (newCompensationFactor > 1.0) {
-                smoothingFollower.set_output(0.0);
-                S output = 0;
-                for (size_t i = 1; i < effectiveSamples; i++) {
-                    output += attackFollower.inputMultiplier() * (compensationFactor - output);
-                    smoothingFollower.integrate(output);
-                }
-                newCompensationFactor = 1.0 / smoothingFollower.output_;
-                compensationFactor *= newCompensationFactor;
-                iterations++;
-            }
-            compensationFactor *= exp(M_SQRT2 * smoothSamples / attackSamples);
-#if PEAK_DETECTION_LOGGING > 0
-            smoothingFollower.set_output(0.0);
-            S out = 0;
-            for (size_t i = 1; i < effectiveSamples; i++) {
-                out += attackFollower.inputMultiplier() * (compensationFactor - out);
-                smoothingFollower.integrate(out);
-            }
-            printf("setSamplesAndThreshold(%zu -> %zu): %lf compensation   %zu iterations  %lf attack   %lf smooth\n",
-                    samples, effectiveSamples, compensationFactor, iterations, attackFollower.getCharacteristicSamples(), smoothingFollower.coefficients_.getCharacteristicSamples());
-#endif
+            ADD_GET_DETECTION_LOGGING_("PeakDetector.setSamplesAndThreshold: samples=%zu; "
+                   "attack=%zu (memory=%zu); smooth=%zu; release=%zu; "
+                   "attack-comp=%lf; smooth-comp=%lf\n",
+                    samples,
+                    attackSamples, attackMemorySamples, smoothSamples, releaseSamples,
+                    attackCompensation, smoothCompensation);
             threshold = peakThreshold;
-            smoothingFollower.set_output(peakThreshold);
-            rawDetection = peakThreshold;
-            return effectiveSamples;
+#ifdef PEAK_DETECTION_ADD_GET_DETECTION_LOGGING
+            index = 0;
+#endif
+            return samples;
         }
 
         S addSampleGetDetection(S sample)
         {
-            S peak = memory.addSampleGetPeak(Floats::max(threshold, sample));
-            if (peak >= rawDetection) {
-                rawDetection += attackFollower.inputMultiplier() * (compensationFactor * peak - rawDetection);
+#ifdef PEAK_DETECTION_ADD_GET_DETECTION_LOGGING
+            printf("[%4zu] PeakDetector.addSampleGetDetection: attack={", index++);
+#endif
+            S peak = attackMemory.detectWithMemory(
+                    Floats::max(threshold, sample));
+
+            if (peak > releaseDetection) {
+                releaseDetection = peak;
             }
             else {
-                rawDetection += releaseFollower.inputMultiplier() * (peak - rawDetection);
+                releaseDetection += releaseFollower.inputMultiplier() * (threshold - releaseDetection);
             }
-            return smoothingFollower.integrate(rawDetection);
+            ADD_GET_DETECTION_LOGGING_("}; release=%lf; smooth={", releaseDetection);
+            S detection = smoothMemory.detectWithMemory(releaseDetection);
+            ADD_GET_DETECTION_LOGGING_("}\n");
+
+            return detection;
         }
 
         void resetState()
         {
-            memory.resetState();
+            attackMemory.resetState();
         }
     };
 

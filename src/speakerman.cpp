@@ -24,8 +24,10 @@
 #include <iostream>
 #include <thread>
 #include <malloc.h>
-#include <tdap/Allocation.hpp>
 
+//#define DYNAMICS_PROCESSOR_LIMITER_ANALYSIS 1
+
+#include <tdap/Allocation.hpp>
 #include <speakerman/jack/JackClient.hpp>
 #include <speakerman/jack/SignalHandler.hpp>
 #include <speakerman/SpeakermanConfig.hpp>
