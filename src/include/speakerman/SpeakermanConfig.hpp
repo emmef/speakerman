@@ -125,17 +125,17 @@ namespace speakerman {
         static constexpr const char *KEY_SNIPPET_SMOOTHING_TO_WINDOW_RATIO = "smoothing-to-window-ratio";
 
         static constexpr double MIN_MAXIMUM_WINDOW_SECONDS = 0.4;
-        static constexpr double DEFAULT_MAXIMUM_WINDOW_SECONDS = 0.4;
+        static constexpr double DEFAULT_MAXIMUM_WINDOW_SECONDS = 1.2;
         static constexpr double MAX_MAXIMUM_WINDOW_SECONDS = 8.0;
         static constexpr const char *KEY_SNIPPET_MAXIMUM_WINDOW_SECONDS = "maximum-window-seconds";
 
         static constexpr size_t MIN_PERCEPTIVE_TO_PEAK_STEPS = 1;
-        static constexpr size_t DEFAULT_PERCEPTIVE_TO_PEAK_STEPS = 4;
+        static constexpr size_t DEFAULT_PERCEPTIVE_TO_PEAK_STEPS = 12;
         static constexpr size_t MAX_PERCEPTIVE_TO_PEAK_STEPS = 12;
         static constexpr const char *KEY_SNIPPET_PERCEPTIVE_TO_PEAK_STEPS = "perceptive-to-peak-steps";
 
         static constexpr size_t MIN_PERCEPTIVE_TO_MAXIMUM_WINDOW_STEPS = 1;
-        static constexpr size_t DEFAULT_PERCEPTIVE_TO_MAXIMUM_WINDOW_STEPS = 1;
+        static constexpr size_t DEFAULT_PERCEPTIVE_TO_MAXIMUM_WINDOW_STEPS = 3;
         static constexpr size_t MAX_PERCEPTIVE_TO_MAXIMUM_WINDOW_STEPS = 7;
         static constexpr const char *KEY_SNIPPET_PERCEPTIVE_TO_MAXIMUM_WINDOW_STEPS = "perceptive-to-maximum-window-steps";
 

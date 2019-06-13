@@ -3,6 +3,9 @@
 //
 
 #define PEAK_DETECTION_LOGGING 2
+#define PEAK_DETECTION_CHEAP_MEMORY_LOGGING 4
+#define PEAK_DETECTION_CHEAP_METRICS_LOGGING 5
+
 
 #include <jack/jack.h>
 #include <iostream>
@@ -70,13 +73,15 @@ static void testPeakDetector()
 {
     static constexpr size_t RANGE = 100;
     static constexpr size_t THRESHOLD = 25;
-    static constexpr size_t WINDOW = 288;
+    static constexpr size_t WINDOW = 10;
+    static constexpr size_t PRINT_INTERVAL = 1;
+    static constexpr size_t INTERVAL = Value<size_t >::min(PRINT_INTERVAL, WINDOW);
     static constexpr size_t RUNLENGTH = WINDOW * 100;
     static constexpr size_t PERIODS = 5;
     static constexpr size_t RANDOM_PEAK = 17 * WINDOW / 10;
 
-    PeakMemory<S> memory(288);
-    PeakDetector<S> detector(288, 0.7, 0.3, 1);
+    CheapPeakMemory<S> memory(288);
+    CheapPeakDetector<S> detector(288, 0.7, 0.3, 1);
 
     S input[RUNLENGTH];
     char line[RANGE + 1];
@@ -89,7 +94,8 @@ static void testPeakDetector()
     }
 
 
-    size_t samples = memory.setSamples(WINDOW);
+    size_t samples = WINDOW;
+    memory.setSampleCount(WINDOW);
     static constexpr const char * DIGIT = " iP*";
 
     for (size_t i = 0; i < RUNLENGTH; i++) {
@@ -97,7 +103,7 @@ static void testPeakDetector()
         double peak = memory.addSampleGetPeak(in);
         double delayed = (i >= samples) ? input[i - samples] : 0.0;
         double fault = delayed / peak;
-        if (fault > 1 || (i % WINDOW == 0)) {
+        if (fault > 1 || (i % INTERVAL == 0)) {
             for (size_t at = 0; at < RANGE; at++) {
                 int dig = 0;
                 if (at == static_cast<size_t>(delayed)) {
@@ -118,7 +124,7 @@ static void testPeakDetector()
         }
     }
 
-    memory.setSamples(WINDOW);
+    memory.setSampleCount(WINDOW);
     samples = detector.setSamplesAndThreshold(WINDOW, THRESHOLD);
 
     printf("\nUsing LIMITER\n\n");
@@ -131,7 +137,7 @@ static void testPeakDetector()
         double out = in * gain;
         double fault = in / detect;
         maxFault = Floats::max(maxFault, fault);
-        if (fault > 1 || (i % WINDOW == 0)) {
+        if (fault > 1 || (i % INTERVAL == 0)) {
             for (size_t at = 0; at < RANGE; at++) {
                 int dig = 0;
                 if (at == static_cast<size_t>(in)) {

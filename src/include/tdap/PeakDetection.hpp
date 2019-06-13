@@ -23,12 +23,14 @@
 #ifndef PEAK_DETECTION_HEADER_GUARD
 #define PEAK_DETECTION_HEADER_GUARD
 
-#ifdef PEAK_DETECTION_LOGGING
+#if defined(PEAK_DETECTION_LOGGING) || defined(PEAK_DETECTION_CHEAP_MEMORY_LOGGING) || defined(PEAK_DETECTION_CHEAP_METRICS_LOGGING)
     #include <cstdio>
 #endif
 
 #include <cmath>
 #include <exception>
+#include <limits>
+#include <type_traits>
 #include <tdap/Count.hpp>
 #include <tdap/Value.hpp>
 #include <tdap/Integration.hpp>
@@ -38,6 +40,8 @@
 
 namespace tdap {
     using namespace std;
+
+    enum class PeakMemoryResetType { RESET, KEEP };
 
     template <typename S>
     class PeakMemory
@@ -266,7 +270,6 @@ namespace tdap {
                 maxSamples_ = 0;
                 maxWindows_ = 0;
             }
-
         };
 
         static size_t validSamples(size_t samples)
@@ -284,14 +287,23 @@ namespace tdap {
         :
         data_(validSamples(maxSamples))
         {
-            setSamples(maxSamples);
+            setSampleCount(maxSamples);
         }
 
         size_t samples() const { return data_.samples(); }
 
-        size_t setSamples(size_t samples)
+        static bool supportsResetType(PeakMemoryResetType reset) {
+            return reset == PeakMemoryResetType::RESET;
+        }
+
+        size_t setSampleCount(size_t samples, PeakMemoryResetType reset = PeakMemoryResetType::RESET)
         {
             return data_.setSamples(samples);
+        }
+
+        void resetState()
+        {
+            setSampleCount(samples(), PeakMemoryResetType::RESET);
         }
 
         S addSampleGetPeak(S sample)
@@ -301,8 +313,241 @@ namespace tdap {
 
     };
 
+    template<typename S>
+    class CheapPeakMemoryMetrics
+    {
+        size_t requestedSamples_;
+        size_t windowSize_;
+        size_t windowCount_;
+        size_t maxWindowCount_;
+        size_t sampleCount_;
+
+        static size_t validCount(size_t samples)
+        {
+            if (samples == 0) {
+                throw std::invalid_argument("CheapPeakMemoryMetrics::windowSizeForSamples: must have positive number of samples");
+            }
+            if (samples > Count<S>::max()) {
+                throw std::invalid_argument("CheapPeakMemoryMetrics::windowSizeForSamples: number of samples exceeds maximum for sample type");
+            }
+            return samples;
+        }
+
+        static size_t unsafeWindowSizeForSamples(size_t samples)
+        {
+            return Sizes::max(1, sqrt(samples));
+        }
+
+        static size_t unsafeWindowCountForSamplesAndSize(size_t samples,
+                                                         size_t windowSize)
+        {
+            size_t count = samples / windowSize;
+            size_t actualSamples = count * windowSize;
+            if (actualSamples == samples) {
+                return count;
+            }
+            count++;
+            if (Count<S>::max() / count < windowSize) {
+                throw std::invalid_argument("CheapPeakMemoryMetrics::windowsForSamplesAndSize: actual number of samples would exceed maximum for sample type");
+            }
+            return count;
+        }
+
+    public:
+        static size_t windowSizeForSamples(size_t samples)
+        {
+            return unsafeWindowSizeForSamples(validCount(samples));
+        }
+
+        static  size_t windowCountForSamplesAndSize(size_t samples,
+                                                    size_t windowSize)
+        {
+            return unsafeWindowCountForSamplesAndSize(validCount(samples),
+                                                      validCount(windowSize));
+        }
+
+        CheapPeakMemoryMetrics(size_t sampleCount)
+        {
+            setSampleCount(sampleCount);
+
+        }
+
+        CheapPeakMemoryMetrics() : CheapPeakMemoryMetrics(1) {}
+
+        inline size_t requestedSamples() const { return requestedSamples_; }
+        inline size_t sampleCount() const { return sampleCount_; }
+        inline size_t windowSize() const { return windowSize_; }
+        inline size_t windowCount() const { return windowCount_; }
+        inline size_t maxWindowCount() const { return maxWindowCount_; }
+
+        size_t setSampleCount(size_t sampleCount)
+        {
+            requestedSamples_ = validCount(sampleCount);
+            windowSize_ = unsafeWindowSizeForSamples(requestedSamples_);
+            windowCount_ = unsafeWindowCountForSamplesAndSize(requestedSamples_,
+                                                              windowSize_);
+            maxWindowCount_ = windowCount_;
+            if (windowCount_ > 1) {
+                for (
+                        size_t i = 0,
+                        size = windowSize_ * (windowCount_ - 1);
+                        i < windowSize_;
+                        i++, size++) {
+#if PEAK_DETECTION_CHEAP_METRICS_LOGGING > 3
+                    printf("\tsetSampleCount([%zu] size=%zu, maxWindowCount=%zu)\n", i, size, maxWindowCount_);
+#endif
+                    maxWindowCount_ = Sizes::max(
+                            maxWindowCount_,
+                            unsafeWindowCountForSamplesAndSize(
+                                    size,
+                                    unsafeWindowSizeForSamples(size)));
+                }
+            }
+            sampleCount_ = windowSize_ * windowCount_;
+#if PEAK_DETECTION_CHEAP_METRICS_LOGGING > 0
+            printf("CheapPeakMemoryMetrics("
+                   "requestedSamples=%zu, sampleCount=%zu, "
+                   "windowSize=%zu, windowCount=%zu, maxWindowCount=%zu)\n",
+                   requestedSamples_, sampleCount_,
+                   windowSize_, windowCount_, maxWindowCount_);
+#endif
+            return sampleCount_;
+        }
+    };
+
     template <typename S>
-    class PeakDetector
+    class CheapPeakMemory
+    {
+        static constexpr const S MINIMUM_VALUE = numeric_limits<S>::lowest();
+
+        const CheapPeakMemoryMetrics<S> maxMetrics_;
+        CheapPeakMemoryMetrics<S> metrics_;
+        S *windowPeak_;
+        size_t recentWindowPtr_;
+        size_t samplePtr_;
+        S oldWindowsPeak_;
+        S recentPeak_;
+
+
+        size_t wrap(size_t ptr) { return ptr % metrics_.windowSize(); }
+        size_t next(size_t ptr) { return (ptr + 1) % metrics_.windowSize(); }
+
+        S calculateOldWindowsMax()
+        {
+            S oldMax = MINIMUM_VALUE;
+            for (size_t window = 0; window < metrics_.windowCount(); window++) {
+                oldMax = Value<S>::max(oldMax, windowPeak_[window]);
+            }
+            return oldMax;
+        }
+
+    public:
+
+        CheapPeakMemory(size_t maxSampleCount)
+        :
+                maxMetrics_(maxSampleCount), metrics_(maxMetrics_),
+                windowPeak_(new S[maxMetrics_.maxWindowCount()])
+        {
+            resetState();
+        }
+
+        const CheapPeakMemoryMetrics<S> metrics() const { return metrics_; }
+
+        static bool supportsResetType(PeakMemoryResetType reset)
+        {
+            return reset == PeakMemoryResetType::RESET || reset == PeakMemoryResetType::KEEP;
+        }
+
+        size_t setSampleCount(size_t sampleCount, PeakMemoryResetType reset = PeakMemoryResetType::RESET)
+        {
+            if (sampleCount > maxMetrics_.sampleCount()) {
+                throw std::invalid_argument("CheapPeakMemory::setSampleCount: number of samples exceeds maximum set at construction");
+            }
+            if (reset == PeakMemoryResetType::RESET) {
+                metrics_.setSampleCount(sampleCount);
+                resetState();
+                return metrics_.sampleCount();
+            }
+
+            size_t oldCount = metrics_.windowCount();
+            size_t oldSize = metrics_.windowCount();
+
+            metrics_.setSampleCount(sampleCount);
+
+            size_t newCount = metrics_.windowCount();
+            S oldPeak = MINIMUM_VALUE;
+            size_t overlap = Sizes::min(newCount, oldCount);
+            size_t window = 0;
+
+            if (recentWindowPtr_ == 0) {
+                while (window < overlap) {
+                    oldPeak = Value<S>::max(oldPeak, windowPeak_[window++ % oldCount]);
+                }
+            }
+            else {
+                size_t source = recentWindowPtr_;
+                recentWindowPtr_ = 0;
+
+                while (window < overlap) {
+                    S localPeak = windowPeak_[source++ % oldCount];
+                    windowPeak_[window++ % oldCount] = localPeak;
+                    oldPeak = Value<S>::max(oldPeak, localPeak);
+                }
+            }
+            oldWindowsPeak_ = oldPeak;
+            while (window < newCount) {
+                windowPeak_[window++] = oldPeak;
+            }
+            samplePtr_ *= metrics_.windowSize() / oldSize;
+            return metrics_.sampleCount();
+        }
+
+        void resetState()
+        {
+            for (size_t window = 0; window < metrics_.windowCount(); window++) {
+                windowPeak_[window] = MINIMUM_VALUE;
+            }
+            recentWindowPtr_ = 0;
+            samplePtr_ = 0;
+            oldWindowsPeak_ = MINIMUM_VALUE;
+            recentPeak_ = MINIMUM_VALUE;
+        }
+
+        S addSampleGetPeak(S newSample)
+        {
+            recentPeak_ = Value<S>::max(recentPeak_, newSample);
+            S peak = Value<S>::max(recentPeak_, oldWindowsPeak_);
+
+#if PEAK_DETECTION_CHEAP_MEMORY_LOGGING > 3
+            if (is_floating_point<S>::value) {
+                printf("CheapPeakMemory::addSampleGetPeak   %11.04lg IN   %11.04lg PEAK   %11.04lg RECENT   %11.04lg OLD\n",
+                       (double)newSample, (double)peak, (double)recentPeak_, (double)oldWindowsPeak_);
+            }
+            else {
+                printf("CheapPeakMemory::addSampleGetPeak   %11ld IN   %11ld PEAK   %11ld RECENT   %11ld OLD\n",
+                       (long signed)newSample, (long signed)peak, (long signed)recentPeak_, (long signed)oldWindowsPeak_);
+
+            }
+#endif
+
+            samplePtr_++;
+            if (samplePtr_ == metrics_.windowSize()) {
+                windowPeak_[recentWindowPtr_] = recentPeak_;
+                oldWindowsPeak_ = calculateOldWindowsMax();
+                recentWindowPtr_ = next(recentWindowPtr_);
+                samplePtr_ = 0;
+                windowPeak_[recentWindowPtr_] = MINIMUM_VALUE;
+            }
+            return peak;
+        }
+
+        ~CheapPeakMemory() {
+            delete[] windowPeak_;
+        }
+    };
+
+    template <typename S, class Memory>
+    class PeakDetectorBase
     {
         PeakMemory<S> memory;
         S relativeAttackTimeConstant = 1.0;
@@ -315,7 +560,7 @@ namespace tdap {
         S compensationFactor = 1.0;
         S threshold = 1.0;
     public:
-        PeakDetector(size_t maxSamples, S relativeAttackTimeConstant, S relativeSmoothingTimeConstant, S relativeReleaseTimeConstant)
+        PeakDetectorBase(size_t maxSamples, S relativeAttackTimeConstant, S relativeSmoothingTimeConstant, S relativeReleaseTimeConstant)
         :
         memory(maxSamples),
         relativeAttackTimeConstant(relativeAttackTimeConstant),
@@ -325,11 +570,11 @@ namespace tdap {
             setSamplesAndThreshold(maxSamples, 1.0);
         }
 
-        PeakDetector(size_t maxSamples) : PeakDetector(maxSamples, 1.0, 1.0, 1.0) {}
+        PeakDetectorBase(size_t maxSamples) : PeakDetectorBase(maxSamples, 1.0, 1.0, 1.0) {}
 
-        size_t setSamplesAndThreshold(size_t samples, S peakThreshold)
+        size_t setSamplesAndThreshold(size_t samples, S peakThreshold, PeakMemoryResetType reset = PeakMemoryResetType::RESET)
         {
-            size_t effectiveSamples = memory.setSamples(samples);
+            size_t effectiveSamples = memory.setSampleCount(samples, reset);
             size_t attackSamples = effectiveSamples * relativeAttackTimeConstant;
             size_t smoothSamples = effectiveSamples * relativeSmoothingTimeConstant;
             size_t releaseSamples = effectiveSamples * relativeReleaseTimeConstant;
@@ -380,8 +625,18 @@ namespace tdap {
             }
             return smoothingFollower.integrate(rawDetection);
         }
+
+        void resetState()
+        {
+            memory.resetState();
+        }
     };
-    using PeakMemoryDoubles = PeakMemory<double>;
+
+    template<typename S>
+    using PeakDetector = PeakDetectorBase<S, PeakMemory<S> >;
+
+    template<typename S>
+    using CheapPeakDetector = PeakDetectorBase<S, CheapPeakMemory<S> >;
 
 } /* End of name space tdap */
 

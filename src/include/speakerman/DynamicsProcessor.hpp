@@ -148,10 +148,10 @@ namespace speakerman {
             {}
         };
 
-        class Limiter : public PeakDetector<T>
+        class Limiter : public CheapPeakDetector<T>
         {
         public:
-            Limiter() : PeakDetector<T>(0.5 + 192000 * 0.01, 0.7, 0.333, 7) {}
+            Limiter() : CheapPeakDetector<T>(0.5 + 192000 * 0.01, 0.7, 0.333, 10) {}
             ~Limiter() {}
         };
 
