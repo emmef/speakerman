@@ -34,14 +34,13 @@
 #include <tdap/Count.hpp>
 #include <tdap/Value.hpp>
 #include <tdap/Integration.hpp>
+#include <tdap/Followers.hpp>
 
 #define TRUE_RMS_QUOTE_1(x)#x
 #define TRUE_RMS_QUOTE(t)TRUE_RMS_QUOTE_1(t)
 
 namespace tdap {
     using namespace std;
-
-    enum class PeakMemoryResetType { RESET, KEEP };
 
     template <typename S>
     class PeakMemory
@@ -292,18 +291,14 @@ namespace tdap {
 
         size_t samples() const { return data_.samples(); }
 
-        static bool supportsResetType(PeakMemoryResetType reset) {
-            return reset == PeakMemoryResetType::RESET;
-        }
-
-        size_t setSampleCount(size_t samples, PeakMemoryResetType reset = PeakMemoryResetType::RESET)
+        size_t setSampleCount(size_t samples)
         {
             return data_.setSamples(samples);
         }
 
         void resetState()
         {
-            setSampleCount(samples(), PeakMemoryResetType::RESET);
+            setSampleCount(samples());
         }
 
         S addSampleGetPeak(S sample)
@@ -453,52 +448,13 @@ namespace tdap {
 
         const CheapPeakMemoryMetrics<S> metrics() const { return metrics_; }
 
-        static bool supportsResetType(PeakMemoryResetType reset)
-        {
-            return reset == PeakMemoryResetType::RESET || reset == PeakMemoryResetType::KEEP;
-        }
-
-        size_t setSampleCount(size_t sampleCount, PeakMemoryResetType reset = PeakMemoryResetType::RESET)
+        size_t setSampleCount(size_t sampleCount)
         {
             if (sampleCount > maxMetrics_.sampleCount()) {
                 throw std::invalid_argument("CheapPeakMemory::setSampleCount: number of samples exceeds maximum set at construction");
             }
-            if (reset == PeakMemoryResetType::RESET) {
-                metrics_.setSampleCount(sampleCount);
-                resetState();
-                return metrics_.sampleCount();
-            }
-
-            size_t oldCount = metrics_.windowCount();
-            size_t oldSize = metrics_.windowCount();
-
             metrics_.setSampleCount(sampleCount);
-
-            size_t newCount = metrics_.windowCount();
-            S oldPeak = MINIMUM_VALUE;
-            size_t overlap = Sizes::min(newCount, oldCount);
-            size_t window = 0;
-
-            if (recentWindowPtr_ == 0) {
-                while (window < overlap) {
-                    oldPeak = Value<S>::max(oldPeak, windowPeak_[window++ % oldCount]);
-                }
-            }
-            else {
-                size_t source = recentWindowPtr_;
-                recentWindowPtr_ = 0;
-
-                while (window < overlap) {
-                    S localPeak = windowPeak_[source++ % oldCount];
-                    windowPeak_[window++ % oldCount] = localPeak;
-                    oldPeak = Value<S>::max(oldPeak, localPeak);
-                }
-            }
-            oldWindowsPeak_ = oldPeak;
-            while (window < newCount) {
-                windowPeak_[window++] = oldPeak;
-            }
-            samplePtr_ *= metrics_.windowSize() / oldSize;
+            resetState();
             return metrics_.sampleCount();
         }
 
@@ -553,68 +509,57 @@ namespace tdap {
 #endif
 
     template <typename S, class Memory>
+    class CompensatedAttackWithMemory
+    {
+        CompensatedAttack<S> follower;
+        Memory memory;
+    public:
+        CompensatedAttackWithMemory(size_t maxSampleCount) : memory(maxSampleCount) {}
+
+        void setTimeConstantAndSamples(size_t timeConstantSamples, size_t samples, S initialValue)
+        {
+            size_t actualSamples = memory.setSampleCount(samples);
+            follower.setTimeConstantAndSamples(timeConstantSamples, actualSamples, initialValue);
+        }
+
+        S follow(const S peak)
+        {
+            return follower.follow(memory.addSampleGetPeak(peak));
+        }
+
+    };
+
+    template <typename S, class Memory>
+    class TriangularFollowerWithMemory
+    {
+        TriangularFollower<S> follower;
+        Memory memory;
+    public:
+        TriangularFollowerWithMemory(size_t maxSampleCount) : follower(1 + maxSampleCount/10), memory(2) {}
+
+        void setTimeConstantAndSamples(size_t attackSamples, size_t releaseSamples, S thresHold)
+        {
+//            memory.setSampleCount(attackSamples);
+            follower.setTimeConstantAndSamples(attackSamples, releaseSamples, thresHold);
+        }
+
+        S follow(const S sample)
+        {
+            return follower.follow(sample);
+        }
+
+    };
+
+
+
+    template <typename S, class Memory>
     class PeakDetectorBase
     {
-        class CompensatedAttack
-        {
-            S compensation;
-            S previousPeak;
-            S compensatedPeak;
-            S detectedPeak;
-            IntegrationCoefficients<S> coefficients;
-            Memory memory;
-        public:
-            CompensatedAttack(size_t maxSampleCount) : memory(maxSampleCount) {}
-
-            void setTimeConstantAndSamples(size_t timeConstantSamples, size_t samples, S initialValue, PeakMemoryResetType reset = PeakMemoryResetType::RESET)
-            {
-                coefficients.setCharacteristicSamples(timeConstantSamples);
-                S output = 0.0;
-                size_t actualSamples = memory.setSampleCount(samples, reset);
-                for (size_t sample = 0; sample < actualSamples; sample++) {
-                    output += coefficients.inputMultiplier() * (1.0 - output);
-                }
-                compensation = 1.0 / output;
-                previousPeak = initialValue;
-                compensatedPeak = initialValue;
-                detectedPeak = initialValue;
-            }
-
-            S detectWithMemory(const S sample)
-            {
-                ADD_GET_DETECTION_LOGGING_("input=%lf; ", (double)sample);
-                return detectWithoutMemory(applyMemory(sample));
-            }
-
-            S applyMemory(const S sample)
-            {
-                return memory.addSampleGetPeak(sample);
-            }
-
-            S detectWithoutMemory(const S peak)
-            {
-                if (peak < previousPeak) {
-                    compensatedPeak = peak;
-                    previousPeak = peak;
-                }
-                else if (peak > previousPeak) {
-                    compensatedPeak = detectedPeak + compensation * (peak - detectedPeak);
-                    previousPeak = peak;
-                }
-                detectedPeak += coefficients.inputMultiplier() * (compensatedPeak - detectedPeak);
-                ADD_GET_DETECTION_LOGGING_("peak=%lf; compensated=%lf; detected=%lf",
-                        (double)peak, (double)compensatedPeak, (double)detectedPeak);
-                return detectedPeak;
-            }
-
-        };
-
-        CompensatedAttack attackMemory;
-        CompensatedAttack smoothMemory;
+        TriangularFollowerWithMemory<S,Memory> attackMemory;
+        CompensatedAttackWithMemory<S,Memory> smoothMemory;
         S relativeAttackTimeConstant = 1.0;
         S relativeSmoothingTimeConstant = 1.0;
         S relativeReleaseTimeConstant = 1.0;
-        IntegrationCoefficients<S> releaseFollower;
         S releaseDetection = 1.0;
         S attackCompensation = 1.0;
         S smoothCompensation = 1.0;
@@ -650,50 +595,28 @@ namespace tdap {
 
         PeakDetectorBase(size_t maxSamples) : PeakDetectorBase(maxSamples, 1.0, 1.0, 1.0) {}
 
-        size_t setSamplesAndThreshold(size_t samples, S peakThreshold, PeakMemoryResetType reset = PeakMemoryResetType::RESET)
+        size_t setSamplesAndThreshold(size_t samples, S peakThreshold)
         {
             size_t attackSamples = samples * relativeAttackTimeConstant;
             size_t smoothSamples = samples * relativeSmoothingTimeConstant;
             size_t attackMemorySamples = samples - smoothSamples;
             size_t releaseSamples = samples * relativeReleaseTimeConstant;
 
-            attackMemory.setTimeConstantAndSamples(attackSamples, attackMemorySamples, peakThreshold, reset);
-            smoothMemory.setTimeConstantAndSamples(smoothSamples, smoothSamples + 1, peakThreshold, reset);
+            attackMemory.setTimeConstantAndSamples(attackSamples, attackMemorySamples, peakThreshold);
+            smoothMemory.setTimeConstantAndSamples(smoothSamples, smoothSamples + 1, peakThreshold);
 
-            releaseFollower.setCharacteristicSamples(releaseSamples);
-
-            ADD_GET_DETECTION_LOGGING_("PeakDetector.setSamplesAndThreshold: samples=%zu; "
-                   "attack=%zu (memory=%zu); smooth=%zu; release=%zu; "
-                   "attack-comp=%lf; smooth-comp=%lf\n",
-                    samples,
-                    attackSamples, attackMemorySamples, smoothSamples, releaseSamples,
-                    attackCompensation, smoothCompensation);
             threshold = peakThreshold;
-#ifdef PEAK_DETECTION_ADD_GET_DETECTION_LOGGING
-            index = 0;
-#endif
-            return samples;
+            return attackSamples + smoothSamples;
         }
 
         S addSampleGetDetection(S sample)
         {
-#ifdef PEAK_DETECTION_ADD_GET_DETECTION_LOGGING
-            printf("[%4zu] PeakDetector.addSampleGetDetection: attack={", index++);
-#endif
-            S peak = attackMemory.detectWithMemory(
-                    Floats::max(threshold, sample));
-
-            if (peak > releaseDetection) {
-                releaseDetection = peak;
-            }
-            else {
-                releaseDetection += releaseFollower.inputMultiplier() * (threshold - releaseDetection);
-            }
-            ADD_GET_DETECTION_LOGGING_("}; release=%lf; smooth={", releaseDetection);
-            S detection = smoothMemory.detectWithMemory(releaseDetection);
-            ADD_GET_DETECTION_LOGGING_("}\n");
-
-            return detection;
+            return attackMemory.follow(Floats::max(threshold, sample));
+//            S peak = attackMemory.follow(Floats::max(threshold, sample));
+//
+//            S detection = smoothMemory.follow(peak);
+//
+//            return detection;
         }
 
         void resetState()
