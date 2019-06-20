@@ -447,11 +447,17 @@ namespace tdap {
             inline void add(const Node &source)
             {
                 if (count_ >= maxNodes_) {
+                    fprintf(stderr, "\"TriangularFollower::NodeManager::add: Number of nodes (%zu) exceeded\n", maxNodes_);
+                    for (size_t i = 0; i < count(); i++) {
+                        const Node * node = fromFirst(i);
+                        printf("%5zu {position=%zu, value=%lf, delta=%lf)\n",
+                                i, node->position(), node->value(), node->delta());
+                    }
                     throw runtime_error("TriangularFollower::NodeManager::add: Number of nodes exceeded: cannot create new one");
                 }
-                TDAP_FOLLOWERS_TRACE("# \t TriangularFollower::NodeManager::add(");
+                TDAP_FOLLOWERS_TRACE("# \t TriangularFollower::NodeManager::add(%zu, ", count());
                 source.print();
-                node_[count_++] = source;
+                node_[start_ + count_++] = source;
                 TDAP_FOLLOWERS_TRACE(") { count=%zu; }\n", count_);
             }
             inline bool isInReleaseOrIdle() const
@@ -463,8 +469,8 @@ namespace tdap {
             inline bool isBelowReleaseEnvelope(size_t newSamplePtr, const S newPeakValue) const
             {
                 TDAP_FOLLOWERS_TRACE("# \t isBelowReleaseEnvelope(new-peak-at=%zu, new-peak-value=%lf)\n", newSamplePtr, newPeakValue);
-                S projected = last()->project(newSamplePtr);
-                bool result = newPeakValue <= projected;
+                const Node *l = last();
+                bool result = l != nullptr && newPeakValue <= last()->project(newSamplePtr);
                 TDAP_FOLLOWERS_TRACE("# \t isBelowReleaseEnvelope = %i { nodes=%zu; }\n", result, count());
                 return result;
             }
@@ -494,15 +500,24 @@ namespace tdap {
                 for (ssize_t index = fromLastIndex(1); index >= (ssize_t )start_; index--) {
                     const Node * node = node_ + index;
                     S nodeValue = node->value();
-                    TDAP_FOLLOWERS_TRACE("# \t\t (%zu) ", index);
+                    TDAP_FOLLOWERS_TRACE("# \t\t (%zu) ", index - start_);
                     node->print();
                     TDAP_FOLLOWERS_TRACE("\n");
                     S projected = newPeak.project(node->position());
                     if (nodeValue > projected) {
-                        TDAP_FOLLOWERS_TRACE("# \t\t FOUND\n");
+                        TDAP_FOLLOWERS_TRACE("# \t\t FOUND %zu: ", index - start_);
+                        node->print();
+                        TDAP_FOLLOWERS_TRACE("\n");
+
+                        // We can use some extra optimisation here:
+                        // - Merge consecutive previous nodes with same level
+                        // - Remove concave sections of nodes
+                        // First one is important, as constant-value input now
+                        // keeps producing too many nodes..
                         return index - start_;
                     }
                 }
+                TDAP_FOLLOWERS_TRACE("# \t\t NOT FOUND\n");
                 return -1;
             }
             ~NodeManager()
@@ -552,16 +567,20 @@ namespace tdap {
                 return threshold_;
             }
             const Node *towards = nodes_.first();
-            TDAP_FOLLOWERS_TRACE("# \t\t detect=%lf, towards=", detect_);
-//            detect_ += towards->delta();
+            TDAP_FOLLOWERS_TRACE("# \t\t detect=%lf, pos=%zu, towards=", detect_, position_);
+            towards->print();
+            TDAP_FOLLOWERS_TRACE("\n");
             detect_ = towards->project(position_);
             if (position_++ >= towards->position()) {
                 towards = nodes_.next();
                 if (towards == nullptr) {
-                    TDAP_FOLLOWERS_TRACE("# \t\t\t -- Last node encountered: reset\n");
+                    TDAP_FOLLOWERS_TRACE("# \t\t\t -- Last node reached: reset\n");
                     return detect_;
                 }
-                TDAP_FOLLOWERS_TRACE("# \t\t\t -- Move to next node\n");
+                TDAP_FOLLOWERS_TRACE("# \t\t\t -- Move to next node ");
+                towards->print();
+                nodes_.first()->print();
+                TDAP_FOLLOWERS_TRACE("\n");
             }
             return detect_;
         }
@@ -573,12 +592,12 @@ namespace tdap {
                 return continueAsNormal();
             }
             size_t newPtr = position_ + attSamples_;
-            if (nodes_.count() == 0) {
-                nodes_.add(0, { position_, threshold_, newPtr, value });
-                nodes_.add({ newPtr + 1, value, newPtr + relSamples_, threshold_ });
+            if (nodes_.isBelowReleaseEnvelope(newPtr, value)) {
                 return continueAsNormal();
             }
-            if (nodes_.isBelowReleaseEnvelope(newPtr, value)) {
+            if (nodes_.count() == 0) {
+                nodes_.add(0, { position_ + 1, threshold_, newPtr, value });
+                nodes_.add({ newPtr + 1, value, newPtr + relSamples_, threshold_ });
                 return continueAsNormal();
             }
             if (nodes_.count() == 1) {
@@ -586,19 +605,24 @@ namespace tdap {
                 nodes_.add({ newPtr + 1, value, newPtr + relSamples_, threshold_ });
                 return continueAsNormal();
             }
+            S result = continueAsNormal();
             const Node newPeak = { position_, threshold_, newPtr, value };
             const Node newRelease = { newPtr + 1, value, newPtr + relSamples_, threshold_ };
             ssize_t higherNode = nodes_.getLastAbovePeakAttackEnvelope(newPeak);
             if (higherNode < 0) {
+                TDAP_FOLLOWERS_TRACE("# \t\t Recreate\n");
                 nodes_.add(0, { position_, detect_, newPtr, value});
                 nodes_.add(newRelease);
             }
             else {
                 const Node * from = nodes_.fromFirst(higherNode);
-                nodes_.add(higherNode + 1, {from->position() + 1, from->value(), newPeak.position(), newPeak.value()});
+                TDAP_FOLLOWERS_TRACE("# \t\t Add from existing: ");
+                from->print();
+                TDAP_FOLLOWERS_TRACE("\n");
+                nodes_.add(higherNode + 1, {newPeak.position(), newPeak.value(), (newPeak.value() - from->value())/ (newPeak.position() - from->position())});
                 nodes_.add(newRelease);
             }
-            return continueAsNormal();
+            return result;
         }
 
     public:
@@ -614,9 +638,9 @@ namespace tdap {
 
         inline S follow(const S value)
         {
-            TDAP_FOLLOWERS_TRACE("### follow(%lf) // ptr=%zu, nodes=%zu\n", value, position_, nodes_.count());
+            TDAP_FOLLOWERS_TRACE("### follow(%zu = %lf) // nodes=%zu\n", position_, value, nodes_.count());
             S result = followAlgorithm(value);
-            TDAP_FOLLOWERS_TRACE("### follow = %lf\n", result);
+            TDAP_FOLLOWERS_TRACE("#   follow(%zu = %lf) = %lf\n", position_, value, result);
             return result;
         }
 

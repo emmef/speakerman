@@ -27,7 +27,7 @@
 #include <tdap/Delay.hpp>
 #include <tdap/MemoryFence.hpp>
 #include <tdap/Noise.hpp>
-#include <tdap/PeakDetection.hpp>
+#include <tdap/Followers.hpp>
 #include <tdap/PerceptiveRms.hpp>
 #include <tdap/Transport.hpp>
 #include <tdap/Weighting.hpp>
@@ -103,7 +103,7 @@ namespace speakerman {
         static constexpr double LIMITER_MAX_DELAY = 0.01;
         static constexpr double RMS_MAX_DELAY = 0.01;
         static constexpr double LIMITER_PREDICTION_SECONDS = 0.003;
-        static constexpr double peakThreshold = 0.97;
+        static constexpr double peakThreshold = 1.0;
 
 
         static constexpr size_t GROUP_MAX_DELAY_SAMPLES =
@@ -121,8 +121,6 @@ namespace speakerman {
         using Configurable = SpeakermanRuntimeConfigurable<T, GROUPS, BANDS,
                                                            CHANNELS_PER_GROUP>;
         using ConfigData = SpeakermanRuntimeData<T, GROUPS, BANDS>;
-
-
 
         class GroupDelay : public MultiChannelAndTimeDelay<T>
         {
@@ -148,11 +146,51 @@ namespace speakerman {
             {}
         };
 
-        class Limiter : public CheapPeakDetector<T>
+        class Limiter
         {
+            static constexpr double SMOOTHFACTOR = 0.1;
+            static constexpr double TOTAL_TIME_FACTOR = 1.0 + SMOOTHFACTOR;
+            static constexpr double TOTAL_TIME_FACTOR_1 = 1.0 / TOTAL_TIME_FACTOR;
+            // Under and overshoot of smoothing by integration requires lower threshold
+            // and even that is not a strict guarantee.
+            static constexpr double ADJUST_THRESHOLD = 0.98;
+
+            TriangularFollower<T> follower_;
+            IntegrationCoefficients<T> attack_;
+            IntegrationCoefficients<T> release_;
+            T integrated_ = 0;
+            T adjustedThreshold_;
         public:
-            Limiter() : CheapPeakDetector<T>(0.5 + 192000 * 0.01, 0.7, 0.333, 10) {}
-            ~Limiter() {}
+            Limiter() : follower_(1000) {}
+
+            void setPredictionAndThreshold(size_t prediction, T threshold, T sampleRate)
+            {
+                size_t attack = 0.5 + TOTAL_TIME_FACTOR_1 * prediction;
+                size_t smooth = prediction - attack;
+                size_t release = Floats::min(prediction * 15, sampleRate * 0.040);
+                adjustedThreshold_ = threshold * ADJUST_THRESHOLD;
+                printf("Limiter.setPredictionAndThreshold(%zu, %lf) -> { attack=%zu, release=%zu, smooth=%zu, threshold=%lf\n",
+                        prediction, threshold,
+                        attack, release, smooth, adjustedThreshold_);
+                follower_.setTimeConstantAndSamples(attack, release, adjustedThreshold_);
+                attack_.setCharacteristicSamples(smooth);
+                release_.setCharacteristicSamples(release);
+                integrated_ = adjustedThreshold_;
+            }
+
+            T getGain(T input)
+            {
+                T followed = follower_.follow(input);
+                T integrationfactor;
+                if (followed > integrated_) {
+                    integrationfactor = attack_.inputMultiplier();
+                }
+                else  {
+                    integrationfactor = release_.inputMultiplier();
+                }
+                integrated_ += integrationfactor * (followed - integrated_);
+                return adjustedThreshold_ / integrated_;
+            }
         };
 
     private:
@@ -172,6 +210,7 @@ namespace speakerman {
         Detector subDetector;
         DetectorGroup *groupDetector;
         Limiter limiter[LIMITERS];
+        IntegrationCoefficients<T> limiterRelease;
 
         GroupDelay groupDelay;
         GroupDelay predictionDelay;
@@ -234,9 +273,14 @@ namespace speakerman {
             for (size_t band = 1; band <= CROSSOVERS; band++) {
                 relativeBandWeights[band] = weights[2 * band + 1];
             }
+            size_t predictionSamples = 0.5 + sampleRate * LIMITER_PREDICTION_SECONDS;
+            limiterRelease.setCharacteristicSamples(10 * predictionSamples);
+            printf("Prediction samples: %zu for rate %lf\n", predictionSamples, sampleRate);
             for (size_t l = 0; l < LIMITERS; l++) {
-                limiter[l].setSamplesAndThreshold(sampleRate *
-                                                  LIMITER_PREDICTION_SECONDS, peakThreshold);
+                limiter[l].setPredictionAndThreshold(predictionSamples, peakThreshold, sampleRate);
+            }
+            for (size_t l = 0; l < DELAY_CHANNELS; l++) {
+                predictionDelay.setDelay(l, predictionSamples);
             }
             sampleRate_ = sampleRate;
             runtime.init(createConfigData(config));
@@ -277,11 +321,9 @@ namespace speakerman {
                 size_t groupDelaySamples = data.groupConfig(group).delay() - minGroupDelay;
                 for (size_t channel = 0; channel < CHANNELS_PER_GROUP; channel++, i++) {
                     groupDelay.setDelay(i, groupDelaySamples);
-                    predictionDelay.setDelay(i, predictionSamples);
                 }
             }
             groupDelay.setDelay(0, subDelay - minGroupDelay);
-            predictionDelay.setDelay(0, predictionSamples);
             filters_[GROUPS].configure(data.filterConfig());
         }
 
@@ -434,52 +476,101 @@ namespace speakerman {
         struct Analysis {
             const T decay = exp(-1.0 / 1000000);
             const T multiply = 1.0 - decay;
+            static constexpr size_t HISTORY = 1000;
+            static constexpr size_t MAXCOUNT = 2 * HISTORY;
+            int counter = -1;
             T square = 0.0;
             T maxRms = 0.0;
             T maxPeak = 0.0;
             T maxMaxRms = 0.0;
             T maxMaxPeak = 0.0;
+            T signalPeak = numeric_limits<T>::lowest();
+            T signalDetection = numeric_limits<T>::lowest();
+            T limiterGain = numeric_limits<T>::max();
             size_t peakCount = 0;
             size_t peakRmsCount = 0;
-            size_t counter = 0;
+            size_t peakGreaterThanDetectionCount = 0;
+            T peakHistory[HISTORY];
+            T detectHistory[HISTORY];
+            T delayedHistory[HISTORY];
+            size_t historyPointer = 0;
 
-            void analyseTarget(FixedSizeArray <T, OUTPUTS> &target, size_t offs_start)
+            void analyseTarget(FixedSizeArray <T, OUTPUTS> &target, size_t offs_start, T prePeak, T detection, size_t delay)
             {
-                for (size_t channel = 0, offs = offs_start; channel < CHANNELS_PER_GROUP; channel++, offs++) {
-                    counter++;
-                    const T x = target[offs];
-                    T peak = fabs(x);
-                    if (peak > 1.0) {
-                        peakCount++;
-                        maxPeak = Floats::max(maxPeak, peak);
-                    }
-                    square *= decay;
-                    square += multiply * x * x;
-                    T rms = sqrt(square);
-                    if (rms > 0.25) {
-                        peakRmsCount++;
-                        maxRms = Floats::max(maxRms, sqrt(square));
-                    }
-                    if (counter > 100000) {
-                        if (peakRmsCount > 0 || peakCount > 0) {
-                            maxMaxRms = Floats::max(maxMaxRms, maxRms);
-                            maxMaxPeak = Floats::max(maxMaxPeak, maxPeak);
-                            printf("%8zu PEAKS : %8lg/%8lg; %8zu HIGH-RMS : %8lg/%8lg\n", peakCount, maxPeak, maxMaxPeak, peakRmsCount, maxRms, maxMaxRms);
-                            peakCount = 0;
-                            peakRmsCount = 0;
-                            maxRms = 0;
-                            maxPeak = 0;
-                        }
-                        counter = 0;
+                T maxOut = 0;
+                for (size_t channel = 0, offs = offs_start; channel < CHANNELS_PER_GROUP; channel++) {
+                    maxOut = Floats::max(maxOut, fabs(target[offs]));
+                }
+                peakHistory[historyPointer] = prePeak;
+                detectHistory[historyPointer] = maxOut;
+                T delayedInput = peakHistory[
+                        (historyPointer + HISTORY - delay) % HISTORY];
+                delayedHistory[historyPointer] = delayedInput;
+                bool fault = maxOut > peakThreshold;
+
+                if (fault && counter == -1) {
+                    printf("SAMPLE\tPEAK\tDETECTION\tFAULT\n");
+                    counter = 0;
+                    for (size_t i = historyPointer ; counter < HISTORY; counter++, i = (i + 1) % HISTORY) {
+//                        printf("%i\t%lf\t%lf\t%s\n", counter, peakHistory[i], detectHistory[i], peakHistory[i] > detectHistory[i] ? "FAULT" : "");
+                        printf("%i\t%lf\t%lf\t%8s %zu\n", counter, peakHistory[i], detectHistory[i], detectHistory[historyPointer] > peakThreshold ? "FAULT" : "", delay);
                     }
                 }
+                if (counter >= 0 && counter < MAXCOUNT) {
+                    printf("%i\t%lf\t%lf\t%8s %zu\n", counter, prePeak, maxOut, fault ? "FAULT" : "", delay);
+                    counter ++;
+                }
+                historyPointer = (historyPointer + 1) % HISTORY;
+//                if (counter == 100000) {
+//                    counter = -1;
+//                }
+//
+//
+//                for (size_t channel = 0, offs = offs_start; channel < CHANNELS_PER_GROUP; channel++, offs++) {
+//                    counter++;
+//                    signalPeak = Floats::max(signalPeak, prePeak);
+//                    signalDetection = Floats::max(signalDetection, detection);
+//                    limiterGain = Floats::min(limiterGain, gain);
+//                    const T x = target[offs];
+//                    T peak = fabs(x);
+//                    if (peak > 1.0) {
+//                        peakCount++;
+//                        maxPeak = Floats::max(maxPeak, peak);
+//                    }
+//                    square *= decay;
+//                    square += multiply * x * x;
+//                    T rms = sqrt(square);
+//                    if (rms > 0.25) {
+//                        peakRmsCount++;
+//                        maxRms = Floats::max(maxRms, sqrt(square));
+//                    }
+//
+//
+//                    if (counter > 100000) {
+//                        if (peakRmsCount > 0 || peakCount > 0) {
+//                            maxMaxRms = Floats::max(maxMaxRms, maxRms);
+//                            maxMaxPeak = Floats::max(maxMaxPeak, maxPeak);
+//                            printf("%8zu PEAKS : %8lg/%8lg; %8zu HIGH-RMS : %8lg/%8lg\n", peakCount, maxPeak, maxMaxPeak, peakRmsCount, maxRms, maxMaxRms);
+//                            peakCount = 0;
+//                            peakRmsCount = 0;
+//                            maxRms = 0;
+//                            maxPeak = 0;
+//                        }
+//                        printf("Limiter %lf peak   %lf detect   %lf gain  %zu OVER (%d)\n", signalPeak, signalDetection, limiterGain, peakGreaterThanDetectionCount, signalPeak > signalDetection);
+//                        signalPeak = numeric_limits<T>::lowest();
+//                        signalDetection = numeric_limits<T>::lowest();
+//                        limiterGain = numeric_limits<T>::max();
+//                        peakGreaterThanDetectionCount = 0;
+//                        counter = 0;
+//                    }
+//                }
             }
         } analysis;
 
-#define DO_DYNAMICS_PROCESSOR_LIMITER_ANALYSIS(TARGET,OFFS) \
-    analysis.analyseTarget(TARGET_OFFS);
+#define DO_DYNAMICS_PROCESSOR_LIMITER_ANALYSIS(TARGET,OFFS,MAX,DETECT,OUT) \
+    analysis.analyseTarget(TARGET,OFFS,MAX,DETECT,OUT)
 #else
-#define DO_DYNAMICS_PROCESSOR_LIMITER_ANALYSIS(TARGET,OFFS)
+#define DO_DYNAMICS_PROCESSOR_LIMITER_ANALYSIS(TARGET,OFFS,MAX,DETECT,GAIN)
 #endif
         void processChannelsFilters(FixedSizeArray<T, OUTPUTS> &target)
         {
@@ -487,17 +578,18 @@ namespace speakerman {
             for (size_t group = 0, offs_start = 1; group < GROUPS; group++, offs_start += CHANNELS_PER_GROUP) {
                 auto filter = filters_[group].filter();
 
-                T maxOut = peakThreshold;
+                T maxFiltered = 0;
                 for (size_t channel = 0, offs = offs_start; channel < CHANNELS_PER_GROUP; channel++, offs++) {
                     double out = filter->filter(channel, groupDelay.setAndGet(offs, output[offs]));
-                    maxOut = Floats::max(maxOut, fabs(out));
+                    maxFiltered = Floats::max(maxFiltered, fabs(out));
                     target[offs] = predictionDelay.setAndGet(offs, out);
                 }
-                T limiterGain = peakThreshold / limiter[group].addSampleGetDetection(maxOut);
+                T limiterGain = limiter[group].getGain(maxFiltered);
                 for (size_t channel = 0, offs = offs_start; channel < CHANNELS_PER_GROUP; channel++, offs++) {
-                    target[offs] = Floats::force_between(target[offs] * limiterGain, -0.995, 0.995);
+                    T outputValue = target[offs] * limiterGain;
+                    target[offs] = Floats::force_between(outputValue, -peakThreshold, peakThreshold);
                 }
-                DO_DYNAMICS_PROCESSOR_LIMITER_ANALYSIS(target, offs_start)
+                DO_DYNAMICS_PROCESSOR_LIMITER_ANALYSIS(target, offs_start, maxFiltered, limiterGain, predictionDelay.getDelay(0));
             }
         }
 
@@ -505,8 +597,10 @@ namespace speakerman {
         void processSubLimiter(FixedSizeArray<T, OUTPUTS> &target)
         {
             T value = output[0];
-            T limiterGain = peakThreshold / limiter[0].addSampleGetDetection(fabs(value));
-            target[0] = limiterGain * groupDelay.setAndGet(0, predictionDelay.setAndGet(0, value));
+            T maxOut = fabs(value);
+            T limiterGain = limiter[0].getGain(maxOut);
+//            T limiterGain = peakThreshold / limiter[0].limiter_submit_peak_return_amplification(fabs(value));
+            target[0] = limiterGain * groupDelay.setAndGet(0, limiterGain * predictionDelay.setAndGet(0, value));
         }
     };
 
