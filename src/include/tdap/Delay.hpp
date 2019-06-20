@@ -215,9 +215,11 @@ namespace tdap {
                 read_ = (read_ + channels) % end_;
                 write_ = (write_ + channels) % end_;
             }
+
+            inline size_t delay() const { return delay_; }
         };
 
-        size_t maxChannels_, maxDelay_, channels_;
+        size_t maxChannels_, maxDelay_, channels_, delay_;
         Array<S> buffer_;
         Array<Entry> entry_;
 
@@ -276,7 +278,13 @@ namespace tdap {
             if (delay > maxDelay_) {
                 throw std::runtime_error("MultiChannelDelay::setChannels invalid delay");
             }
+            cout << this << ".setDelay(" << channel << ", " << delay << ")" << endl;
             entry_[channel].setDelay(channels_, channel, delay);
+            delay_ = delay;
+        }
+
+        size_t getDelay(size_t channel) const {
+            return entry_[channel].delay();
         }
 
         S setAndGet(size_t channel, S value)
