@@ -74,12 +74,12 @@ namespace speakerman {
 
         static constexpr double MIN_THRESHOLD = 0.001;
         static constexpr double DEFAULT_THRESHOLD = 0.1;
-        static constexpr double MAX_THRESHOLD = 0.5;
+        static constexpr double MAX_THRESHOLD = 0.9;
         static constexpr const char *KEY_SNIPPET_THRESHOLD = "threshold";
 
         static constexpr double MIN_VOLUME = 0;
         static constexpr double DEFAULT_VOLUME = 1.0;
-        static constexpr double MAX_VOLUME = 20.0;
+        static constexpr double MAX_VOLUME = 40.0;
         static constexpr const char *KEY_SNIPPET_VOLUME = "volume";
 
         static constexpr double MIN_DELAY = 0;
