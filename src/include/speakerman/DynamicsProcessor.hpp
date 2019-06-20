@@ -599,8 +599,7 @@ namespace speakerman {
             T value = output[0];
             T maxOut = fabs(value);
             T limiterGain = limiter[0].getGain(maxOut);
-//            T limiterGain = peakThreshold / limiter[0].limiter_submit_peak_return_amplification(fabs(value));
-            target[0] = limiterGain * groupDelay.setAndGet(0, limiterGain * predictionDelay.setAndGet(0, value));
+            target[0] = groupDelay.setAndGet(0, limiterGain * predictionDelay.setAndGet(0, value));
         }
     };
 
