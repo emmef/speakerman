@@ -148,8 +148,9 @@ namespace speakerman {
 
         class Limiter
         {
-            static constexpr double SMOOTHFACTOR = 0.1;
-            static constexpr double TOTAL_TIME_FACTOR = 1.0 + SMOOTHFACTOR;
+            static constexpr double ATTACK_SMOOTHFACTOR = 0.1;
+            static constexpr double RELEASE_SMOOTHFACTOR = 0.3;
+            static constexpr double TOTAL_TIME_FACTOR = 1.0 + ATTACK_SMOOTHFACTOR;
             static constexpr double TOTAL_TIME_FACTOR_1 = 1.0 / TOTAL_TIME_FACTOR;
             // Under and overshoot of smoothing by integration requires lower threshold
             // and even that is not a strict guarantee.
@@ -174,7 +175,7 @@ namespace speakerman {
                         attack, release, smooth, adjustedThreshold_);
                 follower_.setTimeConstantAndSamples(attack, release, adjustedThreshold_);
                 attack_.setCharacteristicSamples(smooth);
-                release_.setCharacteristicSamples(release);
+                release_.setCharacteristicSamples(release * RELEASE_SMOOTHFACTOR);
                 integrated_ = adjustedThreshold_;
             }
 

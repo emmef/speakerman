@@ -313,6 +313,15 @@ namespace tdap {
                 TDAP_FOLLOWERS_TRACE("# \t\t\t Node from (%zu, %lf) -> (%zu, %lf)\n",
                         currentPosition, currentValue, newPosition, newValue);
             }
+            Node(const Node &from, const Node &to) :
+                    Node(from.position(), from.value(), to.position(), to.value())
+            {
+            }
+            Node(const Node *from, const Node *to) :
+                    Node(from->position(), from->value(), to->position(), to->value())
+            {
+            }
+
             size_t position() const { return position_; }
             S value() const { return value_; }
             S delta() const { return delta_; }
@@ -340,11 +349,15 @@ namespace tdap {
              */
             inline S projectedFrom(const Node &other) const
             {
+                return projectedFrom(&other);
+            }
+            inline S projectedFrom(const Node *other) const
+            {
                 TDAP_FOLLOWERS_TRACE("# \t\t ");
                 print();
                 TDAP_FOLLOWERS_TRACE(".projectedFrom(");
-                other.print();
-                S result = other.projectedValue(position_);
+                other->print();
+                S result = other->projectedValue(position_);
                 TDAP_FOLLOWERS_TRACE(")=%lf\n", result);
                 return result;
             }
@@ -357,7 +370,30 @@ namespace tdap {
                 TDAP_FOLLOWERS_TRACE(
                         "{position=%zu, value=%lf, delta=%lf}",
                         position, value, delta);
+            }
+            static bool isIligibleShortcut(const Node * from, const Node * earlier, S &minimumDelta)
+            {
+                Node constructed = { earlier, from };
+                if (
+                        constructed.delta() < minimumDelta ||
+                        isCloseTo(constructed.delta(), minimumDelta) ||
+                        (fabs(minimumDelta) < 1e-6 && fabs(constructed.delta() < 1e-6)))
+                {
+                    minimumDelta = constructed.delta();
+                    return true;
+                }
+                return false;
+            }
 
+            static bool isCloseTo(S v1, S v2)
+            {
+                return fabs(v2 - v1) /
+                       (fabs(v2) + fabs(v1)) < 1e-6;
+            }
+
+            bool isIligableShortcut(const Node *from, S &minimumDelta) const
+            {
+                return isIligibleShortcut(from, this, minimumDelta);
             }
         };
 
@@ -508,12 +544,6 @@ namespace tdap {
                         TDAP_FOLLOWERS_TRACE("# \t\t FOUND %zu: ", index - start_);
                         node->print();
                         TDAP_FOLLOWERS_TRACE("\n");
-
-                        // We can use some extra optimisation here:
-                        // - Merge consecutive previous nodes with same level
-                        // - Remove concave sections of nodes
-                        // First one is important, as constant-value input now
-                        // keeps producing too many nodes..
                         return index - start_;
                     }
                 }
@@ -619,7 +649,25 @@ namespace tdap {
                 TDAP_FOLLOWERS_TRACE("# \t\t Add from existing: ");
                 from->print();
                 TDAP_FOLLOWERS_TRACE("\n");
-                nodes_.add(higherNode + 1, {newPeak.position(), newPeak.value(), (newPeak.value() - from->value())/ (newPeak.position() - from->position())});
+                Node backProjected {newPeak.position(), newPeak.value(), (newPeak.value() - from->value())/ (newPeak.position() - from->position())};
+                // Merge additional previous peaks if the delta to reach them stays equal or keeps falling (negative time)
+                ssize_t mergeNode = -1;
+                ssize_t shortcutNode = higherNode - 1;
+                S minimumDelta = backProjected.delta();
+                while (shortcutNode> 0 && nodes_.fromFirst(shortcutNode)->isIligableShortcut(&backProjected, minimumDelta)) {
+                    mergeNode = shortcutNode;
+                    shortcutNode--;
+                }
+                if (mergeNode >= 0 && mergeNode != shortcutNode) {
+                    from = nodes_.fromFirst(mergeNode);
+                    TDAP_FOLLOWERS_TRACE("# Ditching %zu peaks until peak %zu ", higherNode - mergeNode, mergeNode);
+                    from->print();
+                    TDAP_FOLLOWERS_TRACE("\n");
+                    backProjected = {newPeak.position(), newPeak.value(), (newPeak.value() - from->value())/ (newPeak.position() - from->position())};
+                    higherNode = mergeNode;
+                }
+                nodes_.add(higherNode + 1, backProjected);
+//                nodes_.add(higherNode + 1, {newPeak.position(), newPeak.value(), (newPeak.value() - from->value())/ (newPeak.position() - from->position())});
                 nodes_.add(newRelease);
             }
             return result;

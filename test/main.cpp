@@ -247,70 +247,60 @@ static void printMeasurement(const Measurement m)
     m.print();
 }
 
-static void testTriangularFollower()
+static void testTriangularFollowerSmoothed()
 {
 //    TriangularFollower<double> fast;
 
-    static constexpr size_t ATTACK = 100;
-    static constexpr size_t RELEASE = 200;
-    static constexpr size_t SIZE = 1600;
+    static constexpr size_t ATTACK = 4;
+    static constexpr size_t RELEASE = 8;
+    static constexpr size_t SIZE = 1000;
     static constexpr double THRESHOLD = 100;
-    static constexpr size_t SMOOTHING = 10;
+    static constexpr double SMOOTHING = 10;
     static constexpr double INTEGRATION = ATTACK / SMOOTHING;
     static constexpr size_t TOTAL_DELAY = ATTACK + INTEGRATION;
 
     TriangularFollower<double> follower1(SIZE);
-    TriangularFollower<double> follower2(SIZE);
+    IntegrationCoefficients<double> smooth(INTEGRATION);
 
     follower1.setTimeConstantAndSamples(ATTACK, RELEASE, THRESHOLD);
-    follower2.setTimeConstantAndSamples(ATTACK, RELEASE, THRESHOLD);
-
-    IntegrationCoefficients<double> smooth(ATTACK / SMOOTHING);
     Scenario<double> input;
-    Scenario<double> inputShort;
 
-//    size_t scenario;
-//
-//    scenario = 5;
-//    input[scenario] = 200;
-//    input[scenario + 3] = 300;
-//
-//    scenario = 25;
-//    input[scenario] = 200;
-//    input[scenario + 3] = 185;
-//    input[scenario + 5] = 120;
-//
-//    scenario = 45;
-//    input[scenario] = 200;
-//    input[scenario + 2] = 185;
-//    input[scenario + 4] = 175;
-//
-//    scenario = 65;
-//    input[scenario] = 200;
-//    input[scenario + 1] = 201.3;
-//    input[scenario + 2] = 202.2;
-//    input[scenario + 3] = 203.1;
-//    input[scenario + 4] = 204;
+    size_t scenario;
 
-    for (size_t i = 0; i < SIZE; i++) {
-        input[i] = 0.5 * THRESHOLD + THRESHOLD * rand() / RAND_MAX;
-    }
-    for (size_t i = 0; i < input.size() - 1; i++) {
-        inputShort[i] = input(i);
-    }
+    scenario = 65;
+    input[scenario] = 200;
+    input[scenario + 3] = 300;
 
-//    input[0] = 2 * THRESHOLD;
+    scenario = 25;
+    input[scenario] = 200;
+    input[scenario + 3] = 185;
+    input[scenario + 5] = 120;
 
+    scenario = 45;
+    input[scenario] = 200;
+    input[scenario + 2] = 185;
+    input[scenario + 4] = 175;
+
+    scenario = 5;
+    input[scenario] = 200;
+    input[scenario + 1] = 204;
+    input[scenario + 2] = 202;
+    input[scenario + 3] = 202;
+    input[scenario + 4] = 202;
+    input[scenario + 5] = 202;
+    input[scenario + 6] = 202;
+    input[scenario + 7] = 201;
+
+//    for (size_t i = 0; i < SIZE; i++) {
+//        input[i] = 0.5 * THRESHOLD + THRESHOLD * rand() / RAND_MAX;
+//    }
     input.enlarge(ATTACK + RELEASE);
-    inputShort.enlarge(input.size());
 
     printf("\n# Triangular follower ***\n\n");
 
     Scenario<Measurement> output;
 
     double int1 = THRESHOLD;
-    double int2 = THRESHOLD;
-    double int3 = THRESHOLD;
     double max = THRESHOLD;
 
     for (size_t i = 0; i < input.size(); i++) {
@@ -318,20 +308,15 @@ static void testTriangularFollower()
 //        double out2 = follower1.follow(input(i));
         double out1 = follower1.follow(input(i));
         smooth.integrate(out1, int1);
-        smooth.integrate(int1, int2);
-        smooth.integrate(int2, int3);
-        double in = i < TOTAL_DELAY ? 0 : input(i - TOTAL_DELAY);
+        double in = i < TOTAL_DELAY ? 0 : input(i - ATTACK);
         ssize_t time = i;
         time -= ATTACK;
-        double effective = THRESHOLD * in / int1;
-        max = Floats::max(max, effective);
-        output[i] = {time, max, int1, effective};
+        output[i] = {time, in, out1, int1};// in * THRESHOLD / int1};
     }
 
     output.foreach(printMeasurement);
 
 }
-
 static void reachIngForFactors()
 {
     static constexpr size_t RC = 100;
@@ -461,7 +446,7 @@ int main(int c, const char *args[])
 {
 //	testMultiTimeDelay();
 //	testTrueAverage();
-        testTriangularFollower();
+        testTriangularFollowerSmoothed();
 //        testPeakDetector();
         reachIngForFactors();
 	return 0;
