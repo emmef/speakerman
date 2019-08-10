@@ -272,7 +272,7 @@ namespace speakerman {
         return 0;
     }
 
-    const std::__cxx11::string &JackClient::name() const
+    const std::string &JackClient::name() const
     {
         return name_;
     }

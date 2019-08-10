@@ -77,7 +77,7 @@ namespace speakerman {
         return pattern_max_length() + 1;
     }
 
-    std::__cxx11::string Names::get_name_pattern(size_t clientLength,
+    std::string Names::get_name_pattern(size_t clientLength,
                                                  size_t portLength)
     {
         static const int SIZE = pattern_max_buffer_size();
@@ -156,38 +156,38 @@ namespace speakerman {
         return value;
     }
 
-    const std::__cxx11::string Names::get_port_pattern()
+    const std::string Names::get_port_pattern()
     {
         static const string pattern = get_name_pattern(0, get_port_size());
         return pattern;
     }
 
-    const std::__cxx11::string Names::get_client_pattern()
+    const std::string Names::get_client_pattern()
     {
         static const string pattern = get_name_pattern(get_client_size(), 0);
         return pattern;
     }
 
-    const std::__cxx11::string Names::get_full_pattern()
+    const std::string Names::get_full_pattern()
     {
         static const string pattern = get_name_pattern(get_client_size(),
                                                        get_port_size());
         return pattern;
     }
 
-    const std::__cxx11::regex &Names::get_port_regex()
+    const std::regex &Names::get_port_regex()
     {
         static const regex NAME_REGEX(get_port_pattern());
         return NAME_REGEX;
     }
 
-    const std::__cxx11::regex &Names::get_client_regex()
+    const std::regex &Names::get_client_regex()
     {
         static const regex NAME_REGEX(get_client_pattern());
         return NAME_REGEX;
     }
 
-    const std::__cxx11::regex &Names::get_full_regex()
+    const std::regex &Names::get_full_regex()
     {
         static const regex NAME_REGEX(get_full_pattern());
         return NAME_REGEX;
@@ -208,13 +208,13 @@ namespace speakerman {
         return std::regex_match(unchecked, get_port_regex());
     }
 
-    std::__cxx11::string &Names::valid_port_full(string &unchecked)
+    std::string &Names::valid_port_full(string &unchecked)
     {
         valid_name(get_full_regex(), unchecked.c_str(), "full port");
         return unchecked;
     }
 
-    const std::__cxx11::string &Names::valid_port_full(
+    const std::string &Names::valid_port_full(
             const string &unchecked)
     {
         valid_name(get_full_regex(), unchecked.c_str(), "full port");
@@ -226,13 +226,13 @@ namespace speakerman {
         return valid_name(get_full_regex(), unchecked, "full port");
     }
 
-    std::__cxx11::string &Names::valid_client(string &unchecked)
+    std::string &Names::valid_client(string &unchecked)
     {
         valid_name(get_client_regex(), unchecked.c_str(), "port");
         return unchecked;
     }
 
-    const std::__cxx11::string &Names::valid_client(
+    const std::string &Names::valid_client(
             const string &unchecked)
     {
         valid_name(get_client_regex(), unchecked.c_str(), "port");
@@ -244,13 +244,13 @@ namespace speakerman {
         return valid_name(get_client_regex(), unchecked, "port");
     }
 
-    std::__cxx11::string &Names::valid_port(string &unchecked)
+    std::string &Names::valid_port(string &unchecked)
     {
         valid_name(get_port_regex(), unchecked.c_str(), "port");
         return unchecked;
     }
 
-    const std::__cxx11::string &Names::valid_port(const string &unchecked)
+    const std::string &Names::valid_port(const string &unchecked)
     {
         valid_name(get_port_regex(), unchecked.c_str(), "port");
         return unchecked;
