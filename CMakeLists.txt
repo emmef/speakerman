@@ -4,7 +4,10 @@ project(speakerman)
 set(CMAKE_CXX_STANDARD 17)
 
 include_directories(include src/include /usr/include)
-
+set(Boost_USE_STATIC_LIBS OFF)
+set(Boost_USE_MULTITHREADED ON)
+set(Boost_USE_STATIC_RUNTIME OFF)
+find_package(Boost)
 
 set(SOURCE_FILES
         src/include/speakerman/jack/ErrorHandler.hpp

@@ -35,9 +35,9 @@ namespace tdap {
 
     struct AllowedFilterError
     {
-        static constexpr double MINIMUM = pow(0.5, 42);
-        static constexpr double DEFAULT = pow(0.5, 23);
-        static constexpr double MAXIMUM = pow(0.5, 8);
+        static constexpr double MINIMUM = constexpr_power<double, 42>(0.5);
+        static constexpr double DEFAULT = constexpr_power<double, 23>(0.5);
+        static constexpr double MAXIMUM = constexpr_power<double, 8>(0.5);
 
         static inline double effective(double allowedFilterError)
         {

@@ -410,7 +410,7 @@ namespace speakerman {
     {
         size_t offset_;
 
-        static size_t long
+        static size_t
         valid_offset(const SpeakermanConfig &config, const void *field)
         {
             const char *config_address = static_cast<const char *>(static_cast<const void *>(&config));

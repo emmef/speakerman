@@ -62,7 +62,7 @@ namespace tdap {
     template<typename M, typename S>
     class ExpectedStateGuard
     {
-        static_assert(TriviallyCopyable<S>::value, "Expected type S that is trivial to copy");
+        static_assert(std::is_trivially_copyable<S>::value, "Expected type S that is trivial to copy");
 
         Guard<M> guard;
         S &actual_;

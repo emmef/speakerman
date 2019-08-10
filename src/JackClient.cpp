@@ -245,8 +245,8 @@ namespace speakerman {
 
     int JackClient::onXRun()
     {
-        static constexpr long long XRUNS_FOR_MEASUREMENT = 20;
-        static constexpr long long MAX_ONE_OUT_OF = 500;
+        static constexpr long long XRUNS_FOR_MEASUREMENT = 200;
+        static constexpr long long MAX_ONE_OUT_OF = 50;
         if (!processor_) {
             return 0;
         }

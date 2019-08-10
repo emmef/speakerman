@@ -321,26 +321,33 @@ namespace tdap {
         {
             return relative_distance(a, b) < epsilon;
         }
-
     };
 
-    template<typename T>
-    struct TriviallyCopyable
+    namespace helper {
+        template<typename T, unsigned P>
+        struct helper_constexpr_power
+        {
+            static constexpr const T value(const T value);
+        };
+
+        template<typename T>
+        struct helper_constexpr_power<T, 0>
+        {
+            static constexpr const T value(const T value) { return 1; }
+        };
+
+        template<typename T, unsigned P>
+        constexpr const T helper_constexpr_power<T,P>::value(const T v)
+        {
+            return v * helper_constexpr_power<T, P - 1>::value(v);
+        }
+    }
+
+    template<typename T, unsigned P>
+    constexpr const T constexpr_power(T value)
     {
-#if !defined(__GNUC__) || (__GNUC__ >= 5)
-        static constexpr bool value = std::is_trivially_copyable<T>::value;
-#else
-        /**
-         * GCC 4 and older have no support for std::std::is_trivially_copyable,
-         * so we try to emulate it here.
-         */
-        static constexpr bool value =
-                        std::is_standard_layout<T>::value &&
-                        std::has_trivial_copy_assign<T>::value &&
-                        std::has_trivial_copy_constructor<T>::value &&
-                        std::is_trivially_destructible<T>::value;
-#endif
-    };
+        return helper::helper_constexpr_power<T, P>::value(value);
+    }
 
 } /* End of name space tdap */
 

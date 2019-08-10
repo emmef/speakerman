@@ -31,7 +31,7 @@ namespace tdap {
     template<typename T, size_t CAPACITY>
     class alignas(Count<T>::align) FixedCapArray : public FixedCapArrayTraits<T, CAPACITY, FixedCapArray<T, CAPACITY>>
     {
-        static_assert(TriviallyCopyable<T>::value,
+        static_assert(std::is_trivially_copyable<T>::value,
                       "Type must be trivial to copy, move or destroy and have standard layout");
         static_assert(CAPACITY > 0 && Power2::constant::next(CAPACITY - 1) >= CAPACITY, "Size must be valid");
         static constexpr size_t MAXSIZE = Power2::constant::next(CAPACITY);

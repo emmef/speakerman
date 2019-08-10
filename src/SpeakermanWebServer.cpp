@@ -115,8 +115,8 @@ namespace speakerman {
     static constexpr int SECONDS_PER_6_DB_DOWN = 180;
 
     static void approach_threshold_scaling(double &value, int new_value) {
-        static constexpr double FACTOR_UP = std::pow(2.0, 0.001 * CONFIG_MILLIS / SECONDS_PER_6_DB_UP);
-        static constexpr double FACTOR_DOWN = std::pow(0.5, 0.001 * CONFIG_MILLIS / SECONDS_PER_6_DB_DOWN);
+        static const double FACTOR_UP = std::pow(2.0, 0.001 * CONFIG_MILLIS / SECONDS_PER_6_DB_UP);
+        static const double FACTOR_DOWN = std::pow(0.5, 0.001 * CONFIG_MILLIS / SECONDS_PER_6_DB_DOWN);
         if (new_value > value) {
             value *= FACTOR_UP;
             if (value > new_value) {
@@ -226,6 +226,9 @@ namespace speakerman {
                 create_command_and_file(range_file, command_line);
                 int old_setting = threshold_scaling_setting;
                 threshold_scaling_setting = 1;
+                if (command_line.length() == 0) {
+
+                }
                 if (system(command_line.c_str()) == 0) {
                     TemporaryFile file{range_file.c_str()};
                     if (file.is_open()) {

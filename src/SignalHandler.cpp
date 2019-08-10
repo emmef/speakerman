@@ -47,6 +47,7 @@ namespace speakerman {
         while (result == 0) {
             thread_numbers.fetch_add(1);
         }
+        return result;
     }
 
     class thread_entry
@@ -162,9 +163,7 @@ namespace speakerman {
                     }
                 }
             }
-            else {
-                throw std::runtime_error("Too many managed threads");
-            }
+            throw std::runtime_error("Too many managed threads");
         }
 
         bool remove_thread(size_t id) {
@@ -223,8 +222,8 @@ namespace speakerman {
                     }
                 }
             }
+            return false;
         }
-
     };
 
     static thread_entries THREAD_ENTITIES;

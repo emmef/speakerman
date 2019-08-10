@@ -255,7 +255,7 @@ namespace tdap {
             size_t end = traitCheckOffsetParamsReturnEndOffset(
                     offset, source, sourceOffset, length);
 
-            if (TriviallyCopyable<T>::value &&
+            if (std::is_trivially_copyable<T>::value &&
                 hasTrivialAddressing() &&
                 source.hasTrivialAddressing()) {
                 const void *src = static_cast<const void *>(source.unsafeData() + sourceOffset);
@@ -275,7 +275,7 @@ namespace tdap {
             size_t end = traitCheckOffsetParamsReturnEndOffset(
                     offset, source, sourceOffset, length);
 
-            if (TriviallyCopyable<T>::value &&
+            if (std::is_trivially_copyable<T>::value &&
                 hasTrivialAddressing() &&
                 source.hasTrivialAddressing()) {
                 // Move constructors not necessary on these type of objects
@@ -296,7 +296,7 @@ namespace tdap {
             if (source.size() != size()) {
                 throw std::invalid_argument("ArrayTraits::copy(): source has different size");
             }
-            if (TriviallyCopyable<T>::value && hasTrivialAddressing() && source.hasTrivialAddressing()) {
+            if (std::is_trivially_copyable<T>::value && hasTrivialAddressing() && source.hasTrivialAddressing()) {
                 const void *src = static_cast<const void *>(source.unsafeData());
                 void *dst = static_cast<void *>(unsafeData());
                 std::memmove(dst, src, sizeof(T) * size());
@@ -315,7 +315,7 @@ namespace tdap {
                 throw std::invalid_argument("ArrayTraits::copy(): source has different size");
             }
 
-            if (TriviallyCopyable<T>::value && hasTrivialAddressing() && source.traitHasTrivialLayout()) {
+            if (std::is_trivially_copyable<T>::value && hasTrivialAddressing() && source.traitHasTrivialLayout()) {
                 const void *src = static_cast<const void *>(source.unsafeData());
                 void *dst = static_cast<void *>(unsafeData());
                 std::memmove(dst, src, sizeof(T) * size());

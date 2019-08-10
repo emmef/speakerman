@@ -30,7 +30,7 @@ namespace tdap {
     template<typename T, size_t SIZE>
     class alignas(Count<T>::align()) FixedSizeArray : public FixedSizeArrayTraits<T, SIZE, FixedSizeArray<T, SIZE>>
     {
-        static_assert(TriviallyCopyable<T>::value,
+        static_assert(std::is_trivially_copyable<T>::value,
                       "Type must be trivial to copy, move or destroy and have standard layout");
 
         friend class ArrayTraits<T, FixedSizeArray<T, SIZE>>;

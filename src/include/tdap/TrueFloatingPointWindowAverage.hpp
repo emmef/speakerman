@@ -84,7 +84,7 @@ namespace tdap {
                 ".";
         static constexpr size_t MIN_MAX_WINDOW_SAMPLES = 64;
         static constexpr size_t MAX_MAX_WINDOW_SAMPLES = Floats::min(
-                pow(0.5, SNR_BITS + 1) / std::numeric_limits<S>::epsilon(),
+                constexpr_power<double, SNR_BITS + 1>(0.5) / std::numeric_limits<S>::epsilon(),
                 MAX_WINDOWS_SIZE_BOUNDARY);
         static constexpr size_t MIN_ERR_MITIGATING_DECAY_SAMPLES =
                 MIN_ERROR_DECAY_TO_WINDOW_RATIO * MIN_MAX_WINDOW_SAMPLES;

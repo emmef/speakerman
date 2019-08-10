@@ -235,6 +235,9 @@ int main(int count, char *arguments[])
     MemoryFence::release();
 
     cout << "Executing " << arguments[0] << endl;
+    cout << "# Config dump start" << endl;
+    dumpSpeakermanConfig(configFileConfig, std::cout);
+    cout << "# Config dump end" << endl;
 
     manager.generate<AbstractSpeakerManager,const SpeakermanConfig&>(create_manager, configFileConfig);
 

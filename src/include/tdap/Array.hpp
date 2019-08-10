@@ -58,7 +58,7 @@ namespace tdap {
     template<typename T>
     class Array : public ArrayTraits<T, Array<T>>
     {
-        static_assert(TriviallyCopyable<T>::value,
+        static_assert(std::is_trivially_copyable<T>::value,
                       "Type must be trivial to copy, move or destroy and have standard layout");
 
         friend class ArrayTraits<T, Array<T>>;
@@ -189,7 +189,7 @@ namespace tdap {
     template<typename T>
     class RefArray : public ArrayTraits<T, RefArray<T>>
     {
-        static_assert(TriviallyCopyable<T>::value,
+        static_assert(std::is_trivially_copyable<T>::value,
                       "Type must be trivial to copy, move or destroy and have standard layout");
 
         friend class ArrayTraits<T, RefArray<T>>;

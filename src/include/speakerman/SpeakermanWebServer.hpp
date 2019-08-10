@@ -26,6 +26,7 @@
 #include <mutex>
 #include <chrono>
 #include <tdap/Power2.hpp>
+#include <tdap/Count.hpp>
 #include <speakerman/ServerSocket.hpp>
 #include <speakerman/HttpMessage.hpp>
 #include <speakerman/SpeakermanConfig.hpp>
@@ -107,7 +108,6 @@ namespace speakerman {
         }
     };
 
-
     class web_server : protected http_message
     {
     public:
@@ -116,7 +116,7 @@ namespace speakerman {
         using Stream = server_socket::Stream;
         static constexpr size_t URL_LENGTH = 1023;
         static constexpr const char *COOKIE_TIME_STAMP = "levelTimeStamp";
-        static constexpr size_t COOKIE_TIME_STAMP_LENGTH = strlen(COOKIE_TIME_STAMP);
+        static constexpr size_t COOKIE_TIME_STAMP_LENGTH = tdap::constexpr_string_length(COOKIE_TIME_STAMP);
 
         web_server(SpeakerManagerControl &speakerManager);
 
@@ -175,7 +175,6 @@ namespace speakerman {
         static void thread_static_function(web_server *);
 
         void thread_function();
-
 
         Result accept_work(Stream &stream, const server_socket &socket);
 

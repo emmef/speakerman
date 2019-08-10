@@ -146,6 +146,11 @@ namespace tdap {
         }
     };
 
+    static constexpr int constexpr_string_length(const char * str)
+    {
+        return *str ? 1 + constexpr_string_length(str + 1) + 1 : 0;
+    }
+
 } /* End of name space tdap */
 
 #endif /* TDAP_COUNT_HEADER_GUARD */

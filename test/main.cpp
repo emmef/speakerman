@@ -104,7 +104,7 @@ static const double * getSpikedInput()
         for (i = 0; i < 8 * RUNLENGTH / 10; i++) {
             if (i % RANDOM_PEAK == 0) {
                 flip = !flip;
-                input[i] == 75;
+                input[i] = 75;
                 peak1 = RANDOM_PEAK / 10;
             }
             else if (peak1 == 0) {
