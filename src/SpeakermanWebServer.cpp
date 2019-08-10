@@ -64,7 +64,13 @@ namespace speakerman {
         rangeFile += number;
         rangeFile += ".ranges";
 
-        command_line = getWatchDogScript();
+        const char *script = getWatchDogScript();
+        if (script == nullptr) {
+            command_line = "";
+            return;
+        }
+
+        command_line = script;
         command_line += " ";
         command_line += rangeFile;
     }
@@ -227,9 +233,9 @@ namespace speakerman {
                 int old_setting = threshold_scaling_setting;
                 threshold_scaling_setting = 1;
                 if (command_line.length() == 0) {
-
+                    cerr << "Cannot find watchdog command" << endl;
                 }
-                if (system(command_line.c_str()) == 0) {
+                else if (system(command_line.c_str()) == 0) {
                     TemporaryFile file{range_file.c_str()};
                     if (file.is_open()) {
                         istream &stream = file.stream();
