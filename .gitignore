@@ -22,6 +22,7 @@
 .kdev*
 .project
 .settings
+cmake-build-*
 
 # Intermediate / generated files
 aclocal.m4
@@ -41,3 +42,4 @@ src/speakerman
 *.cache
 .autotools
 speakerman.kdev4
+
