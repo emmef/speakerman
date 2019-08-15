@@ -59,7 +59,6 @@ namespace speakerman {
         FixedSizeArray <T, INPUTS> inFrame;
         FixedSizeArray <T, OUTPUTS> outFrame;
 
-
         static CrossoverFrequencies crossovers()
         {
             CrossoverFrequencies cr;
@@ -189,11 +188,15 @@ namespace speakerman {
         {
             auto lockFreeData = transport.getLockFreeNoFence(); // method already called from within a fence
             bool modifiedTransport = lockFreeData.modified();
+            ZFPUState state;
 
             if (modifiedTransport) {
                 processor.levels.reset();
                 if (lockFreeData.data().configChanged) {
                     processor.updateConfig(lockFreeData.data().configData);
+                }
+                else {
+                    processor.updateConfig(processor.getConfigData());
                 }
             }
             size_t portNumber = 0;
