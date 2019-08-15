@@ -278,7 +278,6 @@ namespace tdap {
             if (delay > maxDelay_) {
                 throw std::runtime_error("MultiChannelDelay::setChannels invalid delay");
             }
-            cout << this << ".setDelay(" << channel << ", " << delay << ")" << endl;
             entry_[channel].setDelay(channels_, channel, delay);
             delay_ = delay;
         }

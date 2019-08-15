@@ -361,7 +361,7 @@ namespace speakerman {
 
     bool CountedThreadGuard::await_finished(std::chrono::milliseconds timeout, const char *wait_message)
     {
-        THREAD_ENTITIES.await_and_report(timeout, wait_message);
+        return THREAD_ENTITIES.await_and_report(timeout, wait_message);
     }
 
 
