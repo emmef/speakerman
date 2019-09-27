@@ -33,6 +33,7 @@
 #include <speakerman/SpeakermanConfig.hpp>
 #include <speakerman/SpeakerManager.hpp>
 #include <speakerman/SpeakermanWebServer.hpp>
+#include <tdap/array.hpp>
 
 using namespace speakerman;
 using namespace tdap;

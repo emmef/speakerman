@@ -3,7 +3,9 @@ project(speakerman)
 
 set(CMAKE_CXX_STANDARD 17)
 
-include_directories(include src/include /usr/include)
+find_path(LOCAL_TDAP_PATH, README-TAP.md HINTS ../ ../../ NO_DEFAULT_PATH)
+
+include_directories(include src/include ${LOCAL_TDAP_PATH}/src /usr/include)
 set(Boost_USE_STATIC_LIBS OFF)
 set(Boost_USE_MULTITHREADED ON)
 set(Boost_USE_STATIC_RUNTIME OFF)
@@ -75,6 +77,9 @@ set(SOURCE_FILES
         src/SpeakermanConfig.cpp
         src/SpeakermanWebServer.cpp
         src/Stream.cpp)
+
+find_path(LOCAL_TDAP_PATH, README-TAP.md HINTS ../ ../../ NO_DEFAULT_PATH)
+
 
 add_executable(speakerman ${SOURCE_FILES} src/speakerman.cpp)
 set(LIBRARIES

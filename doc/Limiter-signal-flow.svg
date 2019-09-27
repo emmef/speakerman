@@ -1,0 +1,1039 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.0//EN" "http://www.w3.org/TR/2001/PR-SVG-20010719/DTD/svg10.dtd">
+<svg width="115cm" height="124cm" viewBox="-28 -67 2286 2467" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <defs/>
+  <g id="Blocks">
+    <g>
+      <path style="fill: none; stroke-opacity: 1; stroke-width: 10; stroke: #8f8f8f" d="M 288.571 1220 L 1531.43,1220 L 1780,1500 L 1531.43,1780 L 288.571,1780 L 40,1500 L 288.571,1220"/>
+      <text font-size="12.7998" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="910" y="1504">
+        <tspan x="910" y="1504"></tspan>
+      </text>
+    </g>
+    <text font-size="39.5111" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="910" y="1151.26">
+      <tspan x="910" y="1151.26">CHANNEL-LINKED</tspan>
+      <tspan x="910" y="1200.65">PERCEPTIVE RMS LIMITER</tspan>
+    </text>
+    <rect style="fill: none; stroke-opacity: 1; stroke-width: 10; stroke: #8f8f8f" x="160" y="-10" width="1930" height="1020" rx="0" ry="0"/>
+    <text font-size="39.5111" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="1125" y="-29.35">
+      <tspan x="1125" y="-29.35">SPEAKER MANAGEMENT</tspan>
+    </text>
+    <g>
+      <path style="fill: none; stroke-opacity: 1; stroke-width: 10; stroke: #8f8f8f" d="M 782.857 1990 L 1747.14,1990 L 1940,2190 L 1747.14,2390 L 782.857,2390 L 590,2190 L 782.857,1990"/>
+      <text font-size="12.7998" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="1265" y="2194">
+        <tspan x="1265" y="2194"></tspan>
+      </text>
+    </g>
+    <text font-size="39.5111" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="1265" y="1921.26">
+      <tspan x="1265" y="1921.26">CHANNEL-LINKED</tspan>
+      <tspan x="1265" y="1970.65">PREDICTIVE (3ms) PEAK LIMITER</tspan>
+    </text>
+    <g>
+      <path style="fill: none; stroke-opacity: 1; stroke-width: 10; stroke: #8f8f8f" d="M 1940 810 C 2080,1210 1950,1770 1833.78,1957.74"/>
+      <polygon style="fill: #8f8f8f; fill-opacity: 1; stroke-opacity: 1; stroke-width: 10; stroke: #8f8f8f" fill-rule="evenodd" points="1825.88,1970.49 1827.91,1948.22 1833.78,1957.74 1844.91,1958.75 "/>
+    </g>
+    <g>
+      <path style="fill: none; stroke-opacity: 1; stroke-width: 10; stroke: #8f8f8f" d="M 1050 870 C 1030,970 1020,1030 1001.71,1066.58"/>
+      <polygon style="fill: #8f8f8f; fill-opacity: 1; stroke-opacity: 1; stroke-width: 10; stroke: #8f8f8f" fill-rule="evenodd" points="995,1080 995,1057.64 1001.71,1066.58 1012.89,1066.58 "/>
+    </g>
+  </g>
+  <g id="Advanced RMS detector">
+    <g>
+      <ellipse style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" cx="170" cy="1360" rx="40" ry="40"/>
+      <text font-size="16.9333" style="fill: #c00000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="170" y="1365.17">
+        <tspan x="170" y="1365.17">IN 1</tspan>
+      </text>
+    </g>
+    <g>
+      <ellipse style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #008000" cx="170" cy="1640" rx="40" ry="40"/>
+      <text font-size="16.9333" style="fill: #008000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="170" y="1645.17">
+        <tspan x="170" y="1645.17">IN 2</tspan>
+      </text>
+    </g>
+    <g>
+      <path style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" fill-rule="evenodd" d="M 295 1410 L 355,1410 C 363.284,1410 370,1418.95 370,1430 C 370,1441.05 363.284,1450 355,1450 L 295,1450 C 286.716,1450 280,1441.05 280,1430 C 280,1418.95 286.716,1410 295,1410z"/>
+      <text font-size="11.2889" style="fill: #c00000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="325" y="1426.47">
+        <tspan x="325" y="1426.47">PERCEPTIVE</tspan>
+        <tspan x="325" y="1440.58">KEYING</tspan>
+      </text>
+    </g>
+    <g>
+      <path style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #008000" fill-rule="evenodd" d="M 295 1530 L 355,1530 C 363.284,1530 370,1538.95 370,1550 C 370,1561.05 363.284,1570 355,1570 L 295,1570 C 286.716,1570 280,1561.05 280,1550 C 280,1538.95 286.716,1530 295,1530z"/>
+      <text font-size="11.2889" style="fill: #008000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="325" y="1546.47">
+        <tspan x="325" y="1546.47">PERCEPTIVE</tspan>
+        <tspan x="325" y="1560.58">KEYING</tspan>
+      </text>
+    </g>
+    <g>
+      <rect style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" x="410" y="1410" width="49.65" height="40" rx="0" ry="0"/>
+      <text font-size="22.5778" style="fill: #c00000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="434.825" y="1436.89">
+        <tspan x="434.825" y="1436.89">x²</tspan>
+      </text>
+    </g>
+    <g>
+      <rect style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #008000" x="410" y="1530" width="49.65" height="40" rx="0" ry="0"/>
+      <text font-size="22.5778" style="fill: #008000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="434.825" y="1556.89">
+        <tspan x="434.825" y="1556.89">x²</tspan>
+      </text>
+    </g>
+    <g>
+      <ellipse style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" cx="520" cy="1490" rx="20" ry="20"/>
+      <line style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #000000" x1="505.858" y1="1475.86" x2="534.142" y2="1504.14"/>
+      <line style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #000000" x1="505.858" y1="1504.14" x2="534.142" y2="1475.86"/>
+    </g>
+    <g>
+      <polyline style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" points="460.656,1430 520,1430 520,1460.26 "/>
+      <polygon style="fill: #c00000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" fill-rule="evenodd" points="520,1467.76 515,1457.76 520,1460.26 525,1457.76 "/>
+    </g>
+    <g>
+      <polyline style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #008000" points="460.656,1550 520,1550 520,1519.74 "/>
+      <polygon style="fill: #008000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #008000" fill-rule="evenodd" points="520,1512.24 525,1522.24 520,1519.74 515,1522.24 "/>
+    </g>
+    <g>
+      <line style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" x1="207.359" y1="1376.87" x2="277.358" y2="1408.48"/>
+      <polygon style="fill: #c00000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" fill-rule="evenodd" points="284.193,1411.57 273.022,1412.01 277.358,1408.48 277.137,1402.9 "/>
+    </g>
+    <g>
+      <line style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #008000" x1="205.439" y1="1619.42" x2="281.983" y2="1574.98"/>
+      <polygon style="fill: #008000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #008000" fill-rule="evenodd" points="288.469,1571.21 282.332,1580.56 281.983,1574.98 277.311,1571.91 "/>
+    </g>
+    <g>
+      <line style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #008000" x1="370.005" y1="1550" x2="399.262" y2="1550"/>
+      <polygon style="fill: #008000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #008000" fill-rule="evenodd" points="406.762,1550 396.762,1555 399.262,1550 396.762,1545 "/>
+    </g>
+    <g>
+      <line style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" x1="370.005" y1="1430" x2="399.262" y2="1430"/>
+      <polygon style="fill: #c00000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" fill-rule="evenodd" points="406.762,1430 396.762,1435 399.262,1430 396.762,1425 "/>
+    </g>
+    <g>
+      <rect style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" x="590" y="1330" width="270" height="40" rx="0" ry="0"/>
+      <text font-size="11.2887" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="599" y="1353.44">
+        <tspan x="599" y="1353.44">[M] 0.6~8.0s - slow "rest"</tspan>
+      </text>
+    </g>
+    <g>
+      <rect style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" x="590" y="1420" width="269.1" height="40" rx="0" ry="0"/>
+      <text font-size="11.2887" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="599" y="1443.44">
+        <tspan x="599" y="1443.44">[0] 0.4s - ITU-R 468 center perceptive</tspan>
+      </text>
+    </g>
+    <g>
+      <rect style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" x="590" y="1510" width="270" height="40" rx="0" ry="0"/>
+      <text font-size="11.2887" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="599" y="1533.44">
+        <tspan x="599" y="1533.44">[N] 0.6ms~0.3s - ITU-R 468 weighted</tspan>
+      </text>
+    </g>
+    <text font-size="12.8" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:Open Sans;font-style:normal;font-weight:normal" x="725" y="1389.7">
+      <tspan x="725" y="1389.7">0 &lt;= M &lt;= 3</tspan>
+    </text>
+    <text font-size="12.8" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:Open Sans;font-style:normal;font-weight:normal" x="725" y="1500.25">
+      <tspan x="725" y="1500.25">0 &lt;= N &lt;= 11</tspan>
+    </text>
+    <g>
+      <rect style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" x="590" y="1600" width="270" height="40" rx="0" ry="0"/>
+      <text font-size="11.2887" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="599" y="1623.44">
+        <tspan x="599" y="1623.44">0.4 ms - "peak"</tspan>
+      </text>
+    </g>
+    <g>
+      <ellipse style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" cx="950" cy="1490" rx="25.6797" ry="25.6797"/>
+      <text font-size="16.9331" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="950" y="1495.17">
+        <tspan x="950" y="1495.17">MAX</tspan>
+      </text>
+    </g>
+    <g>
+      <line style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #000000" x1="860" y1="1350" x2="930.31" y2="1459.37"/>
+      <polygon style="fill: #000000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" fill-rule="evenodd" points="934.366,1465.68 924.752,1459.97 930.31,1459.37 933.164,1454.56 "/>
+    </g>
+    <g>
+      <line style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #000000" x1="859.1" y1="1440" x2="918.101" y2="1472.45"/>
+      <polygon style="fill: #000000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" fill-rule="evenodd" points="924.672,1476.07 913.5,1475.63 918.101,1472.45 918.32,1466.87 "/>
+    </g>
+    <g>
+      <line style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #000000" x1="860" y1="1530" x2="916.735" y2="1504.78"/>
+      <polygon style="fill: #000000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" fill-rule="evenodd" points="923.589,1501.74 916.482,1510.37 916.735,1504.78 912.42,1501.23 "/>
+    </g>
+    <g>
+      <line style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #000000" x1="860" y1="1620" x2="929.27" y2="1519.94"/>
+      <polygon style="fill: #000000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" fill-rule="evenodd" points="933.539,1513.78 931.957,1524.85 929.27,1519.94 923.736,1519.15 "/>
+    </g>
+    <g>
+      <line style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #000000" x1="529.382" y1="1471.24" x2="586.988" y2="1356.02"/>
+      <polygon style="fill: #000000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" fill-rule="evenodd" points="589,1352 589,1358.71 586.988,1356.02 583.633,1356.02 "/>
+    </g>
+    <g>
+      <line style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #000000" x1="537.021" y1="1477.84" x2="584.519" y2="1443.92"/>
+      <polygon style="fill: #000000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" fill-rule="evenodd" points="588.18,1441.3 585.042,1447.23 584.519,1443.92 581.554,1442.35 "/>
+    </g>
+    <g>
+      <line style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #000000" x1="538.226" y1="1500.42" x2="584.151" y2="1526.66"/>
+      <polygon style="fill: #000000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" fill-rule="evenodd" points="588.059,1528.89 581.361,1528.52 584.151,1526.66 584.338,1523.31 "/>
+    </g>
+    <g>
+      <line style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #000000" x1="529.955" y1="1508.49" x2="586.806" y2="1614.07"/>
+      <polygon style="fill: #000000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" fill-rule="evenodd" points="588.94,1618.03 583.454,1614.17 586.806,1614.07 588.737,1611.33 "/>
+    </g>
+    <g>
+      <rect style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" x="1020" y="1470" width="130" height="40" rx="0" ry="0"/>
+      <text font-size="11.2887" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="1085" y="1493.44">
+        <tspan x="1085" y="1493.44">INTEGRATE 0.4ms</tspan>
+      </text>
+    </g>
+    <g>
+      <line style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #000000" x1="976.677" y1="1490" x2="1010.26" y2="1490"/>
+      <polygon style="fill: #000000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" fill-rule="evenodd" points="1017.76,1490 1007.76,1495 1010.26,1490 1007.76,1485 "/>
+    </g>
+    <g>
+      <rect style="fill: #ffe8e8; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" x="1141.17" y="1720" width="131.5" height="40" rx="0" ry="0"/>
+      <text font-size="11.2887" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="1150.17" y="1743.44">
+        <tspan x="1150.17" y="1743.44">THRESHOLD VALUE</tspan>
+      </text>
+    </g>
+    <g>
+      <rect style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" x="1210" y="1470" width="50" height="40" rx="0" ry="0"/>
+      <text font-size="22.5778" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="1235" y="1496.89">
+        <tspan x="1235" y="1496.89">√x</tspan>
+      </text>
+    </g>
+    <g>
+      <line style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #000000" x1="1150" y1="1490" x2="1200.26" y2="1490"/>
+      <polygon style="fill: #000000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" fill-rule="evenodd" points="1207.76,1490 1197.76,1495 1200.26,1490 1197.76,1485 "/>
+    </g>
+    <text font-size="22.5778" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:Open Sans;font-style:normal;font-weight:normal" x="725" y="1313.35">
+      <tspan x="725" y="1313.35">Weighted Window Averages</tspan>
+    </text>
+    <g>
+      <rect style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" x="1311.17" y="1410" width="190.9" height="160" rx="0" ry="0"/>
+      <text font-size="12.7998" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="1406.62" y="1469.9">
+        <tspan x="1406.62" y="1469.9">RECIPROCAL</tspan>
+        <tspan x="1406.62" y="1485.9">AMPLIFIER</tspan>
+        <tspan x="1406.62" y="1501.9"></tspan>
+        <tspan x="1406.62" y="1517.9">y = x * THRESHOLD / z</tspan>
+      </text>
+    </g>
+    <g>
+      <line style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #000000" x1="1260" y1="1490" x2="1301.44" y2="1490"/>
+      <polygon style="fill: #000000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" fill-rule="evenodd" points="1308.94,1490 1298.94,1495 1301.44,1490 1298.94,1485 "/>
+    </g>
+    <text font-size="22.5778" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:Open Sans;font-style:normal;font-weight:normal" x="1285.59" y="1477.35">
+      <tspan x="1285.59" y="1477.35">z</tspan>
+    </text>
+    <g>
+      <path style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #008000" d="M 203.787 1663.23 C 363.787,1773.23 340,1750 780,1750 C 1220,1750 1170,1530 1301.44,1530"/>
+      <polygon style="fill: #008000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #008000" fill-rule="evenodd" points="1308.94,1530 1298.94,1535 1301.44,1530 1298.94,1525 "/>
+    </g>
+    <g>
+      <path style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" d="M 203.785 1336.77 C 363.785,1226.77 340,1240 780,1240 C 1220,1240 1170,1450 1301.44,1450"/>
+      <polygon style="fill: #c00000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" fill-rule="evenodd" points="1308.94,1450 1298.94,1455 1301.44,1450 1298.94,1445 "/>
+    </g>
+    <g>
+      <path style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" d="M 1502.07 1450 C 1521.31,1450 1570.99,1405.74 1600.55,1381.86"/>
+      <polygon style="fill: #c00000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" fill-rule="evenodd" points="1606.39,1377.15 1601.75,1387.32 1600.55,1381.86 1595.47,1379.54 "/>
+    </g>
+    <g>
+      <path style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #008000" d="M 1502.07 1530 C 1520.36,1530 1571.09,1584.34 1600.66,1608.23"/>
+      <polygon style="fill: #008000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #008000" fill-rule="evenodd" points="1606.5,1612.94 1595.58,1610.55 1600.66,1608.23 1601.86,1602.77 "/>
+    </g>
+    <line style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #d8e5e5" x1="1311.17" y1="1450" x2="1502.07" y2="1450"/>
+    <line style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #d8e5e5" x1="1311.17" y1="1530" x2="1502.07" y2="1530"/>
+    <g>
+      <ellipse style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #008000" cx="1640" cy="1640" rx="40" ry="40"/>
+      <text font-size="16.9333" style="fill: #008000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="1640" y="1645.17">
+        <tspan x="1640" y="1645.17">OUT 2</tspan>
+      </text>
+    </g>
+    <g>
+      <ellipse style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" cx="1640" cy="1350" rx="40" ry="40"/>
+      <text font-size="16.9333" style="fill: #c00000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="1640" y="1355.17">
+        <tspan x="1640" y="1355.17">OUT 1</tspan>
+      </text>
+    </g>
+    <text font-size="11.2887" style="fill: #8b6914; fill-opacity: 1; stroke: none;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="378" y="1649.3">
+      <tspan x="378" y="1649.3">3~6 dB / octave high-pass</tspan>
+    </text>
+    <text font-size="11.2887" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="378" y="1678.83">
+      <tspan x="378" y="1678.83">Tuned-down C-curve &amp; tweater protection HF-boost</tspan>
+    </text>
+    <text font-size="11.2887" style="fill: #008000; fill-opacity: 1; stroke: none;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="378" y="1663.9">
+      <tspan x="378" y="1663.9">2~4 dB / octave high pass</tspan>
+    </text>
+    <text font-size="11.2887" style="fill: #8b6914; fill-opacity: 1; stroke: none;text-anchor:end;font-family:sans-serif;font-style:normal;font-weight:normal" x="362" y="1649.3">
+      <tspan x="362" y="1649.3">(&lt;80Hz) SUB :</tspan>
+    </text>
+    <text font-size="11.2887" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:end;font-family:sans-serif;font-style:normal;font-weight:normal" x="362" y="1678.5">
+      <tspan x="362" y="1678.5">WIDE :</tspan>
+    </text>
+    <text font-size="11.2887" style="fill: #008000; fill-opacity: 1; stroke: none;text-anchor:end;font-family:sans-serif;font-style:normal;font-weight:normal" x="362" y="1663.9">
+      <tspan x="362" y="1663.9">(80~240 Hz) LM :</tspan>
+    </text>
+    <text font-size="11.2889" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:700" x="370" y="1615.19">
+      <tspan x="370" y="1615.19">PERCEPTIVE KEYING</tspan>
+      <tspan x="370" y="1629.3">(flattened high-volume C-curve)</tspan>
+    </text>
+    <text font-size="11.2887" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="378" y="1707.54">
+      <tspan x="378" y="1707.54">Of frequency-weighted bursts of pink noise, the perceived loudness of b</tspan>
+      <tspan x="378" y="1721.65">ursts shorter than 400ms, roughly have a ∜ relation with their length.</tspan>
+    </text>
+    <text font-size="11.2889" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:end;font-family:sans-serif;font-style:normal;font-weight:700" x="362" y="1707.54">
+      <tspan x="362" y="1707.54">ITU-R 468</tspan>
+    </text>
+    <text font-size="14.1111" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:end;font-family:sans-serif;font-style:normal;font-weight:700" x="490" y="1494.88">
+      <tspan x="490" y="1494.88">SUM</tspan>
+    </text>
+    <g>
+      <path style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #000000" d="M 1273.66 1740 C 1339.96,1740 1412.1,1701 1408.98,1580.73"/>
+      <polygon style="fill: #000000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" fill-rule="evenodd" points="1408.79,1573.24 1414.04,1583.1 1408.98,1580.73 1404.05,1583.36 "/>
+    </g>
+    <g>
+      <path style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #000000" d="M 1140.18 1740 C 1054.88,1740 989.357,1594.95 962.776,1524.07"/>
+      <polygon style="fill: #000000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" fill-rule="evenodd" points="960.143,1517.05 968.335,1524.65 962.776,1524.07 958.972,1528.17 "/>
+    </g>
+  </g>
+  <g id="LIMITER">
+    <g>
+      <ellipse style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" cx="950" cy="2190" rx="30" ry="30"/>
+      <text font-size="16.9331" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="950" y="2195.17">
+        <tspan x="950" y="2195.17">MAX</tspan>
+      </text>
+    </g>
+    <g>
+      <path style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" fill-rule="evenodd" d="M 830 2030 L 943.333,2030 C 974.629,2030 1000,2038.95 1000,2050 C 1000,2061.05 974.629,2070 943.333,2070 L 830,2070 L 830,2030z"/>
+      <text font-size="16.9333" style="fill: #c00000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="886.667" y="2055.29">
+        <tspan x="886.667" y="2055.29">DELAY 3ms</tspan>
+      </text>
+    </g>
+    <g>
+      <path style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #008000" fill-rule="evenodd" d="M 830 2310 L 943.333,2310 C 974.629,2310 1000,2318.95 1000,2330 C 1000,2341.05 974.629,2350 943.333,2350 L 830,2350 L 830,2310z"/>
+      <text font-size="16.9333" style="fill: #008000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="886.667" y="2335.29">
+        <tspan x="886.667" y="2335.29">DELAY 3ms</tspan>
+      </text>
+    </g>
+    <g>
+      <ellipse style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" cx="1860" cy="2110" rx="40" ry="40"/>
+      <text font-size="16.9333" style="fill: #c00000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="1860" y="2115.17">
+        <tspan x="1860" y="2115.17">OUT 1</tspan>
+      </text>
+    </g>
+    <g>
+      <ellipse style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #008000" cx="1860" cy="2270" rx="40" ry="40"/>
+      <text font-size="16.9333" style="fill: #008000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="1860" y="2275.17">
+        <tspan x="1860" y="2275.17">OUT 2</tspan>
+      </text>
+    </g>
+    <g>
+      <ellipse style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" cx="670" cy="2110" rx="40" ry="40"/>
+      <text font-size="16.9333" style="fill: #c00000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="670" y="2115.17">
+        <tspan x="670" y="2115.17">IN 1</tspan>
+      </text>
+    </g>
+    <g>
+      <ellipse style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #008000" cx="670" cy="2270" rx="40" ry="40"/>
+      <text font-size="16.9333" style="fill: #008000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="670" y="2275.17">
+        <tspan x="670" y="2275.17">IN 2</tspan>
+      </text>
+    </g>
+    <g>
+      <path style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" d="M 708.379 2095.61 C 788.379,2065.61 780,2050 820.264,2050"/>
+      <polygon style="fill: #c00000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" fill-rule="evenodd" points="827.764,2050 817.764,2055 820.264,2050 817.764,2045 "/>
+    </g>
+    <g>
+      <path style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #008000" d="M 707.675 2286.15 C 777.675,2316.15 790,2330 820.264,2330"/>
+      <polygon style="fill: #008000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #008000" fill-rule="evenodd" points="827.764,2330 817.764,2335 820.264,2330 817.764,2325 "/>
+    </g>
+    <g>
+      <path style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #000000" d="M 710.995 2110 C 780.715,2110 840.968,2149.11 911.852,2175.69"/>
+      <polygon style="fill: #000000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" fill-rule="evenodd" points="918.874,2178.33 907.755,2179.5 911.852,2175.69 911.267,2170.13 "/>
+    </g>
+    <g>
+      <path style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #000000" d="M 710.995 2270 C 780.715,2270 840.968,2230.89 911.852,2204.31"/>
+      <polygon style="fill: #000000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" fill-rule="evenodd" points="918.874,2201.67 911.267,2209.87 911.852,2204.31 907.755,2200.5 "/>
+    </g>
+    <g>
+      <rect style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" x="1040" y="2150" width="230" height="80" rx="0" ry="0"/>
+      <text font-size="16.9331" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="1155" y="2174">
+        <tspan x="1155" y="2174">LINEAIR ENVELOPE</tspan>
+        <tspan x="1155" y="2195.17">PEAK DETECTOR </tspan>
+        <tspan x="1155" y="2216.33">3 ms look-ahead</tspan>
+      </text>
+    </g>
+    <g>
+      <line style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #000000" x1="980.992" y1="2190" x2="1030.26" y2="2190"/>
+      <polygon style="fill: #000000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" fill-rule="evenodd" points="1037.76,2190 1027.76,2195 1030.26,2190 1027.76,2185 "/>
+    </g>
+    <g>
+      <rect style="fill: #ffe8e8; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" x="1130" y="2330" width="131.5" height="40" rx="0" ry="0"/>
+      <text font-size="11.2887" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="1139" y="2353.44">
+        <tspan x="1139" y="2353.44">THRESHOLD VALUE</tspan>
+      </text>
+    </g>
+    <g>
+      <rect style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" x="1520" y="2110" width="190" height="160" rx="0" ry="0"/>
+      <text font-size="12.7998" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="1615" y="2169.9">
+        <tspan x="1615" y="2169.9">RECIPROCAL</tspan>
+        <tspan x="1615" y="2185.9">AMPLIFIER</tspan>
+        <tspan x="1615" y="2201.9"></tspan>
+        <tspan x="1615" y="2217.9">y = x * THRESHOLD / z</tspan>
+      </text>
+    </g>
+    <g>
+      <line style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #000000" x1="1440" y1="2190" x2="1510.26" y2="2190"/>
+      <polygon style="fill: #000000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" fill-rule="evenodd" points="1517.76,2190 1507.76,2195 1510.26,2190 1507.76,2185 "/>
+    </g>
+    <text font-size="22.5778" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:Open Sans;font-style:normal;font-weight:normal" x="1480" y="2177.35">
+      <tspan x="1480" y="2177.35">z</tspan>
+    </text>
+    <g>
+      <path style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" d="M 1000 2050 C 1106.24,2050 1400,2150 1510.26,2150"/>
+      <polygon style="fill: #c00000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" fill-rule="evenodd" points="1517.76,2150 1507.76,2155 1510.26,2150 1507.76,2145 "/>
+    </g>
+    <g>
+      <path style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #008000" d="M 1000 2330 C 1106.24,2330 1400,2230 1510.26,2230"/>
+      <polygon style="fill: #008000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #008000" fill-rule="evenodd" points="1517.76,2230 1507.76,2235 1510.26,2230 1507.76,2225 "/>
+    </g>
+    <g>
+      <path style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" d="M 1710 2150 C 1749.84,2150 1759.03,2110 1809.29,2110"/>
+      <polygon style="fill: #c00000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" fill-rule="evenodd" points="1816.79,2110 1806.79,2115 1809.29,2110 1806.79,2105 "/>
+    </g>
+    <g>
+      <path style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #008000" d="M 1710 2230 C 1749.84,2230 1759.03,2270 1809.29,2270"/>
+      <polygon style="fill: #008000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #008000" fill-rule="evenodd" points="1816.79,2270 1806.79,2275 1809.29,2270 1806.79,2265 "/>
+    </g>
+    <line style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #d8e5e5" x1="1520" y1="2150" x2="1710" y2="2150"/>
+    <line style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #d8e5e5" x1="1520" y1="2230" x2="1710" y2="2230"/>
+    <g>
+      <rect style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" x="1310" y="2170" width="130" height="40" rx="0" ry="0"/>
+      <text font-size="11.2887" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="1375" y="2193.44">
+        <tspan x="1375" y="2193.44">INTEGRATE fast</tspan>
+      </text>
+    </g>
+    <g>
+      <line style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #000000" x1="1270" y1="2190" x2="1300.26" y2="2190"/>
+      <polygon style="fill: #000000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" fill-rule="evenodd" points="1307.76,2190 1297.76,2195 1300.26,2190 1297.76,2185 "/>
+    </g>
+    <g>
+      <path style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #000000" d="M 1261.5 2350 C 1320,2350 1610,2360 1614.45,2280.73"/>
+      <polygon style="fill: #000000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" fill-rule="evenodd" points="1614.87,2273.25 1619.31,2283.51 1614.45,2280.73 1609.32,2282.95 "/>
+    </g>
+    <g>
+      <path style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #000000" d="M 1129.01 2350 C 1047.42,2350 1019.85,2273.82 976.084,2221.3"/>
+      <polygon style="fill: #000000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" fill-rule="evenodd" points="971.283,2215.54 981.526,2220.02 976.084,2221.3 973.844,2226.42 "/>
+    </g>
+  </g>
+  <g id="Speaker manager">
+    <g>
+      <ellipse style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" cx="160" cy="320" rx="40" ry="40"/>
+      <text font-size="16.9333" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="160" y="325.167">
+        <tspan x="160" y="325.167">IN 1/1</tspan>
+      </text>
+    </g>
+    <g>
+      <ellipse style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" cx="160" cy="440" rx="40" ry="40"/>
+      <text font-size="16.9333" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="160" y="445.167">
+        <tspan x="160" y="445.167">IN 1/2</tspan>
+      </text>
+    </g>
+    <g>
+      <ellipse style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" cx="160" cy="560" rx="40" ry="40"/>
+      <text font-size="16.9333" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="160" y="565.167">
+        <tspan x="160" y="565.167">IN 2/1</tspan>
+      </text>
+    </g>
+    <g>
+      <ellipse style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" cx="160" cy="680" rx="40" ry="40"/>
+      <text font-size="16.9333" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="160" y="685.167">
+        <tspan x="160" y="685.167">IN 2/2</tspan>
+      </text>
+    </g>
+    <g>
+      <ellipse style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" cx="420" cy="440" rx="40" ry="40"/>
+      <line style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #000000" x1="391.716" y1="411.716" x2="448.284" y2="468.284"/>
+      <line style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #000000" x1="391.716" y1="468.284" x2="448.284" y2="411.716"/>
+    </g>
+    <g>
+      <ellipse style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" cx="420" cy="560" rx="40" ry="40"/>
+      <line style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #000000" x1="391.716" y1="531.716" x2="448.284" y2="588.284"/>
+      <line style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #000000" x1="391.716" y1="588.284" x2="448.284" y2="531.716"/>
+    </g>
+    <g>
+      <ellipse style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" cx="640" cy="210" rx="40" ry="40"/>
+      <text font-size="16.9333" style="fill: #c00000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="640" y="215.167">
+        <tspan x="640" y="215.167">IN 1/1</tspan>
+      </text>
+    </g>
+    <g>
+      <ellipse style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #008000" cx="640" cy="360" rx="40" ry="40"/>
+      <text font-size="16.9333" style="fill: #008000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="640" y="365.167">
+        <tspan x="640" y="365.167">IN 1/2</tspan>
+      </text>
+    </g>
+    <g>
+      <ellipse style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" cx="640" cy="660" rx="40" ry="40"/>
+      <text font-size="16.9333" style="fill: #c00000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="640" y="665.167">
+        <tspan x="640" y="665.167">IN 2/1</tspan>
+      </text>
+    </g>
+    <g>
+      <ellipse style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" cx="640" cy="810" rx="40" ry="40"/>
+      <text font-size="16.9333" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="640" y="815.167">
+        <tspan x="640" y="815.167">IN 2/2</tspan>
+      </text>
+    </g>
+    <text font-size="16.9333" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:700" x="420" y="333.667">
+      <tspan x="420" y="333.667">CHANNEL-LINKED</tspan>
+      <tspan x="420" y="354.833">VOLUME</tspan>
+      <tspan x="420" y="376">MATRICES</tspan>
+    </text>
+    <g>
+      <line style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #8f8f8f" x1="420" y1="484.472" x2="420" y2="515.528"/>
+      <polyline style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #8f8f8f" points="425,492.236 420,482.236 415,492.236 "/>
+      <polyline style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #8f8f8f" points="415,507.764 420,517.764 425,507.764 "/>
+    </g>
+    <g>
+      <path style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #000000" d="M 200.985 320 C 287.305,320 281.946,384.778 372.906,421.162"/>
+      <polygon style="fill: #000000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" fill-rule="evenodd" points="379.87,423.948 368.728,424.876 372.906,421.162 372.442,415.592 "/>
+    </g>
+    <g>
+      <path style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #000000" d="M 200.985 440 C 287.305,440 281.946,504.778 372.906,541.162"/>
+      <polygon style="fill: #000000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" fill-rule="evenodd" points="379.87,543.948 368.728,544.876 372.906,541.162 372.442,535.592 "/>
+    </g>
+    <g>
+      <path style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #000000" d="M 200.985 560 C 287.305,560 281.946,495.222 372.906,458.838"/>
+      <polygon style="fill: #000000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" fill-rule="evenodd" points="379.87,456.052 372.442,464.408 372.906,458.838 368.728,455.124 "/>
+    </g>
+    <g>
+      <path style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #000000" d="M 200.985 680 C 287.305,680 281.946,615.222 372.906,578.838"/>
+      <polygon style="fill: #000000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" fill-rule="evenodd" points="379.87,576.052 372.442,584.408 372.906,578.838 368.728,575.124 "/>
+    </g>
+    <g>
+      <path style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" d="M 458.066 424.773 C 558.066,384.773 519.001,210 589.265,210"/>
+      <polygon style="fill: #c00000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" fill-rule="evenodd" points="596.765,210 586.765,215 589.265,210 586.765,205 "/>
+    </g>
+    <g>
+      <path style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" d="M 457.943 455.177 C 557.943,495.177 519.134,660 589.398,660"/>
+      <polygon style="fill: #c00000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" fill-rule="evenodd" points="596.898,660 586.898,665 589.398,660 586.898,655 "/>
+    </g>
+    <g>
+      <path style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #008000" d="M 458.045 544.782 C 558.045,504.782 519.024,360 589.288,360"/>
+      <polygon style="fill: #008000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #008000" fill-rule="evenodd" points="596.788,360 586.788,365 589.288,360 586.788,355 "/>
+    </g>
+    <g>
+      <path style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #008000" d="M 458.065 575.226 C 558.065,615.226 519.003,810 589.267,810"/>
+      <polygon style="fill: #008000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #008000" fill-rule="evenodd" points="596.767,810 586.767,815 589.267,810 586.767,805 "/>
+    </g>
+    <text font-size="16.9333" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:700" x="640" y="103.667">
+      <tspan x="640" y="103.667">GROUP</tspan>
+      <tspan x="640" y="124.833">MIXED</tspan>
+      <tspan x="640" y="146">INPUTS</tspan>
+    </text>
+    <text font-size="22.5778" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:end;font-family:sans-serif;font-style:normal;font-weight:700" x="110" y="479.603">
+      <tspan x="110" y="479.603">AUDIO</tspan>
+      <tspan x="110" y="507.825">INTERFACE</tspan>
+      <tspan x="110" y="536.047">INPUTS</tspan>
+    </text>
+    <g>
+      <polygon style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" fill-rule="evenodd" points="820.722,100 861.443,140 820.722,180 780,140 "/>
+      <text font-size="16.9333" style="fill: #c00000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="820.722" y="145.167">
+        <tspan x="820.722" y="145.167">CO</tspan>
+      </text>
+    </g>
+    <g>
+      <polygon style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #008000" fill-rule="evenodd" points="820.722,340 861.443,380 820.722,420 780,380 "/>
+      <text font-size="16.9333" style="fill: #008000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="820.722" y="385.167">
+        <tspan x="820.722" y="385.167">CO</tspan>
+      </text>
+    </g>
+    <g>
+      <polyline style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" points="681.005,210 730.503,210 730.503,140 770.264,140 "/>
+      <polygon style="fill: #c00000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" fill-rule="evenodd" points="777.764,140 767.764,145 770.264,140 767.764,135 "/>
+    </g>
+    <g>
+      <polyline style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #008000" points="681.005,360 730.503,360 730.503,380 770.264,380 "/>
+      <polygon style="fill: #008000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #008000" fill-rule="evenodd" points="777.764,380 767.764,385 770.264,380 767.764,375 "/>
+    </g>
+    <g>
+      <path style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" fill-rule="evenodd" d="M 1031.43 200 L 1088.57,200 L 1100,220 L 1088.57,240 L 1031.43,240 L 1020,220 L 1031.43,200z"/>
+      <text font-size="12.7998" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="1060" y="224">
+        <tspan x="1060" y="224">WIDE</tspan>
+      </text>
+    </g>
+    <g>
+      <path style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" fill-rule="evenodd" d="M 1031.43 280 L 1088.57,280 L 1100,300 L 1088.57,320 L 1031.43,320 L 1020,300 L 1031.43,280z"/>
+      <text font-size="12.7998" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="1060" y="304">
+        <tspan x="1060" y="304">LM</tspan>
+      </text>
+    </g>
+    <g>
+      <path style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" fill-rule="evenodd" d="M 1031.43 360 L 1088.57,360 L 1100,380 L 1088.57,400 L 1031.43,400 L 1020,380 L 1031.43,360z"/>
+      <text font-size="12.7998" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="1060" y="384">
+        <tspan x="1060" y="384">SUB</tspan>
+      </text>
+    </g>
+    <g>
+      <path style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" d="M 845.466 123.303 C 904.745,83.3026 983.65,181.597 1020.44,197.695"/>
+      <polygon style="fill: #c00000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" fill-rule="evenodd" points="1027.32,200.701 1016.15,201.273 1020.44,197.695 1020.16,192.112 "/>
+    </g>
+    <g>
+      <path style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #008000" d="M 845.467 363.302 C 904.745,323.302 983.655,258.401 1020.45,242.303"/>
+      <polygon style="fill: #008000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #008000" fill-rule="evenodd" points="1027.32,239.297 1020.16,247.886 1020.45,242.303 1016.16,238.724 "/>
+    </g>
+    <g>
+      <path style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" d="M 862.443 140 C 921.722,140 983.655,261.599 1020.45,277.697"/>
+      <polygon style="fill: #c00000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" fill-rule="evenodd" points="1027.32,280.703 1016.16,281.276 1020.45,277.697 1020.16,272.114 "/>
+    </g>
+    <g>
+      <path style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #008000" d="M 862.443 380 C 921.722,380 983.65,338.403 1020.44,322.305"/>
+      <polygon style="fill: #008000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #008000" fill-rule="evenodd" points="1027.32,319.299 1020.16,327.888 1020.44,322.305 1016.15,318.727 "/>
+    </g>
+    <g>
+      <path style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" d="M 845.467 156.698 C 904.746,196.698 983.717,341.626 1020.51,357.724"/>
+      <polygon style="fill: #c00000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" fill-rule="evenodd" points="1027.38,360.73 1016.22,361.303 1020.51,357.724 1020.23,352.141 "/>
+    </g>
+    <g>
+      <path style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #008000" d="M 845.462 396.695 C 904.741,436.695 983.65,418.403 1020.44,402.305"/>
+      <polygon style="fill: #008000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #008000" fill-rule="evenodd" points="1027.32,399.299 1020.16,407.888 1020.44,402.305 1016.15,398.727 "/>
+    </g>
+    <text font-size="16.9333" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:700" x="820.722" y="66">
+      <tspan x="820.722" y="66">CROSSOVER</tspan>
+    </text>
+    <text font-size="16.9333" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:700" x="1060" y="132.679">
+      <tspan x="1060" y="132.679">CHANNEL-LINKED</tspan>
+      <tspan x="1060" y="153.846">RMS</tspan>
+      <tspan x="1060" y="175.013">LIMITERS</tspan>
+    </text>
+    <g>
+      <polygon style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" fill-rule="evenodd" points="820.722,600 861.443,640 820.722,680 780,640 "/>
+      <text font-size="16.9333" style="fill: #c00000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="820.722" y="645.167">
+        <tspan x="820.722" y="645.167">CO</tspan>
+      </text>
+    </g>
+    <g>
+      <polygon style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #008000" fill-rule="evenodd" points="820.722,840 861.443,880 820.722,920 780,880 "/>
+      <text font-size="16.9333" style="fill: #008000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="820.722" y="885.167">
+        <tspan x="820.722" y="885.167">CO</tspan>
+      </text>
+    </g>
+    <g>
+      <polyline style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" points="680,660 730,660 730,640 770.264,640 "/>
+      <polygon style="fill: #c00000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" fill-rule="evenodd" points="777.764,640 767.764,645 770.264,640 767.764,635 "/>
+    </g>
+    <g>
+      <polyline style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #000000" points="680,810 730,810 730,880 770.264,880 "/>
+      <polygon style="fill: #000000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" fill-rule="evenodd" points="777.764,880 767.764,885 770.264,880 767.764,875 "/>
+    </g>
+    <g>
+      <path style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" fill-rule="evenodd" d="M 1031.43 620 L 1088.57,620 L 1100,640 L 1088.57,660 L 1031.43,660 L 1020,640 L 1031.43,620z"/>
+      <text font-size="12.7998" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="1060" y="644">
+        <tspan x="1060" y="644">SUB</tspan>
+      </text>
+    </g>
+    <g>
+      <path style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" fill-rule="evenodd" d="M 1031.43 700 L 1088.57,700 L 1100,720 L 1088.57,740 L 1031.43,740 L 1020,720 L 1031.43,700z"/>
+      <text font-size="12.7998" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="1060" y="724">
+        <tspan x="1060" y="724">LM</tspan>
+      </text>
+    </g>
+    <g>
+      <path style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" fill-rule="evenodd" d="M 1031.43 780 L 1088.57,780 L 1100,800 L 1088.57,820 L 1031.43,820 L 1020,800 L 1031.43,780z"/>
+      <text font-size="12.7998" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="1060" y="804">
+        <tspan x="1060" y="804">WIDE</tspan>
+      </text>
+    </g>
+    <g>
+      <path style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" d="M 845.462 623.305 C 904.741,583.305 983.65,601.597 1020.44,617.695"/>
+      <polygon style="fill: #c00000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" fill-rule="evenodd" points="1027.32,620.701 1016.15,621.273 1020.44,617.695 1020.16,612.112 "/>
+    </g>
+    <g>
+      <path style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #008000" d="M 845.467 863.302 C 904.746,823.302 983.717,678.374 1020.51,662.276"/>
+      <polygon style="fill: #008000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #008000" fill-rule="evenodd" points="1027.38,659.27 1020.23,667.859 1020.51,662.276 1016.22,658.697 "/>
+    </g>
+    <g>
+      <path style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" d="M 862.443 640 C 921.722,640 983.65,681.597 1020.44,697.695"/>
+      <polygon style="fill: #c00000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" fill-rule="evenodd" points="1027.32,700.701 1016.15,701.273 1020.44,697.695 1020.16,692.112 "/>
+    </g>
+    <g>
+      <path style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #008000" d="M 862.443 880 C 921.722,880 983.655,758.401 1020.45,742.303"/>
+      <polygon style="fill: #008000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #008000" fill-rule="evenodd" points="1027.32,739.297 1020.16,747.886 1020.45,742.303 1016.16,738.724 "/>
+    </g>
+    <g>
+      <path style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" d="M 845.467 656.698 C 904.745,696.698 983.655,761.599 1020.45,777.697"/>
+      <polygon style="fill: #c00000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" fill-rule="evenodd" points="1027.32,780.703 1016.16,781.276 1020.45,777.697 1020.16,772.114 "/>
+    </g>
+    <g>
+      <path style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #008000" d="M 845.466 896.697 C 904.745,936.697 983.65,838.403 1020.44,822.305"/>
+      <polygon style="fill: #008000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #008000" fill-rule="evenodd" points="1027.32,819.299 1020.16,827.888 1020.44,822.305 1016.15,818.727 "/>
+    </g>
+    <g>
+      <ellipse style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" cx="1430" cy="510" rx="40" ry="40"/>
+      <line style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #000000" x1="1401.72" y1="481.716" x2="1458.28" y2="538.284"/>
+      <line style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #000000" x1="1401.72" y1="538.284" x2="1458.28" y2="481.716"/>
+    </g>
+    <ellipse style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" cx="1190" cy="350" rx="10" ry="10"/>
+    <ellipse style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" cx="1250" cy="380" rx="10" ry="10"/>
+    <ellipse style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" cx="1250" cy="350" rx="10" ry="10"/>
+    <line style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" x1="1200.9" y1="350" x2="1239.1" y2="350"/>
+    <ellipse style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" cx="1190" cy="410" rx="10" ry="10"/>
+    <ellipse style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" cx="1250" cy="410" rx="10" ry="10"/>
+    <line style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #008000" x1="1200.9" y1="410" x2="1239.1" y2="410"/>
+    <g>
+      <path style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" d="M 1095.4 370.131 C 1143.97,350.131 1139.63,350 1169.26,350"/>
+      <polygon style="fill: #c00000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" fill-rule="evenodd" points="1176.76,350 1166.76,355 1169.26,350 1166.76,345 "/>
+    </g>
+    <ellipse style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" cx="1250" cy="440" rx="10" ry="10"/>
+    <g>
+      <path style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #008000" d="M 1094.35 391.883 C 1132.92,411.883 1139.63,410 1169.26,410"/>
+      <polygon style="fill: #008000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #008000" fill-rule="evenodd" points="1176.76,410 1166.76,415 1169.26,410 1166.76,405 "/>
+    </g>
+    <g>
+      <path style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #000000" d="M 1260.98 380 C 1350.62,380 1341.01,421.012 1394.13,474.128"/>
+      <polygon style="fill: #000000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" fill-rule="evenodd" points="1399.43,479.431 1388.82,475.896 1394.13,474.128 1395.9,468.825 "/>
+    </g>
+    <g>
+      <path style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #000000" d="M 1261 440 C 1350.64,440 1320.57,478.735 1381.21,496.061"/>
+      <polygon style="fill: #000000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" fill-rule="evenodd" points="1388.42,498.121 1377.43,500.181 1381.21,496.061 1380.18,490.566 "/>
+    </g>
+    <g>
+      <ellipse style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #008000" cx="1430" cy="360" rx="40" ry="40"/>
+      <line style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #008000" x1="1401.72" y1="331.716" x2="1458.28" y2="388.284"/>
+      <line style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #008000" x1="1401.72" y1="388.284" x2="1458.28" y2="331.716"/>
+    </g>
+    <g>
+      <path style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" d="M 1261 350 C 1320.76,350 1324.41,270.336 1385.96,235.167"/>
+      <polygon style="fill: #c00000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" fill-rule="evenodd" points="1392.47,231.446 1386.27,240.748 1385.96,235.167 1381.31,232.066 "/>
+    </g>
+    <g>
+      <path style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #008000" d="M 1261 410 C 1320.76,410 1322.33,406.143 1383.38,379.978"/>
+      <polygon style="fill: #008000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #008000" fill-rule="evenodd" points="1390.28,377.024 1383.06,385.559 1383.38,379.978 1379.12,376.367 "/>
+    </g>
+    <g>
+      <ellipse style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" cx="1430" cy="210" rx="40" ry="40"/>
+      <line style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" x1="1401.72" y1="181.716" x2="1458.28" y2="238.284"/>
+      <line style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" x1="1401.72" y1="238.284" x2="1458.28" y2="181.716"/>
+    </g>
+    <g>
+      <path style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" d="M 1095.49 290.094 C 1144.06,270.094 1318.99,210 1379.26,210"/>
+      <polygon style="fill: #c00000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" fill-rule="evenodd" points="1386.76,210 1376.76,215 1379.26,210 1376.76,205 "/>
+    </g>
+    <g>
+      <path style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #008000" d="M 1095.49 309.906 C 1144.06,329.906 1322.39,313.882 1383.44,340.046"/>
+      <polygon style="fill: #008000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #008000" fill-rule="evenodd" points="1390.34,343.001 1379.17,343.657 1383.44,340.046 1383.11,334.466 "/>
+    </g>
+    <g>
+      <path style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" d="M 1095.49 210.093 C 1144.06,190.093 1324.41,149.66 1385.95,184.83"/>
+      <polygon style="fill: #c00000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" fill-rule="evenodd" points="1392.46,188.551 1381.3,187.93 1385.95,184.83 1386.26,179.248 "/>
+    </g>
+    <g>
+      <path style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #008000" d="M 1095.46 229.894 C 1144.03,249.894 1328.87,273.315 1391.48,326.979"/>
+      <polygon style="fill: #008000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #008000" fill-rule="evenodd" points="1397.17,331.86 1386.32,329.148 1391.48,326.979 1392.83,321.556 "/>
+    </g>
+    <g>
+      <ellipse style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #008000" cx="1430" cy="810" rx="40" ry="40"/>
+      <line style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #008000" x1="1401.72" y1="781.716" x2="1458.28" y2="838.284"/>
+      <line style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #008000" x1="1401.72" y1="838.284" x2="1458.28" y2="781.716"/>
+    </g>
+    <g>
+      <ellipse style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" cx="1430" cy="660" rx="40" ry="40"/>
+      <line style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" x1="1401.72" y1="631.716" x2="1458.28" y2="688.284"/>
+      <line style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" x1="1401.72" y1="688.284" x2="1458.28" y2="631.716"/>
+    </g>
+    <g>
+      <path style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" d="M 1094.36 628.11 C 1132.93,608.11 1138.99,610 1159.26,610"/>
+      <polygon style="fill: #c00000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" fill-rule="evenodd" points="1166.76,610 1156.76,615 1159.26,610 1156.76,605 "/>
+    </g>
+    <g>
+      <path style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #008000" d="M 1094.36 651.89 C 1132.93,671.89 1148.99,670 1159.26,670"/>
+      <polygon style="fill: #008000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #008000" fill-rule="evenodd" points="1166.76,670 1156.76,675 1159.26,670 1156.76,665 "/>
+    </g>
+    <g>
+      <path style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" d="M 1095.49 710.094 C 1144.06,690.094 1322.39,706.118 1383.44,679.954"/>
+      <polygon style="fill: #c00000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" fill-rule="evenodd" points="1390.34,676.999 1383.11,685.534 1383.44,679.954 1379.17,676.343 "/>
+    </g>
+    <g>
+      <path style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #008000" d="M 1095.49 729.906 C 1144.06,749.906 1318.99,810 1379.26,810"/>
+      <polygon style="fill: #008000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #008000" fill-rule="evenodd" points="1386.76,810 1376.76,815 1379.26,810 1376.76,805 "/>
+    </g>
+    <g>
+      <path style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" d="M 1095.46 790.106 C 1144.03,770.106 1341.01,748.994 1394.12,695.878"/>
+      <polygon style="fill: #c00000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" fill-rule="evenodd" points="1399.42,690.575 1395.89,701.182 1394.12,695.878 1388.82,694.111 "/>
+    </g>
+    <g>
+      <path style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #008000" d="M 1095.49 809.907 C 1144.06,829.907 1324.41,870.34 1385.95,835.17"/>
+      <polygon style="fill: #008000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #008000" fill-rule="evenodd" points="1392.46,831.449 1386.26,840.752 1385.95,835.17 1381.3,832.07 "/>
+    </g>
+    <ellipse style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" cx="1250" cy="610" rx="10" ry="10"/>
+    <ellipse style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" cx="1250" cy="580" rx="10" ry="10"/>
+    <ellipse style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" cx="1250" cy="640" rx="10" ry="10"/>
+    <ellipse style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" cx="1250" cy="670" rx="10" ry="10"/>
+    <ellipse style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" cx="1180" cy="610" rx="10" ry="10"/>
+    <ellipse style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" cx="1180" cy="670" rx="10" ry="10"/>
+    <g>
+      <path style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #008000" d="M 1261 670 C 1320.76,670 1324.41,749.664 1385.96,784.833"/>
+      <polygon style="fill: #008000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #008000" fill-rule="evenodd" points="1392.47,788.554 1381.31,787.934 1385.96,784.833 1386.27,779.252 "/>
+    </g>
+    <g>
+      <path style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" d="M 1261 610 C 1311,610 1322.33,613.857 1383.38,640.022"/>
+      <polygon style="fill: #c00000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" fill-rule="evenodd" points="1390.28,642.976 1379.12,643.633 1383.38,640.022 1383.06,634.441 "/>
+    </g>
+    <g>
+      <path style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #000000" d="M 1261 580 C 1320.76,580 1320.57,541.265 1381.21,523.939"/>
+      <polygon style="fill: #000000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" fill-rule="evenodd" points="1388.42,521.879 1380.18,529.434 1381.21,523.939 1377.43,519.819 "/>
+    </g>
+    <g>
+      <path style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #000000" d="M 1260.98 640 C 1320.74,640 1351.01,588.988 1394.13,545.872"/>
+      <polygon style="fill: #000000; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" fill-rule="evenodd" points="1399.43,540.569 1395.9,551.175 1394.13,545.872 1388.82,544.104 "/>
+    </g>
+    <line style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #000000" x1="1189.98" y1="605.723" x2="1240.02" y2="584.277"/>
+    <line style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #000000" x1="1189.98" y1="665.723" x2="1240.02" y2="644.277"/>
+    <g>
+      <path style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" fill-rule="evenodd" d="M 1541.85 190 L 1629.25,190 C 1641.32,190 1651.1,198.954 1651.1,210 C 1651.1,221.046 1641.32,230 1629.25,230 L 1541.85,230 C 1529.78,230 1520,221.046 1520,210 C 1520,198.954 1529.78,190 1541.85,190z"/>
+      <text font-size="16.9333" style="fill: #c00000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="1585.55" y="215.292">
+        <tspan x="1585.55" y="215.292">PARAMETRIC</tspan>
+      </text>
+    </g>
+    <g>
+      <path style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #008000" fill-rule="evenodd" d="M 1541.85 340 L 1629.25,340 C 1641.32,340 1651.1,348.954 1651.1,360 C 1651.1,371.046 1641.32,380 1629.25,380 L 1541.85,380 C 1529.78,380 1520,371.046 1520,360 C 1520,348.954 1529.78,340 1541.85,340z"/>
+      <text font-size="16.9333" style="fill: #008000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="1585.55" y="365.292">
+        <tspan x="1585.55" y="365.292">PARAMETRIC</tspan>
+      </text>
+    </g>
+    <g>
+      <path style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" fill-rule="evenodd" d="M 1541.85 490 L 1629.25,490 C 1641.32,490 1651.1,498.954 1651.1,510 C 1651.1,521.046 1641.32,530 1629.25,530 L 1541.85,530 C 1529.78,530 1520,521.046 1520,510 C 1520,498.954 1529.78,490 1541.85,490z"/>
+      <text font-size="16.9333" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="1585.55" y="515.292">
+        <tspan x="1585.55" y="515.292">PARAMETRIC</tspan>
+      </text>
+    </g>
+    <g>
+      <path style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" fill-rule="evenodd" d="M 1541.85 640 L 1629.25,640 C 1641.32,640 1651.1,648.954 1651.1,660 C 1651.1,671.046 1641.32,680 1629.25,680 L 1541.85,680 C 1529.78,680 1520,671.046 1520,660 C 1520,648.954 1529.78,640 1541.85,640z"/>
+      <text font-size="16.9333" style="fill: #c00000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="1585.55" y="665.292">
+        <tspan x="1585.55" y="665.292">PARAMETRIC</tspan>
+      </text>
+    </g>
+    <g>
+      <path style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #008000" fill-rule="evenodd" d="M 1541.85 790 L 1629.25,790 C 1641.32,790 1651.1,798.954 1651.1,810 C 1651.1,821.046 1641.32,830 1629.25,830 L 1541.85,830 C 1529.78,830 1520,821.046 1520,810 C 1520,798.954 1529.78,790 1541.85,790z"/>
+      <text font-size="16.9333" style="fill: #008000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="1585.55" y="815.292">
+        <tspan x="1585.55" y="815.292">PARAMETRIC</tspan>
+      </text>
+    </g>
+    <g>
+      <path style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" fill-rule="evenodd" d="M 1881.43 490 L 1938.57,490 L 1950,510 L 1938.57,530 L 1881.43,530 L 1870,510 L 1881.43,490z"/>
+      <text font-size="16.9333" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="1910" y="515.292">
+        <tspan x="1910" y="515.292">LIM</tspan>
+      </text>
+    </g>
+    <g>
+      <path style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" fill-rule="evenodd" d="M 1881.43 710 L 1938.57,710 L 1950,730 L 1938.57,750 L 1881.43,750 L 1870,730 L 1881.43,710z"/>
+      <text font-size="16.9333" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="1910" y="735.292">
+        <tspan x="1910" y="735.292">LIM</tspan>
+      </text>
+    </g>
+    <g>
+      <path style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" fill-rule="evenodd" d="M 1881.43 260 L 1938.57,260 L 1950,280 L 1938.57,300 L 1881.43,300 L 1870,280 L 1881.43,260z"/>
+      <text font-size="16.9333" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="1910" y="285.292">
+        <tspan x="1910" y="285.292">LIM</tspan>
+      </text>
+    </g>
+    <g>
+      <path style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" fill-rule="evenodd" d="M 1680 190 L 1762.35,190 C 1785.09,190 1803.52,198.954 1803.52,210 C 1803.52,221.046 1785.09,230 1762.35,230 L 1680,230 L 1680,190z"/>
+      <text font-size="16.9333" style="fill: #c00000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="1721.18" y="215.292">
+        <tspan x="1721.18" y="215.292">DELAY</tspan>
+      </text>
+    </g>
+    <g>
+      <path style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #008000" fill-rule="evenodd" d="M 1680 340 L 1762.35,340 C 1785.09,340 1803.52,348.954 1803.52,360 C 1803.52,371.046 1785.09,380 1762.35,380 L 1680,380 L 1680,340z"/>
+      <text font-size="16.9333" style="fill: #008000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="1721.18" y="365.292">
+        <tspan x="1721.18" y="365.292">DELAY</tspan>
+      </text>
+    </g>
+    <g>
+      <path style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" fill-rule="evenodd" d="M 1680 490 L 1762.35,490 C 1785.09,490 1803.52,498.954 1803.52,510 C 1803.52,521.046 1785.09,530 1762.35,530 L 1680,530 L 1680,490z"/>
+      <text font-size="16.9333" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="1721.18" y="515.292">
+        <tspan x="1721.18" y="515.292">DELAY</tspan>
+      </text>
+    </g>
+    <g>
+      <path style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" fill-rule="evenodd" d="M 1680 640 L 1762.35,640 C 1785.09,640 1803.52,648.954 1803.52,660 C 1803.52,671.046 1785.09,680 1762.35,680 L 1680,680 L 1680,640z"/>
+      <text font-size="16.9333" style="fill: #c00000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="1721.18" y="665.292">
+        <tspan x="1721.18" y="665.292">DELAY</tspan>
+      </text>
+    </g>
+    <g>
+      <path style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #008000" fill-rule="evenodd" d="M 1680 790 L 1762.35,790 C 1785.09,790 1803.52,798.954 1803.52,810 C 1803.52,821.046 1785.09,830 1762.35,830 L 1680,830 L 1680,790z"/>
+      <text font-size="16.9333" style="fill: #008000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="1721.18" y="815.292">
+        <tspan x="1721.18" y="815.292">DELAY</tspan>
+      </text>
+    </g>
+    <g>
+      <ellipse style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" cx="2090" cy="210" rx="40" ry="40"/>
+      <text font-size="16.9333" style="fill: #c00000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="2090" y="215.167">
+        <tspan x="2090" y="215.167">OUT 1/1</tspan>
+      </text>
+    </g>
+    <g>
+      <ellipse style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #008000" cx="2090" cy="360" rx="40" ry="40"/>
+      <text font-size="16.9333" style="fill: #008000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="2090" y="365.167">
+        <tspan x="2090" y="365.167">OUT 1/2</tspan>
+      </text>
+    </g>
+    <g>
+      <ellipse style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #000000" cx="2090" cy="510" rx="40" ry="40"/>
+      <text font-size="16.9333" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="2090" y="515.167">
+        <tspan x="2090" y="515.167">SUB</tspan>
+      </text>
+    </g>
+    <g>
+      <ellipse style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" cx="2090" cy="660" rx="40" ry="40"/>
+      <text font-size="16.9333" style="fill: #c00000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="2090" y="665.167">
+        <tspan x="2090" y="665.167">OUT 2/1</tspan>
+      </text>
+    </g>
+    <g>
+      <ellipse style="fill: #ffffff; fill-opacity: 1; stroke-opacity: 1; stroke-width: 2; stroke: #008000" cx="2090" cy="810" rx="40" ry="40"/>
+      <text font-size="16.9333" style="fill: #008000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="2090" y="815.167">
+        <tspan x="2090" y="815.167">OUT 2/2</tspan>
+      </text>
+    </g>
+    <line style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" x1="1470.86" y1="210" x2="1519.99" y2="210"/>
+    <line style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" x1="1651.09" y1="210" x2="1679.03" y2="210"/>
+    <line style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" x1="1786.2" y1="227.312" x2="1878.43" y2="263.248"/>
+    <line style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" x1="1945.3" y1="270.088" x2="2052.13" y2="225.727"/>
+    <line style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #008000" x1="1470.86" y1="360" x2="1519.99" y2="360"/>
+    <line style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #008000" x1="1651.09" y1="360" x2="1679.03" y2="360"/>
+    <line style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #008000" x1="1782.86" y1="341.699" x2="1879.51" y2="298.665"/>
+    <line style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #008000" x1="1944.81" y1="291.099" x2="2052.96" y2="342.419"/>
+    <line style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #000000" x1="1470.86" y1="510" x2="1519.99" y2="510"/>
+    <line style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #000000" x1="1651.09" y1="510" x2="1679.03" y2="510"/>
+    <line style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #000000" x1="1803.53" y1="510" x2="1870.01" y2="510"/>
+    <line style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #000000" x1="1950" y1="510" x2="2049" y2="510"/>
+    <line style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" x1="1470.86" y1="660" x2="1519.99" y2="660"/>
+    <line style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" x1="1651.09" y1="660" x2="1679.03" y2="660"/>
+    <line style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" x1="1786.2" y1="677.312" x2="1878.43" y2="713.248"/>
+    <line style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #c00000" x1="1945.3" y1="720.088" x2="2052.13" y2="675.727"/>
+    <line style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #008000" x1="1470.86" y1="810" x2="1519.99" y2="810"/>
+    <line style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #008000" x1="1651.09" y1="810" x2="1679.03" y2="810"/>
+    <line style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #008000" x1="1782.86" y1="791.699" x2="1879.51" y2="748.665"/>
+    <line style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #008000" x1="1944.81" y1="741.099" x2="2052.96" y2="792.419"/>
+    <text font-size="22.5778" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:700" x="2120" y="408.206">
+      <tspan x="2120" y="408.206">AUDIO</tspan>
+      <tspan x="2120" y="436.428">INTERFACE</tspan>
+      <tspan x="2120" y="464.65">OUTPUTS</tspan>
+    </text>
+    <g>
+      <line style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #8f8f8f" x1="1585.55" y1="235.465" x2="1585.55" y2="334.535"/>
+      <polyline style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #8f8f8f" points="1590.55,243.229 1585.55,233.229 1580.55,243.229 "/>
+      <polyline style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #8f8f8f" points="1580.55,326.771 1585.55,336.771 1590.55,326.771 "/>
+    </g>
+    <g>
+      <line style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #8f8f8f" x1="1741.76" y1="235.465" x2="1741.76" y2="334.535"/>
+      <polyline style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #8f8f8f" points="1746.76,243.229 1741.76,233.229 1736.76,243.229 "/>
+      <polyline style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #8f8f8f" points="1736.76,326.771 1741.76,336.771 1746.76,326.771 "/>
+    </g>
+    <g>
+      <line style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #8f8f8f" x1="1585.55" y1="685.465" x2="1585.55" y2="784.535"/>
+      <polyline style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #8f8f8f" points="1590.55,693.229 1585.55,683.229 1580.55,693.229 "/>
+      <polyline style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #8f8f8f" points="1580.55,776.771 1585.55,786.771 1590.55,776.771 "/>
+    </g>
+    <g>
+      <line style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #8f8f8f" x1="1741.76" y1="685.465" x2="1741.76" y2="784.535"/>
+      <polyline style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #8f8f8f" points="1746.76,693.229 1741.76,683.229 1736.76,693.229 "/>
+      <polyline style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke: #8f8f8f" points="1736.76,776.771 1741.76,786.771 1746.76,776.771 "/>
+    </g>
+    <text font-size="16.9333" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:700" x="1430" y="104.833">
+      <tspan x="1430" y="104.833">CHANNEL</tspan>
+      <tspan x="1430" y="126">SUMS</tspan>
+    </text>
+    <text font-size="16.9333" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:700" x="1910" y="182.679">
+      <tspan x="1910" y="182.679">CHANNEL-LINKED</tspan>
+      <tspan x="1910" y="203.846">PEAK</tspan>
+      <tspan x="1910" y="225.013">LIMITERS</tspan>
+    </text>
+    <line style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke-dasharray: 4; stroke: #8f8f8f" x1="1220" y1="350" x2="1220" y2="410"/>
+    <line style="fill: none; stroke-opacity: 1; stroke-width: 2; stroke-dasharray: 4; stroke: #8f8f8f" x1="1215" y1="595" x2="1215" y2="655"/>
+    <text font-size="14.1111" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:end;font-family:sans-serif;font-style:normal;font-weight:700" x="1211" y="642.1">
+      <tspan x="1211" y="642.1">SUB ON</tspan>
+    </text>
+    <text font-size="14.1111" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:end;font-family:sans-serif;font-style:normal;font-weight:700" x="1216" y="384.875">
+      <tspan x="1216" y="384.875">SUB OFF</tspan>
+    </text>
+    <text font-size="16.9333" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:700" x="1585.55" y="102.679">
+      <tspan x="1585.55" y="102.679">PARAMETRIC</tspan>
+      <tspan x="1585.55" y="123.846">EQS.</tspan>
+      <tspan x="1585.55" y="145.013">(2 x BiQuad)</tspan>
+    </text>
+    <text font-size="16.9333" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:700" x="1721.18" y="102.679">
+      <tspan x="1721.18" y="102.679">DELAY</tspan>
+      <tspan x="1721.18" y="123.846">(default off)</tspan>
+      <tspan x="1721.18" y="145.013">(0~10ms)</tspan>
+    </text>
+    <text font-size="16.9333" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:700" x="1190" y="505.045">
+      <tspan x="1190" y="505.045">TOGGLE</tspan>
+      <tspan x="1190" y="526.211">SUB (no LO in or</tspan>
+    </text>
+    <text font-size="16.9333" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:end;font-family:sans-serif;font-style:normal;font-weight:700" x="114" y="309.012">
+      <tspan x="114" y="309.012">CAPTURE-1</tspan>
+    </text>
+    <text font-size="16.9333" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:end;font-family:sans-serif;font-style:normal;font-weight:700" x="114" y="429.012">
+      <tspan x="114" y="429.012">CAPTURE-2</tspan>
+    </text>
+    <text font-size="16.9333" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:end;font-family:sans-serif;font-style:normal;font-weight:700" x="114" y="581.75">
+      <tspan x="114" y="581.75">CAPTURE-3</tspan>
+    </text>
+    <text font-size="16.9333" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:end;font-family:sans-serif;font-style:normal;font-weight:700" x="114" y="702.244">
+      <tspan x="114" y="702.244">CAPTURE-4</tspan>
+    </text>
+    <text font-size="16.9333" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:700" x="2136" y="815.628">
+      <tspan x="2136" y="815.628">PLAYBACK-5</tspan>
+    </text>
+    <text font-size="16.9333" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:700" x="2136" y="665.628">
+      <tspan x="2136" y="665.628">PLAYBACK-4</tspan>
+    </text>
+    <text font-size="16.9333" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:700" x="2136" y="515.875">
+      <tspan x="2136" y="515.875">PLAYBACK-3</tspan>
+    </text>
+    <text font-size="16.9333" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:700" x="2136" y="365.628">
+      <tspan x="2136" y="365.628">PLAYBACK-2</tspan>
+    </text>
+    <text font-size="16.9333" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:700" x="2136" y="215.628">
+      <tspan x="2136" y="215.628">PLAYBACK-1</tspan>
+    </text>
+    <text font-size="16.9333" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:end;font-family:sans-serif;font-style:normal;font-weight:700" x="2070" y="295.875">
+      <tspan x="2070" y="295.875">GROUP 1</tspan>
+    </text>
+    <text font-size="16.9333" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:end;font-family:sans-serif;font-style:normal;font-weight:700" x="2070" y="735.875">
+      <tspan x="2070" y="735.875">GROUP 2</tspan>
+    </text>
+    <text font-size="16.9333" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:700" x="180" y="385.875">
+      <tspan x="180" y="385.875">GROUP 1</tspan>
+    </text>
+    <text font-size="16.9333" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:700" x="180" y="625.875">
+      <tspan x="180" y="625.875">GROUP 2</tspan>
+    </text>
+    <g>
+      <rect style="fill: #ffffff; fill-opacity: 1; stroke: none" x="1404.6" y="196.125" width="50.8" height="27.75"/>
+      <text font-size="16.9333" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:700" x="1430" y="215.875">
+        <tspan x="1430" y="215.875">SUM</tspan>
+      </text>
+    </g>
+    <g>
+      <rect style="fill: #ffffff; fill-opacity: 1; stroke: none" x="1404.6" y="346.125" width="50.8" height="27.75"/>
+      <text font-size="16.9333" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:700" x="1430" y="365.875">
+        <tspan x="1430" y="365.875">SUM</tspan>
+      </text>
+    </g>
+    <g>
+      <rect style="fill: #ffffff; fill-opacity: 1; stroke: none" x="1404.6" y="496.125" width="50.8" height="27.75"/>
+      <text font-size="16.9333" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:700" x="1430" y="515.875">
+        <tspan x="1430" y="515.875">SUM</tspan>
+      </text>
+    </g>
+    <g>
+      <rect style="fill: #ffffff; fill-opacity: 1; stroke: none" x="1404.6" y="646.125" width="50.8" height="27.75"/>
+      <text font-size="16.9333" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:700" x="1430" y="665.875">
+        <tspan x="1430" y="665.875">SUM</tspan>
+      </text>
+    </g>
+    <g>
+      <rect style="fill: #ffffff; fill-opacity: 1; stroke: none" x="1404.6" y="796.125" width="50.8" height="27.75"/>
+      <text font-size="16.9333" style="fill: #000000; fill-opacity: 1; stroke: none;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:700" x="1430" y="815.875">
+        <tspan x="1430" y="815.875">SUM</tspan>
+      </text>
+    </g>
+  </g>
+</svg>
