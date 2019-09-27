@@ -8,6 +8,7 @@ Speakerman hae these goals:
 - to limit too loud input input without _horribly imposing_ that fact on the audio. DJs want to be loud but the neighbours don't want them to be. That does not mean we have to make the sound horrible if the DJ turns the volume up. We just make it less loud :-) 
 - to support multiple groups of speakers. A group means that all speakers in that group will have the same gain applied for all channels in that group. Sounds that move from left to right because the left channel is too loud, is annoying.
 - to function as crossover. For now: all groups share the same sub-low group (< 80 Hz)
+- Here is a [signal flow diagram](doc/Limiter-signal-flow.svg)
 
 ## Perception
 Human hearing is complex. It doesn't care about peaks_ &ndash; unless they are damagingly loud &ndash; but rather about the _energy_ in the signal. Which, naturally, depends on both frequency and how that energy is spread over time. A loud hum is pretty annoying. But a punchy kick drum wants to make you dance, even if it has the same energy _when measured over a smaller interval_. This is all _very Funny_, but darn annoying when designing a perceptive limiter. How is it possible to measure the perceived loudness of a signal and how to keep it under control without harming the experience?
