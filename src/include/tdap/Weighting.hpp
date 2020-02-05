@@ -29,6 +29,8 @@
 #include <tdap/IirBiquad.hpp>
 #include <tdap/IirButterworth.hpp>
 
+
+
 namespace tdap {
     using namespace std;
 
@@ -36,6 +38,7 @@ namespace tdap {
     struct ACurves
     {
         // Defines the bulk of the curve with a parameterized equalizer
+#ifdef TDAP_FULL_ACURVE
         static constexpr double PARAM_CENTER = 2516.0;
         static constexpr double PARAM_GAIN = 19.1;
         static constexpr double PARAM_BANDWIDTH = 8.12;
@@ -46,7 +49,14 @@ namespace tdap {
 
         // Overall filter gain for 0dB @ 1kHz
         static constexpr double OVERALL_GAIN = 0.0597736;
+#else
+  static constexpr double PARAM_CENTER = 8000.0;
+  static constexpr double PARAM_GAIN = 16; // 24 dB
+  static constexpr double PARAM_BANDWIDTH = 8; // 3dB / octave on average
+  // Overall filter gain for 0dB @ 1kHz
+  static constexpr double OVERALL_GAIN = 0.5 * M_SQRT1_2; // 9dB
 
+#endif
         static void setFirstOrder(IirCoefficients &coeffs)
         {
             if (coeffs.order() != 1) {
@@ -62,6 +72,7 @@ namespace tdap {
             BiQuad::setParametric(coeffs, sampleRate, PARAM_CENTER, PARAM_GAIN, PARAM_BANDWIDTH);
         }
 
+#ifdef TDAP_FULL_ACURVE
         static void setLowPassParameters(IirCoefficients &coeffs, double sampleRate)
         {
             setFirstOrder(coeffs);
@@ -73,13 +84,15 @@ namespace tdap {
             setFirstOrder(coeffs);
             Butterworth::create(coeffs, sampleRate, HIGH_PASS_FREQUENCY, Butterworth::Pass::HIGH, 1.0);
         }
-
+#endif
         template<typename SAMPLE>
         class Coefficients
         {
             FixedSizeIirCoefficients<SAMPLE, 2> curve_;
+#ifdef TDAP_FULL_ACURVE
             FixedSizeIirCoefficients<SAMPLE, 1> highPass_;
             FixedSizeIirCoefficients<SAMPLE, 1> lowPass_;
+#endif
         public:
             Coefficients() = default;
 
@@ -92,16 +105,20 @@ namespace tdap {
             {
                 auto coeffs1 = curve_.wrap();
                 setCurveParameters(coeffs1, sampleRate);
+#ifdef TDAP_FULL_ACURVE
                 auto coeffs2 = highPass_.wrap();
                 setHighPassParameters(coeffs2, sampleRate);
                 auto coeffs3 = lowPass_.wrap();
                 setHighPassParameters(coeffs3, sampleRate);
+#endif
             }
 
             const FixedSizeIirCoefficients<SAMPLE, 2> &curve() const
             {
                 return curve_;
             }
+
+#ifdef TDAP_FULL_ACURVE
 
             const FixedSizeIirCoefficients<SAMPLE, 1> &highPass() const
             {
@@ -112,6 +129,7 @@ namespace tdap {
             {
                 return lowPass_;
             }
+#endif
         };
 
         template<typename SAMPLE, size_t CHANNELS>
@@ -123,23 +141,26 @@ namespace tdap {
             {
                 SAMPLE curveX[IirCoefficients::historyForOrder(2)];
                 SAMPLE curveY[IirCoefficients::historyForOrder(2)];
+#ifdef TDAP_FULL_ACURVE
                 SAMPLE lowX[IirCoefficients::historyForOrder(1)];
                 SAMPLE lowY[IirCoefficients::historyForOrder(1)];
                 SAMPLE highX[IirCoefficients::historyForOrder(1)];
                 SAMPLE highY[IirCoefficients::historyForOrder(1)];
-
+#endif
                 void reset()
                 {
                     for (size_t i = 0; i < IirCoefficients::historyForOrder(2); i++) {
                         curveX[i] = 0;
                         curveY[i] = 0;
                     }
+#ifdef TDAP_FULL_ACURVE
                     for (size_t i = 0; i < IirCoefficients::historyForOrder(1); i++) {
                         lowX[i] = 0;
                         lowY[i] = 0;
                         highX[i] = 0;
                         highY[i] = 0;
                     }
+#endif
                 }
             };
 
@@ -216,10 +237,12 @@ namespace tdap {
                 SAMPLE y = input;
                 y = coefficients_.curve().template do_filter<SAMPLE, flushToZero>(history_[channel].curveX,
                                                                                   history_[channel].curveY, y);
+#ifdef TDAP_FULL_ACURVE
                 y = coefficients_.lowPass().template do_filter<SAMPLE, flushToZero>(history_[channel].lowX,
                                                                                     history_[channel].lowY, y);
                 y = coefficients_.highPass().template do_filter<SAMPLE, flushToZero>(history_[channel].highX,
                                                                                      history_[channel].highY, y);
+#endif
                 return OVERALL_GAIN * y;
             }
 
