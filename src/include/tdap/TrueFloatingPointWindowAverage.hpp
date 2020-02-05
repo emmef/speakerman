@@ -187,7 +187,7 @@ namespace tdap {
         S * const history_;
         const size_t emdSamples_;
         const S emdFactor_;
-        size_t historyEndPtr_;
+        size_t optimizedHistorySamples_;
         size_t writePtr_ = 0;
 
     protected:
@@ -198,7 +198,7 @@ namespace tdap {
                 history_(new S[historySamples]),
                 emdSamples_(emdSamples),
                 emdFactor_(exp( -1.0 / emdSamples)),
-                historyEndPtr_(historySamples - 1),
+                optimizedHistorySamples_(historySamples),
                 writePtr_(0)
         {}
         inline void setNextPtr(size_t &ptr) const
@@ -207,20 +207,21 @@ namespace tdap {
                 ptr--;
             }
             else
-                ptr = historyEndPtr_;
+                ptr = optimizedHistorySamples_;
         }
 
     public:
 
-        size_t historySize() const { return historySamples_; }
+      size_t historySize() const { return historySamples_; }
+      size_t maxHistorySize() const { return historySamples_; }
         size_t emdSamples() const { return emdSamples_; }
         size_t writePtr() const { return writePtr_; }
-        size_t maxWindowSamples() const { return historyEndPtr_ + 1; }
+        size_t maxWindowSamples() const { return optimizedHistorySamples_; }
         S emdFactor() const { return emdFactor_; }
 
         inline size_t getRelative(size_t delta) const
         {
-            return (writePtr_ + delta) % (historyEndPtr_ + 1);
+            return (writePtr_ + delta) % optimizedHistorySamples_;
         }
         const S getHistoryValue(size_t &readPtr) const
         {
@@ -230,7 +231,7 @@ namespace tdap {
         }
         const S get(size_t index) const
         {
-            return history_[IndexPolicy::NotGreater::method(index, historyEndPtr_)];
+            return history_[IndexPolicy::method(index, optimizedHistorySamples_)];
         }
         const S get() const
         {
@@ -238,11 +239,11 @@ namespace tdap {
         }
         const S operator[](size_t index) const
         {
-            return history_[IndexPolicy::NotGreater::array(index, historyEndPtr_)];
+            return history_[IndexPolicy::method(index, optimizedHistorySamples_)];
         }
         void set(size_t index, S value)
         {
-            history_[IndexPolicy::NotGreater::method(index, historyEndPtr_)] = value;
+            history_[IndexPolicy::method(index, optimizedHistorySamples_)] = value;
         }
         void write(S value)
         {
@@ -251,11 +252,11 @@ namespace tdap {
         }
         S &operator[](size_t index)
         {
-            return history_[IndexPolicy::NotGreater::array(index, historyEndPtr_)];
+            return history_[IndexPolicy::array(index, optimizedHistorySamples_)];
         }
         void fillWithAverage(const S average)
         {
-            for (size_t i = 0; i <= historyEndPtr_; i++) {
+            for (size_t i = 0; i < historySamples_; i++) {
                 history_[i] = average;
             }
         }
@@ -265,9 +266,9 @@ namespace tdap {
         bool optimiseForMaximumWindowSamples(size_t samples)
         {
             size_t newHistoryEnd =
-                    Sizes::force_between(samples, 4, maxWindowSamples()) - 1;
-            if (newHistoryEnd != historyEndPtr_) {
-                historyEndPtr_ = newHistoryEnd;
+                    Sizes::force_between(samples, 4, historySamples_);
+            if (newHistoryEnd != optimizedHistorySamples_) {
+                optimizedHistorySamples_ = newHistoryEnd;
                 return true;
             }
             return false;
@@ -332,7 +333,7 @@ namespace tdap {
             if (history_ == nullptr) {
                 throw std::runtime_error("WindowForTrueFloatingPointMovingAverage::setWindowSamples(): window not related to history data");
             }
-            if (!Sizes::is_between(windowSamples, 1, history_->maxWindowSamples())) {
+            if (!Sizes::is_between(windowSamples, 1, history_->historySize())) {
                 throw std::runtime_error("WindowForTrueFloatingPointMovingAverage: window samples must lie between 1 and history's maximum size");
             }
             windowSamples_ = windowSamples;
@@ -583,7 +584,9 @@ namespace tdap {
 
         size_t getMaxWindows() const { return entries_; }
         size_t getUsedWindows() const { return usedWindows_; }
-        size_t getMaxWindowSamples() const { return history_.historySize(); }
+        size_t getMaxWindowSamples() const {
+          return history_.historySize();
+        }
 
         void setUsedWindows(size_t windows)
         {
@@ -611,9 +614,7 @@ namespace tdap {
             for (size_t i = 0; i < entries_; i++) {
                 entry_[i].setAverage(average);
             }
-            for (size_t i = 0; i < history_.historySize(); i++) {
-                history_.set(i, average);
-            }
+            history_.fillWithAverage(average);
         }
 
         S getAverage(size_t index) const
