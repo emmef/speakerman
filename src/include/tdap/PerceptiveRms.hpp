@@ -40,8 +40,8 @@ namespace tdap {
     struct PerceptiveMetrics
     {
         static constexpr double PERCEPTIVE_SECONDS = 0.400;
-        static constexpr double PEAK_SECONDS = 0.0003;
-        static constexpr double PEAK_HOLD_SECONDS = 0.001;//0.0050
+        static constexpr double PEAK_SECONDS = 0.003;
+        static constexpr double PEAK_HOLD_SECONDS = 0.003;//0.0050
         static constexpr double PEAK_RELEASE_SECONDS = 0.0080; // 0.0100
         static constexpr double MAX_SECONDS = 10.0000;
         static constexpr double PEAK_PERCEPTIVE_RATIO =
@@ -98,7 +98,7 @@ namespace tdap {
         }
 
     public:
-        PerceptiveRms() : follower_(1, 1, 1, 1), rms_(MAX_WINDOW_SAMPLES, MAX_WINDOW_SAMPLES*10, LEVELS, 1e-6) {};
+        PerceptiveRms() : follower_(1, 1, 1, 1), rms_(MAX_WINDOW_SAMPLES, MAX_WINDOW_SAMPLES*10, LEVELS, 0) {};
 
         void configure(size_t sample_rate, S peak_to_rms,
                        size_t steps_to_peak,
@@ -116,16 +116,14 @@ namespace tdap {
             rms_.setUsedWindows(used_levels_);
             double peak_scale = 1.0 / Value<S>::force_between(peak_to_rms, 2, 10);
             S initial_avererage = Value<S>::force_between(initial_value, 0.0, 100.0);
-            rms_.setAverages(0.0);
 
             for (size_t level = 0; level < smaller_levels; level++) {
                 double exponent =
                         1.0 * (smaller_levels - level) / smaller_levels;
                 double window_size = PerceptiveMetrics::PERCEPTIVE_SECONDS *
                                      pow(PerceptiveMetrics::PEAK_PERCEPTIVE_RATIO, exponent);
-                double scale = level == 0 ?
-                               peak_scale :
-                               pow(PerceptiveMetrics::PEAK_PERCEPTIVE_RATIO, exponent * 0.25);
+                double scale = pow(
+                    PerceptiveMetrics::PEAK_PERCEPTIVE_RATIO, exponent * 0.25);
                 rms_.setWindowSizeAndScale(level, 0.5 + window_size * sample_rate, scale * scale);
             }
 
@@ -140,6 +138,8 @@ namespace tdap {
                                          exponent);
                 rms_.setWindowSizeAndScale(level, 0.5 + window_size * sample_rate, 1.0);
             }
+
+          rms_.setAverages(0.0);
 
             for (size_t level = 0; level < used_levels_; level++) {
                 double window_size =
