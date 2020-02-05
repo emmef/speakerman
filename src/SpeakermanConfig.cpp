@@ -248,8 +248,8 @@ namespace speakerman {
             }
 
             return strncasecmp(keyword, value, key_length) == 0 &&
-                   value[key_length] == '\0' ||
-                   config::isWhiteSpace(value[key_length]);
+                (value[key_length] == '\0' ||
+                   config::isWhiteSpace(value[key_length]));
         }
 
         static bool parse(T &field, const char *value, char *&end)
@@ -478,7 +478,8 @@ namespace speakerman {
                 : PositionedVariableReader<sizeof(T)>(runtime_changeable, config, &field)
         {};
 
-        void write(const SpeakermanConfig &config, const char *key, ostream &stream) const
+        void write(const SpeakermanConfig &config, const char *key, ostream
+        &stream) const override
         {
             const T &field = *static_cast<const T *>(variable(config));
             if (!UnsetValue<T>::is(field)) {
@@ -521,7 +522,8 @@ namespace speakerman {
                 : PositionedVariableReader<N * sizeof(T)>(runtime_changeable, config, &field)
         {};
 
-        void write(const SpeakermanConfig &config, const char * key, ostream &stream) const
+        void write(const SpeakermanConfig &config, const char * key, ostream
+        &stream) const override
         {
             const T *field = static_cast<const T *>(variable(config));
             bool print = false;

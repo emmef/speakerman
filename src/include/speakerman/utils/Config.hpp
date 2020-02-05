@@ -141,7 +141,6 @@ namespace speakerman {
                 START_VALUE,
                 VALUE,
                 QUOTE,
-                DQ,
                 ESC
             };
 
@@ -321,6 +320,7 @@ namespace speakerman {
                         throw;
                     }
                 }
+                return ReadResult::UNEXPECTED_EOF;
             }
 
         private:

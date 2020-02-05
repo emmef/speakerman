@@ -227,8 +227,7 @@ namespace speakerman {
                 return 0;
             }
         } catch (const std::exception &e) {
-            std:
-            cerr << "Exception in onMetricsUpdate: " << e.what() << std::endl;
+            std::cerr << "Exception in onMetricsUpdate: " << e.what() << std::endl;
         }
         return 1;
     }
