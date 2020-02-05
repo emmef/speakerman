@@ -40,7 +40,7 @@ namespace tdap {
     struct PerceptiveMetrics
     {
         static constexpr double PERCEPTIVE_SECONDS = 0.400;
-        static constexpr double PEAK_SECONDS = 0.003;
+        static constexpr double PEAK_SECONDS = 0.002;
         static constexpr double PEAK_HOLD_SECONDS = 0.003;//0.0050
         static constexpr double PEAK_RELEASE_SECONDS = 0.0080; // 0.0100
         static constexpr double MAX_SECONDS = 10.0000;
