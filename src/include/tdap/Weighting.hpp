@@ -50,12 +50,12 @@ namespace tdap {
         // Overall filter gain for 0dB @ 1kHz
         static constexpr double OVERALL_GAIN = 0.0597736;
 #else
-  static constexpr double PARAM_CENTER = 8000.0;
-  static constexpr double PARAM_GAIN = 16; // 24 dB
-  static constexpr double PARAM_BANDWIDTH = 10; // 2.4 dB / octave on
+  static constexpr double PARAM_CENTER = 16000.0;
+  static constexpr double PARAM_GAIN = 8; // 18 dB
+  static constexpr double PARAM_BANDWIDTH = 9; // 2 dB / octave on
   // average
   // Overall filter gain for 0dB @ 1kHz
-  static constexpr double OVERALL_GAIN = 0.42; // 7.2dB
+  static constexpr double OVERALL_GAIN = 0.4; // 8dB
 
 #endif
         static void setFirstOrder(IirCoefficients &coeffs)
