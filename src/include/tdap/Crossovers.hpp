@@ -201,22 +201,25 @@ namespace tdap {
             cutoffLow.reset();
             cutoffHigh.reset();
             double unweightedTotal = 0.0;
-            for (size_t band = 0; band <= CROSSOVERS; band++) {
+            for (size_t band = 0; band < y.capacity(); band++) {
                 y[band] = 0.0;
             }
             FixedSizeArray<double, 2> filtered;
             for (size_t sample = 0; sample < samples; sample++) {
-                T input = cutoffHigh.filter(0, cutoffLow.filter(0, noise()));       // bandwidth limited pink noise
+              double noiseValue = noise();
+              T input = cutoffHigh.filter(0, cutoffLow.filter(0, noiseValue));       // bandwidth limited pink noise
                 unweightedTotal += input * input;          // unweighted full-range measurement
                 filtered[0] = input;// apply keying filter
                 filtered[1] = curves.filter(0, input);// apply keying filter
                 const FixedSizeArray<double, 2 * CROSSOVERS + 2> &w = crossover.filter(filtered);
                 for (size_t band = 0; band < 2 * CROSSOVERS + 2; band++) {
-                    y[band] += w[band] * w[band];          // weighted-keyed measurement per band
+                  const T x = w[band];
+                  y[band] += x * x;          // weighted-keyed measurement per band
                 }
             }
             for (size_t band = 0; band < 2 * CROSSOVERS + 2; band++) {
-                y[band] = sqrt(y[band] / unweightedTotal); // correct with unweighted full-range measurement
+              T sqrtRelativeWeight = sqrt(y[band] / unweightedTotal);
+              y[band] = sqrtRelativeWeight; // correct with unweighted full-range measurement
             }
 
             return y;

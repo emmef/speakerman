@@ -232,10 +232,14 @@ namespace speakerman {
                 }
             }
             auto weights = Crossovers::weights(crossovers, sampleRate);
+            cout << "Band weights: sub=" << weights[0];
             relativeBandWeights[0] = weights[0];
             for (size_t band = 1; band <= CROSSOVERS; band++) {
-                relativeBandWeights[band] = weights[2 * band + 1];
+              const T &bw = weights[2 * band + 1];
+              cout << " band-" << band << "=" << bw;
+              relativeBandWeights[band] = bw;
             }
+            cout << endl;
             size_t predictionSamples = 0.5 + sampleRate * LIMITER_PREDICTION_SECONDS;
             limiterRelease.setCharacteristicSamples(10 * predictionSamples);
             printf("Prediction samples: %zu for rate %lf\n", predictionSamples, sampleRate);
