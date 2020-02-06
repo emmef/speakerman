@@ -30,6 +30,7 @@
 #include <tdap/Denormal.hpp>
 #include <tdap/Value.hpp>
 #include <tdap/Filters.hpp>
+#include <tdap/FixedSizeArray.hpp>
 
 namespace tdap {
 
