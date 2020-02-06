@@ -182,7 +182,7 @@ namespace tdap {
 
             size_t samples = 2 * sampleRate;
             FixedSizeArray<T, 2 * CROSSOVERS + 2> y;
-            PinkNoise::Default noise(1.0);
+            PinkNoise::Default noise(1.0, sampleRate / 20);
             Filter<T, double, 2, CROSSOVERS> crossover;
             crossover.configure(sampleRate, crossovers);
             ACurves::Filter<T, 1> curves;

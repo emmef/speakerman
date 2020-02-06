@@ -191,7 +191,9 @@ namespace speakerman {
     public:
         DynamicProcessorLevels levels;
 
-        DynamicsProcessor() : sampleRate_(0), levels(GROUPS, CROSSOVERS),
+        DynamicsProcessor() : sampleRate_(0),
+                              noise(1.0, 9600),
+                              levels(GROUPS, CROSSOVERS),
                               groupDetector(new DetectorGroup[DETECTORS])
         {
             levels.reset();
@@ -252,6 +254,7 @@ namespace speakerman {
             sampleRate_ = sampleRate;
             runtime.init(createConfigData(config));
             noise.setScale(runtime.userSet().noiseScale());
+            noise.setIntegrationSamples(sampleRate_ * 0.05);
         }
 
         const ConfigData &getConfigData() const
@@ -313,17 +316,9 @@ namespace speakerman {
         }
 
     private:
-
-        double nextNoise()
-        {
-            double n = noise();
-            noiseIntegrator.integrate(n, noiseAvg);
-            return n - noiseAvg;
-        }
-
         void applyVolumeAddNoise(const FixedSizeArray<T, INPUTS> &input)
         {
-            T ns = nextNoise();
+            T ns = noise();
             for (size_t group = 0; group < GROUPS; group++) {
                 const GroupRuntimeData<T,
                                        BANDS> &conf = runtime.data().groupConfig(
