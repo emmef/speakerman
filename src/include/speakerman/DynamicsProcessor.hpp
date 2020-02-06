@@ -108,37 +108,97 @@ namespace speakerman {
             {}
         };
 
-        class Limiter
+        class CheapLimiter {
+          IntegrationCoefficients<T> release_;
+          IntegrationCoefficients<T> attack_;
+          T hold_ = 0;
+          T integrated1_ = 0;
+          T integrated2_ = 0;
+          T threshold_ = 1.0;
+          size_t holdCount_= 0;
+          bool inRelease = false;
+          size_t latency_ = 0;
+
+          static constexpr double predictionFactor = 0.25;
+
+        public:
+          void setPredictionAndThreshold( size_t prediction,
+                                          T threshold,
+                                          T sampleRate) {
+            double release = sampleRate * 0.04;
+            double thresholdfactor = exp(predictionFactor);
+            latency_ = prediction;
+            release_.setCharacteristicSamples(release * M_SQRT1_2);
+            attack_.setCharacteristicSamples(predictionFactor * prediction);
+            integrated1_ = integrated2_ = 0.0;
+            threshold_ = threshold *  thresholdfactor;
+          }
+
+          size_t latency() const noexcept {
+            return latency_;
+          }
+
+          T getGain(T sample)
+          {
+            T peak = std::max(sample, threshold_);
+            if (peak > hold_) {
+              hold_ = peak;
+              holdCount_ = latency_;
+            }
+            else if (holdCount_) {
+              holdCount_--;
+            }
+            else {
+              hold_ = peak;
+            }
+            if (hold_ >= integrated2_) {
+              attack_.integrate(hold_, integrated1_);
+              integrated2_ = integrated1_;
+            }
+            else {
+              release_.integrate(hold_, integrated1_);
+              release_.integrate(integrated1_, integrated2_);
+            }
+            return threshold_ / integrated2_;
+          }
+        };
+
+        class TriangularLimiter
         {
             static constexpr double ATTACK_SMOOTHFACTOR = 0.1;
             static constexpr double RELEASE_SMOOTHFACTOR = 0.3;
             static constexpr double TOTAL_TIME_FACTOR = 1.0 + ATTACK_SMOOTHFACTOR;
-            static constexpr double TOTAL_TIME_FACTOR_1 = 1.0 / TOTAL_TIME_FACTOR;
-            // Under and overshoot of smoothing by integration requires lower threshold
-            // and even that is not a strict guarantee.
-            static constexpr double ADJUST_THRESHOLD = 0.98;
+            static constexpr double ADJUST_THRESHOLD = 0.99999;
 
             TriangularFollower<T> follower_;
-            IntegrationCoefficients<T> attack_;
             IntegrationCoefficients<T> release_;
             T integrated_ = 0;
             T adjustedThreshold_;
+            size_t latency_ = 0;
         public:
-            Limiter() : follower_(1000) {}
+            TriangularLimiter() : follower_(1000) {}
 
             void setPredictionAndThreshold(size_t prediction, T threshold, T sampleRate)
             {
-                size_t attack = 0.5 + TOTAL_TIME_FACTOR_1 * prediction;
-                size_t smooth = prediction - attack;
-                size_t release = Floats::min(prediction * 15, sampleRate * 0.040);
+                size_t attack = prediction;
+                latency_ = prediction;
+                size_t release = Floats::clamp(
+                    prediction * 10,
+                    sampleRate * 0.010,
+                    sampleRate * 0.020);
                 adjustedThreshold_ = threshold * ADJUST_THRESHOLD;
-                printf("Limiter.setPredictionAndThreshold(%zu, %lf) -> { attack=%zu, release=%zu, smooth=%zu, threshold=%lf\n",
+                printf("Limiter.setPredictionAndThreshold(%zu, %lf) -> { "
+                       "attack=%zu, release=%zu, smooth=Not used, "
+                       "threshold=%lf\n",
                         prediction, threshold,
-                        attack, release, smooth, adjustedThreshold_);
+                        attack, release, /*smooth, */adjustedThreshold_);
                 follower_.setTimeConstantAndSamples(attack, release, adjustedThreshold_);
-                attack_.setCharacteristicSamples(smooth);
                 release_.setCharacteristicSamples(release * RELEASE_SMOOTHFACTOR);
                 integrated_ = adjustedThreshold_;
+            }
+
+            size_t latency() const noexcept {
+              return latency_;
             }
 
             T getGain(T input)
@@ -146,7 +206,7 @@ namespace speakerman {
                 T followed = follower_.follow(input);
                 T integrationfactor;
                 if (followed > integrated_) {
-                    integrationfactor = attack_.inputMultiplier();
+                    integrationfactor = 1.0;//attack_.inputMultiplier();
                 }
                 else  {
                     integrationfactor = release_.inputMultiplier();
@@ -169,6 +229,7 @@ namespace speakerman {
         ACurves::Filter<T, PROCESSING_CHANNELS> aCurve;
         using Detector = PerceptiveRms<T, (size_t)(0.5 + 192000 * BandConfig::MAX_MAXIMUM_WINDOW_SECONDS), 16>;
         using DetectorGroup = PerceptiveRmsGroup<T, (size_t)(0.5 + 192000 * BandConfig::MAX_MAXIMUM_WINDOW_SECONDS), 16, CHANNELS_PER_GROUP>;
+        using Limiter = TriangularLimiter;
 
         Detector subDetector;
         DetectorGroup *groupDetector;
@@ -245,11 +306,12 @@ namespace speakerman {
             size_t predictionSamples = 0.5 + sampleRate * LIMITER_PREDICTION_SECONDS;
             limiterRelease.setCharacteristicSamples(10 * predictionSamples);
             printf("Prediction samples: %zu for rate %lf\n", predictionSamples, sampleRate);
-            for (size_t l = 0; l < LIMITERS; l++) {
-                limiter[l].setPredictionAndThreshold(predictionSamples, peakThreshold, sampleRate);
+            for (size_t lim = 0; lim < LIMITERS; lim++) {
+                limiter[lim].setPredictionAndThreshold(predictionSamples, peakThreshold, sampleRate);
             }
+            size_t latency = limiter[0].latency();
             for (size_t l = 0; l < DELAY_CHANNELS; l++) {
-                predictionDelay.setDelay(l, predictionSamples);
+                predictionDelay.setDelay(l, latency);
             }
             sampleRate_ = sampleRate;
             runtime.init(createConfigData(config));

@@ -51,8 +51,9 @@ namespace tdap {
         static constexpr double OVERALL_GAIN = 0.0597736;
 #else
   static constexpr double PARAM_CENTER = 16000.0;
-  static constexpr double PARAM_GAIN = 8; // 18 dB
-  static constexpr double PARAM_BANDWIDTH = 9; // 2 dB / octave on
+  static constexpr double PARAM_GAIN = 10; // 20 dB
+  static constexpr double PARAM_BANDWIDTH = 14; // bw=14/2=7 -> 20/7 ~ 3 dB /
+  // octave on
   // average
   // Overall filter gain for 0dB @ 1kHz
   static constexpr double OVERALL_GAIN = 0.4; // 8dB
