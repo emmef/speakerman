@@ -68,7 +68,7 @@ namespace speakerman {
                     cr[0] = 112;
                     break;
                 case 2:
-                    cr[1] = 160;
+                    cr[1] = 120;
                     break;
                 case 3:
                     cr[1] = 160;
