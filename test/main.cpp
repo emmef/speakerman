@@ -4,14 +4,17 @@
 
 #define TDAP_FOLLOWERS_DEBUG_LOGGING 3
 
-#include <jack/jack.h>
-#include <iostream>
-#include <cstdio>
-#include <tdap/Delay.hpp>
-#include <tdap/PerceptiveRms.hpp>
-#include <tdap/PeakDetection.hpp>
-#include <tdap/TrueFloatingPointWindowAverage.hpp>
 #include <atomic>
+#include <cstdio>
+#include <iostream>
+#include <jack/jack.h>
+#include <random>
+#include <tdap/Crossovers.hpp>
+#include <tdap/Delay.hpp>
+#include <tdap/IirBiquad.hpp>
+#include <tdap/PeakDetection.hpp>
+#include <tdap/PerceptiveRms.hpp>
+#include <tdap/TrueFloatingPointWindowAverage.hpp>
 
 using namespace tdap;
 using namespace std;
@@ -442,12 +445,27 @@ void testMultiTimeDelay()
 	}
 }
 
+
+
+void printPinkNoise() {
+  constexpr size_t crossoverCount = 2;
+  tdap::FixedSizeArray<double, crossoverCount> crossovers;
+  crossovers[0] = 80;
+  crossovers[1] = 120;
+  tdap::FixedSizeArray<double, 2 + 2 * crossoverCount> weights =
+      Crossovers::weights(crossovers, 96000);
+  for (size_t i = 0; i < weights.capacity(); i++) {
+    std::cout << "w[" << i << "]=" << weights[i] << std::endl;
+  }
+}
+
 int main(int c, const char *args[])
 {
 //	testMultiTimeDelay();
 //	testTrueAverage();
-        testTriangularFollowerSmoothed();
+//        testTriangularFollowerSmoothed();
 //        testPeakDetector();
-        reachIngForFactors();
+        printPinkNoise();
+//        reachIngForFactors();
 	return 0;
 }
