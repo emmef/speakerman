@@ -65,7 +65,7 @@ namespace speakerman {
             cr[0] = 80;
             switch (cr.size()) {
                 case 1:
-                    cr[0] = 112;
+                    cr[0] = 120;
                     break;
                 case 2:
                     cr[1] = 120;
