@@ -115,23 +115,30 @@ namespace speakerman {
           T integrated1_ = 0;
           T integrated2_ = 0;
           T threshold_ = 1.0;
+          T adjustedPeakFactor_ = 1.0;
           size_t holdCount_= 0;
           bool inRelease = false;
           size_t latency_ = 0;
 
-          static constexpr double predictionFactor = 0.25;
+          static constexpr double predictionFactor = 0.30;
 
         public:
           void setPredictionAndThreshold( size_t prediction,
                                           T threshold,
                                           T sampleRate) {
             double release = sampleRate * 0.04;
-            double thresholdfactor = 1.0 - exp(-1.0 / predictionFactor);
+            double thresholdFactor = 1.0 - exp(-1.0 / predictionFactor);
             latency_ = prediction;
-            release_.setCharacteristicSamples(release * M_SQRT1_2);
             attack_.setCharacteristicSamples(predictionFactor * prediction);
-            integrated1_ = integrated2_ = 0.0;
-            threshold_ = threshold *  thresholdfactor;
+            release_.setCharacteristicSamples(release * M_SQRT1_2);
+            threshold_ = threshold;
+            integrated1_ = integrated2_ = threshold_;
+            adjustedPeakFactor_ = 1.0 / thresholdFactor;
+            printf("Limiter.setPredictionAndThreshold(%zu, %lf) -> { "
+                   "attack=%lf, release=%lf, smooth=Not used, "
+                   "threshold=%lf\n",
+                prediction, threshold,
+                attack_.getCharacteristicSamples(), release_.getCharacteristicSamples(), thresholdFactor);
           }
 
           size_t latency() const noexcept {
@@ -141,23 +148,25 @@ namespace speakerman {
           T getGain(T sample)
           {
             T peak = std::max(sample, threshold_);
-            if (peak > hold_) {
-              hold_ = peak;
+            if (peak >= hold_) {
+              hold_ = peak * adjustedPeakFactor_;
               holdCount_ = latency_ + 1;
+              integrated1_ += attack_.inputMultiplier() * (hold_ -
+                  integrated1_);
+              integrated2_ = integrated1_;
             }
             else if (holdCount_) {
               holdCount_--;
-            }
-            else {
-              hold_ = peak;
-            }
-            if (hold_ >= integrated2_) {
-              attack_.integrate(hold_, integrated1_);
+              integrated1_ += attack_.inputMultiplier() * (hold_ -
+                  integrated1_);
               integrated2_ = integrated1_;
             }
             else {
-              release_.integrate(hold_, integrated1_);
-              release_.integrate(integrated1_, integrated2_);
+              hold_ = peak;
+              integrated1_ += release_.inputMultiplier() * (hold_ -
+                  integrated1_);
+              integrated1_ += release_.inputMultiplier() * (integrated1_ -
+                  integrated2_);
             }
             return threshold_ / integrated2_;
           }
@@ -191,7 +200,7 @@ namespace speakerman {
                        "attack=%zu, release=%zu, smooth=Not used, "
                        "threshold=%lf\n",
                         prediction, threshold,
-                        attack, release, /*smooth, */adjustedThreshold_);
+                        attack, release, /*smooth, */ADJUST_THRESHOLD);
                 follower_.setTimeConstantAndSamples(attack, release, adjustedThreshold_);
                 release_.setCharacteristicSamples(release * RELEASE_SMOOTHFACTOR);
                 integrated_ = adjustedThreshold_;
@@ -610,7 +619,8 @@ namespace speakerman {
                 T limiterGain = limiter[group].getGain(maxFiltered);
                 for (size_t channel = 0, offs = offs_start; channel < CHANNELS_PER_GROUP; channel++, offs++) {
                     T outputValue = target[offs] * limiterGain;
-                    target[offs] = Floats::force_between(outputValue, -peakThreshold, peakThreshold);
+                    target[offs] = outputValue;
+                    //Floats::force_between(outputValue,-peakThreshold, peakThreshold);
                 }
                 DO_DYNAMICS_PROCESSOR_LIMITER_ANALYSIS(target, offs_start, maxFiltered, limiterGain, predictionDelay.getDelay(0));
             }

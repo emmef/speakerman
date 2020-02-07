@@ -41,8 +41,8 @@ namespace tdap {
     {
         static constexpr double PERCEPTIVE_SECONDS = 0.400;
         static constexpr double PEAK_SECONDS = 0.001;
-        static constexpr double PEAK_HOLD_SECONDS = 0.002;//0.0050
-        static constexpr double PEAK_RELEASE_SECONDS = 0.002; // 0.0100
+        static constexpr double PEAK_HOLD_SECONDS = 0.004;//0.0050
+        static constexpr double PEAK_RELEASE_SECONDS = 0.004; // 0.0100
         static constexpr double MAX_SECONDS = 10.0000;
         static constexpr double PEAK_PERCEPTIVE_RATIO =
                 PEAK_SECONDS / PERCEPTIVE_SECONDS;
