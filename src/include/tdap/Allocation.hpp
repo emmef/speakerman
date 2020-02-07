@@ -106,20 +106,15 @@ namespace tdap {
                     consecutive_alloc::leave();
                 }
             }
-        private:
-            operator Enable &();
-            operator const Enable &();
-            Enable &operator*();
-            Enable &operator->();
+            operator Enable* &() = delete;
+            operator const Enable* &() const = delete;
+            Enable &operator*() = delete;
+            Enable &operator->() = delete;
         };
 
         class Disable
         {
             bool execute_;
-            operator Disable &();
-            operator const Disable &();
-            Disable &operator*();
-            Disable &operator->();
         public:
             Disable() : execute_(consecutive_alloc::disable_consecutive_allocation())
             {
@@ -134,6 +129,10 @@ namespace tdap {
                     consecutive_alloc::reenable_consecutive_allocation();
                 }
             }
+            operator Disable* &() = delete;
+            operator const Disable* &() const = delete;
+            Disable &operator*() = delete;
+            Disable &operator->() = delete;
         };
 
     private:
