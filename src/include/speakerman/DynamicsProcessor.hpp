@@ -126,7 +126,7 @@ namespace speakerman {
                                           T threshold,
                                           T sampleRate) {
             double release = sampleRate * 0.04;
-            double thresholdfactor = exp(predictionFactor);
+            double thresholdfactor = 1.0 - exp(-1.0 / predictionFactor);
             latency_ = prediction;
             release_.setCharacteristicSamples(release * M_SQRT1_2);
             attack_.setCharacteristicSamples(predictionFactor * prediction);
@@ -143,7 +143,7 @@ namespace speakerman {
             T peak = std::max(sample, threshold_);
             if (peak > hold_) {
               hold_ = peak;
-              holdCount_ = latency_;
+              holdCount_ = latency_ + 1;
             }
             else if (holdCount_) {
               holdCount_--;
