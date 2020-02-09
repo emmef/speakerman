@@ -117,43 +117,43 @@ namespace speakerman {
         const GroupConfig with_groups_mixed() const;
     };
 
-    struct BandConfig
+    struct DetectionConfig
     {
-        static constexpr double MIN_SMOOTHING_TO_WINDOW_RATIO = 0.01;
-        static constexpr double DEFAULT_SMOOTHING_TO_WINDOW_RATIO = 0.1;
-        static constexpr double MAX_SMOOTHING_TO_WINDOW_RATIO = 1.00;
-        static constexpr const char *KEY_SNIPPET_SMOOTHING_TO_WINDOW_RATIO = "smoothing-to-window-ratio";
-
         static constexpr double MIN_MAXIMUM_WINDOW_SECONDS = 0.4;
-        static constexpr double DEFAULT_MAXIMUM_WINDOW_SECONDS = 1.2;
+        static constexpr double DEFAULT_MAXIMUM_WINDOW_SECONDS = 0.4;
         static constexpr double MAX_MAXIMUM_WINDOW_SECONDS = 8.0;
-        static constexpr const char *KEY_SNIPPET_MAXIMUM_WINDOW_SECONDS = "maximum-window-seconds";
+        static constexpr const char *KEY_SNIPPET_MAXIMUM_WINDOW_SECONDS =
+            "detection.slow-seconds";
 
         static constexpr size_t MIN_PERCEPTIVE_TO_PEAK_STEPS = 1;
-        static constexpr size_t DEFAULT_PERCEPTIVE_TO_PEAK_STEPS = 12;
+        static constexpr size_t DEFAULT_PERCEPTIVE_TO_PEAK_STEPS = 11;
         static constexpr size_t MAX_PERCEPTIVE_TO_PEAK_STEPS = 12;
-        static constexpr const char *KEY_SNIPPET_PERCEPTIVE_TO_PEAK_STEPS = "perceptive-to-peak-steps";
+        static constexpr const char *KEY_SNIPPET_PERCEPTIVE_TO_PEAK_STEPS =
+            "detection.fast-time-constants";
 
         static constexpr size_t MIN_PERCEPTIVE_TO_MAXIMUM_WINDOW_STEPS = 1;
-        static constexpr size_t DEFAULT_PERCEPTIVE_TO_MAXIMUM_WINDOW_STEPS = 3;
+        static constexpr size_t DEFAULT_PERCEPTIVE_TO_MAXIMUM_WINDOW_STEPS = 2;
         static constexpr size_t MAX_PERCEPTIVE_TO_MAXIMUM_WINDOW_STEPS = 7;
-        static constexpr const char *KEY_SNIPPET_PERCEPTIVE_TO_MAXIMUM_WINDOW_STEPS = "perceptive-to-maximum-window-steps";
+        static constexpr const char *KEY_SNIPPET_PERCEPTIVE_TO_MAXIMUM_WINDOW_STEPS =
+            "detection.slow-time-constants";
 
-        static constexpr const char *KEY_SNIPPET_BAND = "band";
+        static constexpr int DEFAULT_USE_BRICK_WALL_PREDICTION = 1;
+        static constexpr const char *KEY_SNIPPET_USE_BRICK_WALL_PREDICTION =
+            "detection.use-brick-wall-prediction";
 
-        double smoothing_to_window_ratio = DEFAULT_SMOOTHING_TO_WINDOW_RATIO;
         double maximum_window_seconds = DEFAULT_MAXIMUM_WINDOW_SECONDS;
         size_t perceptive_to_peak_steps = DEFAULT_PERCEPTIVE_TO_PEAK_STEPS;
         size_t perceptive_to_maximum_window_steps = DEFAULT_PERCEPTIVE_TO_MAXIMUM_WINDOW_STEPS;
+        int useBrickWallPrediction = DEFAULT_USE_BRICK_WALL_PREDICTION;
 
-        static const BandConfig defaultConfig()
+        static const DetectionConfig defaultConfig()
         {
             return {};
         }
 
-        static const BandConfig unsetConfig();
+        static const DetectionConfig unsetConfig();
 
-        void set_if_unset(const BandConfig &config_if_unset);
+        void set_if_unset(const DetectionConfig &config_if_unset);
     };
 
     struct SpeakermanConfig
@@ -218,7 +218,7 @@ namespace speakerman {
         int generateNoise = DEFAULT_GENERATE_NOISE;
         long long timeStamp = -1;
         double threshold_scaling = DEFAULT_THRESHOLD_SCALING;
-        BandConfig band[MAX_CROSSOVERS + 1];
+        DetectionConfig detection;
         GroupConfig group[MAX_GROUPS];
         EqualizerConfig eq[MAX_EQS];
         size_t eqs = DEFAULT_EQS;

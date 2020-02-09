@@ -28,6 +28,7 @@
 #include <tdap/MemoryFence.hpp>
 #include <tdap/Noise.hpp>
 #include <tdap/Followers.hpp>
+#include <tdap/Limiter.hpp>
 #include <tdap/PerceptiveRms.hpp>
 #include <tdap/Transport.hpp>
 #include <tdap/Weighting.hpp>
@@ -108,123 +109,69 @@ namespace speakerman {
             {}
         };
 
-        class CheapLimiter {
-          IntegrationCoefficients<T> release_;
-          IntegrationCoefficients<T> attack_;
-          T hold_ = 0;
-          T integrated1_ = 0;
-          T integrated2_ = 0;
-          T threshold_ = 1.0;
-          T adjustedPeakFactor_ = 1.0;
-          size_t holdCount_= 0;
-          bool inRelease = false;
-          size_t latency_ = 0;
+        enum class LimiterClass { SMOOTH_TRIANGULAR, CRUDE };
 
-          static constexpr double predictionFactor = 0.30;
+        class Limiters {
+          using LimiterPtr = Limiter<T>*;
+          LimiterPtr limiters[LIMITERS];
+
+          void free()  {
+            for (size_t i = 0; i < LIMITERS; i++) {
+              LimiterPtr p = limiters[i];
+              if (p) {
+                limiters[i] = nullptr;
+                delete p;
+              }
+            }
+          }
 
         public:
-          void setPredictionAndThreshold( size_t prediction,
-                                          T threshold,
-                                          T sampleRate) {
-            double release = sampleRate * 0.04;
-            double thresholdFactor = 1.0 - exp(-1.0 / predictionFactor);
-            latency_ = prediction;
-            attack_.setCharacteristicSamples(predictionFactor * prediction);
-            release_.setCharacteristicSamples(release * M_SQRT1_2);
-            threshold_ = threshold;
-            integrated1_ = integrated2_ = threshold_;
-            adjustedPeakFactor_ = 1.0 / thresholdFactor;
-            printf("Limiter.setPredictionAndThreshold(%zu, %lf) -> { "
-                   "attack=%lf, release=%lf, smooth=Not used, "
-                   "threshold=%lf\n",
-                prediction, threshold,
-                attack_.getCharacteristicSamples(), release_.getCharacteristicSamples(), thresholdFactor);
-          }
 
-          size_t latency() const noexcept {
-            return latency_;
-          }
-
-          T getGain(T sample)
-          {
-            T peak = std::max(sample, threshold_);
-            if (peak >= hold_) {
-              hold_ = peak * adjustedPeakFactor_;
-              holdCount_ = latency_ + 1;
-              integrated1_ += attack_.inputMultiplier() * (hold_ -
-                  integrated1_);
-              integrated2_ = integrated1_;
+          Limiters() {
+            for (size_t i = 0; i < LIMITERS; i++) {
+              limiters[i] = nullptr;
             }
-            else if (holdCount_) {
-              holdCount_--;
-              integrated1_ += attack_.inputMultiplier() * (hold_ -
-                  integrated1_);
-              integrated2_ = integrated1_;
+          }
+
+          void setPredictionAndThreshold(size_t prediction, T threshold, T sampleRate,
+              LimiterClass limiterClass) {
+            free();
+            for (size_t i = 0; i < LIMITERS; i++) {
+              limiters[i] = limiterClass == LimiterClass::SMOOTH_TRIANGULAR
+                  ? dynamic_cast<LimiterPtr>(new TriangularLimiter<T>)
+                  : dynamic_cast<LimiterPtr>(new ZeroPredictionHardAttackLimiter<T>);
+              limiters[i]->setPredictionAndThreshold(prediction, threshold, sampleRate);
+            }
+            std::cout << "PEAK limiter: type=";
+            if (limiterClass == LimiterClass::SMOOTH_TRIANGULAR) {
+              std::cout << "Inaudible smooth";
+              std::cout << "; prediction=" << prediction;
             }
             else {
-              hold_ = peak;
-              integrated1_ += release_.inputMultiplier() * (hold_ -
-                  integrated1_);
-              integrated1_ += release_.inputMultiplier() * (integrated1_ -
-                  integrated2_);
+              std::cout << "Fast";
             }
-            return threshold_ / integrated2_;
+            std::cout << "; threshold=" << threshold <<
+                         "; sample-rate=" << sampleRate <<
+                         "; latency=" << (1.0 * getLatency() / sampleRate) <<
+                         std::endl;
+          }
+
+          size_t getLatency() const {
+            LimiterPtr p = limiters[0];
+            if (!p) {
+              throw std::runtime_error("Limiters::getLatency(): not initialized!");
+            }
+            return p->latency();
+          }
+
+          T getGain(size_t channel, T sample) noexcept {
+            return limiters[channel]->getGain(sample);
+          }
+
+          ~Limiters() {
+            free();
           }
         };
-
-        class TriangularLimiter
-        {
-            static constexpr double ATTACK_SMOOTHFACTOR = 0.1;
-            static constexpr double RELEASE_SMOOTHFACTOR = 0.3;
-            static constexpr double TOTAL_TIME_FACTOR = 1.0 + ATTACK_SMOOTHFACTOR;
-            static constexpr double ADJUST_THRESHOLD = 0.99999;
-
-            TriangularFollower<T> follower_;
-            IntegrationCoefficients<T> release_;
-            T integrated_ = 0;
-            T adjustedThreshold_;
-            size_t latency_ = 0;
-        public:
-            TriangularLimiter() : follower_(1000) {}
-
-            void setPredictionAndThreshold(size_t prediction, T threshold, T sampleRate)
-            {
-                size_t attack = prediction;
-                latency_ = prediction;
-                size_t release = Floats::clamp(
-                    prediction * 10,
-                    sampleRate * 0.010,
-                    sampleRate * 0.020);
-                adjustedThreshold_ = threshold * ADJUST_THRESHOLD;
-                printf("Limiter.setPredictionAndThreshold(%zu, %lf) -> { "
-                       "attack=%zu, release=%zu, smooth=Not used, "
-                       "threshold=%lf\n",
-                        prediction, threshold,
-                        attack, release, /*smooth, */ADJUST_THRESHOLD);
-                follower_.setTimeConstantAndSamples(attack, release, adjustedThreshold_);
-                release_.setCharacteristicSamples(release * RELEASE_SMOOTHFACTOR);
-                integrated_ = adjustedThreshold_;
-            }
-
-            size_t latency() const noexcept {
-              return latency_;
-            }
-
-            T getGain(T input)
-            {
-                T followed = follower_.follow(input);
-                T integrationfactor;
-                if (followed > integrated_) {
-                    integrationfactor = 1.0;//attack_.inputMultiplier();
-                }
-                else  {
-                    integrationfactor = release_.inputMultiplier();
-                }
-                integrated_ += integrationfactor * (followed - integrated_);
-                return adjustedThreshold_ / integrated_;
-            }
-        };
-
     private:
         PinkNoise::Default noise;
         double noiseAvg = 0;
@@ -236,13 +183,12 @@ namespace speakerman {
 
         Crossovers::Filter<double, T, INPUTS, CROSSOVERS> crossoverFilter;
         ACurves::Filter<T, PROCESSING_CHANNELS> aCurve;
-        using Detector = PerceptiveRms<T, (size_t)(0.5 + 192000 * BandConfig::MAX_MAXIMUM_WINDOW_SECONDS), 16>;
-        using DetectorGroup = PerceptiveRmsGroup<T, (size_t)(0.5 + 192000 * BandConfig::MAX_MAXIMUM_WINDOW_SECONDS), 16, CHANNELS_PER_GROUP>;
-        using Limiter = TriangularLimiter;
+        using Detector = PerceptiveRms<T, (size_t)(0.5 + 192000 * DetectionConfig::MAX_MAXIMUM_WINDOW_SECONDS), 16>;
+        using DetectorGroup = PerceptiveRmsGroup<T, (size_t)(0.5 + 192000 * DetectionConfig::MAX_MAXIMUM_WINDOW_SECONDS), 16, CHANNELS_PER_GROUP>;
 
         Detector subDetector;
         DetectorGroup *groupDetector;
-        Limiter limiter[LIMITERS];
+        Limiters limiter;
         IntegrationCoefficients<T> limiterRelease;
 
         GroupDelay groupDelay;
@@ -284,21 +230,20 @@ namespace speakerman {
             aCurve.setSampleRate(sampleRate);
             crossoverFilter.configure(sampleRate, crossovers);
             // Rms detector confiuration
-            BandConfig bandConfig = config.band[0];
+            DetectionConfig detection = config.detection;
             subDetector.configure(
                     sampleRate, 3,
-                    bandConfig.perceptive_to_peak_steps,
-                    bandConfig.maximum_window_seconds,
-                    bandConfig.perceptive_to_maximum_window_steps,
+                    detection.perceptive_to_peak_steps,
+                    detection.maximum_window_seconds,
+                    detection.perceptive_to_maximum_window_steps,
                     100.0);
             for (size_t band = 0, detector = 0; band < CROSSOVERS; band++) {
-                bandConfig = config.band[band + 1];
                 for (size_t group = 0; group < GROUPS; group++, detector++) {
                     groupDetector[detector].configure(
                             sampleRate, 3,
-                            bandConfig.perceptive_to_peak_steps,
-                            bandConfig.maximum_window_seconds,
-                            bandConfig.perceptive_to_maximum_window_steps,
+                            detection.perceptive_to_peak_steps,
+                            detection.maximum_window_seconds,
+                            detection.perceptive_to_maximum_window_steps,
                             100.0);
 
                 }
@@ -315,10 +260,10 @@ namespace speakerman {
             size_t predictionSamples = 0.5 + sampleRate * LIMITER_PREDICTION_SECONDS;
             limiterRelease.setCharacteristicSamples(10 * predictionSamples);
             printf("Prediction samples: %zu for rate %lf\n", predictionSamples, sampleRate);
-            for (size_t lim = 0; lim < LIMITERS; lim++) {
-                limiter[lim].setPredictionAndThreshold(predictionSamples, peakThreshold, sampleRate);
-            }
-            size_t latency = limiter[0].latency();
+            limiter.setPredictionAndThreshold(predictionSamples, peakThreshold, sampleRate,
+                detection.useBrickWallPrediction == 0 ? LimiterClass::SMOOTH_TRIANGULAR :
+                LimiterClass::CRUDE);
+            size_t latency = limiter.getLatency();
             for (size_t l = 0; l < DELAY_CHANNELS; l++) {
                 predictionDelay.setDelay(l, latency);
             }
@@ -616,7 +561,7 @@ namespace speakerman {
                     maxFiltered = Floats::max(maxFiltered, fabs(out));
                     target[offs] = predictionDelay.setAndGet(offs, out);
                 }
-                T limiterGain = limiter[group].getGain(maxFiltered);
+                T limiterGain = limiter.getGain(group, maxFiltered);
                 for (size_t channel = 0, offs = offs_start; channel < CHANNELS_PER_GROUP; channel++, offs++) {
                     T outputValue = target[offs] * limiterGain;
                     target[offs] = outputValue;
@@ -631,7 +576,7 @@ namespace speakerman {
         {
             T value = output[0];
             T maxOut = fabs(value);
-            T limiterGain = limiter[0].getGain(maxOut);
+            T limiterGain = limiter.getGain(0, maxOut);
             target[0] = groupDelay.setAndGet(0, limiterGain * predictionDelay.setAndGet(0, value));
         }
     };

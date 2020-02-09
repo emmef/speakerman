@@ -731,6 +731,15 @@ namespace speakerman {
             add_reader(KEY_SNIPPET_GENERATE_NOISE, true, generateNoise);
             add_reader(KEY_SNIPPET_INPUT_OFFSET, false, inputOffset);
 
+            add_reader(DetectionConfig::KEY_SNIPPET_MAXIMUM_WINDOW_SECONDS, false,
+                    detection.maximum_window_seconds);
+            add_reader(DetectionConfig::KEY_SNIPPET_PERCEPTIVE_TO_MAXIMUM_WINDOW_STEPS, false,
+                    detection.perceptive_to_maximum_window_steps);
+            add_reader(DetectionConfig::KEY_SNIPPET_PERCEPTIVE_TO_PEAK_STEPS, false,
+                    detection.perceptive_to_peak_steps);
+            add_reader(DetectionConfig::KEY_SNIPPET_USE_BRICK_WALL_PREDICTION, false,
+                    detection.useBrickWallPrediction);
+
             string key;
             for (size_t group_idx = 0; group_idx < SpeakermanConfig::MAX_GROUPS; group_idx++) {
                 string groupKey = GroupConfig::KEY_SNIPPET_GROUP;
@@ -780,26 +789,6 @@ namespace speakerman {
                 }
             }
 
-            for (size_t band_idx = 0;
-                band_idx <= SpeakermanConfig::MAX_CROSSOVERS; band_idx++) {
-                string bandKey = BandConfig::KEY_SNIPPET_BAND;
-                bandKey += "/";
-                bandKey += (char) (band_idx + '0');
-                bandKey += "/";
-
-                key = bandKey;
-                key += BandConfig::KEY_SNIPPET_MAXIMUM_WINDOW_SECONDS;
-                add_reader(key, false, band[band_idx].maximum_window_seconds);
-                key = bandKey;
-                key += BandConfig::KEY_SNIPPET_PERCEPTIVE_TO_MAXIMUM_WINDOW_STEPS;
-                add_reader(key, false, band[band_idx].perceptive_to_maximum_window_steps);
-                key = bandKey;
-                key += BandConfig::KEY_SNIPPET_PERCEPTIVE_TO_PEAK_STEPS;
-                add_reader(key, false, band[band_idx].perceptive_to_peak_steps);
-                key = bandKey;
-                key += BandConfig::KEY_SNIPPET_SMOOTHING_TO_WINDOW_RATIO;
-                add_reader(key, false, band[band_idx].smoothing_to_window_ratio);
-            }
             add_reader(GroupConfig::KEY_SNIPPET_EQ_COUNT, true, eqs);
             string eqBase = "";
             eqBase += EqualizerConfig::KEY_SNIPPET_EQUALIZER;
@@ -1169,11 +1158,11 @@ namespace speakerman {
         }
     }
 
-    const BandConfig BandConfig::unsetConfig()
+    const DetectionConfig DetectionConfig::unsetConfig()
     {
-        BandConfig result;
+        DetectionConfig result;
 
-        unset_config_value(result.smoothing_to_window_ratio);
+        unset_config_value(result.useBrickWallPrediction);
         unset_config_value(result.maximum_window_seconds);
         unset_config_value(result.perceptive_to_peak_steps);
         unset_config_value(result.perceptive_to_maximum_window_steps);
@@ -1181,12 +1170,9 @@ namespace speakerman {
         return result;
     }
 
-    void BandConfig::set_if_unset(const BandConfig &config_if_unset)
+    void DetectionConfig::set_if_unset(const DetectionConfig &config_if_unset)
     {
-        box_if_out_of_range(smoothing_to_window_ratio,
-                            config_if_unset.smoothing_to_window_ratio,
-                            MIN_SMOOTHING_TO_WINDOW_RATIO,
-                            MAX_SMOOTHING_TO_WINDOW_RATIO);
+        set_if_unset_config_value(useBrickWallPrediction, config_if_unset.useBrickWallPrediction);
         box_if_out_of_range(maximum_window_seconds,
                             config_if_unset.maximum_window_seconds,
                             MIN_MAXIMUM_WINDOW_SECONDS,
@@ -1207,9 +1193,7 @@ namespace speakerman {
         for (size_t i = 0; i < MAX_SPEAKERMAN_GROUPS; i++) {
             result.group[i] = GroupConfig::defaultConfig(i);
         }
-        for (size_t i = 0; i <= MAX_CROSSOVERS; i++) {
-            result.band[i] = BandConfig::defaultConfig();
-        }
+        result.detection = DetectionConfig::defaultConfig();
         for (size_t i = 0; i < MAX_EQS; i++) {
             result.eq[i] = EqualizerConfig::defaultConfig();
         }
@@ -1222,9 +1206,7 @@ namespace speakerman {
         for (size_t i = 0; i < MAX_SPEAKERMAN_GROUPS; i++) {
             result.group[i] = GroupConfig::unsetConfig();
         }
-        for (size_t i = 0; i <= MAX_CROSSOVERS; i++) {
-            result.band[i] = BandConfig::unsetConfig();
-        }
+        result.detection.unsetConfig();
         for (size_t i = 0; i < MAX_EQS; i++) {
             result.eq[i] = EqualizerConfig::unsetConfig();
         }
@@ -1258,21 +1240,7 @@ namespace speakerman {
         for (; group_idx < MAX_GROUPS; group_idx++) {
             group[group_idx] = GroupConfig::unsetConfig();
         }
-
-        size_t band_id;
-        if (set_if_unset_or_invalid_config_value(crossovers, config_if_unset.crossovers, MIN_CROSSOVERS, MAX_CROSSOVERS)) {
-            for (band_id = 0; band_id <= crossovers; band_id++) {
-                band[band_id] = config_if_unset.band[band_id];
-            }
-        }
-        else {
-            for (band_id = 0; band_id <= crossovers; band_id++) {
-                band[band_id].set_if_unset(config_if_unset.band[band_id]);
-            }
-        }
-        for (; band_id <= MAX_CROSSOVERS; band_id++) {
-            band[band_id] = BandConfig::unsetConfig();
-        }
+        detection.set_if_unset(config_if_unset.detection);
         size_t eq_idx;
         if (set_if_unset_or_invalid_config_value(eqs, config_if_unset.eqs,
                                                  MIN_EQS, MAX_EQS)) {
@@ -1286,7 +1254,7 @@ namespace speakerman {
             }
         }
         for (; eq_idx < MAX_EQS; eq_idx++) {
-            eq[eq_idx] = EqualizerConfig::unsetConfig();
+            eq[eq_idx] = EqualizerConfig::defaultConfig();
         }
 
         set_if_unset_or_invalid_config_value(groupChannels, config_if_unset.groupChannels, MIN_GROUP_CHANNELS, MAX_GROUP_CHANNELS);
