@@ -125,11 +125,17 @@ namespace speakerman {
         static constexpr const char *KEY_SNIPPET_MAXIMUM_WINDOW_SECONDS =
             "detection.slow-seconds";
 
-        static constexpr size_t MIN_PERCEPTIVE_TO_PEAK_STEPS = 1;
-        static constexpr size_t DEFAULT_PERCEPTIVE_TO_PEAK_STEPS = 11;
-        static constexpr size_t MAX_PERCEPTIVE_TO_PEAK_STEPS = 12;
-        static constexpr const char *KEY_SNIPPET_PERCEPTIVE_TO_PEAK_STEPS =
-            "detection.fast-time-constants";
+      static constexpr size_t MIN_PERCEPTIVE_TO_PEAK_STEPS = 1;
+      static constexpr size_t DEFAULT_PERCEPTIVE_TO_PEAK_STEPS = 11;
+      static constexpr size_t MAX_PERCEPTIVE_TO_PEAK_STEPS = 12;
+      static constexpr const char *KEY_SNIPPET_PERCEPTIVE_TO_PEAK_STEPS =
+          "detection.fast-time-constants";
+
+      static constexpr double MIN_MINIMUM_WINDOW_SECONDS = 0.0001;
+      static constexpr double DEFAULT_MINIMUM_WINDOW_SECONDS = 0.001;
+      static constexpr double MAX_MINIMUM_WINDOW_SECONDS = 0.010;
+      static constexpr const char *KEY_SNIPPET_MINIMUM_WINDOW_SECONDS =
+          "detection.fast-seconds";
 
         static constexpr size_t MIN_PERCEPTIVE_TO_MAXIMUM_WINDOW_STEPS = 1;
         static constexpr size_t DEFAULT_PERCEPTIVE_TO_MAXIMUM_WINDOW_STEPS = 2;
@@ -142,6 +148,7 @@ namespace speakerman {
             "detection.use-brick-wall-prediction";
 
         double maximum_window_seconds = DEFAULT_MAXIMUM_WINDOW_SECONDS;
+        double minimum_window_seconds = DEFAULT_MINIMUM_WINDOW_SECONDS;
         size_t perceptive_to_peak_steps = DEFAULT_PERCEPTIVE_TO_PEAK_STEPS;
         size_t perceptive_to_maximum_window_steps = DEFAULT_PERCEPTIVE_TO_MAXIMUM_WINDOW_STEPS;
         int useBrickWallPrediction = DEFAULT_USE_BRICK_WALL_PREDICTION;

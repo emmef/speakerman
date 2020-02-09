@@ -26,6 +26,7 @@
 #include <iostream>
 
 #include <type_traits>
+#include <algorithm>
 #include <cmath>
 
 #include <tdap/FixedSizeArray.hpp>
@@ -40,12 +41,20 @@ namespace tdap {
     struct PerceptiveMetrics
     {
         static constexpr double PERCEPTIVE_SECONDS = 0.400;
-        static constexpr double PEAK_SECONDS = 0.001;
-        static constexpr double PEAK_HOLD_SECONDS = 0.004;//0.0050
-        static constexpr double PEAK_RELEASE_SECONDS = 0.004; // 0.0100
+        static constexpr double PEAK_SECONDS = 0.0004;
         static constexpr double MAX_SECONDS = 10.0000;
-        static constexpr double PEAK_PERCEPTIVE_RATIO =
-                PEAK_SECONDS / PERCEPTIVE_SECONDS;
+
+        template<typename S>
+        static S calculateFastSeconds(
+                S fastSeconds, S&peakHoldSeconds, S&peakReleaseSecond, S&peakPerceptiveRatio) {
+
+            S smallest = Value<S>::force_between(fastSeconds, 0.0001, 0.01);
+            peakHoldSeconds = std::max(smallest * 4, 0.004);
+            peakReleaseSecond = peakHoldSeconds;
+            peakPerceptiveRatio =
+                smallest / PerceptiveMetrics::PERCEPTIVE_SECONDS;
+            return smallest;
+        }
     };
 
     template<typename S, size_t MAX_WINDOW_SAMPLES, size_t LEVELS>
@@ -70,42 +79,21 @@ namespace tdap {
             return limited_window;
         }
 
-        void determine_number_of_levels(double biggest_window,
-                                        size_t &bigger_levels,
-                                        size_t &smaller_levels)
-        {
-            if (bigger_levels == 0 || biggest_window == PerceptiveMetrics::PERCEPTIVE_SECONDS) {
-                smaller_levels = Value<size_t>::min(smaller_levels, LEVELS - 1);
-                bigger_levels = 0;
-                return;
-            }
-            double bigger_weight =
-                    log(biggest_window) - log(PerceptiveMetrics::PERCEPTIVE_SECONDS);
-            double smaller_weight =
-                    log(PerceptiveMetrics::PERCEPTIVE_SECONDS) - log(PerceptiveMetrics::PEAK_SECONDS);
-
-            while (bigger_levels + smaller_levels + 1 > LEVELS) {
-                if (bigger_levels * smaller_weight > smaller_levels * bigger_weight) {
-                    bigger_levels--;
-                }
-                if (biggest_window > PerceptiveMetrics::PERCEPTIVE_SECONDS * 1.3) {
-                    bigger_levels++;
-                }
-                else {
-                    smaller_levels++;
-                }
-            }
-        }
-
     public:
         PerceptiveRms() : follower_(1, 1, 1, 1), rms_(MAX_WINDOW_SAMPLES, MAX_WINDOW_SAMPLES*10, LEVELS, 0) {};
 
         void configure(size_t sample_rate, S peak_to_rms,
                        size_t steps_to_peak,
-                       S biggest_window, size_t steps_to_biggest,
+                       S biggest_window, S smallest_window, size_t steps_to_biggest,
                        S initial_value = 0.0)
         {
             size_t smaller_levels = Value<size_t >::max(steps_to_peak, 1);
+            double peakHoldSeconds;
+            double peakReleaseSecond;
+            double peakPerceptiveRatio;
+            double smallest = PerceptiveMetrics::calculateFastSeconds(
+                    smallest_window, peakHoldSeconds, peakReleaseSecond, peakPerceptiveRatio);
+
             double biggest = get_biggest_window_size(biggest_window);
             size_t bigger_levels = biggest == PerceptiveMetrics::PERCEPTIVE_SECONDS ? 0 : Value<size_t >::max(steps_to_biggest, 1);
             cout << this << " Levels smaller " << smaller_levels << " bigger " << bigger_levels << endl;
@@ -121,9 +109,9 @@ namespace tdap {
                 double exponent =
                         1.0 * (smaller_levels - level) / smaller_levels;
                 double window_size = PerceptiveMetrics::PERCEPTIVE_SECONDS *
-                                     pow(PerceptiveMetrics::PEAK_PERCEPTIVE_RATIO, exponent);
+                                     pow(peakPerceptiveRatio, exponent);
                 double scale = pow(
-                    PerceptiveMetrics::PEAK_PERCEPTIVE_RATIO, exponent * 0.25);
+                    peakPerceptiveRatio, exponent * 0.25);
                 rms_.setWindowSizeAndScale(level, 0.5 + window_size * sample_rate, scale * scale);
             }
 
@@ -152,9 +140,9 @@ namespace tdap {
             }
 
             follower_ = SmoothHoldMaxAttackRelease<S>(
-                    PerceptiveMetrics::PEAK_HOLD_SECONDS * sample_rate,
+                    peakHoldSeconds * sample_rate,
                     0.5 + 0.25 * PerceptiveMetrics::PEAK_SECONDS * sample_rate,
-                    PerceptiveMetrics::PEAK_RELEASE_SECONDS * sample_rate,
+                    peakReleaseSecond * sample_rate,
                     10);
         }
 
@@ -192,18 +180,23 @@ namespace tdap {
 
         void configure(size_t sample_rate, S peak_to_rms,
                        size_t steps_to_peak,
-                       S biggest_window, size_t steps_to_biggest,
-                       S initial_value = 0.0)
+                       S biggest_window, S smallest_window, size_t steps_to_biggest,
+                       S initial_value)
         {
             for (size_t channel = 0; channel < CHANNELS; channel++) {
                 rms_[IndexPolicy::force(channel, CHANNELS)].configure(
-                        sample_rate, peak_to_rms,steps_to_peak, biggest_window,
+                        sample_rate, peak_to_rms,steps_to_peak, biggest_window, smallest_window,
                         steps_to_biggest, initial_value);
             }
+          S peakHoldSeconds;
+          S peakReleaseSeconds;
+          S peakPerceptiveRatio;
+          S smallest = PerceptiveMetrics::calculateFastSeconds<S>(
+                  smallest_window, peakHoldSeconds, peakReleaseSeconds, peakPerceptiveRatio);
             follower_ = SmoothHoldMaxAttackRelease<S>(
-                    PerceptiveMetrics::PEAK_HOLD_SECONDS * sample_rate,
+                    peakHoldSeconds * sample_rate,
                     0.5 + 0.5 * PerceptiveMetrics::PEAK_SECONDS * sample_rate,
-                    PerceptiveMetrics::PEAK_RELEASE_SECONDS * sample_rate,
+                    peakReleaseSeconds * sample_rate,
                     10);
 
         }

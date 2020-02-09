@@ -235,6 +235,7 @@ namespace speakerman {
                     sampleRate, 3,
                     detection.perceptive_to_peak_steps,
                     detection.maximum_window_seconds,
+                    detection.minimum_window_seconds,
                     detection.perceptive_to_maximum_window_steps,
                     100.0);
             for (size_t band = 0, detector = 0; band < CROSSOVERS; band++) {
@@ -243,8 +244,9 @@ namespace speakerman {
                             sampleRate, 3,
                             detection.perceptive_to_peak_steps,
                             detection.maximum_window_seconds,
+                            detection.minimum_window_seconds,
                             detection.perceptive_to_maximum_window_steps,
-                            100.0);
+                            100);
 
                 }
             }

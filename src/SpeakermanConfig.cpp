@@ -733,6 +733,8 @@ namespace speakerman {
 
             add_reader(DetectionConfig::KEY_SNIPPET_MAXIMUM_WINDOW_SECONDS, false,
                     detection.maximum_window_seconds);
+            add_reader(DetectionConfig::KEY_SNIPPET_MINIMUM_WINDOW_SECONDS, false,
+                    detection.minimum_window_seconds);
             add_reader(DetectionConfig::KEY_SNIPPET_PERCEPTIVE_TO_MAXIMUM_WINDOW_STEPS, false,
                     detection.perceptive_to_maximum_window_steps);
             add_reader(DetectionConfig::KEY_SNIPPET_PERCEPTIVE_TO_PEAK_STEPS, false,
@@ -741,6 +743,26 @@ namespace speakerman {
                     detection.useBrickWallPrediction);
 
             string key;
+            add_reader(GroupConfig::KEY_SNIPPET_EQ_COUNT, true, eqs);
+            string eqBase = "";
+            eqBase += EqualizerConfig::KEY_SNIPPET_EQUALIZER;
+            eqBase += "/";
+            for (size_t eq_idx = 0; eq_idx < GroupConfig::MAX_EQS; eq_idx++) {
+                string eqKey = eqBase;
+                eqKey += (char) ('0' + eq_idx);
+                eqKey += "/";
+
+                key = eqKey;
+                key += EqualizerConfig::KEY_SNIPPET_CENTER;
+                add_reader(key, true, eq[eq_idx].center);
+                key = eqKey;
+                key += EqualizerConfig::KEY_SNIPPET_GAIN;
+                add_reader(key, true, eq[eq_idx].gain);
+                key = eqKey;
+                key += EqualizerConfig::KEY_SNIPPET_BANDWIDTH;
+                add_reader(key, true, eq[eq_idx].bandwidth);
+            }
+
             for (size_t group_idx = 0; group_idx < SpeakermanConfig::MAX_GROUPS; group_idx++) {
                 string groupKey = GroupConfig::KEY_SNIPPET_GROUP;
                 groupKey += "/";
@@ -789,25 +811,6 @@ namespace speakerman {
                 }
             }
 
-            add_reader(GroupConfig::KEY_SNIPPET_EQ_COUNT, true, eqs);
-            string eqBase = "";
-            eqBase += EqualizerConfig::KEY_SNIPPET_EQUALIZER;
-            eqBase += "/";
-            for (size_t eq_idx = 0; eq_idx < GroupConfig::MAX_EQS; eq_idx++) {
-                string eqKey = eqBase;
-                eqKey += (char) ('0' + eq_idx);
-                eqKey += "/";
-
-                key = eqKey;
-                key += EqualizerConfig::KEY_SNIPPET_CENTER;
-                add_reader(key, true, eq[eq_idx].center);
-                key = eqKey;
-                key += EqualizerConfig::KEY_SNIPPET_GAIN;
-                add_reader(key, true, eq[eq_idx].gain);
-                key = eqKey;
-                key += EqualizerConfig::KEY_SNIPPET_BANDWIDTH;
-                add_reader(key, true, eq[eq_idx].bandwidth);
-            }
         }
 
         size_t size() const
@@ -1164,6 +1167,7 @@ namespace speakerman {
 
         unset_config_value(result.useBrickWallPrediction);
         unset_config_value(result.maximum_window_seconds);
+        unset_config_value(result.minimum_window_seconds);
         unset_config_value(result.perceptive_to_peak_steps);
         unset_config_value(result.perceptive_to_maximum_window_steps);
 
@@ -1174,9 +1178,13 @@ namespace speakerman {
     {
         set_if_unset_config_value(useBrickWallPrediction, config_if_unset.useBrickWallPrediction);
         box_if_out_of_range(maximum_window_seconds,
-                            config_if_unset.maximum_window_seconds,
-                            MIN_MAXIMUM_WINDOW_SECONDS,
-                            MAX_MAXIMUM_WINDOW_SECONDS);
+                config_if_unset.maximum_window_seconds,
+                MIN_MAXIMUM_WINDOW_SECONDS,
+                MAX_MAXIMUM_WINDOW_SECONDS);
+        box_if_out_of_range(minimum_window_seconds,
+                config_if_unset.minimum_window_seconds,
+                MIN_MINIMUM_WINDOW_SECONDS,
+                MAX_MINIMUM_WINDOW_SECONDS);
         box_if_out_of_range(perceptive_to_peak_steps,
                             config_if_unset.perceptive_to_peak_steps,
                             MIN_PERCEPTIVE_TO_PEAK_STEPS,
