@@ -76,7 +76,7 @@ set(SOURCE_FILES
         src/SocketStream.cpp
         src/SpeakermanConfig.cpp
         src/SpeakermanWebServer.cpp
-        src/Stream.cpp)
+        src/Stream.cpp src/include/tdap/Limiter.hpp)
 
 find_path(LOCAL_TDAP_PATH, README-TAP.md HINTS ../ ../../ NO_DEFAULT_PATH)
 
