@@ -112,7 +112,10 @@ namespace tdap {
     void setPredictionAndThreshold( size_t prediction,
             T threshold,
             T sampleRate) override {
-      double release = sampleRate * 0.04;
+      size_t release = Floats::clamp(
+              prediction * 8,
+              sampleRate * 0.010,
+              sampleRate * 0.020);
       release_.setCharacteristicSamples(release * M_SQRT1_2);
       threshold_ = threshold;
       integrated1_ = integrated2_ = threshold_;
@@ -159,7 +162,7 @@ namespace tdap {
       size_t attack = prediction;
       latency_ = prediction;
       size_t release = Floats::clamp(
-              prediction * 10,
+              prediction * 8,
               sampleRate * 0.010,
               sampleRate * 0.020);
       adjustedThreshold_ = threshold * ADJUST_THRESHOLD;
