@@ -144,10 +144,14 @@ namespace tdap {
               double scaleFactor = maxSteps / (maxSlowSteps + maxFastSteps);
               maxSlowSteps = maxSlowSteps * scaleFactor;
               maxFastSteps = maxFastSteps * scaleFactor;
+              bool hasSlowSteps = slowSteps > 0;
               slowSteps = maxSlowSteps;
               fastSteps = maxFastSteps;
               size_t extraSteps = maxSteps - slowSteps - fastSteps;
               if (extraSteps == 0) {
+                if (hasSlowSteps && slowSteps == 0) {
+                    slowSteps++;
+                }
                 return {
                   validMaxLevels,
                   slowSteps,
@@ -156,6 +160,9 @@ namespace tdap {
               }
               else if (extraSteps > 1 && (maxFastSteps - maxSlowSteps <= 1.0)) {
                 return {validMaxLevels, slowSteps + 1, slowSeconds, fastSeconds};
+              }
+              if (hasSlowSteps && slowSteps == 0) {
+                slowSteps++;
               }
               return {
                 validMaxLevels,
