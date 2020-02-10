@@ -735,10 +735,8 @@ namespace speakerman {
                     detection.maximum_window_seconds);
             add_reader(DetectionConfig::KEY_SNIPPET_MINIMUM_WINDOW_SECONDS, false,
                     detection.minimum_window_seconds);
-            add_reader(DetectionConfig::KEY_SNIPPET_PERCEPTIVE_TO_MAXIMUM_WINDOW_STEPS, false,
-                    detection.perceptive_to_maximum_window_steps);
-            add_reader(DetectionConfig::KEY_SNIPPET_PERCEPTIVE_TO_PEAK_STEPS, false,
-                    detection.perceptive_to_peak_steps);
+            add_reader(DetectionConfig::KEY_SNIPPET_PERCEPTIVE_LEVELS, false,
+                    detection.perceptive_levels);
             add_reader(DetectionConfig::KEY_SNIPPET_USE_BRICK_WALL_PREDICTION, false,
                     detection.useBrickWallPrediction);
 
@@ -1168,8 +1166,7 @@ namespace speakerman {
         unset_config_value(result.useBrickWallPrediction);
         unset_config_value(result.maximum_window_seconds);
         unset_config_value(result.minimum_window_seconds);
-        unset_config_value(result.perceptive_to_peak_steps);
-        unset_config_value(result.perceptive_to_maximum_window_steps);
+        unset_config_value(result.perceptive_levels);
 
         return result;
     }
@@ -1185,14 +1182,10 @@ namespace speakerman {
                 config_if_unset.minimum_window_seconds,
                 MIN_MINIMUM_WINDOW_SECONDS,
                 MAX_MINIMUM_WINDOW_SECONDS);
-        box_if_out_of_range(perceptive_to_peak_steps,
-                            config_if_unset.perceptive_to_peak_steps,
-                            MIN_PERCEPTIVE_TO_PEAK_STEPS,
-                            MAX_PERCEPTIVE_TO_PEAK_STEPS);
-        box_if_out_of_range(perceptive_to_maximum_window_steps,
-                            config_if_unset.perceptive_to_maximum_window_steps,
-                            MIN_PERCEPTIVE_TO_MAXIMUM_WINDOW_STEPS,
-                            MAX_PERCEPTIVE_TO_MAXIMUM_WINDOW_STEPS);
+        box_if_out_of_range(perceptive_levels,
+                            config_if_unset.perceptive_levels,
+                            MIN_PERCEPTIVE_LEVELS,
+                            MAX_PERCEPTIVE_LEVELS);
     }
 
     const SpeakermanConfig SpeakermanConfig::defaultConfig()

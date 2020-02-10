@@ -62,6 +62,8 @@ namespace speakerman {
         // OUTPUTS
         static constexpr size_t OUTPUTS = INPUTS + 1;
 
+        static constexpr size_t RMS_DETECTION_LEVELS = 16;
+
         static constexpr double GROUP_MAX_DELAY = GroupConfig::MAX_DELAY;
         static constexpr double LIMITER_MAX_DELAY = 0.01;
         static constexpr double RMS_MAX_DELAY = 0.01;
@@ -183,8 +185,9 @@ namespace speakerman {
 
         Crossovers::Filter<double, T, INPUTS, CROSSOVERS> crossoverFilter;
         ACurves::Filter<T, PROCESSING_CHANNELS> aCurve;
-        using Detector = PerceptiveRms<T, (size_t)(0.5 + 192000 * DetectionConfig::MAX_MAXIMUM_WINDOW_SECONDS), 16>;
-        using DetectorGroup = PerceptiveRmsGroup<T, (size_t)(0.5 + 192000 * DetectionConfig::MAX_MAXIMUM_WINDOW_SECONDS), 16, CHANNELS_PER_GROUP>;
+
+        using Detector = PerceptiveRms<T, (size_t)(0.5 + 192000 * DetectionConfig::MAX_MAXIMUM_WINDOW_SECONDS), RMS_DETECTION_LEVELS>;
+        using DetectorGroup = PerceptiveRmsGroup<T, (size_t)(0.5 + 192000 * DetectionConfig::MAX_MAXIMUM_WINDOW_SECONDS), RMS_DETECTION_LEVELS, CHANNELS_PER_GROUP>;
 
         Detector subDetector;
         DetectorGroup *groupDetector;
@@ -231,21 +234,21 @@ namespace speakerman {
             crossoverFilter.configure(sampleRate, crossovers);
             // Rms detector confiuration
             DetectionConfig detection = config.detection;
+            Perceptive::Metrics perceptiveMetrics =
+                    Perceptive::Metrics::createWithEvenSteps(
+                            detection.maximum_window_seconds,
+                            detection.minimum_window_seconds,
+                            std::min(RMS_DETECTION_LEVELS, detection.perceptive_levels));
+            std::cout << perceptiveMetrics << std::endl;
             subDetector.configure(
-                    sampleRate, 3,
-                    detection.perceptive_to_peak_steps,
-                    detection.maximum_window_seconds,
-                    detection.minimum_window_seconds,
-                    detection.perceptive_to_maximum_window_steps,
-                    100.0);
+                    sampleRate,
+                    perceptiveMetrics,
+                    100);
             for (size_t band = 0, detector = 0; band < CROSSOVERS; band++) {
                 for (size_t group = 0; group < GROUPS; group++, detector++) {
                     groupDetector[detector].configure(
-                            sampleRate, 3,
-                            detection.perceptive_to_peak_steps,
-                            detection.maximum_window_seconds,
-                            detection.minimum_window_seconds,
-                            detection.perceptive_to_maximum_window_steps,
+                            sampleRate,
+                            perceptiveMetrics,
                             100);
 
                 }

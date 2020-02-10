@@ -465,7 +465,10 @@ int main(int c, const char *args[])
 //	testTrueAverage();
 //        testTriangularFollowerSmoothed();
 //        testPeakDetector();
+    std::cout << tdap::Perceptive::Metrics::createWithEvenSteps(
+            1.2, 0.4/625, 16) << std::endl;
         printPinkNoise();
+
 //        reachIngForFactors();
 	return 0;
 }
