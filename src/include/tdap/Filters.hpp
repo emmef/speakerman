@@ -23,97 +23,80 @@
 #ifndef TDAP_FILTERS_HEADER_GUARD
 #define TDAP_FILTERS_HEADER_GUARD
 
-#include <tdap/Count.hpp>
-#include <tdap/Value.hpp>
 #include <cstddef>
-#include <type_traits>
 #include <limits>
 #include <math.h>
 #include <tdap/ArrayTraits.hpp>
+#include <tdap/Count.hpp>
+#include <tdap/Value.hpp>
+#include <type_traits>
 
 namespace tdap {
 
-    struct AllowedFilterError
-    {
-        static constexpr double MINIMUM = constexpr_power<double, 42>(0.5);
-        static constexpr double DEFAULT = constexpr_power<double, 23>(0.5);
-        static constexpr double MAXIMUM = constexpr_power<double, 8>(0.5);
+struct AllowedFilterError {
+  static constexpr double MINIMUM = constexpr_power<double, 42>(0.5);
+  static constexpr double DEFAULT = constexpr_power<double, 23>(0.5);
+  static constexpr double MAXIMUM = constexpr_power<double, 8>(0.5);
 
-        static inline double effective(double allowedFilterError)
-        {
-            return Value<double>::force_between(
-                    allowedFilterError,
-                    MINIMUM, MAXIMUM);
-        }
-    };
+  static inline double effective(double allowedFilterError) {
+    return Value<double>::force_between(allowedFilterError, MINIMUM, MAXIMUM);
+  }
+};
 
-    template<typename Sample>
-    struct Filter;
+template <typename Sample> struct Filter;
 
-    template<typename Sample>
-    struct IdentityFilter : public Filter<Sample>
-    {
-        virtual Sample filter(Sample input)
-        { return input; }
+template <typename Sample> struct IdentityFilter : public Filter<Sample> {
+  virtual Sample filter(Sample input) { return input; }
 
-        virtual void reset()
-        { /* No state */ }
-    };
+  virtual void reset() { /* No state */
+  }
+};
 
-    template<typename Sample>
-    struct Filter
-    {
-        static_assert(std::is_arithmetic<Sample>::value, "Sample type must be arithmetic");
+template <typename Sample> struct Filter {
+  static_assert(std::is_arithmetic<Sample>::value,
+                "Sample type must be arithmetic");
 
-        virtual Sample filter(Sample input) = 0;
+  virtual Sample filter(Sample input) = 0;
 
-        virtual void reset() = 0;
+  virtual void reset() = 0;
 
-        virtual ~Filter() = default;
+  virtual ~Filter() = default;
 
-        static Filter<Sample> &identity()
-        {
-            static IdentityFilter<Sample> filter;
-            return filter;
-        }
-    };
+  static Filter<Sample> &identity() {
+    static IdentityFilter<Sample> filter;
+    return filter;
+  }
+};
 
-    template<typename Sample>
-    struct MultiFilter;
+template <typename Sample> struct MultiFilter;
 
-    template<typename Sample>
-    struct IdentityMultiFilter : public MultiFilter<Sample>
-    {
-        virtual size_t channels() const
-        { return Count<Sample>::max(); }
+template <typename Sample>
+struct IdentityMultiFilter : public MultiFilter<Sample> {
+  virtual size_t channels() const { return Count<Sample>::max(); }
 
-        virtual Sample filter(size_t channel, Sample input)
-        { return input; }
+  virtual Sample filter(size_t channel, Sample input) { return input; }
 
-        virtual void reset()
-        { /* No state */ }
-    };
+  virtual void reset() { /* No state */
+  }
+};
 
-    template<typename Sample>
-    struct MultiFilter
-    {
-        static_assert(std::is_arithmetic<Sample>::value, "Sample type must be arithmetic");
+template <typename Sample> struct MultiFilter {
+  static_assert(std::is_arithmetic<Sample>::value,
+                "Sample type must be arithmetic");
 
-        virtual size_t channels() const = 0;
+  virtual size_t channels() const = 0;
 
-        virtual Sample filter(size_t channel, Sample input) = 0;
+  virtual Sample filter(size_t channel, Sample input) = 0;
 
-        virtual void reset() = 0;
+  virtual void reset() = 0;
 
-        virtual ~MultiFilter() = default;
+  virtual ~MultiFilter() = default;
 
-        static MultiFilter<Sample> &identity()
-        {
-            static IdentityMultiFilter<Sample> filter;
-            return filter;
-        }
-    };
-
+  static MultiFilter<Sample> &identity() {
+    static IdentityMultiFilter<Sample> filter;
+    return filter;
+  }
+};
 
 /**
  * Returns the length in samples after which the impulse response of the
@@ -130,60 +113,62 @@ namespace tdap {
  * measured. If the energy level did not drop below the negligible level at
  * that time, the function returns 0.
  */
-    template<typename Sample>
-    size_t effectiveLength(Filter<Sample> &filter, size_t bucketSize, size_t bucketsPerWindow, double epsilon,
-                           size_t maxBuckets)
-    {
-        size_t size = bucketSize > 0 ? bucketSize : 1;
-        size_t windowBuckets = Value<size_t>::force_between(bucketsPerWindow, 1, 10000);
-        size_t usedMaxBuckets = Value<size_t>::force_between(maxBuckets, windowBuckets + 1, Count<Sample>::max());
+template <typename Sample>
+size_t effectiveLength(Filter<Sample> &filter, size_t bucketSize,
+                       size_t bucketsPerWindow, double epsilon,
+                       size_t maxBuckets) {
+  size_t size = bucketSize > 0 ? bucketSize : 1;
+  size_t windowBuckets =
+      Value<size_t>::force_between(bucketsPerWindow, 1, 10000);
+  size_t usedMaxBuckets = Value<size_t>::force_between(
+      maxBuckets, windowBuckets + 1, Count<Sample>::max());
 
-        double usedEpsilon = Value<double>::force_between(epsilon, 1e-24, 1);
+  double usedEpsilon = Value<double>::force_between(epsilon, 1e-24, 1);
 
-        size_t windowPointer = 0;
-        double window[windowBuckets];
-        double totalSum = 0.0;
-        double bucketSum = 0.0;
-        Sample input = std::is_floating_point<Sample>::value ?
-                       static_cast<Sample>(1) :
-                       std::numeric_limits<Sample>::max();
+  size_t windowPointer = 0;
+  double window[windowBuckets];
+  double totalSum = 0.0;
+  double bucketSum = 0.0;
+  Sample input = std::is_floating_point<Sample>::value
+                     ? static_cast<Sample>(1)
+                     : std::numeric_limits<Sample>::max();
 
-        for (size_t bucket = 0; bucket < usedMaxBuckets; bucket++) {
-            // Determine root mean square value for bucket. As all buckets
-            // have the same size, we do not re-scale for the number of
-            // samples in the bucket.
-            bucketSum = 0.0;
-            for (size_t i = 0; i < size; i++) {
-                double value = filter.filter(input);
-                input = static_cast<Sample>(0);
-                bucketSum += value * value;
-            }
-
-            // Add bucket sum to (rotating) window and total sum
-            window[windowPointer] = bucketSum;
-            windowPointer = (windowPointer + 1) % windowBuckets;
-
-            totalSum += bucketSum;
-
-            if (bucket >= windowBuckets) {
-                // Calculate total window energy
-                double windowSumSqr = 0.0;
-                for (size_t i = 0; i < windowBuckets; i++) {
-                    windowSumSqr += window[i];
-                }
-                Sample windowSum = sqrt(windowSumSqr);
-                // compare with total times epsilon. If the Sample type is
-                // discrete, the effective length can be shorter if the
-                // window energy is below the quantization error.
-                if (windowSum < sqrt(totalSum) * usedEpsilon) {
-                    return size * (bucket + 1 - windowBuckets);
-                }
-            }
-        }
-
-        return 0;
+  for (size_t bucket = 0; bucket < usedMaxBuckets; bucket++) {
+    // Determine root mean square value for bucket. As all buckets
+    // have the same size, we do not re-scale for the number of
+    // samples in the bucket.
+    bucketSum = 0.0;
+    for (size_t i = 0; i < size; i++) {
+      double value = filter.filter(input);
+      input = static_cast<Sample>(0);
+      bucketSum += value * value;
     }
 
-} /* End of name space tdap */
+    // Add bucket sum to (rotating) window and total sum
+    window[windowPointer] = bucketSum;
+    windowPointer = (windowPointer + 1) % windowBuckets;
+
+    totalSum += bucketSum;
+
+    if (bucket >= windowBuckets) {
+      // Calculate total window energy
+      double windowSumSqr = 0.0;
+      for (size_t i = 0; i < windowBuckets; i++) {
+        windowSumSqr += window[i];
+      }
+      Sample windowSum = sqrt(windowSumSqr);
+      // compare with total times epsilon. If the Sample type is
+      // discrete, the effective length can be shorter if the
+      // window energy is below the quantization error.
+      if (windowSum < sqrt(totalSum) * usedEpsilon) {
+        return size * (bucket + 1 - windowBuckets);
+      }
+    }
+  }
+
+  return 0;
+}
+
+} // namespace tdap
 
 #endif /* TDAP_FILTERS_HEADER_GUARD */

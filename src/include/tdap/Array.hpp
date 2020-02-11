@@ -23,244 +23,192 @@
 #ifndef TDAP_ARRAY_HEADER_GUARD
 #define TDAP_ARRAY_HEADER_GUARD
 
-#include <tdap/ArrayTraits.hpp>
 #include "debug.hpp"
+#include <tdap/ArrayTraits.hpp>
 
 namespace tdap {
 
-    TDAP_DEBUG_DEF_COUNT(ArrayInitMaxSizeAndSize)
+TDAP_DEBUG_DEF_COUNT(ArrayInitMaxSizeAndSize)
 
-    TDAP_DEBUG_DEF_COUNT(ArrayInitMaxSize)
+TDAP_DEBUG_DEF_COUNT(ArrayInitMaxSize)
 
-    TDAP_DEBUG_DEF_COUNT(ArrayInitCopy)
+TDAP_DEBUG_DEF_COUNT(ArrayInitCopy)
 
-    TDAP_DEBUG_DEF_COUNT(ArrayInitMove)
+TDAP_DEBUG_DEF_COUNT(ArrayInitMove)
 
-    TDAP_DEBUG_DEF_COUNT(ArrayInitRefMove)
+TDAP_DEBUG_DEF_COUNT(ArrayInitRefMove)
 
-    TDAP_DEBUG_DEF_COUNT(ArrayDestructor)
+TDAP_DEBUG_DEF_COUNT(ArrayDestructor)
 
-    TDAP_DEBUG_DEF_COUNT(ArrayRef)
+TDAP_DEBUG_DEF_COUNT(ArrayRef)
 
-    TDAP_DEBUG_DEF_COUNT(ArrayRead)
+TDAP_DEBUG_DEF_COUNT(ArrayRead)
 
-    TDAP_DEBUG_DEF_COUNT(ArrayUnsafeRef)
+TDAP_DEBUG_DEF_COUNT(ArrayUnsafeRef)
 
-    TDAP_DEBUG_DEF_COUNT(ArrayUnsafeRead)
+TDAP_DEBUG_DEF_COUNT(ArrayUnsafeRead)
 
-    TDAP_DEBUG_DEF_COUNT(ArrayPlus)
+TDAP_DEBUG_DEF_COUNT(ArrayPlus)
 
-    TDAP_DEBUG_DEF_COUNT(ArrayGetSize)
+TDAP_DEBUG_DEF_COUNT(ArrayGetSize)
 
-    template<typename T>
-    class RefArray;
+template <typename T> class RefArray;
 
-    template<typename T>
-    class Array : public ArrayTraits<T, Array<T>>
-    {
-        static_assert(std::is_trivially_copyable<T>::value,
-                      "Type must be trivial to copy, move or destroy and have standard layout");
+template <typename T> class Array : public ArrayTraits<T, Array<T>> {
+  static_assert(
+      std::is_trivially_copyable<T>::value,
+      "Type must be trivial to copy, move or destroy and have standard layout");
 
-        friend class ArrayTraits<T, Array<T>>;
+  friend class ArrayTraits<T, Array<T>>;
 
-        using Parent = ArrayTraits<T, Array<T>>;
+  using Parent = ArrayTraits<T, Array<T>>;
 
-        size_t capacity_;
-        size_t size_;
-        T *data_;
+  size_t capacity_;
+  size_t size_;
+  T *data_;
 
-        static size_t validCapacity(size_t size)
-        {
-            if (Count<T>::valid_positive(size)) {
-                return size;
-            }
-            throw std::invalid_argument("Array: invalid capacity");
-        }
+  static size_t validCapacity(size_t size) {
+    if (Count<T>::valid_positive(size)) {
+      return size;
+    }
+    throw std::invalid_argument("Array: invalid capacity");
+  }
 
-        size_t _traitGetSize() const
-        { return size_; }
+  size_t _traitGetSize() const { return size_; }
 
-        size_t _traitGetCapacity() const
-        { return capacity_; }
+  size_t _traitGetCapacity() const { return capacity_; }
 
-        T &_traitRefAt(size_t i)
-        {
-            return *reinterpret_cast<T *>(data_ + i);
-        }
+  T &_traitRefAt(size_t i) { return *reinterpret_cast<T *>(data_ + i); }
 
-        const T &_traitRefAt(size_t i) const
-        {
-            return *reinterpret_cast<const T *>(data_ + i);
-        }
+  const T &_traitRefAt(size_t i) const {
+    return *reinterpret_cast<const T *>(data_ + i);
+  }
 
-        T *_traitUnsafeData()
-        {
-            return reinterpret_cast<T *>(data_);
-        }
+  T *_traitUnsafeData() { return reinterpret_cast<T *>(data_); }
 
-        const T *_traitUnsafeData() const
-        {
-            return reinterpret_cast<const T *>(data_);
-        }
+  const T *_traitUnsafeData() const {
+    return reinterpret_cast<const T *>(data_);
+  }
 
-        T *_traitPlus(size_t i) const
-        {
-            return reinterpret_cast<T *>(data_ + i);
-        }
+  T *_traitPlus(size_t i) const { return reinterpret_cast<T *>(data_ + i); }
 
-        void _traitSetSize(size_t newSize)
-        {
-            size_ = newSize;
-        }
+  void _traitSetSize(size_t newSize) { size_ = newSize; }
 
-        static constexpr bool _traitHasTrivialAddressing()
-        { return true; }
+  static constexpr bool _traitHasTrivialAddressing() { return true; }
 
-        static T *const nonNull(T *const ptr)
-        {
-            if (ptr != nullptr) {
-                return ptr;
-            }
-            throw new std::invalid_argument("Array Cannot reference null");
-        }
+  static T *const nonNull(T *const ptr) {
+    if (ptr != nullptr) {
+      return ptr;
+    }
+    throw new std::invalid_argument("Array Cannot reference null");
+  }
 
-    public:
-        using ArrayTraits<T, Array<T>>::copy;
-        using ArrayTraits<T, Array<T>>::validSize;
+public:
+  using ArrayTraits<T, Array<T>>::copy;
+  using ArrayTraits<T, Array<T>>::validSize;
 
-        Array(size_t capacity) : capacity_(validCapacity(capacity)), size_(capacity_), data_(new T[capacity_])
-        {}
+  Array(size_t capacity)
+      : capacity_(validCapacity(capacity)), size_(capacity_),
+        data_(new T[capacity_]) {}
 
-        Array(size_t capacity, size_t size) : capacity_(validCapacity(capacity)), size_(Parent::validSize(size)),
-                                              data_(new T[capacity_])
-        {}
+  Array(size_t capacity, size_t size)
+      : capacity_(validCapacity(capacity)), size_(Parent::validSize(size)),
+        data_(new T[capacity_]) {}
 
-        Array(Array<T> &&source) : capacity_(source.capacity_), size_(source.size_), data_(source.data_)
-        {
-            source.capacity_ = 0;
-            source.size_ = 0;
-            source.data_ = nullptr;
-        }
+  Array(Array<T> &&source)
+      : capacity_(source.capacity_), size_(source.size_), data_(source.data_) {
+    source.capacity_ = 0;
+    source.size_ = 0;
+    source.data_ = nullptr;
+  }
 
-        template<typename ...A>
-        Array(const ArrayTraits<T, A...> &source) : capacity_(source.size()), size_(capacity_),
-                                                    data_(new T[capacity_])
-        {
-            copy(source);
-        }
+  template <typename... A>
+  Array(const ArrayTraits<T, A...> &source)
+      : capacity_(source.size()), size_(capacity_), data_(new T[capacity_]) {
+    copy(source);
+  }
 
-        Array(const Array<T> &source, ConstructionPolicy policy) :
-                capacity_(policy == ConstructionPolicy::INHERIT_CAPACITY ? source.capacity_ : source.size_),
-                size_(source.size_), data_(new T[capacity_])
-        {
-            copy(source);
-        }
+  Array(const Array<T> &source, ConstructionPolicy policy)
+      : capacity_(policy == ConstructionPolicy::INHERIT_CAPACITY
+                      ? source.capacity_
+                      : source.size_),
+        size_(source.size_), data_(new T[capacity_]) {
+    copy(source);
+  }
 
-        Array(const Array<T> &source) : Array(source, ConstructionPolicy::SIZE_BECOMES_CAPACITY)
-        {}
+  Array(const Array<T> &source)
+      : Array(source, ConstructionPolicy::SIZE_BECOMES_CAPACITY) {}
 
-        void setSize(size_t newSize)
-        {
-            size_ = validSize(newSize);
-        }
+  void setSize(size_t newSize) { size_ = validSize(newSize); }
 
-        template<typename ...A>
-        void operator=(const ArrayTraits<T, A...> &source)
-        {
-            copy(source);
-        }
+  template <typename... A> void operator=(const ArrayTraits<T, A...> &source) {
+    copy(source);
+  }
 
-        void operator=(const Array<T> &source)
-        {
-            copy(source);
-        }
+  void operator=(const Array<T> &source) { copy(source); }
 
-        ~Array()
-        {
-            if (data_) {
-                delete[] data_;
-                data_ = nullptr;
-            }
-            size_ = 0;
-            capacity_ = 0;
-        }
-    };
+  ~Array() {
+    if (data_) {
+      delete[] data_;
+      data_ = nullptr;
+    }
+    size_ = 0;
+    capacity_ = 0;
+  }
+};
 
-    template<typename T>
-    class RefArray : public ArrayTraits<T, RefArray<T>>
-    {
-        static_assert(std::is_trivially_copyable<T>::value,
-                      "Type must be trivial to copy, move or destroy and have standard layout");
+template <typename T> class RefArray : public ArrayTraits<T, RefArray<T>> {
+  static_assert(
+      std::is_trivially_copyable<T>::value,
+      "Type must be trivial to copy, move or destroy and have standard layout");
 
-        friend class ArrayTraits<T, RefArray<T>>;
+  friend class ArrayTraits<T, RefArray<T>>;
 
-        size_t size_ = 0;
-        T *data_ = 0;
+  size_t size_ = 0;
+  T *data_ = 0;
 
-        static size_t validSize(size_t size)
-        {
-            if (Count<T>::valid_positive(size)) {
-                return size;
-            }
-            throw std::invalid_argument("RefArray: size too big");
-        }
+  static size_t validSize(size_t size) {
+    if (Count<T>::valid_positive(size)) {
+      return size;
+    }
+    throw std::invalid_argument("RefArray: size too big");
+  }
 
-        size_t _traitGetSize() const
-        { return size_; }
+  size_t _traitGetSize() const { return size_; }
 
-        size_t _traitGetCapacity() const
-        { return size_; }
+  size_t _traitGetCapacity() const { return size_; }
 
-        T &_traitRefAt(size_t i)
-        {
-            return data_[i];
-        }
+  T &_traitRefAt(size_t i) { return data_[i]; }
 
-        const T &_traitRefAt(size_t i) const
-        {
-            return data_[i];
-        }
+  const T &_traitRefAt(size_t i) const { return data_[i]; }
 
-        T *_traitUnsafeData()
-        {
-            return &data_[0];
-        }
+  T *_traitUnsafeData() { return &data_[0]; }
 
-        const T *_traitUnsafeData() const
-        {
-            return &data_[0];
-        }
+  const T *_traitUnsafeData() const { return &data_[0]; }
 
-        T *_traitPlus(size_t i) const
-        {
-            return data_ + i;
-        }
+  T *_traitPlus(size_t i) const { return data_ + i; }
 
-        static constexpr bool _traitHasTrivialAddressing()
-        { return true; }
+  static constexpr bool _traitHasTrivialAddressing() { return true; }
 
-        static T *const nonNull(T *const ptr)
-        {
-            if (ptr != nullptr) {
-                return ptr;
-            }
-            throw new std::invalid_argument("RefArray Cannot reference null");
-        }
+  static T *const nonNull(T *const ptr) {
+    if (ptr != nullptr) {
+      return ptr;
+    }
+    throw new std::invalid_argument("RefArray Cannot reference null");
+  }
 
-    public:
-        RefArray() = default;
+public:
+  RefArray() = default;
 
-        RefArray(T *const data, size_t size) : size_(validSize(size)), data_(nonNull(data))
-        {}
+  RefArray(T *const data, size_t size)
+      : size_(validSize(size)), data_(nonNull(data)) {}
 
-        void reset()
-        {
-            size_ = 0;
-            data_ = 0;
-        }
-    };
+  void reset() {
+    size_ = 0;
+    data_ = 0;
+  }
+};
 
-
-} /* End of name space tdap */
+} // namespace tdap
 
 #endif /* TDAP_ARRAY_HEADER_GUARD */

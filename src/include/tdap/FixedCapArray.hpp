@@ -28,77 +28,54 @@
 
 namespace tdap {
 
-    template<typename T, size_t CAPACITY>
-    class alignas(Count<T>::align) FixedCapArray : public FixedCapArrayTraits<T, CAPACITY, FixedCapArray<T, CAPACITY>>
-    {
-        static_assert(std::is_trivially_copyable<T>::value,
-                      "Type must be trivial to copy, move or destroy and have standard layout");
-        static_assert(CAPACITY > 0 && Power2::constant::next(CAPACITY - 1) >= CAPACITY, "Size must be valid");
-        static constexpr size_t MAXSIZE = Power2::constant::next(CAPACITY);
+template <typename T, size_t CAPACITY>
+class alignas(Count<T>::align) FixedCapArray
+    : public FixedCapArrayTraits<T, CAPACITY, FixedCapArray<T, CAPACITY>> {
+  static_assert(
+      std::is_trivially_copyable<T>::value,
+      "Type must be trivial to copy, move or destroy and have standard layout");
+  static_assert(CAPACITY > 0 &&
+                    Power2::constant::next(CAPACITY - 1) >= CAPACITY,
+                "Size must be valid");
+  static constexpr size_t MAXSIZE = Power2::constant::next(CAPACITY);
 
-        friend class ArrayTraits<T, FixedCapArray<T, CAPACITY>>;
+  friend class ArrayTraits<T, FixedCapArray<T, CAPACITY>>;
 
-        friend class FixedCapArrayTraits<T, CAPACITY, FixedCapArray<T, CAPACITY>>;
+  friend class FixedCapArrayTraits<T, CAPACITY, FixedCapArray<T, CAPACITY>>;
 
-        using FixedCapArrayTraits<T, CAPACITY, FixedCapArray<T, CAPACITY>>::validSize;
+  using FixedCapArrayTraits<T, CAPACITY, FixedCapArray<T, CAPACITY>>::validSize;
 
-        size_t size_ = 0;
-        T alignas(alignof(Count<T>::align)) data_[MAXSIZE];
+  size_t size_ = 0;
+  T alignas(alignof(Count<T>::align)) data_[MAXSIZE];
 
-        size_t _traitGetSize() const
-        { return size_; }
+  size_t _traitGetSize() const { return size_; }
 
-        size_t _traitGetCapacity() const
-        { return MAXSIZE; }
+  size_t _traitGetCapacity() const { return MAXSIZE; }
 
-        T &_traitRefAt(size_t i)
-        {
-            return data_[i];
-        }
+  T &_traitRefAt(size_t i) { return data_[i]; }
 
-        const T &_traitRefAt(size_t i) const
-        {
-            return data_[i];
-        }
+  const T &_traitRefAt(size_t i) const { return data_[i]; }
 
-        T *_traitUnsafeData()
-        {
-            return data_;
-        }
+  T *_traitUnsafeData() { return data_; }
 
-        const T *_traitUnsafeData() const
-        {
-            return data_;
-        }
+  const T *_traitUnsafeData() const { return data_; }
 
-        T *_traitPlus(size_t i) const
-        {
-            return data_ + i;
-        }
+  T *_traitPlus(size_t i) const { return data_ + i; }
 
-        void _traitSetSize(size_t newSize)
-        {
-            size_ = newSize;
-        }
+  void _traitSetSize(size_t newSize) { size_ = newSize; }
 
-        static constexpr bool _traitHasTrivialAddressing()
-        { return true; }
+  static constexpr bool _traitHasTrivialAddressing() { return true; }
 
-    public:
-        FixedCapArray() = default;
+public:
+  FixedCapArray() = default;
 
-        FixedCapArray(size_t size) : size_(validSize(size))
-        {}
+  FixedCapArray(size_t size) : size_(validSize(size)) {}
 
-        size_t maxSize() const
-        { return MAXSIZE; }
+  size_t maxSize() const { return MAXSIZE; }
 
-        void resize(size_t newSize)
-        {
-            size_ = validSize(newSize);
-        }
-    };
+  void resize(size_t newSize) { size_ = validSize(newSize); }
+};
 
-} /* End of name space tdap */
+} // namespace tdap
 
 #endif /* TDAP_FIXEDCAPARRAY_HEADER_GUARD */

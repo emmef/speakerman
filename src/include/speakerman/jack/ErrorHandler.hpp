@@ -27,97 +27,87 @@
 
 #include <jack/types.h>
 
-
 namespace speakerman {
 
-    using namespace std;
+using namespace std;
 
-    class ErrorHandler
-    {
-        static thread_local const char *message_;
-        static thread_local bool force_log_;
-        static atomic_bool callback_installed_;
+class ErrorHandler {
+  static thread_local const char *message_;
+  static thread_local bool force_log_;
+  static atomic_bool callback_installed_;
 
-        static void error_callback(const char *message);
+  static void error_callback(const char *message);
 
+public:
+  static void clear();
 
-    public:
-        static void clear();
+  static void clear_ensure();
 
-        static void clear_ensure();
+  static void setForceLogNext();
 
-        static void setForceLogNext();
+  static const char *get_message();
 
-        static const char *get_message();
+  static const char *get_message_clear();
 
-        static const char *get_message_clear();
+  /**
+   * Checks if the value is zero and throws runtime_error otherwise.
+   * The format of the error is one of
+   *   [value] Unspecified error
+   *   [value] Description
+   *   [value] jack_message
+   *   [value] Description: jack_message
+   *
+   * @param value The value to check
+   * @param description Additional description
+   */
+  static void checkZeroOrThrow(int value, const char *description);
 
-        /**
-         * Checks if the value is zero and throws runtime_error otherwise.
-         * The format of the error is one of
-         *   [value] Unspecified error
-         *   [value] Description
-         *   [value] jack_message
-         *   [value] Description: jack_message
-         *
-         * @param value The value to check
-         * @param description Additional description
-         */
-        static void checkZeroOrThrow(int value, const char *description);
+  /**
+   * Throws runtime_exception if the pointer ptr is nullptr.
+   * @param ptr The pointer
+   * @param description Additional message in error
+   * @return the non-nullptr pointer
+   */
+  template <typename T>
+  static T *checkNotNullOrThrow(T *const ptr, const char *description) {
+    if (ptr) {
+      return ptr;
+    }
+    const char *error = get_message_clear();
+    if (error) {
+      string message = description ? description : "Error";
+      message += ": ";
+      message += error;
+      throw std::runtime_error(message);
+    } else if (description) {
+      throw std::runtime_error(description);
+    } else {
+      throw std::runtime_error("Jack error");
+    }
+  }
 
-        /**
-         * Throws runtime_exception if the pointer ptr is nullptr.
-         * @param ptr The pointer
-         * @param description Additional message in error
-         * @return the non-nullptr pointer
-         */
-        template<typename T>
-        static T *checkNotNullOrThrow(T *const ptr, const char *description)
-        {
-            if (ptr) {
-                return ptr;
-            }
-            const char *error = get_message_clear();
-            if (error) {
-                string message = description ? description : "Error";
-                message += ": ";
-                message += error;
-                throw std::runtime_error(message);
-            }
-            else if (description) {
-                throw std::runtime_error(description);
-            }
-            else {
-                throw std::runtime_error("Jack error");
-            }
-        }
+  /**
+   * Throws runtime_exception if the pointer ptr is nullptr.
+   * @param ptr The pointer
+   * @param description Additional message in error
+   * @return the non-nullptr pointer
+   */
+  template <typename T> bool returnIfZero(int value, int *result) {
+    if (result) {
+      *result = value;
+    }
+    return value == 0;
+  }
 
-        /**
-         * Throws runtime_exception if the pointer ptr is nullptr.
-         * @param ptr The pointer
-         * @param description Additional message in error
-         * @return the non-nullptr pointer
-         */
-        template<typename T>
-        bool returnIfZero(int value, int *result)
-        {
-            if (result) {
-                *result = value;
-            }
-            return value == 0;
-        }
-
-        /**
-         * Returns whether the value is zero.
-         * @param value The value to check
-         * @param result Stores the value if it is not nullptr.
-         * @return true if the value is zero.
-         */
-        static bool returnIfZero(int value, int *result);
-    };
-
+  /**
+   * Returns whether the value is zero.
+   * @param value The value to check
+   * @param result Stores the value if it is not nullptr.
+   * @return true if the value is zero.
+   */
+  static bool returnIfZero(int value, int *result);
+};
 
 } /* End of namespace speakerman */
 
 #endif /* SMS_SPEAKERMAN_ERROR_HANDLER_GUARD_H_ */
-

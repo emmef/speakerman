@@ -27,70 +27,57 @@
 
 namespace tdap {
 
-    class MemoryFence
-    {
-        enum class Action
-        {
-            ENTER, LEAVE
-        };
+class MemoryFence {
+  enum class Action { ENTER, LEAVE };
 
-        static bool innerOrOuter(Action type)
-        {
-            static thread_local int level = 0;
+  static bool innerOrOuter(Action type) {
+    static thread_local int level = 0;
 
-            return !(type == Action::ENTER ? level++ : --level);
-        }
+    return !(type == Action::ENTER ? level++ : --level);
+  }
 
-        const bool forceAcquireRelease_;
+  const bool forceAcquireRelease_;
 
-    public:
-        /**
-         * Force an explicit acquire memory barrier where all data that was written
-         * to main memory by other threads before this barrier, for instance by
-         * using a release memory barrier, will become visible for this thread.
-         */
-        static void acquire()
-        {
-            atomic_thread_fence(std::memory_order_acquire);
-        }
+public:
+  /**
+   * Force an explicit acquire memory barrier where all data that was written
+   * to main memory by other threads before this barrier, for instance by
+   * using a release memory barrier, will become visible for this thread.
+   */
+  static void acquire() { atomic_thread_fence(std::memory_order_acquire); }
 
-        /**
-         * Force an explicit release memory barrier where all data is written to
-         * main memory so it becomes visible for other threads when those use a
-         * acquire memory barrier.
-         */
-        static void release()
-        {
-            atomic_thread_fence(std::memory_order_release);
-        }
+  /**
+   * Force an explicit release memory barrier where all data is written to
+   * main memory so it becomes visible for other threads when those use a
+   * acquire memory barrier.
+   */
+  static void release() { atomic_thread_fence(std::memory_order_release); }
 
-        /**
-         * Creates a memory fence that will use an acquire memory barrier on
-         * construction and a release memory barrier on destruction if it is the
-         * outermost fence in this thread.
-         * <p>
-         * If additional barriers are required, the static methods #acquire() and
-         * #release() can be used to force them explicitly.
-         * </p>
-         * @param forceAquireRelease will do the acquire and release even if this
-         *     fence is not the outermost one.
-         */
-        MemoryFence(bool forceAquireRelease = false) : forceAcquireRelease_(forceAquireRelease)
-        {
-            if (forceAquireRelease || innerOrOuter(Action::ENTER)) {
-                acquire();
-            }
-        }
+  /**
+   * Creates a memory fence that will use an acquire memory barrier on
+   * construction and a release memory barrier on destruction if it is the
+   * outermost fence in this thread.
+   * <p>
+   * If additional barriers are required, the static methods #acquire() and
+   * #release() can be used to force them explicitly.
+   * </p>
+   * @param forceAquireRelease will do the acquire and release even if this
+   *     fence is not the outermost one.
+   */
+  MemoryFence(bool forceAquireRelease = false)
+      : forceAcquireRelease_(forceAquireRelease) {
+    if (forceAquireRelease || innerOrOuter(Action::ENTER)) {
+      acquire();
+    }
+  }
 
-        ~MemoryFence()
-        {
-            if (forceAcquireRelease_ || innerOrOuter(Action::LEAVE)) {
-                release();
-            }
-        }
+  ~MemoryFence() {
+    if (forceAcquireRelease_ || innerOrOuter(Action::LEAVE)) {
+      release();
+    }
+  }
+};
 
-    };
-
-} /* End of name space tdap */
+} // namespace tdap
 
 #endif /* TDAP_MEMORYFENCE_HEADER_GUARD */

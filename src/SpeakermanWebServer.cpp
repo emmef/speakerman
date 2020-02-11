@@ -19,537 +19,474 @@
  * limitations under the License.
  */
 
+#include <cstdio>
 #include <cstring>
 #include <iostream>
-#include <cstdio>
-#include <sys/types.h>
-#include <unistd.h>
-#include <speakerman/jack/SignalHandler.hpp>
 #include <speakerman/SpeakermanWebServer.hpp>
+#include <speakerman/jack/SignalHandler.hpp>
 #include <speakerman/utils/Config.hpp>
+#include <sys/types.h>
 #include <tdap/MemoryFence.hpp>
+#include <unistd.h>
 
 namespace speakerman {
-    bool web_server::open(const char *service, int timeoutSeconds, int backLog, int *errorCode)
-    {
-        return socket_.open(service, timeoutSeconds, backLog, errorCode);
+bool web_server::open(const char *service, int timeoutSeconds, int backLog,
+                      int *errorCode) {
+  return socket_.open(service, timeoutSeconds, backLog, errorCode);
+}
+
+bool web_server::work(int *errorCode) {
+  return socket_.work(errorCode, web_server::worker_function, this);
+}
+
+void web_server::thread_static_function(web_server *server) {
+  CountedThreadGuard guard("Web server configuration updater");
+
+  try {
+    server->thread_function();
+  } catch (const signal_exception &e) {
+    e.handle("Web server configuration update and level fetching");
+  }
+}
+
+static void create_command_and_file(string &rangeFile, string &command_line) {
+  char number[33];
+  snprintf(number, 33, "%x", rand());
+
+  rangeFile = "/tmp/";
+  rangeFile += number;
+  snprintf(number, 33, "%llx", (long long int)getpid());
+  rangeFile += number;
+  rangeFile += ".ranges";
+
+  const char *script = getWatchDogScript();
+  if (script == nullptr) {
+    command_line = "";
+    return;
+  }
+
+  command_line = script;
+  command_line += " ";
+  command_line += rangeFile;
+}
+
+struct TemporaryFile {
+  ifstream file_;
+  string name_;
+
+  TemporaryFile(const char *name) : name_(name) { file_.open(name_); }
+
+  bool is_open() const { return file_.is_open(); }
+
+  const char *name() const { return name_.c_str(); }
+
+  istream &stream() { return file_; }
+
+  ~TemporaryFile() {
+    if (file_.is_open()) {
+      file_.close();
     }
-
-
-    bool web_server::work(int *errorCode)
-    {
-        return socket_.work(errorCode, web_server::worker_function, this);
+    int result = std::remove(name_.c_str());
+    if (result != 0) {
+      cerr << "Could not remove " << name_ << ": " << strerror(errno) << endl;
     }
+  }
+};
 
-    void web_server::thread_static_function(web_server *server)
-    {
-        CountedThreadGuard guard("Web server configuration updater");
+static constexpr int SLEEP_MILLIS = 50;
+static constexpr int CONFIG_NUMBER_OF_SLEEPS = 10;
+static constexpr int CONFIG_MILLIS = SLEEP_MILLIS * CONFIG_NUMBER_OF_SLEEPS;
+static constexpr int WAIT_MILLIS = 1000;
+static constexpr int SECONDS_PER_6_DB_UP = 30;
+static constexpr int SECONDS_PER_6_DB_DOWN = 180;
 
+static void approach_threshold_scaling(double &value, int new_value) {
+  static const double FACTOR_UP =
+      std::pow(2.0, 0.001 * CONFIG_MILLIS / SECONDS_PER_6_DB_UP);
+  static const double FACTOR_DOWN =
+      std::pow(0.5, 0.001 * CONFIG_MILLIS / SECONDS_PER_6_DB_DOWN);
+  if (new_value > value) {
+    value *= FACTOR_UP;
+    if (value > new_value) {
+      value = new_value;
+    }
+  } else if (new_value < value) {
+    value *= FACTOR_DOWN;
+    if (value < new_value) {
+      value = new_value;
+    }
+  }
+}
+
+void web_server::thread_function() {
+  static std::chrono::milliseconds wait(WAIT_MILLIS);
+  static std::chrono::milliseconds sleep(SLEEP_MILLIS);
+  int count = 1;
+
+  SpeakermanConfig configFileConfig;
+  SpeakerManagerControl::MixMode current_mix_mode;
+  {
+    tdap::MemoryFence fence;
+    configFileConfig = manager_.getConfig();
+    current_mix_mode = mix_mode;
+  }
+  DynamicProcessorLevels levels;
+  string range_file;
+  string command_line;
+  int threshold_scaling_setting = 1;
+  double threshold_scaling = threshold_scaling_setting;
+  double new_threshold_scaling = threshold_scaling;
+
+  while (!SignalHandler::check_raised()) {
+    count++;
+    bool got_levels = false;
+    if ((count % CONFIG_NUMBER_OF_SLEEPS) == 0) {
+      approach_threshold_scaling(new_threshold_scaling,
+                                 threshold_scaling_setting);
+
+      bool read = false;
+      bool mode_change = false;
+      {
+        MemoryFence fence;
+        if (current_mix_mode != mix_mode) {
+          current_mix_mode = mix_mode;
+          mode_change = true;
+        }
+      }
+
+      auto stamp = getConfigFileTimeStamp();
+      if (stamp != configFileConfig.timeStamp) {
+        cout << "read config!" << std::endl;
         try {
-            server->thread_function();
+          configFileConfig = readSpeakermanConfig(configFileConfig, false);
+          read = true;
+        } catch (const runtime_error &e) {
+          cerr << "Error reading configuration: " << e.what() << endl;
+          configFileConfig.timeStamp = stamp;
         }
-        catch (const signal_exception &e) {
-            e.handle("Web server configuration update and level fetching");
+      }
+      if (new_threshold_scaling != threshold_scaling) {
+        threshold_scaling = new_threshold_scaling;
+        configFileConfig.threshold_scaling = threshold_scaling;
+        read = true;
+      }
+      if (read || mode_change) {
+        SpeakermanConfig usedConfig;
+        switch (current_mix_mode) {
+        case SpeakerManagerControl::MixMode::OWN:
+          usedConfig = configFileConfig.with_groups_separated();
+          cout << "Mix mode set to OWN" << std::endl;
+
+          break;
+        case SpeakerManagerControl::MixMode::ALL:
+          usedConfig = configFileConfig.with_groups_mixed();
+          cout << "Mix mode set to ALL" << std::endl;
+          break;
+        case SpeakerManagerControl::MixMode::FIRST:
+          usedConfig = configFileConfig.with_groups_first();
+          cout << "Mix mode set to FIRST" << std::endl;
+          break;
+        default:
+          usedConfig = configFileConfig;
+          cout << "Mix mode set to AS CONFIGURED" << std::endl;
+          break;
         }
+        if (!read) {
+          dumpSpeakermanConfig(usedConfig, std::cout);
+        }
+        if (manager_.applyConfigAndGetLevels(usedConfig, &levels, wait)) {
+          level_buffer.put(levels);
+          got_levels = true;
+        }
+      }
     }
+    if (!got_levels && manager_.getLevels(&levels, wait)) {
+      level_buffer.put(levels);
+    }
+    if (count == 100) {
+      count = 0;
+      create_command_and_file(range_file, command_line);
+      int old_setting = threshold_scaling_setting;
+      threshold_scaling_setting = 1;
+      if (command_line.length() == 0) {
+        cerr << "Cannot find watchdog command" << endl;
+      } else if (system(command_line.c_str()) == 0) {
+        TemporaryFile file{range_file.c_str()};
+        if (file.is_open()) {
+          istream &stream = file.stream();
+          while (!stream.eof()) {
+            char chr = stream.get();
+            if (chr >= '1' && chr <= '5') {
+              threshold_scaling_setting = chr - '0';
+              break;
+            } else if (!config::isWhiteSpace(chr)) {
+              break;
+            }
+          }
+        }
+      }
+      if (old_setting != threshold_scaling_setting) {
+        cout << "Threshold scaling set from " << old_setting << " to "
+             << threshold_scaling_setting << endl;
+      }
+    }
+    this_thread::sleep_for(sleep);
+  }
+}
 
-    static void create_command_and_file(string &rangeFile, string &command_line)
-    {
-        char number[33];
-        snprintf(number, 33, "%x", rand());
+web_server::web_server(SpeakerManagerControl &speakerManager)
+    : http_message(10240, 2048), manager_(speakerManager),
+      indexHtmlFile("index.html"), cssFile("speakerman.css"),
+      javaScriptFile("speakerman.js"), faviconFile("favicon.png") {
+  thread t(thread_static_function, this);
+  level_fetch_thread.swap(t);
+  level_fetch_thread.detach();
+}
 
-        rangeFile = "/tmp/";
-        rangeFile += number;
-        snprintf(number, 33, "%llx", (long long int)getpid());
-        rangeFile += number;
-        rangeFile += ".ranges";
+web_server::Result web_server::worker_function(server_socket::Stream &stream,
+                                               const server_socket &socket,
+                                               void *data) {
+  return static_cast<web_server *>(data)->accept_work(stream, socket);
+}
 
-        const char *script = getWatchDogScript();
-        if (script == nullptr) {
-            command_line = "";
+void web_server::close() { socket_.close(); }
+
+web_server::Result web_server::accept_work(Stream &stream,
+                                           const server_socket &socket) {
+  levelTimeStamp = 0;
+  handle(stream);
+  return Result::CONTINUE;
+}
+
+const char *web_server::on_method(const char *method_name) {
+  if (strncmp("GET", method_name, 10) == 0) {
+    method = Method::GET;
+    return nullptr;
+  }
+  if (strncmp("PUT", method_name, 10) == 0) {
+    method = Method::PUT;
+    return nullptr;
+  }
+  return method_name;
+}
+
+const char *web_server::on_url(const char *url) {
+  size_t i;
+  for (i = 0; i < URL_LENGTH; i++) {
+    char c = url[i];
+    if (c != 0) {
+      url_[i] = c;
+    } else {
+      break;
+    }
+  }
+  if (i < URL_LENGTH) {
+    url_[i] = 0;
+    //			std::cout << "D: URL = " << url_ << std::endl;
+    return nullptr;
+  }
+  return "URL too long";
+}
+
+void web_server::on_header(const char *header, const char *value) {
+  static constexpr int ASSIGN = 1;
+  static constexpr int VALUE = 2;
+  static constexpr int NUM = 3;
+  static constexpr int DONE = 4;
+  unsigned long long number = 0;
+  unsigned long long previousNumber = 0;
+  if (strcasecmp("cookie", header) == 0) {
+    const char *pos = strstr(value, COOKIE_TIME_STAMP);
+    if (pos) {
+      pos += COOKIE_TIME_STAMP_LENGTH;
+      int status = ASSIGN;
+      char c;
+      while (status != DONE && (c = *pos++) != 0) {
+        switch (status) {
+        case ASSIGN:
+          if (c == '=') {
+            status = VALUE;
+          } else if (c != ' ') {
             return;
+          }
+          break;
+        case VALUE:
+          if (c == ' ') {
+            continue;
+          }
+          if (c == ';') {
+            return;
+          }
+          if (c >= '0' && c <= '9') {
+            number = c - '0';
+            status = NUM;
+          } else {
+            return;
+          }
+          break;
+        case NUM:
+          if (c >= '0' && c <= '9') {
+            previousNumber = number;
+            number *= 10;
+            number += c - '0';
+            if (number < previousNumber) {
+              status = DONE;
+            }
+          } else if (c == ';') {
+            status = DONE;
+          }
+          break;
         }
-
-        command_line = script;
-        command_line += " ";
-        command_line += rangeFile;
+      }
+      levelTimeStamp = number;
     }
+  }
+}
 
-    struct TemporaryFile
-    {
-        ifstream file_;
-        string name_;
+static const char *ftostr(char *buffer, size_t len, double value) {
+  snprintf(buffer, len, "%lf", value);
+  return buffer;
+}
 
-        TemporaryFile(const char *name) :
-                name_(name)
+static const char *itostr(char *buffer, size_t len, long long value) {
+  snprintf(buffer, len, "%lli", value);
+  return buffer;
+}
+
+void web_server::handle_request() {
+  if (strncmp("/", url_, 32) == 0) {
+    strncpy(url_, "/index.html", 32);
+  }
+  for (size_t i = 0; i < URL_LENGTH && url_[i] != '\0'; i++) {
+    if (url_[i] == '?') {
+      url_[i] = '\0';
+      break;
+    }
+  }
+  if (method == Method::GET) {
+
+    if (strncasecmp("/levels.json", url_, 32) == 0) {
+      char numbers[60];
+      LevelEntry entry;
+      level_buffer.get(levelTimeStamp, entry);
+      if (entry.set) {
+        DynamicProcessorLevels levels = entry.levels;
+        snprintf(numbers, 60, "%s=%lli", COOKIE_TIME_STAMP, entry.stamp);
+        set_header("Set-Cookie", numbers);
+        set_header("Access-Control-Allow-Origin", "*");
+        set_content_type("application/json");
+        response().write_string("{\r\n");
+        response().write_string("\t\"elapsedMillis\": \"");
+        response().write_string(
+            itostr(numbers, 30, entry.stamp - levelTimeStamp));
+        response().write_string("\", \r\n");
+        response().write_string("\t\"thresholdScale\": \"");
+        response().write_string(
+            ftostr(numbers, 30, manager_.getConfig().threshold_scaling));
+        response().write_string("\", \r\n");
+        response().write_string("\t\"subLevel\": \"");
+        response().write_string(ftostr(numbers, 30, levels.getSignal(0)));
+        response().write_string("\", \r\n");
+        response().write_string("\t\"periods\": \"");
+        response().write_string(itostr(numbers, 30, levels.count()));
+        response().write_string("\", \r\n");
+        response().write_string("\t\"mixMode\": \"");
         {
-            file_.open(name_);
+          MemoryFence fence;
+          switch (mix_mode) {
+          case SpeakerManagerControl::MixMode::ALL:
+            response().write_string("all");
+            break;
+          case SpeakerManagerControl::MixMode::OWN:
+            response().write_string("own");
+            break;
+          case SpeakerManagerControl::MixMode::FIRST:
+            response().write_string("first");
+            break;
+          default:
+            response().write_string("def");
+            break;
+          }
         }
-
-        bool is_open() const
-        {
-            return file_.is_open();
+        response().write_string("\", \r\n");
+        response().write_string("\t\"group\" : [\r\n");
+        for (size_t i = 0; i < levels.groups(); i++) {
+          response().write_string("\t\t{\r\n");
+          response().write_string("\t\t\t\"group_name\": \"");
+          response().write_string(manager_.getConfig().group[i].name);
+          response().write_string("\", \r\n");
+          response().write_string("\t\t\t\"level\": \"");
+          response().write_string(ftostr(numbers, 30, levels.getSignal(i + 1)));
+          response().write_string("\"\r\n");
+          response().write_string("\t\t}");
+          if (i < levels.groups() - 1) {
+            response().write(',');
+          }
+          response().write_string("\r\n");
         }
-
-        const char * name() const
-        {
-            return name_.c_str();
-        }
-
-        istream &stream()
-        {
-            return file_;
-        }
-
-        ~TemporaryFile()
-        {
-            if (file_.is_open()) {
-                file_.close();
-            }
-            int result = std::remove(name_.c_str());
-            if (result != 0) {
-                cerr << "Could not remove " << name_ << ": " << strerror(errno) << endl;
-            }
-        }
-    };
-
-    static constexpr int SLEEP_MILLIS = 50;
-    static constexpr int CONFIG_NUMBER_OF_SLEEPS = 10;
-    static constexpr int CONFIG_MILLIS = SLEEP_MILLIS * CONFIG_NUMBER_OF_SLEEPS;
-    static constexpr int WAIT_MILLIS = 1000;
-    static constexpr int SECONDS_PER_6_DB_UP = 30;
-    static constexpr int SECONDS_PER_6_DB_DOWN = 180;
-
-    static void approach_threshold_scaling(double &value, int new_value) {
-        static const double FACTOR_UP = std::pow(2.0, 0.001 * CONFIG_MILLIS / SECONDS_PER_6_DB_UP);
-        static const double FACTOR_DOWN = std::pow(0.5, 0.001 * CONFIG_MILLIS / SECONDS_PER_6_DB_DOWN);
-        if (new_value > value) {
-            value *= FACTOR_UP;
-            if (value > new_value) {
-                value = new_value;
-            }
-        }
-        else if (new_value < value) {
-            value *= FACTOR_DOWN;
-            if (value < new_value) {
-                value = new_value;
-            }
-        }
+        response().write_string("\t]\r\n");
+        response().write_string("}\r\n");
+      } else {
+        set_error(http_status::SERVICE_UNAVAILABLE);
+      }
+    } else if (strncasecmp("/favicon.ico", url_, 32) == 0) {
+      set_content_type("text/plain");
+      response().write_string("X", 1);
+      set_success();
+    } else if (strncasecmp(url_, "/index.html", 32) == 0) {
+      set_content_type("text/html");
+      indexHtmlFile.reset();
+      handle_content(indexHtmlFile.size(), &indexHtmlFile);
+    } else if (strncasecmp(url_, "/speakerman.css", 32) == 0) {
+      set_content_type("text/css");
+      cssFile.reset();
+      handle_content(cssFile.size(), &cssFile);
+    } else if (strncasecmp(url_, "/speakerman.js", 32) == 0) {
+      set_content_type("text/javascript");
+      javaScriptFile.reset();
+      handle_content(javaScriptFile.size(), &javaScriptFile);
+    } else if (strncasecmp(url_, "/favicon.ico", 32) == 0) {
+      set_content_type("image/png");
+      faviconFile.reset();
+      handle_content(faviconFile.size(), &faviconFile);
+    } else {
+      set_error(404);
     }
-
-    void web_server::thread_function()
-    {
-        static std::chrono::milliseconds wait(WAIT_MILLIS);
-        static std::chrono::milliseconds sleep(SLEEP_MILLIS);
-        int count = 1;
-
-        SpeakermanConfig configFileConfig;
-        SpeakerManagerControl::MixMode current_mix_mode;
-        {
-            tdap::MemoryFence fence;
-            configFileConfig = manager_.getConfig();
-            current_mix_mode = mix_mode;
-        }
-        DynamicProcessorLevels levels;
-        string range_file;
-        string command_line;
-        int threshold_scaling_setting = 1;
-        double threshold_scaling = threshold_scaling_setting;
-        double new_threshold_scaling = threshold_scaling;
-
-        while (!SignalHandler::check_raised()) {
-            count++;
-            bool got_levels = false;
-            if ((count % CONFIG_NUMBER_OF_SLEEPS) == 0) {
-                approach_threshold_scaling(new_threshold_scaling,
-                                           threshold_scaling_setting);
-
-                bool read = false;
-                bool mode_change = false;
-                {
-                    MemoryFence fence;
-                    if (current_mix_mode != mix_mode) {
-                        current_mix_mode = mix_mode;
-                        mode_change = true;
-                    }
-                }
-
-                auto stamp = getConfigFileTimeStamp();
-                if (stamp != configFileConfig.timeStamp) {
-                    cout << "read config!" << std::endl;
-                    try {
-                        configFileConfig = readSpeakermanConfig(
-                                configFileConfig, false);
-                        read = true;
-                    }
-                    catch (const runtime_error &e) {
-                        cerr << "Error reading configuration: " << e.what()
-                             << endl;
-                        configFileConfig.timeStamp = stamp;
-                    }
-                }
-                if (new_threshold_scaling != threshold_scaling) {
-                    threshold_scaling = new_threshold_scaling;
-                    configFileConfig.threshold_scaling = threshold_scaling;
-                    read = true;
-                }
-                if (read || mode_change) {
-                    SpeakermanConfig usedConfig;
-                    switch (current_mix_mode) {
-                        case SpeakerManagerControl::MixMode::OWN:
-                            usedConfig = configFileConfig.with_groups_separated();
-                            cout << "Mix mode set to OWN" << std::endl;
-
-                            break;
-                        case SpeakerManagerControl::MixMode::ALL:
-                            usedConfig = configFileConfig.with_groups_mixed();
-                            cout << "Mix mode set to ALL" << std::endl;
-                            break;
-                        case SpeakerManagerControl::MixMode::FIRST:
-                            usedConfig = configFileConfig.with_groups_first();
-                            cout << "Mix mode set to FIRST" << std::endl;
-                            break;
-                        default:
-                            usedConfig = configFileConfig;
-                            cout << "Mix mode set to AS CONFIGURED" << std::endl;
-                            break;
-                    }
-                    if (!read) {
-                        dumpSpeakermanConfig(usedConfig, std::cout);
-                    }
-                    if (manager_.applyConfigAndGetLevels(usedConfig, &levels, wait)) {
-                        level_buffer.put(levels);
-                        got_levels = true;
-                    }
-                }
-
-            }
-            if (!got_levels && manager_.getLevels(&levels, wait)) {
-                level_buffer.put(levels);
-            }
-            if (count == 100) {
-                count = 0;
-                create_command_and_file(range_file, command_line);
-                int old_setting = threshold_scaling_setting;
-                threshold_scaling_setting = 1;
-                if (command_line.length() == 0) {
-                    cerr << "Cannot find watchdog command" << endl;
-                }
-                else if (system(command_line.c_str()) == 0) {
-                    TemporaryFile file{range_file.c_str()};
-                    if (file.is_open()) {
-                        istream &stream = file.stream();
-                        while (!stream.eof()) {
-                            char chr = stream.get();
-                            if (chr >= '1' && chr <= '5') {
-                                threshold_scaling_setting = chr - '0';
-                                break;
-                            }
-                            else if (!config::isWhiteSpace(chr)) {
-                                break;
-                            }
-                        }
-                    }
-                }
-                if (old_setting != threshold_scaling_setting) {
-                    cout << "Threshold scaling set from " << old_setting << " to " << threshold_scaling_setting << endl;
-                }
-            }
-            this_thread::sleep_for(sleep);
-        }
+  } else if (method == Method::PUT) {
+    set_content_type("text/plain");
+    MemoryFence fence;
+    auto previous = mix_mode;
+    if (strncasecmp(url_, "/mix-mode-all", 32) == 0) {
+      mix_mode = SpeakerManagerControl::MixMode::ALL;
+      response().write_string("Mix-mode-request: all\r\n");
+    } else if (strncasecmp(url_, "/mix-mode-own", 32) == 0) {
+      mix_mode = SpeakerManagerControl::MixMode::OWN;
+      response().write_string("Mix-mode-request: own\r\n");
+    } else if (strncasecmp(url_, "/mix-mode-first", 32) == 0) {
+      mix_mode = SpeakerManagerControl::MixMode::FIRST;
+      response().write_string("Mix-mode-request: first\r\n");
+    } else if (strncasecmp(url_, "/mix-mode-default", 32) == 0) {
+      mix_mode = SpeakerManagerControl::MixMode::AS_CONFIGURED;
+      response().write_string("Mix-mode-request: default (as configured)\r\n");
+    } else {
+      set_error(404);
+      return;
     }
-
-    web_server::web_server(SpeakerManagerControl &speakerManager) :
-            http_message(10240, 2048),
-            manager_(speakerManager),
-            indexHtmlFile("index.html"),
-            cssFile("speakerman.css"),
-            javaScriptFile("speakerman.js"),
-            faviconFile("favicon.png")
-    {
-        thread t(thread_static_function, this);
-        level_fetch_thread.swap(t);
-        level_fetch_thread.detach();
+    switch (previous) {
+    case SpeakerManagerControl::MixMode::ALL:
+      response().write_string("Mix-mode-old-value: all\r\n");
+      break;
+    case SpeakerManagerControl::MixMode::OWN:
+      response().write_string("Mix-mode-old-value: own\r\n");
+      break;
+    case SpeakerManagerControl::MixMode::FIRST:
+      response().write_string("Mix-mode-old-value: first\r\n");
+      break;
+    default:
+      response().write_string(
+          "Mix-mode-old-value: default (as configured)\r\n");
+      break;
     }
-
-    web_server::Result web_server::worker_function(
-            server_socket::Stream &stream,
-            const server_socket &socket, void *data)
-    {
-        return static_cast<web_server *>(data)->accept_work(stream, socket);
-    }
-
-    void web_server::close()
-    {
-        socket_.close();
-    }
-
-    web_server::Result
-    web_server::accept_work(Stream &stream, const server_socket &socket)
-    {
-        levelTimeStamp = 0;
-        handle(stream);
-        return Result::CONTINUE;
-    }
-
-    const char *web_server::on_method(const char *method_name)
-    {
-        if (strncmp("GET", method_name, 10) == 0)
-        {
-            method = Method::GET;
-            return nullptr;
-        }
-        if (strncmp("PUT", method_name, 10) == 0)
-        {
-            method = Method::PUT;
-            return nullptr;
-        }
-        return method_name;
-    }
-
-
-    const char *web_server::on_url(const char *url)
-    {
-        size_t i;
-        for (i = 0; i < URL_LENGTH; i++) {
-            char c = url[i];
-            if (c != 0) {
-                url_[i] = c;
-            }
-            else {
-                break;
-            }
-
-        }
-        if (i < URL_LENGTH) {
-            url_[i] = 0;
-//			std::cout << "D: URL = " << url_ << std::endl;
-            return nullptr;
-        }
-        return "URL too long";
-    }
-
-    void web_server::on_header(const char *header, const char *value)
-    {
-        static constexpr int ASSIGN = 1;
-        static constexpr int VALUE = 2;
-        static constexpr int NUM = 3;
-        static constexpr int DONE = 4;
-        unsigned long long number = 0;
-        unsigned long long previousNumber = 0;
-        if (strcasecmp("cookie", header) == 0) {
-            const char *pos = strstr(value, COOKIE_TIME_STAMP);
-            if (pos) {
-                pos += COOKIE_TIME_STAMP_LENGTH;
-                int status = ASSIGN;
-                char c;
-                while (status != DONE && (c = *pos++) != 0) {
-                    switch (status) {
-                        case ASSIGN:
-                            if (c == '=') {
-                                status = VALUE;
-                            }
-                            else if (c != ' ') {
-                                return;
-                            }
-                            break;
-                        case VALUE:
-                            if (c == ' ') {
-                                continue;
-                            }
-                            if (c == ';') {
-                                return;
-                            }
-                            if (c >= '0' && c <= '9') {
-                                number = c - '0';
-                                status = NUM;
-                            }
-                            else {
-                                return;
-                            }
-                            break;
-                        case NUM:
-                            if (c >= '0' && c <= '9') {
-                                previousNumber = number;
-                                number *= 10;
-                                number += c - '0';
-                                if (number < previousNumber) {
-                                    status = DONE;
-                                }
-                            }
-                            else if (c == ';') {
-                                status = DONE;
-                            }
-                            break;
-                    }
-                }
-                levelTimeStamp = number;
-            }
-        }
-    }
-
-    static const char *ftostr(char *buffer, size_t len, double value)
-    {
-        snprintf(buffer, len, "%lf", value);
-        return buffer;
-    }
-
-    static const char *itostr(char *buffer, size_t len, long long value)
-    {
-        snprintf(buffer, len, "%lli", value);
-        return buffer;
-    }
-
-    void web_server::handle_request()
-    {
-        if (strncmp("/", url_, 32) == 0) {
-            strncpy(url_, "/index.html", 32);
-        }
-        for (size_t i = 0; i < URL_LENGTH && url_[i] != '\0'; i++) {
-            if (url_[i] == '?') {
-                url_[i] = '\0';
-                break;
-            }
-        }
-        if (method == Method::GET) {
-
-            if (strncasecmp("/levels.json", url_, 32) == 0) {
-                char numbers[60];
-                LevelEntry entry;
-                level_buffer.get(levelTimeStamp, entry);
-                if (entry.set) {
-                    DynamicProcessorLevels levels = entry.levels;
-                    snprintf(numbers, 60, "%s=%lli", COOKIE_TIME_STAMP,
-                             entry.stamp);
-                    set_header("Set-Cookie", numbers);
-                    set_header("Access-Control-Allow-Origin", "*");
-                    set_content_type("application/json");
-                    response().write_string("{\r\n");
-                    response().write_string("\t\"elapsedMillis\": \"");
-                    response().write_string(
-                            itostr(numbers, 30, entry.stamp - levelTimeStamp));
-                    response().write_string("\", \r\n");
-                    response().write_string("\t\"thresholdScale\": \"");
-                    response().write_string(ftostr(numbers, 30,
-                                                   manager_.getConfig().threshold_scaling));
-                    response().write_string("\", \r\n");
-                    response().write_string("\t\"subLevel\": \"");
-                    response().write_string(
-                            ftostr(numbers, 30, levels.getSignal(0)));
-                    response().write_string("\", \r\n");
-                    response().write_string("\t\"periods\": \"");
-                    response().write_string(itostr(numbers, 30, levels.count()));
-                    response().write_string("\", \r\n");
-                    response().write_string("\t\"mixMode\": \"");
-                    {
-                        MemoryFence fence;
-                        switch (mix_mode) {
-                            case SpeakerManagerControl::MixMode::ALL:
-                                response().write_string("all");
-                                break;
-                            case SpeakerManagerControl::MixMode::OWN:
-                                response().write_string("own");
-                                break;
-                            case SpeakerManagerControl::MixMode::FIRST:
-                                response().write_string("first");
-                                break;
-                            default:
-                                response().write_string("def");
-                                break;
-                        }
-                    }
-                    response().write_string("\", \r\n");
-                    response().write_string("\t\"group\" : [\r\n");
-                    for (size_t i = 0; i < levels.groups(); i++) {
-                        response().write_string("\t\t{\r\n");
-                        response().write_string("\t\t\t\"group_name\": \"");
-                        response().write_string(manager_.getConfig().group[i].name);
-                        response().write_string("\", \r\n");
-                        response().write_string("\t\t\t\"level\": \"");
-                        response().write_string(
-                                ftostr(numbers, 30, levels.getSignal(i + 1)));
-                        response().write_string("\"\r\n");
-                        response().write_string("\t\t}");
-                        if (i < levels.groups() - 1) {
-                            response().write(',');
-                        }
-                        response().write_string("\r\n");
-                    }
-                    response().write_string("\t]\r\n");
-                    response().write_string("}\r\n");
-                }
-                else {
-                    set_error(http_status::SERVICE_UNAVAILABLE);
-                }
-            }
-            else if (strncasecmp("/favicon.ico", url_, 32) == 0) {
-                set_content_type("text/plain");
-                response().write_string("X", 1);
-                set_success();
-            }
-            else if (strncasecmp(url_, "/index.html", 32) == 0) {
-                set_content_type("text/html");
-                indexHtmlFile.reset();
-                handle_content(indexHtmlFile.size(), &indexHtmlFile);
-            }
-            else if (strncasecmp(url_, "/speakerman.css", 32) == 0) {
-                set_content_type("text/css");
-                cssFile.reset();
-                handle_content(cssFile.size(), &cssFile);
-            }
-            else if (strncasecmp(url_, "/speakerman.js", 32) == 0) {
-                set_content_type("text/javascript");
-                javaScriptFile.reset();
-                handle_content(javaScriptFile.size(), &javaScriptFile);
-            }
-            else if (strncasecmp(url_, "/favicon.ico", 32) == 0) {
-                set_content_type("image/png");
-                faviconFile.reset();
-                handle_content(faviconFile.size(), &faviconFile);
-            }
-            else {
-                set_error(404);
-            }
-        }
-        else if (method == Method::PUT) {
-            set_content_type("text/plain");
-            MemoryFence fence;
-            auto previous = mix_mode;
-            if (strncasecmp(url_, "/mix-mode-all", 32) == 0) {
-                mix_mode = SpeakerManagerControl::MixMode::ALL;
-                response().write_string("Mix-mode-request: all\r\n");
-            }
-            else if (strncasecmp(url_, "/mix-mode-own", 32) == 0) {
-                mix_mode = SpeakerManagerControl::MixMode::OWN;
-                response().write_string("Mix-mode-request: own\r\n");
-            }
-            else if (strncasecmp(url_, "/mix-mode-first", 32) == 0) {
-                mix_mode = SpeakerManagerControl::MixMode::FIRST;
-                response().write_string("Mix-mode-request: first\r\n");
-            }
-            else if (strncasecmp(url_, "/mix-mode-default", 32) == 0) {
-                mix_mode = SpeakerManagerControl::MixMode::AS_CONFIGURED;
-                response().write_string("Mix-mode-request: default (as configured)\r\n");
-            }
-            else {
-                set_error(404);
-                return;
-            }
-            switch (previous) {
-                case SpeakerManagerControl::MixMode::ALL:
-                    response().write_string("Mix-mode-old-value: all\r\n");
-                    break;
-                case SpeakerManagerControl::MixMode::OWN:
-                    response().write_string("Mix-mode-old-value: own\r\n");
-                    break;
-                case SpeakerManagerControl::MixMode::FIRST:
-                    response().write_string("Mix-mode-old-value: first\r\n");
-                    break;
-                default:
-                    response().write_string("Mix-mode-old-value: default (as configured)\r\n");
-                    break;
-            }
-        }
-    }
+  }
+}
 } /* End of namespace speakerman */
-

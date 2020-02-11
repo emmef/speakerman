@@ -26,99 +26,88 @@
 
 namespace speakerman {
 
-    class SignalHandler
-    {
-        int int_get_signal() const;
+class SignalHandler {
+  int int_get_signal() const;
 
-        bool int_is_set() const;
+  bool int_is_set() const;
 
-        int int_raise_signal(int signal) const;
+  int int_raise_signal(int signal) const;
 
-        bool int_check_raised() const;
+  bool int_check_raised() const;
 
-        SignalHandler();
+  SignalHandler();
 
-    public:
-        static const SignalHandler &instance();
+public:
+  static const SignalHandler &instance();
 
-        static int get_signal();
+  static int get_signal();
 
-        static bool is_set();
+  static bool is_set();
 
-        static int raise_signal(int signal);
+  static int raise_signal(int signal);
 
-        static bool check_raised();
-    };
+  static bool check_raised();
+};
 
-    /**
-     * This is NOT an exception and must be caught separately
-     */
-    class signal_exception
-    {
-        friend class SignalHandler;
+/**
+ * This is NOT an exception and must be caught separately
+ */
+class signal_exception {
+  friend class SignalHandler;
 
-        static constexpr int LENGTH = 32;
-        int signal_;
-        char message_[LENGTH];
+  static constexpr int LENGTH = 32;
+  int signal_;
+  char message_[LENGTH];
 
-        signal_exception(int signal, bool user_raised);
+  signal_exception(int signal, bool user_raised);
 
-    public:
-        const char *what() const;
+public:
+  const char *what() const;
 
-        int signal() const
-        { return signal_; }
+  int signal() const { return signal_; }
 
-        void handle() const;
+  void handle() const;
 
-        void handle(const char *description) const;
-    };
+  void handle(const char *description) const;
+};
 
-    template<typename T>
-    void signal_aware_thread_method_data(void (thread_method)(T &data), T &data,
-                                         const char *thread_description)
-    {
-        if (thread_method) {
-            try {
-                thread_method(data);
-            }
-            catch (const signal_exception &e) {
-                e.handle(thread_description);
-            }
-        }
+template <typename T>
+void signal_aware_thread_method_data(void(thread_method)(T &data), T &data,
+                                     const char *thread_description) {
+  if (thread_method) {
+    try {
+      thread_method(data);
+    } catch (const signal_exception &e) {
+      e.handle(thread_description);
     }
+  }
+}
 
-    class CountedThreadGuard
-    {
-        size_t thread_id;
+class CountedThreadGuard {
+  size_t thread_id;
 
-    public:
+public:
+  CountedThreadGuard(const char *thread_name);
 
-        CountedThreadGuard(const char *thread_name);
+  ~CountedThreadGuard();
 
-        ~CountedThreadGuard();
+  static bool await_finished(std::chrono::milliseconds timeout,
+                             const char *wait_message);
+};
 
-        static bool await_finished(std::chrono::milliseconds timeout, const char *wait_message);
-    };
+class AwaitThreadFinishedAfterExit {
+  std::chrono::milliseconds timeout_;
+  const char *wait_message_;
 
-    class AwaitThreadFinishedAfterExit {
-        std::chrono::milliseconds timeout_;
-        const char *wait_message_;
+public:
+  AwaitThreadFinishedAfterExit(long timeout_millis, const char *wait_message)
+      : timeout_(timeout_millis), wait_message_(wait_message) {}
 
-    public:
-        AwaitThreadFinishedAfterExit(long timeout_millis, const char *wait_message) :
-            timeout_(timeout_millis), wait_message_(wait_message)
-        {
-
-        }
-
-        ~AwaitThreadFinishedAfterExit()
-        {
-            CountedThreadGuard::await_finished(timeout_, wait_message_);
-        }
-    };
+  ~AwaitThreadFinishedAfterExit() {
+    CountedThreadGuard::await_finished(timeout_, wait_message_);
+  }
+};
 
 } /* End of namespace speakerman */
 
 #endif /* SMS_SPEAKERMAN_SIGNAL_HANDLER_GUARD_H_ */
-

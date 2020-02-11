@@ -25,138 +25,125 @@
 
 #include <tdap/Value.hpp>
 
-#include <math.h>
-#include <string>
 #include <limits>
-#include <type_traits>
+#include <math.h>
 #include <stdexcept>
+#include <string>
+#include <type_traits>
 
 namespace tdap {
-    namespace helper {
+namespace helper {
 
-        template<typename F, typename R>
-        struct FrequencyTraits
-        {
-            static_assert(std::is_arithmetic<F>::value, "Frequency type must be arithmetic");
-            static_assert(std::is_floating_point<R>::value, "Return type must be floating point");
+template <typename F, typename R> struct FrequencyTraits {
+  static_assert(std::is_arithmetic<F>::value,
+                "Frequency type must be arithmetic");
+  static_assert(std::is_floating_point<R>::value,
+                "Return type must be floating point");
 
-            static inline constexpr bool isValid(F frequency)
-            {
-                return frequency > 0;
-            }
+  static inline constexpr bool isValid(F frequency) { return frequency > 0; }
 
-            static inline constexpr bool isPositive(F frequency)
-            {
-                return frequency > Value<F>::minimumPositive();
-            }
+  static inline constexpr bool isPositive(F frequency) {
+    return frequency > Value<F>::minimumPositive();
+  }
 
-            static inline constexpr R
-            nycquist(F sampleRate)
-            {
-                return static_cast<R>(0.5) * sampleRate;
-            }
+  static inline constexpr R nycquist(F sampleRate) {
+    return static_cast<R>(0.5) * sampleRate;
+  }
 
-            static inline constexpr R
-            relative(F frequency, F sampleRate)
-            {
-                return static_cast<R>(frequency) / sampleRate;
-            }
+  static inline constexpr R relative(F frequency, F sampleRate) {
+    return static_cast<R>(frequency) / sampleRate;
+  }
 
-            static inline constexpr R
-            relativeBetween(F frequency, F sampleRate, R minRelative, R maxRelative)
-            {
-                return Value<R>::force_between(relative(frequency, sampleRate), minRelative, maxRelative);
-            }
+  static inline constexpr R relativeBetween(F frequency, F sampleRate,
+                                            R minRelative, R maxRelative) {
+    return Value<R>::force_between(relative(frequency, sampleRate), minRelative,
+                                   maxRelative);
+  }
 
-            static inline constexpr R
-            relativeNycquistLimited(F frequency, F sampleRate)
-            {
-                return Value<R>::force_between(relative(frequency, sampleRate), std::numeric_limits<R>::min(), 0.5);
-            }
+  static inline constexpr R relativeNycquistLimited(F frequency, F sampleRate) {
+    return Value<R>::force_between(relative(frequency, sampleRate),
+                                   std::numeric_limits<R>::min(), 0.5);
+  }
 
-            static inline constexpr R
-            period(F frequency)
-            {
-                return static_cast<R>(1.0) / frequency;
-            }
+  static inline constexpr R period(F frequency) {
+    return static_cast<R>(1.0) / frequency;
+  }
 
-            static inline constexpr R
-            angularSpeed(F frequency)
-            {
-                return static_cast<R>(M_PI * 2) * frequency;
-            }
+  static inline constexpr R angularSpeed(F frequency) {
+    return static_cast<R>(M_PI * 2) * frequency;
+  }
 
-            static inline constexpr R
-            angularPeriod(F frequency)
-            {
-                return static_cast<R>(1.0) / angularSpeed(frequency);
-            }
-        };
+  static inline constexpr R angularPeriod(F frequency) {
+    return static_cast<R>(1.0) / angularSpeed(frequency);
+  }
+};
 
-        template<typename F, bool isFloat>
-        struct FrequencyHelper
-        {
-        };
+template <typename F, bool isFloat> struct FrequencyHelper {};
 
-        template<typename F>
-        struct FrequencyHelper<F, true> : public FrequencyTraits<F, F>
-        {
-            static_assert(std::is_floating_point<F>::value,
-                          "Frequency type must be floating point for this specialization");
+template <typename F>
+struct FrequencyHelper<F, true> : public FrequencyTraits<F, F> {
+  static_assert(
+      std::is_floating_point<F>::value,
+      "Frequency type must be floating point for this specialization");
 
-            using FrequencyTraits<F, F>::isValid;
-            using FrequencyTraits<F, F>::isPositive;
-            using FrequencyTraits<F, F>::nycquist;
-            using FrequencyTraits<F, F>::relative;
-            using FrequencyTraits<F, F>::relativeBetween;
-            using FrequencyTraits<F, F>::relativeNycquistLimited;
-            using FrequencyTraits<F, F>::period;
-            using FrequencyTraits<F, F>::angularSpeed;
-            using FrequencyTraits<F, F>::angularPeriod;
-        };
+  using FrequencyTraits<F, F>::isValid;
+  using FrequencyTraits<F, F>::isPositive;
+  using FrequencyTraits<F, F>::nycquist;
+  using FrequencyTraits<F, F>::relative;
+  using FrequencyTraits<F, F>::relativeBetween;
+  using FrequencyTraits<F, F>::relativeNycquistLimited;
+  using FrequencyTraits<F, F>::period;
+  using FrequencyTraits<F, F>::angularSpeed;
+  using FrequencyTraits<F, F>::angularPeriod;
+};
 
-        template<typename F>
-        struct FrequencyHelper<F, false> : public FrequencyTraits<F, double>
-        {
-            static_assert(std::is_arithmetic<F>::value, "Frequency type must be arithmetic type");
+template <typename F>
+struct FrequencyHelper<F, false> : public FrequencyTraits<F, double> {
+  static_assert(std::is_arithmetic<F>::value,
+                "Frequency type must be arithmetic type");
 
-            using FrequencyTraits<F, double>::isValid;
-            using FrequencyTraits<F, double>::isPositive;
-            using FrequencyTraits<F, double>::nycquist;
-            using FrequencyTraits<F, double>::relative;
-            using FrequencyTraits<F, double>::relativeBetween;
-            using FrequencyTraits<F, double>::relativeNycquistLimited;
-            using FrequencyTraits<F, double>::period;
-            using FrequencyTraits<F, double>::angularSpeed;
-            using FrequencyTraits<F, double>::angularPeriod;
-        };
+  using FrequencyTraits<F, double>::isValid;
+  using FrequencyTraits<F, double>::isPositive;
+  using FrequencyTraits<F, double>::nycquist;
+  using FrequencyTraits<F, double>::relative;
+  using FrequencyTraits<F, double>::relativeBetween;
+  using FrequencyTraits<F, double>::relativeNycquistLimited;
+  using FrequencyTraits<F, double>::period;
+  using FrequencyTraits<F, double>::angularSpeed;
+  using FrequencyTraits<F, double>::angularPeriod;
+};
 
-    } /* End of namespace helpers */
+} // namespace helper
 
-    template<typename F>
-    struct Frequency : public helper::FrequencyHelper<F, std::is_floating_point<F>::value>
-    {
-        using helper::FrequencyHelper<F, std::is_floating_point<F>::value>::isValid;
-        using helper::FrequencyHelper<F, std::is_floating_point<F>::value>::isPositive;
-        using helper::FrequencyHelper<F, std::is_floating_point<F>::value>::nycquist;
-        using helper::FrequencyHelper<F, std::is_floating_point<F>::value>::relative;
-        using helper::FrequencyHelper<F, std::is_floating_point<F>::value>::relativeBetween;
-        using helper::FrequencyHelper<F, std::is_floating_point<F>::value>::relativeNycquistLimited;
-        using helper::FrequencyHelper<F, std::is_floating_point<F>::value>::period;
-        using helper::FrequencyHelper<F, std::is_floating_point<F>::value>::angularSpeed;
-        using helper::FrequencyHelper<F, std::is_floating_point<F>::value>::angularPeriod;
+template <typename F>
+struct Frequency
+    : public helper::FrequencyHelper<F, std::is_floating_point<F>::value> {
+  using helper::FrequencyHelper<F, std::is_floating_point<F>::value>::isValid;
+  using helper::FrequencyHelper<F,
+                                std::is_floating_point<F>::value>::isPositive;
+  using helper::FrequencyHelper<F, std::is_floating_point<F>::value>::nycquist;
+  using helper::FrequencyHelper<F, std::is_floating_point<F>::value>::relative;
+  using helper::FrequencyHelper<
+      F, std::is_floating_point<F>::value>::relativeBetween;
+  using helper::FrequencyHelper<
+      F, std::is_floating_point<F>::value>::relativeNycquistLimited;
+  using helper::FrequencyHelper<F, std::is_floating_point<F>::value>::period;
+  using helper::FrequencyHelper<F,
+                                std::is_floating_point<F>::value>::angularSpeed;
+  using helper::FrequencyHelper<
+      F, std::is_floating_point<F>::value>::angularPeriod;
 
-        static F checkPositive(F frequency, const char *name)
-        {
-            if (!isPositive(frequency)) {
-                std::string message;
-                message.append(name != nullptr ? name : "Frequency").append(" must be positive");
-                throw std::invalid_argument(message);
-            }
-            return frequency;
-        }
-    };
+  static F checkPositive(F frequency, const char *name) {
+    if (!isPositive(frequency)) {
+      std::string message;
+      message.append(name != nullptr ? name : "Frequency")
+          .append(" must be positive");
+      throw std::invalid_argument(message);
+    }
+    return frequency;
+  }
+};
 
-} /* End of name space tdap */
+} // namespace tdap
 
 #endif /* TDAP_FREQUENCY_HEADER_GUARD */

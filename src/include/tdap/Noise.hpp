@@ -23,76 +23,67 @@
 #ifndef TDAP_NOISE_HEADER_GUARD
 #define TDAP_NOISE_HEADER_GUARD
 
-#include <tdap/Value.hpp>
-#include <tdap/Integration.hpp>
 #include <random>
+#include <tdap/Integration.hpp>
+#include <tdap/Value.hpp>
 
 namespace tdap {
 
-template<typename Sample, class Rnd>
-class RandomNoise
-{
-  static_assert(std::is_floating_point<Sample>::value, "Sample must be a floating-point type");
+template <typename Sample, class Rnd> class RandomNoise {
+  static_assert(std::is_floating_point<Sample>::value,
+                "Sample must be a floating-point type");
 
-  static constexpr double middle = 0.5 * ((double) Rnd::min() + (double) Rnd::max());
-  static constexpr double width = (double) Rnd::max() - (double) Rnd::min();
+  static constexpr double middle =
+      0.5 * ((double)Rnd::min() + (double)Rnd::max());
+  static constexpr double width = (double)Rnd::max() - (double)Rnd::min();
   static constexpr double unityMultiplier = 1.0 / width;
 
   Rnd random;
   const Sample add;
   const Sample multiply;
+
 public:
-  RandomNoise(Sample offset, Sample amplitude) :
-      add(offset - unityMultiplier * middle * amplitude),
-      multiply(unityMultiplier * amplitude)
-  {}
+  RandomNoise(Sample offset, Sample amplitude)
+      : add(offset - unityMultiplier * middle * amplitude),
+        multiply(unityMultiplier * amplitude) {}
 
-  RandomNoise() : RandomNoise(0.0, 1e-10)
-  {}
+  RandomNoise() : RandomNoise(0.0, 1e-10) {}
 
-  Sample next()
-  {
-    return multiply * random() + add;
-  }
+  Sample next() { return multiply * random() + add; }
 
-  Sample operator()()
-  {
-    return next();
-  }
+  Sample operator()() { return next(); }
 };
 
 typedef RandomNoise<double, std::minstd_rand> DefaultNoise;
 typedef RandomNoise<double, std::minstd_rand0> DefaultNoise0;
 
-struct PinkNoise
-{
+struct PinkNoise {
 public:
   static constexpr size_t MAX_RANDOM_ROWS = 30;
   static constexpr size_t RANDOM_BITS = 24;
   static constexpr size_t RANDOM_SHIFT = 32 - RANDOM_BITS;
 
-  template<class Rnd, size_t ACCURACY>
-  class Generator
-  {
-    static_assert(ACCURACY >= 4 && ACCURACY <= MAX_RANDOM_ROWS, "Invalid accuracy");
+  template <class Rnd, size_t ACCURACY> class Generator {
+    static_assert(ACCURACY >= 4 && ACCURACY <= MAX_RANDOM_ROWS,
+                  "Invalid accuracy");
 
-    static constexpr uint_fast32_t middle = 0.5 * ((double) Rnd::min() + (double) Rnd::max());
-    static constexpr double width = (double) Rnd::max() - (double) Rnd::min();
+    static constexpr uint_fast32_t middle =
+        0.5 * ((double)Rnd::min() + (double)Rnd::max());
+    static constexpr double width = (double)Rnd::max() - (double)Rnd::min();
     static constexpr double unityMultiplier = 1.0 / width;
 
     Rnd white_;
     int32_t random_;
     int32_t rows_[MAX_RANDOM_ROWS];
-    int32_t runningSum_;   /* Used to optimize summing of generators. */
-    size_t index_;        /* Incremented each sample. */
-    size_t indexMask_;    /* Index wrapped by ANDing with this mask. */
+    int32_t runningSum_; /* Used to optimize summing of generators. */
+    size_t index_;       /* Incremented each sample. */
+    size_t indexMask_;   /* Index wrapped by ANDing with this mask. */
     double scale_;
     double offset_;
     IntegrationCoefficients<double> dcCoefficients;
 
   public:
-    Generator(double scale, size_t integrationSamples)
-    {
+    Generator(double scale, size_t integrationSamples) {
       dcCoefficients.setCharacteristicSamples(integrationSamples);
       random_ = white_();
       index_ = 0;
@@ -111,8 +102,7 @@ public:
         double result = this->operator()();
         if (result < 0) {
           negative++;
-        }
-        else if (result > 0) {
+        } else if (result > 0) {
           positive++;
         }
         double ratio = negative > 0 ? positive / negative : 0;
@@ -123,10 +113,10 @@ public:
       }
     }
 
-    void setScale(double scale)
-    {
+    void setScale(double scale) {
       double usedScale = std::max(1e-20, scale);
-      /* Calculate maximum possible signed random value. Extra 1 for white noise always added. */
+      /* Calculate maximum possible signed random value. Extra 1 for white noise
+       * always added. */
       int32_t pmax = (ACCURACY + 1) * (1 << (RANDOM_BITS - 1));
       double newScale = usedScale / pmax;
       scale_ = newScale;
@@ -136,8 +126,7 @@ public:
       dcCoefficients.setCharacteristicSamples(integrationSamples);
     }
 
-    double operator()()
-    {
+    double operator()() {
       /* Increment and mask index. */
       index_ = (index_ + 1) & indexMask_;
 
@@ -170,40 +159,28 @@ public:
       dcCoefficients.integrate((double)sum, offset_);
       return scale_ * (sum - offset_);
     }
-
   };
 
   typedef Generator<std::minstd_rand, PinkNoise::MAX_RANDOM_ROWS> Default;
 };
 
-
-template<typename Sample>
-struct AddedNoise
-{
+template <typename Sample> struct AddedNoise {
   static constexpr double MINIMUM =
-      std::is_floating_point<Sample>::value ?
-      1e-20 :
-      1;
+      std::is_floating_point<Sample>::value ? 1e-20 : 1;
 
   static constexpr double MAXIMUM =
-      std::is_floating_point<Sample>::value ?
-      pow(0.5, 8) :
-      std::numeric_limits<Sample>::max() / 256;
+      std::is_floating_point<Sample>::value
+          ? pow(0.5, 8)
+          : std::numeric_limits<Sample>::max() / 256;
 
   static constexpr double DEFAULT =
-      std::is_floating_point<Sample>::value ?
-      pow(0.5, 24) :
-      0.5;
+      std::is_floating_point<Sample>::value ? pow(0.5, 24) : 0.5;
 
-  static double effective(double noise)
-  {
-    return Value<Sample>::between(
-        noise, MINIMUM, MAXIMUM);
+  static double effective(double noise) {
+    return Value<Sample>::between(noise, MINIMUM, MAXIMUM);
   }
-
 };
 
-} /* End of name space tdap */
+} // namespace tdap
 
 #endif /* TDAP_NOISE_HEADER_GUARD */
-

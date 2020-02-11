@@ -22,166 +22,146 @@
 #ifndef SMS_SPEAKERMAN_WEBSERVER_GUARD_H_
 #define SMS_SPEAKERMAN_WEBSERVER_GUARD_H_
 
-#include <thread>
-#include <mutex>
 #include <chrono>
-#include <tdap/Power2.hpp>
-#include <tdap/Count.hpp>
-#include <speakerman/ServerSocket.hpp>
+#include <mutex>
 #include <speakerman/HttpMessage.hpp>
-#include <speakerman/SpeakermanConfig.hpp>
+#include <speakerman/ServerSocket.hpp>
 #include <speakerman/SingleThreadFileCache.hpp>
+#include <speakerman/SpeakermanConfig.hpp>
+#include <tdap/Count.hpp>
+#include <tdap/Power2.hpp>
+#include <thread>
 
 namespace speakerman {
-    using namespace std;
-    using namespace std::chrono;
+using namespace std;
+using namespace std::chrono;
 
-    static long long current_millis()
-    {
-        return system_clock::now().time_since_epoch().count() / 1000000;
+static long long current_millis() {
+  return system_clock::now().time_since_epoch().count() / 1000000;
+}
+
+static long relative_milliseconds() {
+  static long long START = current_millis();
+
+  return current_millis() - START;
+}
+
+struct LevelEntry {
+  DynamicProcessorLevels levels;
+  bool set;
+  long long stamp;
+
+  LevelEntry() : set(false) {}
+
+  LevelEntry(DynamicProcessorLevels lvl)
+      : levels(lvl), set(true), stamp(current_millis()) {}
+};
+
+class LevelEntryBuffer {
+  mutex m;
+  static constexpr size_t SIZE = 128;
+  static constexpr size_t MASK = SIZE - 1;
+  static_assert(tdap::Power2::constant::is(SIZE), "Size must be power of two");
+  LevelEntry entries[SIZE];
+  size_t wr_;
+
+  static size_t prev(size_t n) { return (n + SIZE - 1) & MASK; }
+
+  static size_t next(size_t n) { return (n + 1) & MASK; }
+
+public:
+  void put(const DynamicProcessorLevels &levels) {
+    unique_lock<mutex> lock(m);
+    wr_ = prev(wr_);
+    entries[wr_] = LevelEntry(levels);
+  }
+
+  void get(long long lastChecked, LevelEntry &target) {
+    unique_lock<mutex> lock(m);
+    target = entries[wr_];
+    if (lastChecked <= 0) {
+      return;
     }
-
-    static long relative_milliseconds()
-    {
-        static long long START = current_millis();
-
-        return current_millis() - START;
+    size_t read = wr_;
+    read = next(read);
+    LevelEntry entry = entries[read];
+    while (read != wr_ && entry.set && entry.stamp > lastChecked) {
+      target.levels += entry.levels;
+      read = next(read);
+      entry = entries[read];
     }
+  }
+};
 
-    struct LevelEntry
-    {
-        DynamicProcessorLevels levels;
-        bool set;
-        long long stamp;
+class web_server : protected http_message {
+public:
+  using Result = server_worker_result;
+  using State = server_socket_state;
+  using Stream = server_socket::Stream;
+  static constexpr size_t URL_LENGTH = 1023;
+  static constexpr const char *COOKIE_TIME_STAMP = "levelTimeStamp";
+  static constexpr size_t COOKIE_TIME_STAMP_LENGTH =
+      tdap::constexpr_string_length(COOKIE_TIME_STAMP);
 
-        LevelEntry() : set(false)
-        {}
+  web_server(SpeakerManagerControl &speakerManager);
 
-        LevelEntry(DynamicProcessorLevels lvl) :
-                levels(lvl), set(true), stamp(current_millis())
-        {}
-    };
+  bool open(const char *service, int timeoutSeconds, int backLog,
+            int *errorCode);
 
-    class LevelEntryBuffer
-    {
-        mutex m;
-        static constexpr size_t SIZE = 128;
-        static constexpr size_t MASK = SIZE - 1;
-        static_assert(tdap::Power2::constant::is(SIZE), "Size must be power of two");
-        LevelEntry entries[SIZE];
-        size_t wr_;
+  const char *const service() const { return socket_.service(); }
 
-        static size_t prev(size_t n)
-        {
-            return (n + SIZE - 1) & MASK;
-        }
+  State state() const { return socket_.state(); }
 
-        static size_t next(size_t n)
-        {
-            return (n + 1) & MASK;
-        }
+  bool isOpen() const { return state() != State::CLOSED; }
 
-    public:
+  bool isWorking() const { return state() == State::WORKING; }
 
-        void put(const DynamicProcessorLevels &levels)
-        {
-            unique_lock<mutex> lock(m);
-            wr_ = prev(wr_);
-            entries[wr_] = LevelEntry(levels);
-        }
+  bool work(int *errorCode);
 
-        void get(long long lastChecked, LevelEntry &target)
-        {
-            unique_lock<mutex> lock(m);
-            target = entries[wr_];
-            if (lastChecked <= 0) {
-                return;
-            }
-            size_t read = wr_;
-            read = next(read);
-            LevelEntry entry = entries[read];
-            while (read != wr_ && entry.set && entry.stamp > lastChecked) {
-                target.levels += entry.levels;
-                read = next(read);
-                entry = entries[read];
-            }
-        }
-    };
+  void close();
 
-    class web_server : protected http_message
-    {
-    public:
-        using Result = server_worker_result;
-        using State = server_socket_state;
-        using Stream = server_socket::Stream;
-        static constexpr size_t URL_LENGTH = 1023;
-        static constexpr const char *COOKIE_TIME_STAMP = "levelTimeStamp";
-        static constexpr size_t COOKIE_TIME_STAMP_LENGTH = tdap::constexpr_string_length(COOKIE_TIME_STAMP);
+  ~web_server() {
+    cout << "Closing web server" << endl;
+    close();
+  }
 
-        web_server(SpeakerManagerControl &speakerManager);
+protected:
+  virtual bool content_stream_delete() const override { return false; }
 
-        bool open(const char *service, int timeoutSeconds, int backLog, int *errorCode);
+  virtual const char *on_url(const char *url) override;
 
-        const char *const service() const
-        { return socket_.service(); }
+  virtual void on_header(const char *header, const char *value) override;
 
-        State state() const
-        { return socket_.state(); }
+  virtual void handle_request() override;
 
-        bool isOpen() const
-        { return state() != State::CLOSED; }
+  virtual const char *on_method(const char *method_name) override;
 
-        bool isWorking() const
-        { return state() == State::WORKING; }
+private:
+  enum class Method { GET, PUT };
 
-        bool work(int *errorCode);
+  SpeakerManagerControl &manager_;
+  file_entry indexHtmlFile;
+  file_entry cssFile;
+  file_entry javaScriptFile;
+  file_entry faviconFile;
+  server_socket socket_;
+  LevelEntryBuffer level_buffer;
+  char url_[URL_LENGTH + 1];
+  std::thread level_fetch_thread;
+  long long levelTimeStamp = 0;
+  Method method = Method::GET;
+  SpeakerManagerControl::MixMode mix_mode =
+      SpeakerManagerControl::MixMode::AS_CONFIGURED;
 
-        void close();
+  static void thread_static_function(web_server *);
 
-        ~web_server()
-        {
-            cout << "Closing web server" << endl;
-            close();
-        }
+  void thread_function();
 
-    protected:
-        virtual bool content_stream_delete() const override
-        { return false; }
+  Result accept_work(Stream &stream, const server_socket &socket);
 
-        virtual const char *on_url(const char *url) override;
-
-        virtual void on_header(const char *header, const char *value) override;
-
-        virtual void handle_request() override;
-
-        virtual const char * on_method(const char* method_name) override;
-
-    private:
-        enum class Method { GET, PUT };
-
-        SpeakerManagerControl &manager_;
-        file_entry indexHtmlFile;
-        file_entry cssFile;
-        file_entry javaScriptFile;
-        file_entry faviconFile;
-        server_socket socket_;
-        LevelEntryBuffer level_buffer;
-        char url_[URL_LENGTH + 1];
-        std::thread level_fetch_thread;
-        long long levelTimeStamp = 0;
-        Method method = Method::GET;
-        SpeakerManagerControl::MixMode mix_mode = SpeakerManagerControl::MixMode::AS_CONFIGURED;
-
-        static void thread_static_function(web_server *);
-
-        void thread_function();
-
-        Result accept_work(Stream &stream, const server_socket &socket);
-
-        static Result worker_function(
-                Stream &stream,
-                const server_socket &socket, void *data);
-    };
+  static Result worker_function(Stream &stream, const server_socket &socket,
+                                void *data);
+};
 
 } /* End of namespace speakerman */
 

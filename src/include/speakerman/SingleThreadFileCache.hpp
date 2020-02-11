@@ -22,38 +22,35 @@
 #ifndef SMS_SPEAKERMAN_SINGLE_THREAD_FILE_CACHE_GUARD_H_
 #define SMS_SPEAKERMAN_SINGLE_THREAD_FILE_CACHE_GUARD_H_
 
-#include <string>
 #include <speakerman/Stream.hpp>
+#include <string>
 
 namespace speakerman {
 
-    class file_entry : public input_stream
-    {
-        std::string name_;
-        char *data_ = nullptr;
-        size_t size_ = 0;
-        size_t capacity_ = 0;
-        size_t readPos_ = 0;
-        long long fileStamp_;
-        long long lastChecked_;
-    public:
-        file_entry(const char *name);
+class file_entry : public input_stream {
+  std::string name_;
+  char *data_ = nullptr;
+  size_t size_ = 0;
+  size_t capacity_ = 0;
+  size_t readPos_ = 0;
+  long long fileStamp_;
+  long long lastChecked_;
 
-        void reset();
+public:
+  file_entry(const char *name);
 
-        virtual int read();
+  void reset();
 
-        virtual signed long read(void *buff, size_t offs, size_t length);
+  virtual int read();
 
-        virtual void close();
+  virtual signed long read(void *buff, size_t offs, size_t length);
 
-        size_t size() const
-        { return size_; }
+  virtual void close();
 
-        ~file_entry();
+  size_t size() const { return size_; }
 
-    };
-
+  ~file_entry();
+};
 
 } /* End of namespace speakerman */
 
