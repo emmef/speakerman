@@ -28,19 +28,33 @@
 namespace tdap {
 
 #ifndef TDAP_INDEX_POLICY_METHODS_CHECKED
-static constexpr bool defaultMethodIndexPolicy = true;
+// By default, indexing methods are checked
+#define TDAP_METHOD_INDEX_CHECK true
 #elif TDAP_INDEX_POLICY_METHODS_CHECKED == 0
-static constexpr bool defaultMethodIndexPolicy = false;
+#undef TDAP_METHOD_INDEX_CHECK
 #else
-static constexpr bool defaultMethodIndexPolicy = true;
+#define TDAP_METHOD_INDEX_CHECK true
 #endif
 
-#ifndef TDAP_INDEX_POLICY_OPERATORS_CHECKED
-static constexpr bool defaultOperatorIndexPolicy = true;
-#elif TDAP_INDEX_POLICY_OPERATORS_CHECKED == 0
-static constexpr bool defaultOperatorIndexPolicy = false;
+#ifndef TDAP_METHOD_INDEX_CHECK
+#define TDAP_METHOD_INDEX_NOEXCEPT noexcept
 #else
-static constexpr bool defaultOperatorIndexPolicy = true;
+#define TDAP_METHOD_INDEX_NOEXCEPT
+#endif
+
+#ifndef TDAP_INDEX_POLICY_ARRAY_CHECKED
+// By default, arrays are not checked
+#undef TDAP_ARRAY_INDEX_CHECK
+#elif TDAP_INDEX_POLICY_ARRAY_CHECKED == 0
+#undef TDAP_ARRAY_INDEX_CHECK
+#else
+#define TDAP_ARRAY_INDEX_CHECK true
+#endif
+
+#ifndef TDAP_ARRAY_INDEX_CHECK
+#define TDAP_ARRAY_INDEX_NOEXCEPT noexcept
+#else
+#define TDAP_ARRAY_INDEX_NOEXCEPT
 #endif
 
 struct IndexPolicy {
@@ -51,12 +65,20 @@ struct IndexPolicy {
     throw std::out_of_range("Index out of range");
   }
 
-  static inline size_t array(size_t index, size_t size) {
-    return defaultOperatorIndexPolicy ? force(index, size) : index;
+  static inline size_t array(size_t index, size_t size) TDAP_ARRAY_INDEX_NOEXCEPT {
+#ifdef TDAP_ARRAY_INDEX_CHECK
+    return force(index, size);
+#else
+    return index;
+#endif
   }
 
-  static inline size_t method(size_t index, size_t size) {
-    return defaultMethodIndexPolicy ? force(index, size) : index;
+  static inline size_t method(size_t index, size_t size) TDAP_METHOD_INDEX_NOEXCEPT {
+#ifdef TDAP_METHOD_INDEX_CHECK
+    return force(index, size);
+#else
+    return index;
+#endif
   }
 
   struct NotGreater {
@@ -67,12 +89,20 @@ struct IndexPolicy {
       throw std::out_of_range("Index out of range");
     }
 
-    static inline size_t array(size_t index, size_t high_value) {
-      return defaultOperatorIndexPolicy ? force(index, high_value) : index;
+    static inline size_t array(size_t index, size_t high_value) TDAP_ARRAY_INDEX_NOEXCEPT {
+#ifdef TDAP_ARRAY_INDEX_CHECK
+      return force(index, high_value);
+#else
+      return index;
+#endif
     }
 
-    static inline size_t method(size_t index, size_t high_value) {
-      return defaultMethodIndexPolicy ? force(index, high_value) : index;
+    static inline size_t method(size_t index, size_t high_value) TDAP_METHOD_INDEX_NOEXCEPT {
+#ifdef TDAP_METHOD_INDEX_CHECK
+      return force(index, high_value);
+#else
+      return index;
+#endif
     }
   };
 };

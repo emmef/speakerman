@@ -58,9 +58,9 @@ public:
 
   Delay() : Delay(4000) {}
 
-  size_t maxDelay() const { return buffer_.size() - 1; }
+  [[nodiscard]] size_t maxDelay() const noexcept { return buffer_.size() - 1; }
 
-  size_t delay() const { return delay_; }
+  [[nodiscard]] size_t delay() const noexcept { return delay_; }
 
   void setDelay(size_t newDelay) {
     validDelay(newDelay);
@@ -69,9 +69,9 @@ public:
     write_ = delay_;
   }
 
-  void zero() { buffer_.zero(); }
+  void zero() noexcept { buffer_.zero(); }
 
-  S setAndGet(S value) {
+  [[nodiscard]] S setAndGet(S value) noexcept {
     buffer_[write_++] = value;
     S result = buffer_[read_++];
     if (write_ > delay_) {
@@ -101,7 +101,7 @@ template <typename S> class MultiChannelDelay {
                              "channels and maximum delay invalid");
   }
 
-  void setMetrics(size_t channels, size_t delay) {
+  void setMetrics(size_t channels, size_t delay) noexcept {
     buffer_.zero();
     channels_ = channels;
     delay_ = delay;
@@ -117,7 +117,7 @@ public:
     setMetrics(maxChannels_, 0);
   }
 
-  void zero() { buffer_.zero(); }
+  void zero() noexcept { buffer_.zero(); }
 
   void setChannels(size_t channels) {
     if (channels == 0 || channels > maxChannels_) {
@@ -134,13 +134,15 @@ public:
     setMetrics(channels_, delay);
   }
 
-  S setAndGet(size_t channel, S value) {
+  [[nodiscard]] size_t getChannels() const noexcept { return channels_; }
+
+  [[nodiscard]] S setAndGet(size_t channel, S value) noexcept {
     IndexPolicy::array(channel, channels_);
     buffer_[write_ + channel] = value;
     return buffer_[read_ + channel];
   }
 
-  void next() {
+  void next() noexcept {
     write_ += channels_;
     if (write_ > end_) {
       write_ = 0;
@@ -156,27 +158,27 @@ template <typename S> struct MultiChannelAndTimeDelay {
   struct Entry {
     size_t read_, write_, delay_, end_;
 
-    inline void init(size_t channels, size_t channel) {
+    inline void init(size_t channels, size_t channel) noexcept {
       setDelay(channels, channel, 0);
     }
 
-    inline void reset(size_t channels, size_t channel) {
+    inline void reset(size_t channels, size_t channel) noexcept {
       setDelay(channels, channel, delay_);
     }
 
-    inline void setDelay(size_t channels, size_t channel, size_t delay) {
+    inline void setDelay(size_t channels, size_t channel, size_t delay) noexcept {
       read_ = channel;
       write_ = read_ + delay * channels;
       end_ = channels * (delay + 1);
       delay_ = delay;
     }
 
-    inline void next(size_t channels) {
+    inline void next(size_t channels) noexcept {
       read_ = (read_ + channels) % end_;
       write_ = (write_ + channels) % end_;
     }
 
-    inline size_t delay() const { return delay_; }
+    [[nodiscard]] inline size_t delay() const noexcept { return delay_; }
   };
 
   size_t maxChannels_, maxDelay_, channels_, delay_;
@@ -235,15 +237,17 @@ public:
     delay_ = delay;
   }
 
-  size_t getDelay(size_t channel) const { return entry_[channel].delay(); }
+  [[nodiscard]] size_t getDelay(size_t channel) const { return entry_[channel].delay(); }
 
-  S setAndGet(size_t channel, S value) {
+  [[nodiscard]] size_t getChannels() const noexcept { return channels_; }
+
+  [[nodiscard]] S setAndGet(size_t channel, S value) noexcept {
     Entry &entry = entry_[channel];
     buffer_[entry.write_] = value;
     return buffer_[entry.read_];
   }
 
-  void next() {
+  void next() noexcept {
     for (size_t channel = 0; channel < channels_; channel++) {
       entry_[channel].next(channels_);
     }
