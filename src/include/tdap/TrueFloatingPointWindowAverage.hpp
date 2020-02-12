@@ -89,11 +89,14 @@ template <typename S> struct TrueMovingAverageErrors {
      * => N                   ~ pow(error/epsilon, 2/3)   2         10     -
      */
     double sampleEstimate = pow(fabs(error) / epsilon, 2.0 / 3.0);
+    if (sampleEstimate < 1) {
+      return 1;
+    }
     /**
-     * Knowing the approximate error, we can correct it with 1/(1-1/N).
+     * Knowing the approximate error, we can correct it with (1 + 1/N).
      */
     return sensibleIntegrationSamples(0.5 + sampleEstimate *
-                                                (1.0 - 1.0 / sampleEstimate));
+                                                (1.0 + 1.0 / sampleEstimate));
   }
 
   [[nodiscard]] static constexpr double
@@ -120,14 +123,17 @@ template <typename S> struct TrueMovingAverageErrors {
      * => N                ~ pow(error/epsilon, 2/3)   error = ~ 2*N^(-1/2)/3
      */
     double sampleEstimate = pow(fabs(error) / epsilon, 2.0 / 3.0);
+    if (sampleEstimate < 1) {
+      return 1;
+    }
     /**
-     * Knowing the approximate error, we can correct it with 1/(1-2*N^(-1/2)/3).
+     * Knowing the approximate error, we can correct it with
+     * (lower bound) (1 + 2/3 * 1/sqrt(N))
      */
-    return sensibleIntegrationSamples(0.5 * sampleEstimate /
-                                      (1.0 - 0.66 * sqrt(sampleEstimate)));
+    return sensibleIntegrationSamples(0.5 * sampleEstimate *
+                                      (1.0 + 0.66 / sqrt(sampleEstimate)));
   }
 };
-
 
 template <typename S, size_t SNR_BITS = 20,
           size_t MIN_ERROR_DECAY_TO_WINDOW_RATIO = 10>
