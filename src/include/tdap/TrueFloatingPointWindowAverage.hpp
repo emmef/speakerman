@@ -38,6 +38,97 @@
 namespace tdap {
 using namespace std;
 
+template <typename S> struct TrueMovingAverageErrors {
+
+  static_assert(!std::is_floating_point<S>::value,
+                "Sample type must be floating point");
+
+  static constexpr double epsilon = std::numeric_limits<S>::epsilon();
+  static constexpr double stabilityHeadroom = 0.01;
+
+  [[nodiscard]] static constexpr double
+  singleIntegrationError(size_t integrationSamples) {
+    // error = epsilon / (1 - exp(-1/N))
+    return epsilon / Integration::get_input_multiplier((S)integrationSamples);
+  }
+
+  [[nodiscard]] static constexpr size_t maximumStableIntegrationSamples() {
+    return std::min(epsilon * stabilityHeadroom,
+                    (double)std::numeric_limits<size_t>::max());
+  }
+
+  [[nodiscard]] static constexpr size_t sensibleIntegrationSamples(S samples) {
+    return (size_t)std::min(samples, (S)maximumStableIntegrationSamples());
+  }
+
+  [[nodiscard]] static constexpr size_t
+  sensibleIntegrationSamples(size_t samples) {
+    return std::min(samples, maximumStableIntegrationSamples());
+  }
+
+  [[nodiscard]] static constexpr double
+  integrationErrorForSamples(size_t integrationSamples) {
+    // error1 = epsilon / (1 - exp(-1/N))
+    double error1 = singleIntegrationError(integrationSamples);
+    // consider errors as noise, RMS
+    return sqrt(error1 * error1 * integrationSamples);
+  }
+
+  [[nodiscard]] static constexpr size_t
+  samplesForIntegrationError(double error) {
+    /**
+     * Inverse of: error = sqrt((N * epsilon^2 / (1 - exp(-1/N)))^2)
+     * Let's assume N is relatively and approximate:
+     *                                 Error % for N =  100         10    +/-
+     * exp(-1/N)              ~ 1 - 1/N                   0.005      0.5   +
+     * => 1 - exp(-1/N)       ~ 1/N                       1          5     -
+     * => (1 - exp(1/N))^2    ~ 1/N^2                     2         10     -
+     * => 1/(1 - exp(1/N))^2  ~ N^2                       2         10     +
+     * => error               ~ sqrt(N^3 * epsilon^2)     1          5     +
+     * => error^2             ~ epsilon^2 * N^3           2         10     +
+     * => N                   ~ pow(error/epsilon, 2/3)   2         10     -
+     */
+    double sampleEstimate = pow(fabs(error) / epsilon, 2.0 / 3.0);
+    /**
+     * Knowing the approximate error, we can correct it with 1/(1-1/N).
+     */
+    return sensibleIntegrationSamples(0.5 + sampleEstimate *
+                                                (1.0 - 1.0 / sampleEstimate));
+  }
+
+  [[nodiscard]] static constexpr double
+  additionErrorForSamples(size_t samplesToAdd) {
+    return epsilon * samplesToAdd;
+  }
+
+  [[nodiscard]] static constexpr size_t samplesForAdditionError(double error) {
+    return error / epsilon;
+  }
+
+  [[nodiscard]] static constexpr double errorForSamples(size_t samples) {
+    return integrationErrorForSamples(samples) +
+           additionErrorForSamples(samples);
+  }
+
+  [[nodiscard]] static constexpr size_t samplesForError(double error) {
+    /*
+     * See for approximations also #samplesForIntegrationError.
+     * error               ~ sqrt(N^3 * epsilon^2) + epsilon * N
+     * => error            ~ N * epsilon * (sqrt(N) + 1)
+     *    sqrt(N) + 1      ~ sqrt(N)                       error = - N^(-1/2)
+     * => error            ~ epsilon * N^(3/2)             error = - N^(-1/2)
+     * => N                ~ pow(error/epsilon, 2/3)   error = ~ 2*N^(-1/2)/3
+     */
+    double sampleEstimate = pow(fabs(error) / epsilon, 2.0 / 3.0);
+    /**
+     * Knowing the approximate error, we can correct it with 1/(1-2*N^(-1/2)/3).
+     */
+    return sensibleIntegrationSamples(0.5 * sampleEstimate /
+                                      (1.0 - 0.66 * sqrt(sampleEstimate)));
+  }
+};
+
+
 template <typename S, size_t SNR_BITS = 20,
           size_t MIN_ERROR_DECAY_TO_WINDOW_RATIO = 10>
 struct MetricsForTrueFloatingPointMovingAverageMetyrics {
@@ -46,13 +137,13 @@ struct MetricsForTrueFloatingPointMovingAverageMetyrics {
 
   static constexpr size_t MIN_SNR_BITS = 4;
   static constexpr size_t MAX_SNR_BITS = 44;
+  static constexpr size_t MIN_MIN_ERROR_DECAY_TO_WINDOW_RATIO = 1;
+  static constexpr size_t MAX_MIN_ERROR_DECAY_TO_WINDOW_RATIO = 1000;
   static_assert(
       SNR_BITS >= MIN_SNR_BITS && SNR_BITS <= MAX_SNR_BITS,
       "Number of signal-noise-ratio in bits must lie between" TRUE_RMS_QUOTE(
           MIN_SNR_BITS) " and " TRUE_RMS_QUOTE(MAX_SNR_BITS) ".");
 
-  static constexpr size_t MIN_MIN_ERROR_DECAY_TO_WINDOW_RATIO = 1;
-  static constexpr size_t MAX_MIN_ERROR_DECAY_TO_WINDOW_RATIO = 1000;
   static_assert(Sizes::is_between(MIN_ERROR_DECAY_TO_WINDOW_RATIO,
                                   MIN_MIN_ERROR_DECAY_TO_WINDOW_RATIO,
                                   MAX_MIN_ERROR_DECAY_TO_WINDOW_RATIO),
