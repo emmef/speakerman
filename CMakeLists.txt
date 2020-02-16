@@ -76,7 +76,7 @@ set(SOURCE_FILES
         src/SocketStream.cpp
         src/SpeakermanConfig.cpp
         src/SpeakermanWebServer.cpp
-        src/Stream.cpp src/include/tdap/Limiter.hpp)
+        src/Stream.cpp src/include/tdap/Limiter.hpp src/include/tdap/AlignedFrame.hpp)
 
 find_path(LOCAL_TDAP_PATH, README-TAP.md HINTS ../ ../../ NO_DEFAULT_PATH)
 
@@ -88,7 +88,7 @@ set(LIBRARIES
         )
 link_libraries(jack pthread)
 target_link_libraries(speakerman jack pthread)
-add_executable(test_speakerman ${SOURCE_FILES} test/main.cpp)
+add_executable(test_speakerman ${SOURCE_FILES} test/main.cpp test/TestIirCoefficients.hpp test/TestIirCoefficients.cpp test/TestAlignedFrame.cpp test/TestAlignedFrame.hpp)
 install(TARGETS speakerman RUNTIME DESTINATION bin)
 install(FILES web/index.html web/speakerman.js web/speakerman.css DESTINATION share/speakerman/web)
 install(PROGRAMS src/speakerman-watchdog.sh DESTINATION share/speakerman/script)
