@@ -107,6 +107,54 @@ struct IndexPolicy {
   };
 };
 
+#if __cplusplus >= 201703L
+#define tdap_nodiscard [[nodiscard]]
+#if defined(__clang__) || defined(__GNUC__)
+#define tdap_force_inline __attribute__((always_inline))
+#elif defined(_MSC_VER)
+#define tdap_force_inline __forceinline
+#endif
+#else
+#define tdap_nodiscard
+#define tdap_force_inline inline
+#endif
+
+/**
+ * The C++20 standard is going to include a template that makes the compiler
+ * assume that a certain pointer is aligned to a certain number of bytes. This
+ * is described in
+ * http://open-std.org/JTC1/SC22/WG21/docs/papers/2018/p1007r2.pdf. This
+ * document contains an example to implement this assumption, using using
+ * current C++17 compilers.
+ */
+#if __cplusplus <= 201703L
+/*
+ * It is *assumed* here that C++20 will use something higher than 201703. If
+ * this assumption proves false that will be amended.
+ */
+template <std::size_t N, typename T>
+tdap_nodiscard tdap_force_inline constexpr T *assume_aligned(T *ptr) {
+#if defined(__clang__) || (defined(__GNUC__) && !defined(__ICC))
+  return reinterpret_cast<T *>(__builtin_assume_aligned(ptr, N));
+
+#elif defined(_MSC_VER)
+  if ((reinterpret_cast<std::uintptr_t>(ptr) & ((1 << N) - 1)) == 0)
+    return ptr;
+  else
+    __assume(0);
+#elif defined(__ICC)
+  if (simpledsp::algorithm::Power2::constant::is(N)) {
+    __assume_aligned(ptr, N);
+  }
+  return ptr;
+#else
+  // Unknown compiler — do nothing
+  return ptr;
+#endif
+}
+
+#endif //  __cplusplus <= 201703L
+
 } // namespace tdap
 
 #endif /* TDAP_INDEX_POLICY_HEADER_GUARD */
