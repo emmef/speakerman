@@ -1,0 +1,89 @@
+
+// Per channel algorithm
+
+ *** Compare computation algorithms to filter sample-blocks with 8 channels. ***
+Multi-channel naive  (1.8e-04 +/- 2.5e-05) (14.0%)
+Calculation-method: Raw data block
+- Absolute           (6.4e-05 +/- 8.8e-07) (1.4%)
+- Relative           (2.8e+00 +/- 3.8e-02) (1.4%)
+
+ *** Compare computation algorithms to filter sample-blocks with 4 channels. ***
+Multi-channel naive  (8.0e-05 +/- 1.4e-06) (1.7%)
+Calculation-method: Raw data block
+- Absolute           (6.5e-05 +/- 1.0e-06) (1.6%)
+- Relative           (1.2e+00 +/- 2.0e-02) (1.6%)
+
+ *** Compare computation algorithms to filter sample-blocks with 2 channels. ***
+Multi-channel naive  (6.2e-05 +/- 1.9e-06) (3.1%)
+Calculation-method: Raw data block
+- Absolute           (6.5e-05 +/- 9.9e-07) (1.5%)
+- Relative           (9.5e-01 +/- 1.5e-02) (1.5%)
+
+ *** Compare computation algorithms to filter sample-blocks with 3 channels. ***
+Multi-channel naive  (7.0e-05 +/- 1.3e-06) (1.8%)
+Calculation-method: Raw data block
+- Absolute           (6.5e-05 +/- 1.0e-06) (1.6%)
+- Relative           (1.1e+00 +/- 1.7e-02) (1.6%)
+
+ *** Compare computation algorithms to filter sample-blocks with 5 channels. ***
+Multi-channel naive  (9.6e-05 +/- 1.4e-06) (1.5%)
+Calculation-method: Raw data block
+- Absolute           (6.3e-05 +/- 1.1e-06) (1.8%)
+- Relative           (1.5e+00 +/- 2.7e-02) (1.8%)
+
+ *** Compare computation algorithms to filter sample-blocks with 6 channels. ***
+Multi-channel naive  (1.4e-04 +/- 3.7e-06) (2.6%)
+Calculation-method: Raw data block
+- Absolute           (6.3e-05 +/- 1.0e-06) (1.7%)
+- Relative           (2.3e+00 +/- 3.8e-02) (1.7%)
+
+ *** Compare computation algorithms to filter sample-blocks with 7 channels. ***
+Multi-channel naive  (1.6e-04 +/- 2.3e-06) (1.5%)
+Calculation-method: Raw data block
+- Absolute           (6.4e-05 +/- 7.6e-07) (1.2%)
+- Relative           (2.5e+00 +/- 3.0e-02) (1.2%)
+
+// Per frame algorithm
+
+
+ *** Compare computation algorithms to filter sample-blocks with 8 channels. ***
+Multi-channel naive  (1.8e-04 +/- 3.5e-06) (2.0%)
+Calculation-method: Raw data block
+- Absolute           (6.8e-05 +/- 1.3e-06) (2.0%)
+- Relative           (2.6e+00 +/- 5.1e-02) (2.0%)
+
+ *** Compare computation algorithms to filter sample-blocks with 4 channels. ***
+Multi-channel naive  (8.2e-05 +/- 2.8e-06) (3.4%)
+Calculation-method: Raw data block
+- Absolute           (6.5e-05 +/- 7.3e-07) (1.1%)
+- Relative           (1.3e+00 +/- 1.4e-02) (1.1%)
+
+ *** Compare computation algorithms to filter sample-blocks with 2 channels. ***
+Multi-channel naive  (6.2e-05 +/- 1.0e-06) (1.7%)
+Calculation-method: Raw data block
+- Absolute           (6.5e-05 +/- 9.2e-07) (1.4%)
+- Relative           (9.5e-01 +/- 1.4e-02) (1.4%)
+
+ *** Compare computation algorithms to filter sample-blocks with 3 channels. ***
+Multi-channel naive  (6.9e-05 +/- 8.0e-07) (1.2%)
+Calculation-method: Raw data block
+- Absolute           (6.5e-05 +/- 8.7e-07) (1.3%)
+- Relative           (1.1e+00 +/- 1.4e-02) (1.3%)
+
+ *** Compare computation algorithms to filter sample-blocks with 5 channels. ***
+Multi-channel naive  (9.7e-05 +/- 9.2e-07) (0.9%)
+Calculation-method: Raw data block
+- Absolute           (6.5e-05 +/- 5.7e-07) (0.9%)
+- Relative           (1.5e+00 +/- 1.3e-02) (0.9%)
+
+ *** Compare computation algorithms to filter sample-blocks with 6 channels. ***
+Multi-channel naive  (1.4e-04 +/- 2.6e-06) (1.8%)
+Calculation-method: Raw data block
+- Absolute           (6.6e-05 +/- 9.5e-07) (1.4%)
+- Relative           (2.2e+00 +/- 3.1e-02) (1.4%)
+
+ *** Compare computation algorithms to filter sample-blocks with 7 channels. ***
+Multi-channel naive  (1.6e-04 +/- 2.6e-06) (1.7%)
+Calculation-method: Raw data block
+- Absolute           (6.6e-05 +/- 1.1e-06) (1.6%)
+- Relative           (2.4e+00 +/- 3.8e-02) (1.6%)
