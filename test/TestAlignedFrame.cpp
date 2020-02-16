@@ -4,15 +4,14 @@
 #include <iostream>
 #include <tdap/AlignedFrame.hpp>
 
-
 template<size_t CHANNELS> void printAlignedResults() {
   using Alignment = tdap::Alignment<double, CHANNELS>;
   using Frame = tdap::AlignedFrame<double, CHANNELS>;
   std::cout << "Alignment<double," << CHANNELS << ">{elements=" << Alignment::elements
             << "; bytes=" << Alignment::bytes << "}" << std::endl;
-  std::cout << "AlignedFrame<double," << CHANNELS << ">{channels=" << Frame::CHANNELS
-            << "; bytes=" << Frame::ALIGN_BYTES
-            << "; framesize=" << Frame::FRAMESIZE << "}" << std::endl;
+  std::cout << "AlignedFrame<double," << CHANNELS << ">{channels=" << Frame::channels
+            << "; bytes=" << Frame::alignBytes
+            << "; framesize=" << Frame::frameSize << "}" << std::endl;
 
 }
 

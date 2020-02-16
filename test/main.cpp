@@ -18,6 +18,7 @@
 
 #include "TestIirCoefficients.hpp"
 #include "TestAlignedFrame.hpp"
+#include "TestVolumeMatrix.hpp"
 
 using namespace tdap;
 using namespace std;
@@ -464,8 +465,9 @@ void printPinkNoise() {
 
 int main(int c, const char *args[])
 {
-  alignedFrameTests();
-  testIirCoefficientVariants();
+  testVolumeMatrix();
+//  alignedFrameTests();
+//  testIirCoefficientVariants();
 //	testMultiTimeDelay();
 //	testTrueAverage();
 //        testTriangularFollowerSmoothed();

@@ -88,7 +88,7 @@ set(LIBRARIES
         )
 link_libraries(jack pthread)
 target_link_libraries(speakerman jack pthread)
-add_executable(test_speakerman ${SOURCE_FILES} test/main.cpp test/TestIirCoefficients.hpp test/TestIirCoefficients.cpp test/TestAlignedFrame.cpp test/TestAlignedFrame.hpp)
+add_executable(test_speakerman ${SOURCE_FILES} test/main.cpp test/TestIirCoefficients.hpp test/TestIirCoefficients.cpp test/TestAlignedFrame.cpp test/TestAlignedFrame.hpp test/TestVolumeMatrix.hpp test/TestVolumeMatrix.cpp)
 install(TARGETS speakerman RUNTIME DESTINATION bin)
 install(FILES web/index.html web/speakerman.js web/speakerman.css DESTINATION share/speakerman/web)
 install(PROGRAMS src/speakerman-watchdog.sh DESTINATION share/speakerman/script)
