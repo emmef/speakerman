@@ -10,8 +10,6 @@ After=usb-reset.service
 #Requires=dbus-org.freedesktop.timedate1.service
 Requires=dbus.service
 Requires=dbus.socket
-Requires=networking.service
-Requires=NetworkManager.service
 Requires=sockets.target
 Requires=alsa-state.service
 
