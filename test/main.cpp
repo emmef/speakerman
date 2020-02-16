@@ -16,6 +16,9 @@
 #include <tdap/PerceptiveRms.hpp>
 #include <tdap/TrueFloatingPointWindowAverage.hpp>
 
+#include "TestIirCoefficients.hpp"
+#include "TestAlignedFrame.hpp"
+
 using namespace tdap;
 using namespace std;
 
@@ -461,13 +464,15 @@ void printPinkNoise() {
 
 int main(int c, const char *args[])
 {
+  alignedFrameTests();
+  testIirCoefficientVariants();
 //	testMultiTimeDelay();
 //	testTrueAverage();
 //        testTriangularFollowerSmoothed();
 //        testPeakDetector();
-    std::cout << tdap::Perceptive::Metrics::createWithEvenSteps(
-            0.6, 0.001, 15) << std::endl;
-        printPinkNoise();
+//    std::cout << tdap::Perceptive::Metrics::createWithEvenSteps(
+//            0.6, 0.001, 15) << std::endl;
+//        printPinkNoise();
 
 //        reachIngForFactors();
 	return 0;

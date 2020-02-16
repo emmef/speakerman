@@ -61,7 +61,6 @@ class LevelEntryBuffer {
   mutex m;
   static constexpr size_t SIZE = 128;
   static constexpr size_t MASK = SIZE - 1;
-  static_assert(tdap::Power2::constant::is(SIZE), "Size must be power of two");
   LevelEntry entries[SIZE];
   size_t wr_;
 
