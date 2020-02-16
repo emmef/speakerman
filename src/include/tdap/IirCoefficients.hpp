@@ -24,13 +24,13 @@
 #define TDAP_IIRCOEFFICIENTS_HEADER_GUARD
 
 #include <cstddef>
-#include <type_traits>
-
+#include <tdap/AlignedFrame.hpp>
 #include <tdap/Count.hpp>
 #include <tdap/Denormal.hpp>
 #include <tdap/Filters.hpp>
 #include <tdap/FixedSizeArray.hpp>
 #include <tdap/Value.hpp>
+#include <type_traits>
 
 namespace tdap {
 
@@ -121,21 +121,37 @@ struct IirCoefficients {
     return 2 * historyForOrder(order);
   }
 
-  virtual size_t order() const = 0;
+  virtual size_t order() const noexcept = 0;
 
-  virtual size_t maxOrder() const = 0;
+  virtual size_t maxOrder() const noexcept = 0;
 
-  virtual bool hasFixedOrder() const = 0;
+  virtual bool hasFixedOrder() const noexcept = 0;
 
-  virtual void setOrder(size_t newOrder) = 0;
+  void setOrder(size_t newOrder) {
+    if (newOrder == order()) {
+      return;
+    }
+    if (hasFixedOrder()) {
+      throw std::runtime_error("This set of coefficients has a fixed order.");
+    }
+    if (newOrder > maxOrder()) {
+      throw std::invalid_argument(
+          "Exceeded maximum order for this set of coefficients.");
+    }
+    setOrderUnchecked(newOrder);
+  }
 
-  virtual void setC(size_t idx, const double coefficient) = 0;
+  void setC(size_t idx, const double coefficient) {
+    return setCUnchecked(validIndex(idx), coefficient);
+  }
 
-  virtual void setD(size_t idx, const double coefficient) = 0;
+  void setD(size_t idx, const double coefficient) {
+    return setDUnchecked(validIndex(idx), coefficient);
+  }
 
-  virtual double getC(size_t idx) const = 0;
+  double getC(size_t idx) const { return getCUnchecked(validIndex(idx)); }
 
-  virtual double getD(size_t idx) const = 0;
+  double getD(size_t idx) const { return getDUnchecked(validIndex(idx)); }
 
   size_t coefficientCount() const { return coefficientsForOrder(order()); }
 
@@ -145,12 +161,64 @@ struct IirCoefficients {
 
   size_t historyCount() const { return historyForOrder(order()); }
 
-  size_t totalHistoryCount() const { return totalHistoryForOrder(order()); }
+  void scaleOnly(double scale) {
+    setCUnchecked(0, scale);
+    setDUnchecked(0, 0.0);
+    for (size_t i = 1; i < order(); i++) {
+      setCUnchecked(i, 0.0);
+      setDUnchecked(i, 0.0);
+    }
+  }
 
   virtual ~IirCoefficients() = default;
+
+protected:
+  virtual void setOrderUnchecked(size_t newOrder) = 0;
+
+  virtual void setCUnchecked(size_t idx, const double coefficient) = 0;
+
+  virtual void setDUnchecked(size_t idx, const double coefficient) = 0;
+
+  virtual double getCUnchecked(size_t idx) const = 0;
+
+  virtual double getDUnchecked(size_t idx) const = 0;
+
+  [[nodiscard]] size_t validIndex(size_t index) const {
+    if (index <= order()) {
+      return index;
+    }
+    throw std::invalid_argument("Index out of bounds for this coefficient set");
+  }
 };
 
-template <typename C, typename COEFFICIENT_CLASS> class WrappedIirCoefficients;
+template <class Implementation>
+class WrappedIirCoefficients : public IirCoefficients {
+  Implementation &impl_;
+
+public:
+  WrappedIirCoefficients(Implementation &impl) : impl_(impl) {}
+
+  size_t order() const noexcept override { return impl_.order(); }
+
+  size_t maxOrder() const noexcept override { return impl_.maxOrder(); }
+
+  bool hasFixedOrder() const noexcept override { return impl_.hasFixedOrder(); }
+
+protected:
+  void setOrderUnchecked(size_t newOrder) override { impl_.setOrder(newOrder); }
+
+  void setCUnchecked(size_t idx, const double coefficient) override {
+    impl_.setC(idx, coefficient);
+  }
+
+  void setDUnchecked(size_t idx, const double coefficient) override {
+    impl_.setD(idx, coefficient);
+  }
+
+  double getCUnchecked(size_t idx) const override { return impl_.getC(idx); }
+
+  double getDUnchecked(size_t idx) const override { return impl_.getC(idx); }
+};
 
 template <typename C> class VariableSizedIirCoefficients;
 
@@ -269,8 +337,8 @@ public:
     return do_filter<S, false>(xHistory, yHistory, input);
   }
 
-  WrappedIirCoefficients<C, FixedSizeIirCoefficients<C, ORDER>> wrap() {
-    return WrappedIirCoefficients<C, FixedSizeIirCoefficients<C, ORDER>>(*this);
+  WrappedIirCoefficients<FixedSizeIirCoefficients<C, ORDER>> wrap() {
+    return WrappedIirCoefficients<FixedSizeIirCoefficients<C, ORDER>>(*this);
   }
 
 private:
@@ -396,65 +464,11 @@ public:
     return do_filter<S, false>(xHistory, yHistory, input);
   }
 
-  WrappedIirCoefficients<C, VariableSizedIirCoefficients<C>> wrap() {
-    return WrappedIirCoefficients<C, VariableSizedIirCoefficients<C>>(*this);
+  WrappedIirCoefficients<VariableSizedIirCoefficients<C>> wrap() {
+    return WrappedIirCoefficients<VariableSizedIirCoefficients<C>>(*this);
   }
 
   ~VariableSizedIirCoefficients() { delete[] data_; }
-};
-
-template <typename C, typename COEFFICIENT_CLASS>
-class WrappedIirCoefficients : public IirCoefficients {
-  COEFFICIENT_CLASS &coefficients_;
-
-public:
-  WrappedIirCoefficients(COEFFICIENT_CLASS &wrapped) : coefficients_(wrapped) {}
-
-  virtual size_t order() const override { return coefficients_.order(); }
-
-  virtual size_t maxOrder() const override { return coefficients_.maxOrder(); }
-
-  virtual bool hasFixedOrder() const override {
-    return coefficients_.hasFixedOrder();
-  }
-
-  virtual void setOrder(size_t newOrder) override {
-    coefficients_.setOrder(newOrder);
-  }
-
-  virtual void setC(size_t idx, const double coefficient) override {
-    coefficients_.setC(idx, coefficient);
-  }
-
-  virtual void setD(size_t idx, const double coefficient) override {
-    coefficients_.setD(idx, coefficient);
-  }
-
-  virtual double getC(size_t idx) const override {
-    return coefficients_.getC(idx);
-  }
-
-  virtual double getD(size_t idx) const override {
-    return coefficients_.getD(idx);
-  }
-
-  template <typename T> void assign(const IirCoefficients &source) {
-    coefficients_.assign(source);
-  }
-
-  template <typename S, bool flushToZero = false>
-  S do_filter(S *const xHistory, // (ORDER) x value history
-              S *const yHistory, // (ORDER) y value history
-              S input) const {
-    coefficients_.template do_filter<S, flushToZero>(xHistory, yHistory, input);
-  }
-
-  template <typename S>
-  S filter(S *const xHistory, S *const yHistory, const S input) const {
-    return do_filter<S, false>(xHistory, yHistory, input);
-  }
-
-  virtual ~WrappedIirCoefficients() = default;
 };
 
 template <typename C, size_t CHANNELS, size_t ORDER>
@@ -615,6 +629,460 @@ struct MultiFilterData {
 
     target = yN0;
   }
+};
+
+enum class IirFilterResult { SUCCESS, NULL_PTR, UNALIGNED_PTR };
+
+template <typename C, size_t ORDER, size_t ALIGN_SAMPLES = 4>
+struct FixedOrderIirFrameFilterBase : public IirCoefficients {
+  static_assert(ORDER > 0 && ORDER < 16, "ORDER is not between 1 and 16");
+  static_assert(Power2::constant::is(ALIGN_SAMPLES),
+                "ALIGN_SAMPLES is not a power of two.");
+  static constexpr size_t ALIGN_BYTES = ALIGN_SAMPLES * sizeof(C);
+  using Coeffs = AlignedFrame<C, ORDER + 1, ALIGN_SAMPLES>;
+
+  size_t order() const noexcept override { return ORDER; }
+
+  size_t maxOrder() const noexcept override { return ORDER; }
+
+  bool hasFixedOrder() const noexcept override { return false; }
+
+  const C *cCoeffs() const noexcept { return c.data; }
+
+  const C *dCoeffs() const noexcept { return d.data; }
+
+  static constexpr size_t alignedSamplesInFrame(size_t channels) noexcept {
+    return Power2::constant::aligned_with(channels, ALIGN_SAMPLES);
+  }
+
+  static constexpr IirFilterResult checkIO(const C *x, const C *y) {
+    if (!x || !y) {
+      return IirFilterResult::NULL_PTR;
+    }
+    if ((reinterpret_cast<size_t>(x) & (ALIGN_BYTES - 1)) != 0) {
+      return IirFilterResult::UNALIGNED_PTR;
+    }
+    if ((reinterpret_cast<size_t>(y) & (ALIGN_BYTES - 1)) != 0) {
+      return IirFilterResult::UNALIGNED_PTR;
+    }
+    return IirFilterResult::SUCCESS;
+  }
+
+  C filterSingleWithHistory(C *__restrict xHistory, C *__restrict yHistory,
+                            const C &x) noexcept {
+
+    C Y = 0;
+    C X = x; // input is xN0
+    C yN0 = c[0] * x;
+    size_t i, j;
+    for (i = 0, j = 1; i < ORDER; i++, j++) {
+      const C xN1 = xHistory[i];
+      const C yN1 = yHistory[i];
+      xHistory[i] = X;
+      X = xN1;
+      yHistory[i] = Y;
+      Y = yN1;
+      yN0 += xN1 * c[j] + yN1 * d[j];
+    }
+
+    yHistory[0] = yN0;
+
+    return yN0;
+  }
+
+  IirFilterResult filterSingeChannelOffsetByOrder(C *__restrict y,
+                                                  const C *__restrict x,
+                                                  size_t count) noexcept {
+    if (count == 0) {
+      return IirFilterResult::SUCCESS;
+    }
+    if (!y || !x) {
+      return IirFilterResult::NULL_PTR;
+    }
+    unsafeSingleChannelIterations(y, x, count, ORDER);
+    return IirFilterResult::SUCCESS;
+  }
+
+  template <size_t CHANNELS>
+  IirFilterResult filterOffsetByOrderFrames(C *__restrict y,
+                                            const C *__restrict x,
+                                            size_t count) noexcept {
+    if (count == 0) {
+      return IirFilterResult::SUCCESS;
+    }
+    IirFilterResult result = checkIO(x, y);
+    if (result != IirFilterResult::SUCCESS) {
+      return result;
+    }
+    unsafeIterations<CHANNELS>(y, x, count);
+    return IirFilterResult::SUCCESS;
+  }
+
+  IirFilterResult filterSingleChannelHistoryZero(C *__restrict y,
+                                                 const C *__restrict x,
+                                                 size_t count) noexcept {
+    if (count == 0) {
+      return IirFilterResult::SUCCESS;
+    }
+    if (!y || !x) {
+      return IirFilterResult::NULL_PTR;
+    }
+    unsafeSingleChannelRampUpIterations(y, x, count);
+    unsafeSingleChannelIterations(y, x, count);
+    return IirFilterResult::SUCCESS;
+  }
+
+  template <size_t CHANNELS>
+  IirFilterResult filterHistoryZero(C *__restrict y, const C *__restrict x,
+                                    size_t count) noexcept {
+    if (count == 0) {
+      return IirFilterResult::SUCCESS;
+    }
+    IirFilterResult result = checkIO(x, y);
+    if (result != IirFilterResult::SUCCESS) {
+      return result;
+    }
+    unsafeRampUpIterations<CHANNELS>(y, x, count);
+    unsafeIterationsAlt<CHANNELS>(y, x, count);
+    return IirFilterResult::SUCCESS;
+  }
+
+protected:
+  void setOrderUnchecked(size_t) override {}
+
+  void setCUnchecked(size_t idx, const double coefficient) override {
+    c[idx] = coefficient;
+  }
+
+  void setDUnchecked(size_t idx, const double coefficient) override {
+    d[idx] = coefficient;
+  }
+
+  double getCUnchecked(size_t idx) const override { return c[idx]; }
+
+  double getDUnchecked(size_t idx) const override { return d[idx]; }
+
+protected:
+  Coeffs c;
+  Coeffs d;
+
+  tdap_force_inline void
+  unsafeSingleChannelRampUpIterations(C *__restrict y, const C *__restrict x,
+                                      size_t count) const noexcept {
+    size_t end = std::min(ORDER, count);
+    for (size_t n = 0; n < end; n++) {
+      C yN = c[0] * x[n];
+      ptrdiff_t h = n - 1;
+      for (size_t j = 1; h >= 0 && j <= this->ORDER; j++, h--) {
+        yN += x[h] * c[j] + y[h] * d[j];
+      }
+      y[n] = yN;
+    }
+  }
+
+  template <size_t CHANNELS>
+  tdap_force_inline void unsafeRampUpIterations(C *__restrict yPtr,
+                                                const C *__restrict xPtr,
+                                                size_t count) const noexcept {
+    static constexpr size_t FRAME_ELEMENTS =
+        Power2::constant::aligned_with(CHANNELS, ALIGN_SAMPLES);
+
+    C *y = assume_aligned<ALIGN_BYTES, C>(yPtr);
+    const C *x = assume_aligned<ALIGN_BYTES, const C>(xPtr);
+    size_t end = std::min(ORDER, count);
+
+    for (size_t i = 0, n = 0; i < end; i++, n += FRAME_ELEMENTS) {
+      for (size_t channel = 0; channel < CHANNELS; channel++) {
+        const size_t offs = n + channel;
+        C yN = c[0] * x[offs];
+        for (size_t j = 1, h = offs; j <= i; j++) {
+          h -= FRAME_ELEMENTS;
+          yN += x[h] * c[j] + y[h] * d[j];
+        }
+        y[offs] = yN;
+      }
+    }
+  }
+
+  tdap_force_inline void unsafeSingleChannelIterations(C *__restrict y,
+                                                       const C *__restrict x,
+                                                       size_t count) const
+      noexcept {
+    for (size_t n = ORDER; n < count; n++) {
+      C yN = c[0] * x[n];
+      for (size_t j = 1; j <= ORDER; j++) {
+        yN += x[n - j] * c[j] + y[n - j] * d[j];
+      }
+      y[n] = yN;
+    }
+  }
+
+  template <size_t CHANNELS>
+  tdap_force_inline void unsafeIterations(C *__restrict yPtr,
+                                          const C *__restrict xPtr,
+                                          size_t count) const noexcept {
+    static constexpr size_t FRAME_ELEMENTS =
+        Power2::constant::aligned_with(CHANNELS, ALIGN_SAMPLES);
+
+    C *y = assume_aligned<ALIGN_BYTES, C>(yPtr);
+    const C *x = assume_aligned<ALIGN_BYTES, const C>(xPtr);
+    size_t start = FRAME_ELEMENTS * ORDER;
+    const size_t end = count * FRAME_ELEMENTS;
+
+    for (size_t n = start; n < end; n += FRAME_ELEMENTS) {
+      for (size_t channel = 0; channel < CHANNELS; channel++) {
+        size_t offs = n + channel;
+        C yN = c[0] * x[offs];
+        for (size_t j = 1, h = offs; j <= ORDER; j++) {
+          h -= FRAME_ELEMENTS;
+          yN += x[h] * c[j] + y[h] * d[j];
+        }
+        y[offs] = yN;
+      }
+    }
+  }
+
+  template <size_t CHANNELS>
+  tdap_force_inline void unsafeIterationsAlt(C *__restrict yPtr,
+                                          const C *__restrict xPtr,
+                                          size_t count) const noexcept {
+    static constexpr size_t FRAME_ELEMENTS =
+        Power2::constant::aligned_with(CHANNELS, ALIGN_SAMPLES);
+
+    C *y = assume_aligned<ALIGN_BYTES, C>(yPtr);
+    const C *x = assume_aligned<ALIGN_BYTES, const C>(xPtr);
+    size_t start = FRAME_ELEMENTS * ORDER;
+    const size_t end = count * FRAME_ELEMENTS;
+
+    for (size_t n = start; n < end; n += FRAME_ELEMENTS) {
+      C yN[CHANNELS];
+      for (size_t channel = 0, offs = n; channel < CHANNELS; channel++, offs++) {
+        yN[channel] = c[0] * x[offs];
+      }
+      for (size_t j = 1, h = n; j <= ORDER; j++) {
+        h -= FRAME_ELEMENTS;
+        for (size_t channel = 0, offs = h; channel < CHANNELS; channel++, offs++) {
+          yN[channel] += x[h] * c[j] + y[h] * d[j];
+        }
+      }
+      for (size_t channel = 0, offs = n; channel < CHANNELS; channel++, offs++) {
+        y[offs] = yN[channel];
+      }
+    }
+  }
+};
+
+template <typename C, size_t ORDER, size_t CHANNELS, size_t ALIGN_SAMPLES = 4>
+struct FixedOrderIirFrameFilter {
+  using Coeffs = FixedOrderIirFrameFilterBase<C, ORDER, ALIGN_SAMPLES>;
+  static_assert(CHANNELS > 0 && CHANNELS < 1024,
+                "CHANNELS is not between 1 and 1024");
+  static constexpr size_t HISTORY_SIZE = ORDER + 1;
+  using Frame = AlignedFrame<C, CHANNELS, ALIGN_SAMPLES>;
+
+  Coeffs coeffs;
+
+  void clearHistory() noexcept {
+    for (size_t i = 0; i < HISTORY_SIZE; i++) {
+      x[i].zero();
+      y[i].zero();
+    }
+  }
+
+  inline void filter_history_shift(Frame &__restrict out,
+                                   const Frame &__restrict in) noexcept {
+    Frame &output = *assume_aligned<Frame::ALIGN_BYTES, Frame>(&out);
+    const Frame &input = *assume_aligned<Frame::ALIGN_BYTES, const Frame>(&in);
+
+    Frame Y(0);
+    Frame X = input; // input is xN0
+    Frame yN0(0);
+    size_t i, j;
+    auto c = coeffs.cCoeffs();
+    auto d = coeffs.cCoeffs();
+    for (i = 0, j = 1; i < ORDER; i++, j++) {
+      const Frame xN1 = x[i];
+      const Frame yN1 = y[i];
+      x[i] = X;
+      X = xN1;
+      y[i] = Y;
+      Y = yN1;
+      yN0 += c[j] * xN1 + d[j] * yN1;
+    }
+    yN0 += c[0] * input;
+
+    y[0] = yN0;
+  }
+
+  inline void filterHistoryZero(Frame *__restrict out,
+                                const Frame *__restrict in,
+                                size_t count) noexcept {
+    Frame *y = assume_aligned<Frame::ALIGN_BYTES, Frame>(out);
+    const Frame *x = assume_aligned<Frame::ALIGN_BYTES, const Frame>(in);
+    size_t end = std::min(ORDER, count);
+    auto c = coeffs.cCoeffs();
+    auto d = coeffs.cCoeffs();
+
+    for (size_t n = 0; n < end; n++) {
+      Frame yN = c[0] * x[n];
+      for (size_t j = 1, h = n; j <= n; j++) {
+        h--;
+        yN += x[h] * c[j] + y[h] * d[j];
+      }
+      y[n] = yN;
+    }
+    for (size_t n = ORDER; n < count; n++) {
+      Frame yN = c[0] * x[n];
+      for (size_t j = 1, h = n; j <= ORDER; j++) {
+        h--;
+        yN += x[h] * c[j] + y[h] * d[j];
+      }
+      y[n] = yN;
+    }
+  }
+
+  inline void filterOffsetByOrder(Frame *__restrict out,
+                                  const Frame *__restrict in,
+                                  size_t count) noexcept {
+    Frame *y = assume_aligned<Frame::ALIGN_BYTES, Frame>(out);
+    const Frame *x = assume_aligned<Frame::ALIGN_BYTES, const Frame>(in);
+    auto c = coeffs.cCoeffs();
+    auto d = coeffs.cCoeffs();
+
+    for (size_t n = ORDER; n < count; n++) {
+      Frame yN = c[0] * x[n];
+      for (size_t j = 1, h = n; j <= ORDER; j++) {
+        h--;
+        yN += x[h] * c[j] + y[h] * d[j];
+      }
+      y[n] = yN;
+    }
+  }
+
+  //
+  //  inline void filter(C *__restrict out, const C *__restrict in,
+  //                     size_t count) noexcept {
+  //    static constexpr size_t ALIGN_BYTES = Frame::ALIGN_BYTES;
+  //    static constexpr size_t ALIGN_ELEM = Frame::FRAMESIZE;
+  //    const size_t COUNT = ALIGN_ELEM * count;
+  //    C *y = assume_aligned<Frame::ALIGN_BYTES, C>(out);
+  //    const C *x = assume_aligned<Frame::ALIGN_BYTES, const C>(in);
+  //
+  //    for (size_t n = ALIGN_ELEM * SKIP_ELEMENTS; n < COUNT; n += ALIGN_ELEM)
+  //    {
+  //      size_t hStart = n - ALIGN_ELEM;
+  //      for (size_t i = 0; i < CHANNELS; i++) {
+  //        C yN = c[0] * x[n + i];
+  //        size_t h = hStart;
+  //        for (size_t j = 1; j <= ORDER; j++, h -= ALIGN_ELEM) {
+  //          yN += x[h + i] * c[j] + y[h + i] * d[j];
+  //        }
+  //        y[n + i] = yN;
+  //      }
+  //    }
+  //  }
+  //  // 7.74553e-5 ; naive x 1.75928 +/- 0.016
+  //  inline void filter(C *__restrict out, const C *__restrict in,
+  //                     size_t count) noexcept {
+  //    static constexpr size_t ALIGN_BYTES = Frame::ALIGN_BYTES;
+  //    static constexpr size_t ALIGN_ELEM = Frame::FRAMESIZE;
+  //    const size_t COUNT = ALIGN_ELEM * count;
+  //    C *y = assume_aligned<Frame::ALIGN_BYTES, C>(out);
+  //    const C *x = assume_aligned<Frame::ALIGN_BYTES, const C>(in);
+  //
+  //    for (size_t n = ALIGN_ELEM * SKIP_ELEMENTS; n < COUNT; n+= ALIGN_ELEM) {
+  //      C yN[CHANNELS];
+  //      for (size_t i = 0; i < CHANNELS; i++) {
+  //        yN[i] = c[0] * x[n + i];
+  //      }
+  //      size_t h = n - ALIGN_ELEM;
+  //      for (size_t j = 1; j <= ORDER; j++, h-= ALIGN_ELEM) {
+  //        for (size_t i = 0; i < CHANNELS; i++) {
+  //          yN[i] += x[h + i] * c[j] +
+  //                   y[h + i] * d[j];
+  //        }
+  //      }
+  //      for (size_t i = 0; i < CHANNELS; i++) {
+  //        y[n + i] = yN[i];
+  //      }
+  //    }
+  //  }
+  //  // 7.73091e-5 ; naive x 1.83941 +/- 0.25
+  //  inline void filter(C *__restrict out, const C *__restrict in,
+  //                     size_t count) noexcept {
+  //    static constexpr size_t ALIGN_BYTES = Frame::ALIGN_BYTES;
+  //    static constexpr size_t ALIGN_ELEM = Frame::FRAMESIZE;
+  //    C *y = assume_aligned<Frame::ALIGN_BYTES, C>(out);
+  //    const C *x = assume_aligned<Frame::ALIGN_BYTES, const C>(in);
+  //
+  //    for (size_t n = SKIP_ELEMENTS; n < count; n++) {
+  //      C yN[CHANNELS];
+  //      for (size_t i = 0; i < CHANNELS; i++) {
+  //        yN[i] = c[0] * x[n * ALIGN_ELEM + i];
+  //      }
+  //      for (size_t j = 1; j <= ORDER; j++) {
+  //        for (size_t i = 0; i < CHANNELS; i++) {
+  //          yN[i] += x[n * ALIGN_ELEM - j * ALIGN_ELEM + i] * c[j] +
+  //                   y[n * ALIGN_ELEM - j * ALIGN_ELEM + i] * d[j];
+  //        }
+  //      }
+  //      for (size_t i = 0; i < CHANNELS; i++) {
+  //        y[n * ALIGN_ELEM + i] = yN[i];
+  //      }
+  //    }
+  //  }
+
+private:
+  Frame x[HISTORY_SIZE];
+  Frame y[HISTORY_SIZE];
+};
+
+template <typename C, typename S, size_t ORDER, size_t CHANNELS,
+          size_t ALIGN_SAMPLES = 4>
+struct FixedOrderIirFrameFilterIO
+    : public FixedOrderIirFrameFilterBase<C, ORDER, ALIGN_SAMPLES> {
+
+  static_assert(CHANNELS > 0 && CHANNELS < 1024,
+                "CHANNELS is not between 1 and 1024");
+
+  using Frame = AlignedFrame<C, CHANNELS, ALIGN_SAMPLES>;
+
+  void clearHistory() noexcept {
+    for (size_t i = 0; i < HISTORY_SIZE; i++) {
+      x[i].zero();
+      y[i].zero();
+    }
+    t = 0;
+  }
+
+  inline void iir_filter_fixed() noexcept {
+    output = c[0] * input;
+    size_t idx = now();
+    for (size_t i = 1; i <= ORDER; i++) {
+      output += c[i] * x[idx];
+      output += d[i] * y[idx];
+      idx = past(idx);
+    }
+    idx = next();
+    x[idx] = input;
+    y[idx] = output;
+  }
+
+  Frame input;
+  Frame output;
+
+protected:
+  using FixedOrderIirFrameFilterBase<C, ORDER, ALIGN_SAMPLES>::HISTORY_SIZE;
+  using FixedOrderIirFrameFilterBase<C, ORDER, ALIGN_SAMPLES>::past;
+  using FixedOrderIirFrameFilterBase<C, ORDER, ALIGN_SAMPLES>::now;
+  using FixedOrderIirFrameFilterBase<C, ORDER, ALIGN_SAMPLES>::next;
+  using FixedOrderIirFrameFilterBase<C, ORDER, ALIGN_SAMPLES>::c;
+  using FixedOrderIirFrameFilterBase<C, ORDER, ALIGN_SAMPLES>::d;
+
+private:
+  Frame x[HISTORY_SIZE];
+  Frame y[HISTORY_SIZE];
+  size_t t = 0;
 };
 
 } // namespace tdap
