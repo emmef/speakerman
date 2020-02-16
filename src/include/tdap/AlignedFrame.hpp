@@ -31,124 +31,160 @@ template <typename T, size_t ALIGNMENT> struct Alignment {
   static constexpr int bytes = Power2::constant::next(sizeof(T) * elements);
 };
 
-template <typename T, size_t CHNLS, size_t ALIGN_SAMPLES = 4>
+template <typename T, size_t CHANNELS, size_t ALIGNMENT = 4>
 struct AlignedFrame {
-  static_assert(CHNLS > 1 && CHNLS < 1024, "Channels not between 1 and 1024");
-  static_assert(Power2::constant::is(ALIGN_SAMPLES), "ALIGN_SAMPLES os not a power of 2.");
-  static constexpr size_t ALIGN_BYTES = ALIGN_SAMPLES * sizeof(T);
-  static constexpr size_t FRAMESIZE =
-      Power2::constant::aligned_with(CHNLS, ALIGN_SAMPLES);
-  static constexpr size_t CHANNELS = CHNLS;
+  static_assert(CHANNELS > 1 && CHANNELS < 1024,
+                "Channels not between 1 and 1024");
+  static_assert(Power2::constant::is(ALIGNMENT),
+                "ALIGNMENT is not a power of 2.");
 
-  alignas(ALIGN_BYTES) T data[FRAMESIZE];
+  static constexpr size_t channels = CHANNELS;
+  static constexpr size_t alignBytes = ALIGNMENT * sizeof(T);
+  static constexpr size_t frameSize =
+      Power2::constant::aligned_with(CHANNELS, ALIGNMENT);
+
+  alignas(alignBytes) T data[frameSize];
 
   tdap_nodiscard tdap_force_inline T &
   operator[](size_t i) TDAP_ARRAY_INDEX_NOEXCEPT {
-    return data[IndexPolicy::array(i, CHNLS)];
+    return data[IndexPolicy::array(i, CHANNELS)];
   }
 
   tdap_nodiscard tdap_force_inline const T &
   operator[](size_t i) const TDAP_ARRAY_INDEX_NOEXCEPT {
-    return data[IndexPolicy::array(i, CHNLS)];
+    return data[IndexPolicy::array(i, CHANNELS)];
   }
 
   AlignedFrame() noexcept = default;
 
-  AlignedFrame(AlignedFrame &&value) noexcept {
-    for (size_t i = 0; i < CHNLS; i++) {
+  template <size_t A>
+  AlignedFrame(AlignedFrame<T, CHANNELS, A> &&value) noexcept {
+    for (size_t i = 0; i < CHANNELS; i++) {
       data[i] = value.data[i];
     }
   }
 
-  AlignedFrame(const AlignedFrame &&value) noexcept {
-    for (size_t i = 0; i < CHNLS; i++) {
+  template <size_t A>
+  AlignedFrame(const AlignedFrame<T, CHANNELS, A> &&value) noexcept {
+    for (size_t i = 0; i < CHANNELS; i++) {
       data[i] = value.data[i];
     }
   }
 
-  AlignedFrame(const AlignedFrame &value) noexcept {
-    for (size_t i = 0; i < CHNLS; i++) {
+  template <size_t A>
+  AlignedFrame(const AlignedFrame<T, CHANNELS, A> &value) noexcept {
+    for (size_t i = 0; i < CHANNELS; i++) {
       data[i] = value.data[i];
     }
   }
 
   explicit AlignedFrame(T value) noexcept {
-    for (size_t i = 0; i < CHNLS; i++) {
+    for (size_t i = 0; i < CHANNELS; i++) {
       data[i] = value;
     }
   }
 
-  AlignedFrame &operator=(const AlignedFrame &value) noexcept {
+  template <size_t A>
+  AlignedFrame &operator=(const AlignedFrame<T, CHANNELS, A> &value) noexcept {
     if (this == &value) {
       return *this;
     }
-    for (size_t i = 0; i < CHNLS; i++) {
+    for (size_t i = 0; i < CHANNELS; i++) {
       data[i] = value.data[i];
     }
     return *this;
   }
 
   AlignedFrame &operator=(T value) noexcept {
-    for (size_t i = 0; i < CHNLS; i++) {
+    for (size_t i = 0; i < CHANNELS; i++) {
       data[i] = value;
     }
     return *this;
   }
 
   AlignedFrame zero() noexcept {
-    for (size_t i = 0; i < CHNLS; i++) {
+    for (size_t i = 0; i < CHANNELS; i++) {
       data[i] = 0;
     }
     return *this;
   }
 
   AlignedFrame &operator+=(T value) noexcept {
-    for (size_t i = 0; i < CHNLS; i++) {
+    for (size_t i = 0; i < CHANNELS; i++) {
       data[i] += value;
     }
     return *this;
   }
 
   AlignedFrame &operator-=(T value) noexcept {
-    for (size_t i = 0; i < CHNLS; i++) {
+    for (size_t i = 0; i < CHANNELS; i++) {
       data[i] -= value;
     }
     return *this;
   }
 
   AlignedFrame &operator*=(T value) noexcept {
-    for (size_t i = 0; i < CHNLS; i++) {
+    for (size_t i = 0; i < CHANNELS; i++) {
       data[i] *= value;
     }
     return *this;
   }
 
   AlignedFrame &operator/=(T value) noexcept {
-    for (size_t i = 0; i < CHNLS; i++) {
+    for (size_t i = 0; i < CHANNELS; i++) {
       data[i] /= value;
     }
     return *this;
   }
 
-  AlignedFrame &operator+=(const AlignedFrame &value) noexcept {
-    for (size_t i = 0; i < CHNLS; i++) {
+  template <size_t A>
+  AlignedFrame &operator+=(const AlignedFrame<T, CHANNELS, A> &value) noexcept {
+    for (size_t i = 0; i < CHANNELS; i++) {
       data[i] += value.data[i];
     }
     return *this;
   }
 
-  AlignedFrame &operator-=(const AlignedFrame &value) noexcept {
-    for (size_t i = 0; i < CHNLS; i++) {
+  template <size_t A>
+  AlignedFrame &operator-=(const AlignedFrame<T, CHANNELS, A> &value) noexcept {
+    for (size_t i = 0; i < CHANNELS; i++) {
       data[i] -= value.data[i];
     }
     return *this;
   }
 
-
   [[nodiscard]] T dot() const noexcept {
     T y = 0;
-    for (size_t i = 0; i < CHNLS; i++) {
+    for (size_t i = 0; i < CHANNELS; i++) {
       y += data[i] * data[i];
+    }
+    return y;
+  }
+
+  [[nodiscard]] T dotSeeded(T seed) const noexcept {
+    T y = seed;
+    for (size_t i = 0; i < CHANNELS; i++) {
+      y += data[i] * data[i];
+    }
+    return y;
+  }
+
+  template <size_t A>
+  [[nodiscard]] T dot(const AlignedFrame<T, CHANNELS, A> &other) const
+      noexcept {
+    T y = 0;
+    for (size_t i = 0; i < CHANNELS; i++) {
+      y += data[i] * other.data[i];
+    }
+    return y;
+  }
+
+  template <size_t A>
+  [[nodiscard]] T dotSeeded(const AlignedFrame<T, CHANNELS, A> &other,
+                            T seed) const noexcept {
+    T y = seed;
+    for (size_t i = 0; i < CHANNELS; i++) {
+      y += data[i] * other.data[i];
     }
     return y;
   }
@@ -237,7 +273,6 @@ AlignedFrame<T, C, A> operator-(AlignedFrame<T, C, A> &&f1,
   f1 -= f2;
   return f1;
 }
-
 
 } // namespace tdap
 

@@ -637,7 +637,7 @@ template <typename C, size_t ORDER, size_t ALIGN_SAMPLES = 4>
 struct FixedOrderIirFrameFilterBase : public IirCoefficients {
   static_assert(ORDER > 0 && ORDER < 16, "ORDER is not between 1 and 16");
   static_assert(Power2::constant::is(ALIGN_SAMPLES),
-                "ALIGN_SAMPLES is not a power of two.");
+                "ALIGNMENT is not a power of two.");
   static constexpr size_t ALIGN_BYTES = ALIGN_SAMPLES * sizeof(C);
   using Coeffs = AlignedFrame<C, ORDER + 1, ALIGN_SAMPLES>;
 
@@ -891,8 +891,8 @@ struct FixedOrderIirFrameFilter {
 
   inline void filter_history_shift(Frame &__restrict out,
                                    const Frame &__restrict in) noexcept {
-    Frame &output = *assume_aligned<Frame::ALIGN_BYTES, Frame>(&out);
-    const Frame &input = *assume_aligned<Frame::ALIGN_BYTES, const Frame>(&in);
+    Frame &output = *assume_aligned<Frame::alignBytes, Frame>(&out);
+    const Frame &input = *assume_aligned<Frame::alignBytes, const Frame>(&in);
 
     Frame Y(0);
     Frame X = input; // input is xN0
@@ -917,8 +917,8 @@ struct FixedOrderIirFrameFilter {
   inline void filterHistoryZero(Frame *__restrict out,
                                 const Frame *__restrict in,
                                 size_t count) noexcept {
-    Frame *y = assume_aligned<Frame::ALIGN_BYTES, Frame>(out);
-    const Frame *x = assume_aligned<Frame::ALIGN_BYTES, const Frame>(in);
+    Frame *y = assume_aligned<Frame::alignBytes, Frame>(out);
+    const Frame *x = assume_aligned<Frame::alignBytes, const Frame>(in);
     size_t end = std::min(ORDER, count);
     auto c = coeffs.cCoeffs();
     auto d = coeffs.cCoeffs();
@@ -944,8 +944,8 @@ struct FixedOrderIirFrameFilter {
   inline void filterOffsetByOrder(Frame *__restrict out,
                                   const Frame *__restrict in,
                                   size_t count) noexcept {
-    Frame *y = assume_aligned<Frame::ALIGN_BYTES, Frame>(out);
-    const Frame *x = assume_aligned<Frame::ALIGN_BYTES, const Frame>(in);
+    Frame *y = assume_aligned<Frame::alignBytes, Frame>(out);
+    const Frame *x = assume_aligned<Frame::alignBytes, const Frame>(in);
     auto c = coeffs.cCoeffs();
     auto d = coeffs.cCoeffs();
 
@@ -962,11 +962,11 @@ struct FixedOrderIirFrameFilter {
   //
   //  inline void filter(C *__restrict out, const C *__restrict in,
   //                     size_t count) noexcept {
-  //    static constexpr size_t ALIGN_BYTES = Frame::ALIGN_BYTES;
-  //    static constexpr size_t ALIGN_ELEM = Frame::FRAMESIZE;
+  //    static constexpr size_t alignBytes = Frame::alignBytes;
+  //    static constexpr size_t ALIGN_ELEM = Frame::frameSize;
   //    const size_t COUNT = ALIGN_ELEM * count;
-  //    C *y = assume_aligned<Frame::ALIGN_BYTES, C>(out);
-  //    const C *x = assume_aligned<Frame::ALIGN_BYTES, const C>(in);
+  //    C *y = assume_aligned<Frame::alignBytes, C>(out);
+  //    const C *x = assume_aligned<Frame::alignBytes, const C>(in);
   //
   //    for (size_t n = ALIGN_ELEM * SKIP_ELEMENTS; n < COUNT; n += ALIGN_ELEM)
   //    {
@@ -984,11 +984,11 @@ struct FixedOrderIirFrameFilter {
   //  // 7.74553e-5 ; naive x 1.75928 +/- 0.016
   //  inline void filter(C *__restrict out, const C *__restrict in,
   //                     size_t count) noexcept {
-  //    static constexpr size_t ALIGN_BYTES = Frame::ALIGN_BYTES;
-  //    static constexpr size_t ALIGN_ELEM = Frame::FRAMESIZE;
+  //    static constexpr size_t alignBytes = Frame::alignBytes;
+  //    static constexpr size_t ALIGN_ELEM = Frame::frameSize;
   //    const size_t COUNT = ALIGN_ELEM * count;
-  //    C *y = assume_aligned<Frame::ALIGN_BYTES, C>(out);
-  //    const C *x = assume_aligned<Frame::ALIGN_BYTES, const C>(in);
+  //    C *y = assume_aligned<Frame::alignBytes, C>(out);
+  //    const C *x = assume_aligned<Frame::alignBytes, const C>(in);
   //
   //    for (size_t n = ALIGN_ELEM * SKIP_ELEMENTS; n < COUNT; n+= ALIGN_ELEM) {
   //      C yN[CHANNELS];
@@ -1010,10 +1010,10 @@ struct FixedOrderIirFrameFilter {
   //  // 7.73091e-5 ; naive x 1.83941 +/- 0.25
   //  inline void filter(C *__restrict out, const C *__restrict in,
   //                     size_t count) noexcept {
-  //    static constexpr size_t ALIGN_BYTES = Frame::ALIGN_BYTES;
-  //    static constexpr size_t ALIGN_ELEM = Frame::FRAMESIZE;
-  //    C *y = assume_aligned<Frame::ALIGN_BYTES, C>(out);
-  //    const C *x = assume_aligned<Frame::ALIGN_BYTES, const C>(in);
+  //    static constexpr size_t alignBytes = Frame::alignBytes;
+  //    static constexpr size_t ALIGN_ELEM = Frame::frameSize;
+  //    C *y = assume_aligned<Frame::alignBytes, C>(out);
+  //    const C *x = assume_aligned<Frame::alignBytes, const C>(in);
   //
   //    for (size_t n = SKIP_ELEMENTS; n < count; n++) {
   //      C yN[CHANNELS];

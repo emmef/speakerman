@@ -1,7 +1,6 @@
 //
 // Created by michel on 13-02-20.
 //
-#include "TestIirCoefficients.hpp"
 #include <chrono>
 #include <iostream>
 #include <tdap/Denormal.hpp>
@@ -27,8 +26,8 @@ template <size_t CHANNELS, size_t ORDER> struct CoefficientMeasurements {
   Frame inputBuffer[BUFFERSIZE];
   Frame outputBuffer[BUFFERSIZE];
   Frame refOutputBuffer[BUFFERSIZE];
-  alignas(Frame::ALIGN_BYTES) double inputArray[BUFFERSIZE * Frame::FRAMESIZE];
-  alignas(Frame::ALIGN_BYTES) double outputArray[BUFFERSIZE * Frame::FRAMESIZE];
+  alignas(Frame::alignBytes) double inputArray[BUFFERSIZE * Frame::frameSize];
+  alignas(Frame::alignBytes) double outputArray[BUFFERSIZE * Frame::frameSize];
 
   static bool compareFrames(Frame &f1, Frame &f2) {
     size_t digits = std::numeric_limits<Sample>::digits * 2 / 3;
@@ -55,8 +54,8 @@ template <size_t CHANNELS, size_t ORDER> struct CoefficientMeasurements {
         inputBuffer[i][c] = -0.5 + x / RAND_MAX;
       }
     }
-    for (size_t i = 0, j = 0; i < BUFFERSIZE; i++, j += Frame::FRAMESIZE) {
-      for (size_t n = 0; n < Frame::FRAMESIZE; n++) {
+    for (size_t i = 0, j = 0; i < BUFFERSIZE; i++, j += Frame::frameSize) {
+      for (size_t n = 0; n < Frame::frameSize; n++) {
         inputArray[j + n] = inputBuffer[i][n];
       }
     }
@@ -66,7 +65,7 @@ template <size_t CHANNELS, size_t ORDER> struct CoefficientMeasurements {
     for (size_t i = 0; i < BUFFERSIZE; i++) {
       inputBuffer[i].zero();
     }
-    for (size_t n = 0; n < BUFFERSIZE * Frame::FRAMESIZE; n++) {
+    for (size_t n = 0; n < BUFFERSIZE * Frame::frameSize; n++) {
       outputArray[n] = 0;
     }
   }
@@ -219,8 +218,8 @@ template <size_t CHANNELS, size_t ORDER> struct CoefficientMeasurements {
     for (size_t e = 1; e < count; e++) {
       experiment[e].calculation.calculate();
       if (!experiment[e].useFrames) {
-        for (int i = 0, j = 0; i < BUFFERSIZE; i++, j += Frame::FRAMESIZE) {
-          for (size_t channel = 0; channel < Frame::CHANNELS; channel++) {
+        for (int i = 0, j = 0; i < BUFFERSIZE; i++, j += Frame::frameSize) {
+          for (size_t channel = 0; channel < Frame::channels; channel++) {
             outputBuffer[i][channel] = outputArray[j + channel];
           }
         }
@@ -244,11 +243,11 @@ template <size_t CHANNELS, size_t ORDER> struct CoefficientMeasurements {
             printf(" * ");
           }
           printf("\n\tref={");
-          for (size_t channel = 0; channel < Frame::CHANNELS; channel++) {
+          for (size_t channel = 0; channel < Frame::channels; channel++) {
             printf(" %10.3le", refOutputBuffer[frame][channel]);
           }
           printf(" }\n\tout={");
-          for (size_t channel = 0; channel < Frame::CHANNELS; channel++) {
+          for (size_t channel = 0; channel < Frame::channels; channel++) {
             printf(" %10.3le", outputBuffer[frame][channel]);
           }
           printf(" }\n");
