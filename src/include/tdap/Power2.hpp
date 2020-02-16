@@ -107,17 +107,19 @@ template <bool constExpr, typename SIZE_T = size_t>
 class PowerOfTwoHelper
     : public FillBitsToRight<SIZE_T, constExpr ? 0 : sizeof(SIZE_T),
                              constExpr> {
-  using FillBitsToRight<SIZE_T, constExpr ? 0 : sizeof(SIZE_T),
-                        constExpr>::fill;
+  using Bits =
+      FillBitsToRight<SIZE_T, constExpr ? 0 : sizeof(SIZE_T), constExpr>;
 
   static constexpr SIZE_T unchecked_aligned(SIZE_T value, SIZE_T alignment) {
-    return (value | (alignment - 1)) + 1;
+    return ((value - 1) | (alignment - 1)) + 1;
   }
 
 public:
   static constexpr bool minus_one(const SIZE_T value) {
-    return fill(value) == value;
+    return Bits::fill(value) == value;
   }
+
+  static constexpr bool fill(const SIZE_T value) { return Bits::fill(value); }
 
   static constexpr bool is(const SIZE_T value) {
     return value >= 2 ? minus_one(value - 1) : false;
@@ -128,7 +130,7 @@ public:
    * greater.
    */
   static constexpr SIZE_T next(const SIZE_T value) {
-    return fill(value - 1) + 1;
+    return Bits::fill(value - 1) + 1;
   }
 
   /**
@@ -143,7 +145,8 @@ public:
    * Returns value if it is smaller than the power and else the power of two.
    */
   static constexpr SIZE_T within(const SIZE_T value, const SIZE_T powerOfTwo) {
-    return (fill(value & ((powerOfTwo - 1) ^ -1)) | value) & (powerOfTwo - 1);
+    return (Bits::fill(value & ((powerOfTwo - 1) ^ -1)) | value) &
+           (powerOfTwo - 1);
   }
 
   /**
@@ -157,7 +160,7 @@ public:
    */
   static constexpr SIZE_T aligned_with(const SIZE_T value,
                                        const SIZE_T power_of_two) {
-    return is(power_of_two) ? unchecked_aligned(value, power_of_two) : 0;
+    return value == 0 ? 0 : is(power_of_two) ? unchecked_aligned(value, power_of_two) : 0;
   }
 
   /**
@@ -171,10 +174,9 @@ public:
    */
   template <typename T>
   static constexpr T *ptr_aligned_with(T *pointer, const SIZE_T power_of_two) {
-    return is(power_of_two) ? static_cast<T *>(unchecked_aligned(
-                                  static_cast<SIZE_T>(pointer), power_of_two))
-                            : 0;
+    return static_cast<T *>(aligned_with(static_cast<SIZE_T>(pointer), power_of_two));
   }
+
 };
 
 } // namespace helpers_tdap
