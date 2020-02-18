@@ -81,7 +81,7 @@ set(SOURCE_FILES
 find_path(LOCAL_TDAP_PATH, README-TAP.md HINTS ../ ../../ NO_DEFAULT_PATH)
 
 
-add_executable(speakerman ${SOURCE_FILES} src/speakerman.cpp)
+add_executable(speakerman ${SOURCE_FILES} src/speakerman.cpp src/include/tdap/Errors.hpp src/include/tdap/GroupVolume.hpp)
 set(LIBRARIES
         jack
         pthread

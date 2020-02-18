@@ -3,6 +3,7 @@
 //
 
 #include <tdap/VolumeMatrix.hpp>
+#include <tdap/GroupVolume.hpp>
 
 static constexpr size_t INPUTS = 4;
 static constexpr size_t OUTPUTS = 3;

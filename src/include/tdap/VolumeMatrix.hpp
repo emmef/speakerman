@@ -25,11 +25,23 @@
 
 #include <algorithm>
 #include <tdap/AlignedFrame.hpp>
+#include <tdap/Errors.hpp>
 #include <tdap/IndexPolicy.hpp>
 #include <tdap/Integration.hpp>
 
 namespace tdap {
 
+/**
+ * Defines and applies for each output in a set of OUTPUTS outputs what weight,
+ * or "volume", is given to each input from a set of INPUT inputs. Outputs and
+ * inputs contain samples of value-type T. For optimization, data is aligned to
+ * ALIGN samples, where ALIGN is a power of two.
+ *
+ * @tparam T The type of samples used in inputs, outputs and weights.
+ * @tparam INPUTS The number of inputs.
+ * @tparam OUTPUTS The number of outputs.
+ * @tparam ALIGN The number of samples to align to.
+ */
 template <typename T, size_t INPUTS, size_t OUTPUTS, size_t ALIGN = 4>
 class VolumeMatrix {
   static_assert(std::is_floating_point<T>::value,
@@ -37,8 +49,6 @@ class VolumeMatrix {
   static_assert(Power2::constant::is(ALIGN), "ALIGN is not a power of 2.");
   static_assert(Count<T>::valid_positive(INPUTS), "Invalid INPUTS parameter");
   static_assert(Count<T>::valid_positive(OUTPUTS), "Invalid OUTPUTS parameter");
-  static constexpr size_t MIN_CHANNELS = std::min(INPUTS, OUTPUTS);
-  static constexpr size_t MAX_CHANNELS = std::max(INPUTS, OUTPUTS);
 
 public:
   using InputVolumes = AlignedFrame<T, INPUTS, ALIGN>;
@@ -49,147 +59,403 @@ public:
   static constexpr size_t outputs = OUTPUTS;
   static constexpr size_t alignment = ALIGN;
 
-  T epsilon() const noexcept { return epsilon_; }
+  /**
+   * Creates a volume matrix with all weights set to value.
+   * @param value The value of all weights.
+   */
+  explicit VolumeMatrix(T value) { setAll(value); }
 
+  /**
+   * Creates a volume matrix where all outputs are mapped to the corresponding
+   * inputs with unit volume.
+   * @see identity
+   */
+  explicit VolumeMatrix() { identity(); }
+
+  /**
+   * Creates a volume matrix with the same values als the source, including
+   * epsilon, the minimum representable volume.
+   * @param source The source matrix to copy.
+   */
+  explicit VolumeMatrix(const VolumeMatrix &source) { operator=(source); }
+
+  /**
+   * Creates a volume matrix with the same values als the source, including
+   * epsilon, the minimum representable volume.
+   * Values from the source that are outside the dimensions of this matrix are
+   * ignored. If the source is smaller in inputs, outputs or both, all volumes
+   * outside the source boundaries are set to zero.
+   * @param source The source matrix to copy.
+   */
+  template <typename V, size_t IN, size_t OUT, size_t AL>
+  VolumeMatrix(const VolumeMatrix<V, IN, OUT, AL> &source) {
+    operator=(source);
+  }
+
+  /**
+   * Get the minimum (absolute) representable volume. Volumes below this value
+   * will be set to zero.
+   * @return The value of epsilon.
+   */
+  T getEpsilon() const noexcept { return eps; }
+
+  /**
+   * Sets the minimum (absolute) representable volume. If the value is
+   * different, all volumes below this value will be set to zero.
+   * @return The actually set value of epsilon.
+   */
   T setEpsilon(T epsilon) noexcept {
-    return epsilon_ =
-               std::clamp(epsilon, std::numeric_limits<T>::epsilon(), 0.1);
-  }
-
-  const InputVolumes &getOUtputMix(size_t idx) const {
-    return matrix_[IndexPolicy::method(idx, OUTPUTS)];
-  }
-
-  VolumeMatrix(T value) { set_all(value); }
-
-  VolumeMatrix() { identity(); }
-
-  void identity(T scale = 1.0) noexcept {
-    zero();
-    T flushedScale = flushToZero(scale);
-    for (size_t i = 0; i < MIN_CHANNELS; i++) {
-      matrix_[i][i] = flushedScale;
+    T ep = std::clamp(epsilon, 0.0, 0.1);
+    if (ep != epsilon) {
+      epsilon = ep;
+      flushAllToZero();
     }
+    return epsilon;
   }
 
-  void identityWrapped(T scale = 1.0) noexcept {
-    zero();
-    T flushedScale = flushToZero(scale);
-    for (size_t output = 0; output < MAX_CHANNELS; output++) {
-      matrix_[output % OUTPUTS][output % INPUTS] = flushedScale;
-    }
+  /**
+   * @return whether epsilon is copied on assignments from other matrices.
+   */
+  bool copyEpsilon() const noexcept { return copy; }
+
+  /**
+   * Sets whether epsilon is copied on assignments from other matrices.
+   */
+  void setCopyEpsilon(bool copyEpsilon) noexcept { copy = copyEpsilon; }
+
+  /**
+   * Gets the input-weights for the specified output.
+   * @param output The output number.
+   * @return The input weights.
+   * @throw std::invalid_argument if output is invalid.
+   */
+  const InputVolumes &getOUtputMix(size_t output) const {
+    return volumes[IndexPolicy::method(output, OUTPUTS)];
   }
 
-  void zero() noexcept {
-    for (size_t output = 0; output < OUTPUTS; output++) {
-      for (size_t input = 0; input < INPUTS; input++) {
-        matrix_[output][input] = 0;
+  /**
+   * Copies all values from the source, including epsilon, the minimum
+   * representable volume.
+   * @param source The source matrix to copy.
+   */
+  VolumeMatrix &operator=(const VolumeMatrix &source) {
+    if (copy || source.eps >= eps) {
+      for (size_t out = 0; out < OUTPUTS; out++) {
+        for (size_t in = 0; in < INPUTS; in++) {
+          volumes[out][in] = source.volumes[out][in];
+        }
       }
-    }
-  }
-
-  void flushAllToZero() noexcept {
-    for (size_t output = 0; output < OUTPUTS; output++) {
-      for (size_t input = 0; input < INPUTS; input++) {
-        matrix_[output][input] = flushToZero(matrix_[output][input]);
+      if (copy) {
+        eps = source.eps;
       }
-    }
-  }
-
-  void set(size_t output, size_t input, T volume) {
-    int x = matrix_[IndexPolicy::method(output, OUTPUTS)]
-                   [IndexPolicy::method(input, INPUTS)] = flushToZero(volume);
-  }
-
-  T get(size_t output, size_t input) const {
-    return matrix_[IndexPolicy::method(output, OUTPUTS)]
-                  [IndexPolicy::method(input, INPUTS)];
-  }
-
-  void setAll(T volume, T epsilon = 1e-6) noexcept {
-    T flushedToZero = flushToZero(volume);
-    for (size_t output = 0; output < OUTPUTS; output++) {
-      for (size_t input = 0; input < INPUTS; input++) {
-        matrix_[output][input] = flushedToZero;
-      }
-    }
-  }
-
-  void approach(const VolumeMatrix &source,
-                const IntegrationCoefficients<T> &coefficients) {
-    for (size_t output = 0; output < OUTPUTS; output++) {
-      for (size_t input = 0; input < INPUTS; input++) {
-        T sourceValue = source.matrix_[output][input];
-        T &out = matrix_[output][input];
-        if (out == 0 && sourceValue > epsilon_) {
-          out = sourceValue;
-        } else {
-          out = flushToZero(coefficients.getIntegrated(sourceValue, out));
+    } else {
+      for (size_t out = 0; out < OUTPUTS; out++) {
+        for (size_t in = 0; in < INPUTS; in++) {
+          volumes[out][in] = flushToZero(source.volumes[out][in]);
         }
       }
     }
   }
 
+  /**
+   * Copies values from the source, including epsilon, the minimum representable
+   * volume. Values from the source that are outside the dimensions of this
+   * matrix are ignored. If the source is smaller in inputs, outputs or both,
+   * all volumes outside the source boundaries are set to zero.
+   * @param source The source matrix to copy.
+   */
+  template <typename V, size_t IN, size_t OUT, size_t AL>
+  VolumeMatrix &operator=(const VolumeMatrix<V, IN, OUT, AL> &source) {
+    if (copy || source.eps >= eps) {
+      for (size_t out = 0; out < OUTPUTS; out++) {
+        for (size_t in = 0; in < INPUTS; in++) {
+          volumes[out][in] = out < OUT && in < IN ? source.get(out, in) : 0;
+        }
+      }
+      if (copy) {
+        setEpsilon(source.getEpsilon());
+      }
+    } else {
+      for (size_t out = 0; out < OUTPUTS; out++) {
+        for (size_t in = 0; in < INPUTS; in++) {
+          volumes[out][in] =
+              out < OUT && in < IN ? flushToZero(source.get(out, in)) : 0;
+        }
+      }
+    }
+  }
+
+  /**
+   * Set volumes so that all outputs are mapped to the corresponding
+   * inputs with the given volume, that defaults to unity. For matrices with a
+   * different number of inputs and outputs, the smallest is used: al others
+   * weights are zero.
+   * @param volume The volume for mapped channels, that defaults to unity.
+   */
+  void identity(T volume = 1.0) noexcept {
+    static constexpr size_t MIN_CHANNELS = std::min(INPUTS, OUTPUTS);
+    zero();
+    T flushedScale = flushToZero(volume);
+    for (size_t i = 0; i < MIN_CHANNELS; i++) {
+      volumes[i][i] = flushedScale;
+    }
+  }
+
+  /**
+   * Set volumes so that all outputs are mapped to the corresponding
+   * inputs with the given volume, that defaults to unity. For matrices with a
+   * different number of inputs and outputs, the largest is used and the smaller
+   * dimension is "wrapped" or repeated.
+   * @param volume The volume for mapped channels, that defaults to unity.
+   */
+  void identityWrapped(T scale = 1.0) noexcept {
+    static constexpr size_t MAX_CHANNELS = std::max(INPUTS, OUTPUTS);
+    zero();
+    T flushedScale = flushToZero(scale);
+    for (size_t output = 0; output < MAX_CHANNELS; output++) {
+      volumes[output % OUTPUTS][output % INPUTS] = flushedScale;
+    }
+  }
+
+  /**
+   * sets all volumes to zero.
+   */
+  void zero() noexcept {
+    for (size_t output = 0; output < OUTPUTS; output++) {
+      for (size_t input = 0; input < INPUTS; input++) {
+        volumes[output][input] = 0;
+      }
+    }
+  }
+
+  /**
+   * Sets all volumes that are less than epsilon (absolute) to zero.
+   * (This should never be necessary, but hiding this as an internal detail is
+   * rather strict).
+   */
+  void flushAllToZero() noexcept {
+    for (size_t output = 0; output < OUTPUTS; output++) {
+      for (size_t input = 0; input < INPUTS; input++) {
+        volumes[output][input] = flushToZero(volumes[output][input]);
+      }
+    }
+  }
+
+  /**
+   * Sets the volume of the input for the output. Volumes with an absolute value
+   * smaller than epsilon (getEpsilon()) will be set to zero. The method returns
+   * true, but if either input or output are invalid, the method returns false
+   * and sets Error to Error::BOUND.
+   * @param output The output.
+   * @param input The input.
+   * @param volume The volume.
+   * @return whether setting volume was successful.
+   */
+  bool set(size_t output, size_t input, T volume) noexcept {
+    if (output < OUTPUTS && input < INPUTS) {
+      volumes[output][input] = flushToZero(volume);
+      return true;
+    }
+    return Error::setErrorReturn(Error::BOUND);
+  }
+
+  /**
+   * Gets the volume of the input for the output. The method returns true, but
+   * if either input or output are invalid, the method returns false and sets
+   * Error to Error::BOUND.
+   * @param output The output.
+   * @param input The input.
+   * @return whether setting volume was successful.
+   */
+  T get(size_t output, size_t input) const noexcept {
+    if (output < OUTPUTS && input < INPUTS) {
+      return volumes[output][input];
+    }
+    return Error::setErrorReturn(Error::BOUND, (T)0);
+  }
+
+  /**
+   * Set all weights for inputs to all outputs to the same value: volume. If
+   * volumes has an absolute value smaller than epsilon (getEpsilon()), it will
+   * be considered zero.
+   * @param volume The volume.
+   */
+  void setAll(T volume) noexcept {
+    T flushedToZero = flushToZero(volume);
+    for (size_t output = 0; output < OUTPUTS; output++) {
+      for (size_t input = 0; input < INPUTS; input++) {
+        volumes[output][input] = flushedToZero;
+      }
+    }
+  }
+
+  /**
+   * Approach the volumes of the source matrix, using the specified integration.
+   * After an infinite number of invocations, this and the source matrix should
+   * be similar.
+   * @param source The source matrix whose volumes to aproach.
+   * @param coefficients The integration coefficients used.
+   */
+  void approach(const VolumeMatrix &source,
+                const IntegrationCoefficients<T> &coefficients) noexcept {
+    if (copy) {
+      eps = source.eps;
+    }
+    for (size_t output = 0; output < OUTPUTS; output++) {
+      for (size_t input = 0; input < INPUTS; input++) {
+        T sourceValue = source.volumes[output][input];
+        T &out = volumes[output][input];
+        approachValue(out, sourceValue, coefficients);
+      }
+    }
+  }
+
+  /**
+   * Approach the volumes of the source matrix, using the specified integration.
+   * After an infinite number of invocations, this and the source matrix should
+   * be similar. Values outside the dimensions of this matrix will be ignored,
+   * while values that are outside the source matrix will be considered zero.
+   * @param source The source matrix whose volumes to aproach.
+   * @param coefficients The integration coefficients used.
+   */
+  template <typename V, size_t IN, size_t OUT, size_t AL>
+  void approach(const VolumeMatrix<V, IN, OUT, AL> &source,
+                const IntegrationCoefficients<T> &coefficients) {
+    if (copy) {
+      eps = source.getEpsilon();
+    }
+    for (size_t output = 0; output < OUTPUTS; output++) {
+      for (size_t input = 0; input < INPUTS; input++) {
+        T sourceValue =
+            output < OUT && input < IN ? source.get(output, input) : 0;
+        T &out = volumes[output][input];
+        approachValue(out, sourceValue, coefficients);
+      }
+    }
+  }
+
+  /**
+   * Apply all volumes for all input channels in inputs to all outputs and
+   * return the result.
+   * @tparam A alignment of input frame.
+   * @param inputs The input frame.
+   * @return The output frame.
+   */
   template <size_t A>
   AlignedFrame<T, OUTPUTS, A>
-  apply(const AlignedFrame<T, INPUTS, A> &inputs) const {
+  apply(const AlignedFrame<T, INPUTS, A> &inputs) const noexcept {
     AlignedFrame<T, OUTPUTS, A> outputs;
     for (size_t output = 0; output < OUTPUTS; output++) {
-      outputs[output] = inputs.dot(matrix_[output]);
+      outputs[output] = inputs.dot(volumes[output]);
     }
     return outputs;
   }
 
+  /**
+   * Apply all volumes for all input channels in inputs to all outputs and
+   * return the result. All outputs also get added the seed value.
+   * @tparam A alignment of input frame.
+   * @param inputs The input frame.
+   * @param seed The seed value, added to all outputs.
+   * @return The output frame.
+   */
   template <size_t A>
   AlignedFrame<T, OUTPUTS, A>
-  applySeeded(const AlignedFrame<T, INPUTS, A> &inputs, T seed) const {
+  applySeeded(const AlignedFrame<T, INPUTS, A> &inputs, T seed) const noexcept {
     AlignedFrame<T, OUTPUTS, A> outputs;
     for (size_t output = 0; output < OUTPUTS; output++) {
-      outputs[output] = inputs.dotSeeded(matrix_[output], seed);
+      outputs[output] = inputs.dotSeeded(volumes[output], seed);
     }
     return outputs;
   }
 
+  /**
+   * Apply all volumes for all input channels in inputs to all outputs.
+   * @tparam A alignment of input and output frames.
+   * @param outputs The output frame.
+   * @param inputs The input frame.
+   */
   template <size_t A>
   void apply(AlignedFrame<T, OUTPUTS, A> &__restrict outputs,
-             const AlignedFrame<T, INPUTS, A> &__restrict inputs) const {
+             const AlignedFrame<T, INPUTS, A> &__restrict inputs) const
+      noexcept {
 
     unSeededApply<A, std::min(A, ALIGN)>(outputs, inputs);
   }
 
+  /**
+   * Apply all volumes for all input channels in inputs to all outputs. All
+   * outputs also get added the seed value.
+   * @tparam A alignment of input frame.
+   * @param outputs The output frame.
+   * @param inputs The input frame.
+   * @param seed The seed value, added to all outputs.
+   */
   template <size_t A>
   void applySeeded(AlignedFrame<T, OUTPUTS, A> &__restrict outputs,
                    const AlignedFrame<T, INPUTS, A> &__restrict inputs,
-                   T seed) const {
+                   T seed) const noexcept {
     seededApply<A, std::min(A, ALIGN)>(outputs, inputs, seed);
   }
 
-private:
-  InputVolumes matrix_[OUTPUTS];
-  T epsilon_ = 1e-6;
+  /**
+   * Apply all volumes for all input channels in inputs to all outputs. All
+   * outputs also get added the seed value, that defaults to zero.
+   * This method is potentially dangerous as no check is performed whether the
+   * arrays are actually big enough. If the arrays are NIL, the method retruns
+   * false and Error is set to Error::NIL.
+   * @tparam A alignment of input frame.
+   * @param outputs The output frame.
+   * @param inputs The input frame.
+   * @param seed The seed value, added to all outputs.
+   * @return True if both input and output are not null and volumes are applied.
+   */
+  template <size_t ALIGN_SAMPLES = 1>
+  bool apply(T *__restrict outputs, const T *__restrict inputs,
+             T seed = 0) const noexcept {
+    if (!outputs || !inputs) {
+      return Error::setErrorReturn(Error::NILL);
+    }
+    T *out = assume_aligned<ALIGN_SAMPLES * sizeof(T), T *>(out);
+    const T *in = assume_aligned<ALIGN_SAMPLES * sizeof(T), const T *>(out);
 
-  T flushToZero(T volume) const noexcept {
-    return fabs(volume) > epsilon_ ? volume : 0;
+    for (size_t o = 0; o < OUTPUTS; o++) {
+      T sum = seed;
+      for (size_t i = 0; i < INPUTS; i++) {
+        sum += in[i] * volumes[o][i];
+      }
+      out[o] = sum;
+    }
+    return true;
+  }
+
+private:
+  InputVolumes volumes[OUTPUTS];
+  T eps = 1e-6;
+  bool copy = true;
+
+  inline T flushToZero(T volume) const noexcept {
+    return eps == 0 || fabs(volume) > eps ? volume : 0;
   }
 
   template <size_t A, size_t COMMON_ALIGN>
   void seededApply(AlignedFrame<T, OUTPUTS, A> &__restrict outputs,
                    const AlignedFrame<T, INPUTS, A> &__restrict inputs,
-                   T seed) const {
+                   T seed) const noexcept {
     AlignedFrame<T, OUTPUTS, A> &out =
         *assume_aligned<COMMON_ALIGN, AlignedFrame<T, OUTPUTS, A>>(&outputs);
     const AlignedFrame<T, INPUTS, A> &in =
         *assume_aligned<COMMON_ALIGN, const AlignedFrame<T, INPUTS, A>>(
             &inputs);
     for (size_t output = 0; output < OUTPUTS; output++) {
-      out[output] = in.dotSeeded(matrix_[output], seed);
+      out[output] = in.dotSeeded(volumes[output], seed);
     }
   }
 
   template <size_t A, size_t COMMON_ALIGN>
-  void
-  unSeededApply(AlignedFrame<T, OUTPUTS, A> &__restrict outputs,
-                const AlignedFrame<T, INPUTS, A> &__restrict inputs) const {
+  void unSeededApply(AlignedFrame<T, OUTPUTS, A> &__restrict outputs,
+                     const AlignedFrame<T, INPUTS, A> &__restrict inputs) const
+      noexcept {
 
     AlignedFrame<T, OUTPUTS, A> &out =
         *assume_aligned<COMMON_ALIGN, AlignedFrame<T, OUTPUTS, A>>(&outputs);
@@ -197,296 +463,83 @@ private:
         *assume_aligned<COMMON_ALIGN, const AlignedFrame<T, INPUTS, A>>(
             &inputs);
     for (size_t output = 0; output < OUTPUTS; output++) {
-      out[output] = in.dot(matrix_[output]);
+      out[output] = in.dot(volumes[output]);
+    }
+  }
+
+  inline void
+  approachValue(const T &out, T sourceValue,
+                const IntegrationCoefficients<T> &coefficients) const noexcept {
+    if (eps == 0) {
+      coefficients.integrate(sourceValue, out);
+    } else if (out == 0 && fabs(sourceValue) > eps) {
+      out = sourceValue;
+    } else {
+      T t = coefficients.getIntegrated(sourceValue, out);
+      out = fabs(t) > eps ? t : 0;
     }
   }
 };
 
+/**
+ * Manages a target volume matrix and an actual volume matrix, that approaches
+ * the target marix on each call to approach with a certain integration
+ * coefficient.
+ * @see VolumeMatrix
+ * @tparam T The type of sample.
+ * @tparam INPUTS The number of inputs.
+ * @tparam OUTPUTS The number of outputs.
+ * @tparam ALIGN The alignment in samples.
+ */
 template <typename T, size_t INPUTS, size_t OUTPUTS, size_t ALIGN = 4>
-struct VolumeMatrixSmooth {
+struct SmoothVolumeMatrix {
   using Matrix = VolumeMatrix<T, INPUTS, OUTPUTS, ALIGN>;
 
-  const Matrix &matrix() const noexcept { return actualVolume; }
+  /**
+   * Returns the actual volume matrix that can be used, "applied", to calculate
+   * outputs from inputs.
+   * @see VolumeMatrix.apply()
+   * @return the volume matrix
+   */
+  const Matrix &volumes() const noexcept { return vm; }
 
-  VolumeMatrixSmooth() {
-    userVolume.zero();
-    actualVolume.zero();
-    integration.setCharacteristicSamples(96000 * 0.05);
+  /**
+   * Returns the target volume matrix. The volume matrix returned by volumes()
+   * will approach this matrix more on each consequent call to approach().
+   * @see VolumeMatrix.apply
+   * @see approach()
+   * @return the volume matrix
+   */
+  Matrix &target() noexcept { return tm; }
+  const Matrix &target() const noexcept { return tm; }
+
+  /**
+   * Returns the integration coefficients, used for the approach() method.
+   * @see IntegrationCoefficients
+   * @return the integration coefficients.
+   */
+  IntegrationCoefficients<T> &integration() noexcept { return coeffs; }
+  const IntegrationCoefficients<T> &integration() const noexcept {
+    return coeffs;
   }
 
-  void setSmoothSamples(T samples) {
-    integration.setCharacteristicSamples(samples);
-  }
+  /**
+   * Makes the volume matrix approach the target volume matrix, using the set
+   * integration coefficients.
+   */
+  void approach() { vm.approach(tm, coeffs); }
 
-  void zero() {
-    userVolume.zero();
-    actualVolume.zero();
-  }
-
-  void approach() { actualVolume.approach(userVolume, integration); }
-
-  void configure(double sampleRate, double rc, Matrix initialVolumes) {
-    integration.setCharacteristicSamples(sampleRate * rc);
-    userVolume.identity(initialVolumes);
-    actualVolume.set_all(0);
-  }
-
-  void setVolume(const Matrix &newVolumes) { userVolume = newVolumes; }
+  /**
+   * Sets the volume matrix to the same values as the target matrix immediately.
+   */
+  void adopt() { vm = tm; }
 
 private:
-  Matrix actualVolume;
-  Matrix userVolume;
-  IntegrationCoefficients<double> integration;
-};
-
-enum class VolumeControlResult {
-  SUCCESS,
-  HIGH_CHANNEL,
-  HIGH_GROUP,
-  CHANNEL_MAPPED,
-  CHANNEL_NOT_MAPPED
-};
-
-template <typename T, size_t CHANNELS> class GroupMap {
-  ptrdiff_t map_[CHANNELS];
-
-  static bool returnAndAssign(VolumeControlResult *result,
-                              VolumeControlResult code) noexcept {
-    if (result) {
-      *result = code;
-    }
-    return code == VolumeControlResult ::SUCCESS;
-  }
-
-public:
-  static constexpr size_t channels = CHANNELS;
-
-  GroupMap() { removeGroupChannels(-1); }
-
-  ptrdiff_t getGroupFor(size_t channel) const noexcept {
-    return channel < CHANNELS ? map_[channel] : -1;
-  }
-
-  bool addToGroup(size_t group, size_t channel, bool force = false,
-                  VolumeControlResult *result = nullptr) noexcept {
-
-    if (group >= CHANNELS) {
-      return returnAndAssign(result, VolumeControlResult::HIGH_GROUP);
-    }
-    if (channel >= CHANNELS) {
-      return returnAndAssign(result, VolumeControlResult::HIGH_CHANNEL);
-    }
-    if (map_[channel] >= 0 && !force) {
-      return returnAndAssign(result, VolumeControlResult::CHANNEL_MAPPED);
-    }
-    map_[channel] = group;
-    return returnAndAssign(result, VolumeControlResult ::SUCCESS);
-  }
-
-  bool addUnnasignedToGroup(size_t group,
-                            VolumeControlResult *result = nullptr) noexcept {
-    if (group >= CHANNELS) {
-      return returnAndAssign(result, VolumeControlResult::HIGH_GROUP);
-    }
-    size_t count = 0;
-    for (size_t channel = 0; channel < CHANNELS; channel++) {
-      ptrdiff_t &mapped = map_[channel];
-      if (mapped < 0) {
-        mapped = group;
-        count++;
-      }
-    }
-    return returnAndAssign(result, VolumeControlResult ::SUCCESS);
-  }
-
-  bool removeFromGroup(ptrdiff_t group, size_t channel,
-                       VolumeControlResult *result = nullptr) noexcept {
-    if (group >= CHANNELS) {
-      return returnAndAssign(result, VolumeControlResult::HIGH_GROUP);
-    }
-    if (channel >= CHANNELS) {
-      return returnAndAssign(result, VolumeControlResult::HIGH_CHANNEL);
-    }
-    ptrdiff_t &mapped = map_[channel];
-    if (group < 0) {
-      if (mapped < 0) {
-        return returnAndAssign(result, VolumeControlResult::CHANNEL_NOT_MAPPED);
-      }
-    } else if (mapped != group) {
-      return returnAndAssign(result, VolumeControlResult::CHANNEL_NOT_MAPPED);
-    }
-    map_[channel] = -1;
-    return returnAndAssign(result, VolumeControlResult ::SUCCESS);
-  }
-
-  bool removeGroupChannels(ptrdiff_t group,
-                           VolumeControlResult *result = nullptr) noexcept {
-    if (group >= CHANNELS) {
-      return returnAndAssign(result, VolumeControlResult::HIGH_GROUP);
-    }
-    for (size_t channel = 0; channel < CHANNELS; channel++) {
-      ptrdiff_t &mapped = map_[channel];
-      if (group < 0 || group == mapped) {
-        mapped = -1;
-      }
-    }
-    return returnAndAssign(result, VolumeControlResult ::SUCCESS);
-  }
-
-  ptrdiff_t getMaxAssignedChannel() const noexcept {
-    ptrdiff_t i = CHANNELS;
-    while (--i >= 0) {
-      if (map_[i] >= 0) {
-        return i;
-      }
-    }
-    return -1;
-  }
-
-  ptrdiff_t getMaxAssignedGroup() const noexcept {
-    ptrdiff_t maxAssigned = -1;
-    for (size_t i = 0; i < CHANNELS; i++) {
-      maxAssigned = std::max(maxAssigned, map_[i]);
-    }
-    return maxAssigned;
-  }
-
-  size_t getGroupChannels(size_t group) const noexcept {
-    size_t count = 0;
-    for (size_t channel = 0; channel < CHANNELS; channel++) {
-      if (map_[channel] == group) {
-        count++;
-      }
-    }
-    return count;
-  }
-
-  ptrdiff_t getGroupChannel(size_t group, size_t idx) const noexcept {
-    ptrdiff_t count = -1;
-    for (size_t channel = 0; channel < CHANNELS; channel++) {
-      if (map_[channel] == group) {
-        if (++count == idx) {
-          return channel;
-        }
-      }
-    }
-    return -1;
-  }
-};
-
-template <typename T, size_t ICHANNELS, size_t OCHANNELS>
-class GroupVolumeControl {
-public:
-  static constexpr size_t inputChannels = ICHANNELS;
-  static constexpr size_t outputChannels = OCHANNELS;
-
-  using InputMap = GroupMap<T, ICHANNELS>;
-  using OutputMap = GroupMap<T, OCHANNELS>;
-  using GroupMatrix = VolumeMatrix<T, ICHANNELS, OCHANNELS, 2>;
-
-  GroupVolumeControl() { zeroAll(); }
-
-  const InputMap &inputGroups() const noexcept { return inputGroups_; }
-  InputMap &inputGroups() noexcept { return inputGroups_; }
-  const OutputMap &outputGroups() const noexcept { return outputGroups_; }
-  OutputMap &outputGroups() noexcept { return outputGroups_; }
-
-  const GroupMatrix &groupMatrix() const { return matrix_; }
-
-  void zeroAll() noexcept { matrix_.zero(); }
-
-  VolumeControlResult setGroupVolume(size_t inputGroup, size_t outputGroup,
-                                     T volume) {
-    if (inputGroup >= ICHANNELS || outputGroup >= OCHANNELS) {
-      return VolumeControlResult ::HIGH_GROUP;
-    }
-    matrix_.set(outputGroup, inputGroup, volume);
-    return VolumeControlResult ::SUCCESS;
-  }
-
-  VolumeControlResult getGroupVolume(T &volume, size_t inputGroup,
-                                     size_t outputGroup) const {
-    if (inputGroup >= inputGroups_ || outputGroup >= outputGroups_) {
-      return VolumeControlResult ::HIGH_GROUP;
-    }
-    volume = matrix_.get(outputGroup, inputGroup);
-    return VolumeControlResult ::SUCCESS;
-  }
-
-  template <size_t I, size_t O, size_t A>
-  VolumeControlResult apply(VolumeMatrix<T, I, O, A> &applyTo) const {
-    ptrdiff_t maxInputChannel = inputGroups_.getMaxAssignedChannel();
-    ptrdiff_t maxOutputChannel = outputGroups_.getMaxAssignedChannel();
-    if (maxInputChannel >= applyTo.inputs ||
-        maxOutputChannel >= applyTo.outputs) {
-      return VolumeControlResult ::HIGH_CHANNEL;
-    }
-    applyTo.zero();
-    size_t igChannels[ICHANNELS];
-    size_t ogChannels[OCHANNELS];
-    for (ptrdiff_t oGroup = 0; oGroup <= maxOutputChannel; oGroup++) {
-      ogChannels[oGroup] = outputGroups_.getGroupChannels(oGroup);
-    }
-    for (ptrdiff_t iGroup = 0; iGroup <= maxInputChannel; iGroup++) {
-      igChannels[iGroup] = inputGroups_.getGroupChannels(iGroup);
-    }
-
-    for (ptrdiff_t oGroup = 0; oGroup <= maxOutputChannel; oGroup++) {
-      size_t ogCount = ogChannels[oGroup];
-      if (ogCount == 0) {
-        continue;
-      }
-      for (ptrdiff_t iGroup = 0; iGroup <= maxInputChannel; iGroup++) {
-        size_t igCount = igChannels[iGroup];
-        if (igCount == 0) {
-          continue;
-        }
-        T volume = matrix_.get(oGroup, iGroup);
-        size_t i;
-        if (igCount == 1) {
-          for (i = 0; i < ogCount; i++) {
-            setVolume(applyTo, outputGroups_.getGroupChannel(oGroup, i),
-                        inputGroups_.getGroupChannel(iGroup, 0), volume);
-          }
-          continue;
-        }
-        if (ogCount == 1) {
-          for (i = 0; i < igCount; i++) {
-            setVolume(applyTo, outputGroups_.getGroupChannel(oGroup, 0),
-                        inputGroups_.getGroupChannel(iGroup, i), volume);
-          }
-          continue;
-        }
-        for (i = 0; i < std::min(igCount, ogCount); i++) {
-          setVolume(applyTo, outputGroups_.getGroupChannel(oGroup, i),
-                      inputGroups_.getGroupChannel(iGroup, i), volume);
-        }
-        if (igCount > ogCount) {
-          for (; i < igCount; i++) {
-            setVolume(applyTo, outputGroups_.getGroupChannel(oGroup, i % ogCount),
-                        inputGroups_.getGroupChannel(iGroup, i), volume);
-          }
-        }
-      }
-    }
-    return VolumeControlResult ::SUCCESS;
-  }
-
-private:
-  InputMap inputGroups_;
-  OutputMap outputGroups_;
-  GroupMatrix matrix_;
-
-  template <size_t I, size_t O, size_t A>
-  static void setVolume(VolumeMatrix<T, I, O, A> &applyTo, ptrdiff_t output, ptrdiff_t input, T volume)  {
-    if (output >= 0 && input >= 0) {
-      applyTo.set(output, input, volume);
-    }
-  }
-
+  Matrix vm;
+  Matrix tm;
+  IntegrationCoefficients<double> coeffs;
 };
 
 } // namespace tdap
-// namespace tdap
 
 #endif /* TDAP_VALUE_VOLUME_MATRIX_GUARD */
