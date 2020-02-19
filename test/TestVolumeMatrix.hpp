@@ -22,5 +22,6 @@
  */
 
 void testVolumeMatrix();
+void testGroupVolumeMatrix();
 
 #endif // SPEAKERMAN_TESTVOLUMEMATRIX_HPP

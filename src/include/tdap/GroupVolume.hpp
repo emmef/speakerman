@@ -112,7 +112,7 @@ public:
    * @return true on success
    */
   bool unmap(ptrdiff_t group, size_t channel) noexcept {
-    if (group >= CHANNELS || channel >= CHANNELS) {
+    if (group >= (ptrdiff_t )CHANNELS || channel >= CHANNELS) {
       return Error::setReturn(Error::BOUND);
     }
     ptrdiff_t &mapped = map_[channel];
@@ -136,7 +136,7 @@ public:
    * @return true on success
    */
   bool unmapGroup(ptrdiff_t group) noexcept {
-    if (group >= CHANNELS) {
+    if (group >= (ptrdiff_t )CHANNELS) {
       return Error::setReturn(Error::BOUND);
     }
     for (size_t channel = 0; channel < CHANNELS; channel++) {
@@ -222,33 +222,15 @@ public:
  * @tparam ICHANNELS The number of input channels and groups.
  * @tparam OCHANNELS The number of output channels and groups.
  */
-template <typename T, size_t ICHANNELS, size_t OCHANNELS>
+template <typename T, size_t ICHANNELS, size_t OCHANNELS, size_t ALIGN = 4>
 class GroupVolumeMatrix {
 public:
   static constexpr size_t inputChannels = ICHANNELS;
   static constexpr size_t outputChannels = OCHANNELS;
 
-  using InputMap = ChannelMapping<ICHANNELS>;
-  using OutputMap = ChannelMapping<OCHANNELS>;
-  using GroupMatrix = VolumeMatrix<T, ICHANNELS, OCHANNELS, 2>;
-
-  /**
-   * @return the group channel map for inputs.
-   */
-  InputMap &inputGroups() noexcept { return inputGroups_; }
-  const InputMap &inputGroups() const noexcept { return inputGroups_; }
-
-  /**
-   * @return the group channel map for outputs.
-   */
-  const OutputMap &outputGroups() const noexcept { return outputGroups_; }
-  OutputMap &outputGroups() noexcept { return outputGroups_; }
-
-  /**
-   * @return the volume matrix on the group level.
-   */
-  GroupMatrix &groupMatrix() noexcept { return matrix_; }
-  const GroupMatrix &groupMatrix() const noexcept { return matrix_; }
+  ChannelMapping<ICHANNELS> inputGroups;
+  ChannelMapping<OCHANNELS> outputGroups;
+  VolumeMatrix<T, ICHANNELS, OCHANNELS, ALIGN> volumes;
 
   /**
    * Given the group volumes, translates this to a volume matrix for all the
@@ -269,20 +251,20 @@ public:
    */
   template <size_t I, size_t O, size_t A>
   bool apply(VolumeMatrix<T, I, O, A> &applyTo) const noexcept {
-    ptrdiff_t maxInputChannel = inputGroups_.getMaxAssignedChannel();
-    ptrdiff_t maxOutputChannel = outputGroups_.getMaxAssignedChannel();
-    if (maxInputChannel >= applyTo.inputs ||
-        maxOutputChannel >= applyTo.outputs) {
+    ptrdiff_t maxInputChannel = inputGroups.getMaxAssignedChannel();
+    ptrdiff_t maxOutputChannel = outputGroups.getMaxAssignedChannel();
+    if (maxInputChannel >= (ptrdiff_t )applyTo.inputs ||
+        maxOutputChannel >= (ptrdiff_t)applyTo.outputs) {
       return Error::setErrorReturn(Error::BOUND);
     }
     applyTo.zero();
     size_t igChannels[ICHANNELS];
     size_t ogChannels[OCHANNELS];
     for (ptrdiff_t oGroup = 0; oGroup <= maxOutputChannel; oGroup++) {
-      ogChannels[oGroup] = outputGroups_.getGroupChannels(oGroup);
+      ogChannels[oGroup] = outputGroups.getGroupChannels(oGroup);
     }
     for (ptrdiff_t iGroup = 0; iGroup <= maxInputChannel; iGroup++) {
-      igChannels[iGroup] = inputGroups_.getGroupChannels(iGroup);
+      igChannels[iGroup] = inputGroups.getGroupChannels(iGroup);
     }
 
     for (ptrdiff_t oGroup = 0; oGroup <= maxOutputChannel; oGroup++) {
@@ -295,31 +277,31 @@ public:
         if (igCount == 0) {
           continue;
         }
-        T volume = matrix_.get(oGroup, iGroup);
+        T volume = volumes.get(oGroup, iGroup);
         size_t i;
         if (igCount == 1) {
           for (i = 0; i < ogCount; i++) {
-            setVolume(applyTo, outputGroups_.getGroupChannel(oGroup, i),
-                      inputGroups_.getGroupChannel(iGroup, 0), volume);
+            setVolume(applyTo, outputGroups.getGroupChannel(oGroup, i),
+                      inputGroups.getGroupChannel(iGroup, 0), volume);
           }
           continue;
         }
         if (ogCount == 1) {
           for (i = 0; i < igCount; i++) {
-            setVolume(applyTo, outputGroups_.getGroupChannel(oGroup, 0),
-                      inputGroups_.getGroupChannel(iGroup, i), volume);
+            setVolume(applyTo, outputGroups.getGroupChannel(oGroup, 0),
+                      inputGroups.getGroupChannel(iGroup, i), volume);
           }
           continue;
         }
         for (i = 0; i < std::min(igCount, ogCount); i++) {
-          setVolume(applyTo, outputGroups_.getGroupChannel(oGroup, i),
-                    inputGroups_.getGroupChannel(iGroup, i), volume);
+          setVolume(applyTo, outputGroups.getGroupChannel(oGroup, i),
+                    inputGroups.getGroupChannel(iGroup, i), volume);
         }
         if (igCount > ogCount) {
           for (; i < igCount; i++) {
             setVolume(applyTo,
-                      outputGroups_.getGroupChannel(oGroup, i % ogCount),
-                      inputGroups_.getGroupChannel(iGroup, i), volume);
+                      outputGroups.getGroupChannel(oGroup, i % ogCount),
+                      inputGroups.getGroupChannel(iGroup, i), volume);
           }
         }
       }
@@ -328,9 +310,6 @@ public:
   }
 
 private:
-  InputMap inputGroups_;
-  OutputMap outputGroups_;
-  GroupMatrix matrix_;
 
   template <size_t I, size_t O, size_t A>
   static void setVolume(VolumeMatrix<T, I, O, A> &applyTo, ptrdiff_t output,

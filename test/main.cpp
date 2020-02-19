@@ -466,6 +466,7 @@ void printPinkNoise() {
 int main(int c, const char *args[])
 {
   testVolumeMatrix();
+  testGroupVolumeMatrix();
 //  alignedFrameTests();
 //  testIirCoefficientVariants();
 //	testMultiTimeDelay();
