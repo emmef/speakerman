@@ -11,26 +11,7 @@ set(Boost_USE_MULTITHREADED ON)
 set(Boost_USE_STATIC_RUNTIME OFF)
 find_package(Boost)
 
-set(SOURCE_FILES
-        src/include/speakerman/jack/ErrorHandler.hpp
-        src/include/speakerman/jack/JackClient.hpp
-        src/include/speakerman/jack/JackProcessor.hpp
-        src/include/speakerman/jack/Names.hpp
-        src/include/speakerman/jack/Port.hpp
-        src/include/speakerman/jack/PortDefinition.hpp
-        src/include/speakerman/jack/SignalHandler.hpp
-        src/include/speakerman/utils/Config.hpp
-        src/include/speakerman/utils/Mutex.hpp
-        src/include/speakerman/DynamicsProcessor.hpp
-        src/include/speakerman/HttpMessage.hpp
-        src/include/speakerman/ServerSocket.hpp
-        src/include/speakerman/SingleThreadFileCache.hpp
-        src/include/speakerman/SocketStream.hpp
-        src/include/speakerman/SpeakerManager.hpp
-        src/include/speakerman/SpeakermanConfig.hpp
-        src/include/speakerman/SpeakermanRuntimeData.hpp
-        src/include/speakerman/SpeakermanWebServer.hpp
-        src/include/speakerman/Stream.hpp
+set(TDAP_HEADERS
         src/include/tdap/Array.hpp
         src/include/tdap/ArrayTraits.hpp
         src/include/tdap/CapacityPolicy.hpp
@@ -62,6 +43,29 @@ set(SOURCE_FILES
         src/include/tdap/ValueRange.hpp
         src/include/tdap/VolumeMatrix.hpp
         src/include/tdap/Weighting.hpp
+        src/include/tdap/Limiter.hpp src/include/tdap/AlignedFrame.hpp src/include/tdap/Errors.hpp src/include/tdap/GroupVolume.hpp
+        src/include/tdap/TrueRms.hpp)
+
+set(SOURCE_FILES
+        src/include/speakerman/jack/ErrorHandler.hpp
+        src/include/speakerman/jack/JackClient.hpp
+        src/include/speakerman/jack/JackProcessor.hpp
+        src/include/speakerman/jack/Names.hpp
+        src/include/speakerman/jack/Port.hpp
+        src/include/speakerman/jack/PortDefinition.hpp
+        src/include/speakerman/jack/SignalHandler.hpp
+        src/include/speakerman/utils/Config.hpp
+        src/include/speakerman/utils/Mutex.hpp
+        src/include/speakerman/DynamicsProcessor.hpp
+        src/include/speakerman/HttpMessage.hpp
+        src/include/speakerman/ServerSocket.hpp
+        src/include/speakerman/SingleThreadFileCache.hpp
+        src/include/speakerman/SocketStream.hpp
+        src/include/speakerman/SpeakerManager.hpp
+        src/include/speakerman/SpeakermanConfig.hpp
+        src/include/speakerman/SpeakermanRuntimeData.hpp
+        src/include/speakerman/SpeakermanWebServer.hpp
+        src/include/speakerman/Stream.hpp
         src/Allocation.cpp
         src/ErrorHandler.cpp
         src/HttpMessage.cpp
@@ -76,19 +80,19 @@ set(SOURCE_FILES
         src/SocketStream.cpp
         src/SpeakermanConfig.cpp
         src/SpeakermanWebServer.cpp
-        src/Stream.cpp src/include/tdap/Limiter.hpp src/include/tdap/AlignedFrame.hpp)
+        src/Stream.cpp )
 
 find_path(LOCAL_TDAP_PATH, README-TAP.md HINTS ../ ../../ NO_DEFAULT_PATH)
 
 
-add_executable(speakerman ${SOURCE_FILES} src/speakerman.cpp src/include/tdap/Errors.hpp src/include/tdap/GroupVolume.hpp)
+add_executable(speakerman  ${TDAP_HEADERS} ${SOURCE_FILES} src/speakerman.cpp)
 set(LIBRARIES
         jack
         pthread
         )
 link_libraries(jack pthread)
 target_link_libraries(speakerman jack pthread)
-add_executable(test_speakerman ${SOURCE_FILES} test/main.cpp test/TestIirCoefficients.hpp test/TestIirCoefficients.cpp test/TestAlignedFrame.cpp test/TestAlignedFrame.hpp test/TestVolumeMatrix.hpp test/TestVolumeMatrix.cpp)
+add_executable(test_speakerman  ${TDAP_HEADERS} test/main.cpp test/TestIirCoefficients.hpp test/TestIirCoefficients.cpp test/TestAlignedFrame.cpp test/TestAlignedFrame.hpp test/TestVolumeMatrix.hpp test/TestVolumeMatrix.cpp)
 install(TARGETS speakerman RUNTIME DESTINATION bin)
 install(FILES web/index.html web/speakerman.js web/speakerman.css DESTINATION share/speakerman/web)
 install(PROGRAMS src/speakerman-watchdog.sh DESTINATION share/speakerman/script)
