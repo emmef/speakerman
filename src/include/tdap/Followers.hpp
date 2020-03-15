@@ -23,6 +23,7 @@
 #ifndef TDAP_FOLLOWERS_HEADER_GUARD
 #define TDAP_FOLLOWERS_HEADER_GUARD
 
+#include <algorithm>
 #include <tdap/Integration.hpp>
 #ifdef TDAP_FOLLOWERS_DEBUG_LOGGING
 #include <cstdio>
@@ -162,6 +163,89 @@ public:
 
   AttackReleaseFilter<C> &integrator() { return integrator_; }
 };
+
+template <typename T>
+class FastSmoothHoldFollower {
+  IntegrationCoefficients<T> attack_;
+  IntegrationCoefficients<T> release_;
+  T releaseInt1_ = 1;
+  T releaseInt2_ = 1;
+  T attackInt1_ = 1;
+  T attackInt2_ = 1;
+  T attackInt3_ = 1;
+  T attackInt4_ = 1;
+  T overshoot_ = 1.5;
+  T holdPeak_ = 1;
+  T threshold_ = 1;
+  size_t prediction_ = 1;
+  size_t count_ = 0;
+
+  T calculateOverShoot(size_t predictionSamples) {
+    T m1, m2, m3, m4;
+    m1 = m2 = m3 = m4 = 0;
+    for (size_t s = 0; s < predictionSamples; s++) {
+      attack_.integrate(1.0, m1);
+      attack_.integrate(m1, m2);
+      attack_.integrate(m2, m3);
+      attack_.integrate(m3, m4);
+    }
+    return 1.0 / m4;
+  }
+
+public:
+  void setPredictionAndThreshold(T predictionSeconds, T threshold,
+                                 T sampleRate, T releaseSeconds, T initialValue = -1)  {
+    T initValue = std::clamp(initialValue, threshold, threshold *  100);
+    threshold_ = threshold;
+    releaseInt1_ = initValue;
+    releaseInt2_ = initValue;
+    attackInt1_ = initValue;
+    attackInt2_ = initValue;
+    attackInt3_ = initValue;
+    attackInt4_ = initValue;
+    holdPeak_ = initValue;
+    prediction_ = 0.5 + predictionSeconds * sampleRate;
+    attack_.setCharacteristicSamples(std::max(prediction_ / 6, 8lu));
+    overshoot_ = calculateOverShoot(prediction_);
+    release_.setCharacteristicSamples(sampleRate * std::clamp(releaseSeconds, 0.001, 0.1));
+    count_ = 0;
+  }
+
+  size_t latency() const noexcept { return prediction_; }
+
+  T threshold() const noexcept { return threshold_; }
+
+  T getDetection(T sample) noexcept  {
+    T limitValue = std::max(threshold_, sample);
+    if (limitValue > holdPeak_) {
+      holdPeak_ = limitValue;
+      count_ = prediction_;
+    }
+    else if (count_ > 0) {
+      count_--;
+    }
+    else {
+      holdPeak_ = limitValue;
+    }
+    T correctedValue = threshold_ + (holdPeak_ - threshold_) * overshoot_;
+    if (correctedValue > releaseInt2_) {
+      releaseInt2_ = releaseInt1_ = correctedValue;
+    }
+    else {
+      release_.integrate(correctedValue, releaseInt1_);
+      release_.integrate(releaseInt1_, releaseInt2_);
+    }
+    attack_.integrate(releaseInt2_, attackInt1_);
+    attack_.integrate(attackInt1_, attackInt2_);
+    attack_.integrate(attackInt2_, attackInt3_);
+    attack_.integrate(attackInt3_, attackInt4_);
+
+    return attackInt4_;
+  }
+
+  T getGain(T sample) noexcept { return threshold() / getDetection(sample); }
+};
+
 
 template <typename C> class SmoothHoldMaxAttackRelease {
   static_assert(is_arithmetic<C>::value, "Sample type S must be arithmetic");
