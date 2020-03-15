@@ -120,7 +120,7 @@ struct DetectionConfig {
 
   static constexpr size_t MIN_PERCEPTIVE_LEVELS = 2;
   static constexpr size_t DEFAULT_PERCEPTIVE_LEVELS = 11;
-  static constexpr size_t MAX_PERCEPTIVE_LEVELS = 16;
+  static constexpr size_t MAX_PERCEPTIVE_LEVELS = 20;
   static constexpr const char *KEY_SNIPPET_PERCEPTIVE_LEVELS =
       "detection.time-constants";
 
@@ -130,12 +130,19 @@ struct DetectionConfig {
   static constexpr const char *KEY_SNIPPET_MINIMUM_WINDOW_SECONDS =
       "detection.fast-seconds";
 
+  static constexpr double MIN_RMS_FAST_RELEASE_SECONDS = 0.001;
+  static constexpr double DEFAULT_RMS_FAST_RELEASE_SECONDS = 0.02;
+  static constexpr double MAX_RMS_FAST_RELEASE_SECONDS = 0.10;
+  static constexpr const char *KEY_SNIPPET_RMS_FAST_RELEASE_SECONDS =
+      "detection.rms-fast-release-seconds";
+
   static constexpr int DEFAULT_USE_BRICK_WALL_PREDICTION = 1;
   static constexpr const char *KEY_SNIPPET_USE_BRICK_WALL_PREDICTION =
       "detection.use-brick-wall-prediction";
 
   double maximum_window_seconds = DEFAULT_MAXIMUM_WINDOW_SECONDS;
   double minimum_window_seconds = DEFAULT_MINIMUM_WINDOW_SECONDS;
+  double rms_fast_release_seconds = DEFAULT_RMS_FAST_RELEASE_SECONDS;
   size_t perceptive_levels = DEFAULT_PERCEPTIVE_LEVELS;
   int useBrickWallPrediction = DEFAULT_USE_BRICK_WALL_PREDICTION;
 

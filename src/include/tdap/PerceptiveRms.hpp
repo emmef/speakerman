@@ -105,7 +105,7 @@ struct Perceptive {
       IndexPolicy::method(index, count_);
       double exponent = double(index - perceptive_) / fastSteps();
       double base = fastSeconds_ / PERCEPTIVE_SECONDS;
-      return pow(base, exponent * PERCEPTIVE_WEIGHT_POWER);
+      return std::max(0.1, pow(base, exponent * PERCEPTIVE_WEIGHT_POWER));
     }
 
     [[nodiscard]] double seconds(size_t index) const {
@@ -193,7 +193,7 @@ static std::ostream &operator<<(std::ostream &stream,
 namespace tdap {
 template <typename S, size_t MAX_WINDOW_SAMPLES, size_t LEVELS>
 class PerceptiveRms {
-  static_assert(Values::is_between(LEVELS, (size_t)3, (size_t)16),
+  static_assert(Values::is_between(LEVELS, (size_t)3, (size_t)24),
                 "Levels must be between 3 and 16");
 
   TrueFloatingPointWeightedMovingAverageSet<S> rms_;
@@ -281,22 +281,23 @@ class PerceptiveRmsGroup {
   using RmsClass = PerceptiveRms<S, MAX_WINDOW_SAMPLES, LEVELS>;
   RmsClass rms_[CHANNELS];
   S maximum_unsmoothed_detection;
-  SmoothHoldMaxAttackRelease<S> follower_;
+  FastSmoothHoldFollower<S> follower_;
 
 public:
   PerceptiveRmsGroup()
-      : maximum_unsmoothed_detection(0.0), follower_(1, 1, 1, 1) {}
+      : maximum_unsmoothed_detection(0.0) {}
 
-  void configure(double sample_rate, const Perceptive::Metrics &metrics,
+  void configure(double sample_rate, const Perceptive::Metrics &metrics, S rmsRelease,
                  S initial_value) {
     for (size_t channel = 0; channel < CHANNELS; channel++) {
       rms_[channel].configure(sample_rate, metrics, initial_value);
     }
 
-    follower_ = SmoothHoldMaxAttackRelease<S>(
-        0.5 + metrics.holdSeconds() * sample_rate,
-        metrics.attackSeconds() * sample_rate,
-        metrics.releaseSeconds() * sample_rate, 10);
+    follower_.setPredictionAndThreshold(0.001, 1.0, sample_rate, rmsRelease, initial_value);
+  }
+
+  size_t getLatency() noexcept {
+    return follower_.latency();
   }
 
   void reset_frame_detection() { maximum_unsmoothed_detection = 0.0; }
@@ -308,7 +309,9 @@ public:
             square, minimim));
   }
 
-  S get_detection() { return follower_.apply(maximum_unsmoothed_detection); }
+  S get_detection() {
+    return follower_.getDetection(maximum_unsmoothed_detection);
+  }
 };
 
 } // namespace tdap

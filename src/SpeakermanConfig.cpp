@@ -635,6 +635,8 @@ public:
                detection.maximum_window_seconds);
     add_reader(DetectionConfig::KEY_SNIPPET_MINIMUM_WINDOW_SECONDS, false,
                detection.minimum_window_seconds);
+    add_reader(DetectionConfig::KEY_SNIPPET_RMS_FAST_RELEASE_SECONDS, false,
+               detection.rms_fast_release_seconds);
     add_reader(DetectionConfig::KEY_SNIPPET_PERCEPTIVE_LEVELS, false,
                detection.perceptive_levels);
     add_reader(DetectionConfig::KEY_SNIPPET_USE_BRICK_WALL_PREDICTION, false,
@@ -1029,6 +1031,7 @@ const DetectionConfig DetectionConfig::unsetConfig() {
   unset_config_value(result.useBrickWallPrediction);
   unset_config_value(result.maximum_window_seconds);
   unset_config_value(result.minimum_window_seconds);
+  unset_config_value(result.rms_fast_release_seconds);
   unset_config_value(result.perceptive_levels);
 
   return result;
@@ -1043,6 +1046,9 @@ void DetectionConfig::set_if_unset(const DetectionConfig &config_if_unset) {
   box_if_out_of_range(minimum_window_seconds,
                       config_if_unset.minimum_window_seconds,
                       MIN_MINIMUM_WINDOW_SECONDS, MAX_MINIMUM_WINDOW_SECONDS);
+  box_if_out_of_range(rms_fast_release_seconds,
+                      config_if_unset.rms_fast_release_seconds,
+                      MIN_RMS_FAST_RELEASE_SECONDS, MAX_RMS_FAST_RELEASE_SECONDS);
   box_if_out_of_range(perceptive_levels, config_if_unset.perceptive_levels,
                       MIN_PERCEPTIVE_LEVELS, MAX_PERCEPTIVE_LEVELS);
 }

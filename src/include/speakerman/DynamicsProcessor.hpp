@@ -62,12 +62,12 @@ public:
   // OUTPUTS
   static constexpr size_t OUTPUTS = INPUTS + 1;
 
-  static constexpr size_t RMS_DETECTION_LEVELS = 16;
+  static constexpr size_t RMS_DETECTION_LEVELS = 20;
 
   static constexpr double GROUP_MAX_DELAY = GroupConfig::MAX_DELAY;
   static constexpr double LIMITER_MAX_DELAY = 0.01;
   static constexpr double RMS_MAX_DELAY = 0.01;
-  static constexpr double LIMITER_PREDICTION_SECONDS = 0.003;
+  static constexpr double LIMITER_PREDICTION_SECONDS = 0.001;
   static constexpr double peakThreshold = 1.0;
 
   static constexpr size_t GROUP_MAX_DELAY_SAMPLES =
@@ -131,7 +131,7 @@ public:
       free();
       for (size_t i = 0; i < LIMITERS; i++) {
         limiters[i] = limiterClass == LimiterClass::SMOOTH_TRIANGULAR
-                          ? dynamic_cast<LimiterPtr>(new TriangularLimiter<T>)
+                          ? dynamic_cast<LimiterPtr>(new FastLookAheadLimiter<T>)
                           : dynamic_cast<LimiterPtr>(
                                 new ZeroPredictionHardAttackLimiter<T>);
         limiters[i]->setPredictionAndThreshold(prediction, threshold,
@@ -190,6 +190,7 @@ private:
 
   GroupDelay groupDelay;
   GroupDelay predictionDelay;
+  RmsDelay rmsDelay;
   EqualizerFilter<double, CHANNELS_PER_GROUP> filters_[GROUPS + 1];
 
   Configurable runtime;
@@ -228,9 +229,12 @@ public:
     subDetector.configure(sampleRate, perceptiveMetrics, 100);
     for (size_t band = 0, detector = 0; band < CROSSOVERS; band++) {
       for (size_t group = 0; group < GROUPS; group++, detector++) {
-        groupDetector[detector].configure(sampleRate, perceptiveMetrics, 100);
+        groupDetector[detector].configure(sampleRate, perceptiveMetrics, detection.rms_fast_release_seconds, 100);
       }
     }
+    size_t rmsLatency = groupDetector[0].getLatency();
+    rmsDelay.setDelay(rmsLatency);
+    std::cout << "RMS detection prediction=" << rmsLatency << std::endl;
     auto weights = Crossovers::weights(crossovers, sampleRate);
     cout << "Band weights: sub=" << weights[0];
     relativeBandWeights[0] = weights[0];
@@ -246,7 +250,7 @@ public:
            sampleRate);
     limiter.setPredictionAndThreshold(
         predictionSamples, peakThreshold, sampleRate,
-        detection.useBrickWallPrediction == 0 ? LimiterClass::SMOOTH_TRIANGULAR
+        detection.useBrickWallPrediction == 1 ? LimiterClass::SMOOTH_TRIANGULAR
                                               : LimiterClass::CRUDE);
     size_t latency = limiter.getLatency();
     for (size_t l = 0; l < DELAY_CHANNELS; l++) {
@@ -306,6 +310,7 @@ public:
     processSubLimiter(target);
     groupDelay.next();
     predictionDelay.next();
+    rmsDelay.next();
   }
 
 private:
@@ -347,7 +352,7 @@ private:
     T detect = subDetector.add_square_get_detection(x * x, 1.0);
     T gain = 1.0 / detect;
     levels.addValues(0, detect);
-    sub *= gain;
+    sub = gain * rmsDelay.setAndGet(0, sub);
     processInput[0] = filters_[GROUPS].filter()->filter(0, sub);
   }
 
@@ -363,7 +368,6 @@ private:
         for (size_t offset = baseOffset, channel = 0; offset < nextOffset;
              offset++, delay++, channel++) {
           T x = processInput[offset];
-          processInput[offset] = x;
           T y = aCurve.filter(offset, x);
           y *= scaleForUnity;
           gd.add_square_for_channel(channel, y * y, 1.0);
@@ -372,7 +376,7 @@ private:
         T gain = 1.0 / detect;
         levels.addValues(1 + group, detect);
         for (size_t offset = baseOffset; offset < nextOffset; offset++) {
-          processInput[offset] *= gain;
+          processInput[offset] = gain * rmsDelay.setAndGet(offset, processInput[offset]);
         }
         baseOffset = nextOffset;
       }
