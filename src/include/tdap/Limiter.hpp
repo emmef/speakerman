@@ -21,6 +21,7 @@
  * limitations under the License.
  */
 
+#include <algorithm>
 #include <tdap/Followers.hpp>
 
 namespace tdap {
@@ -88,6 +89,28 @@ public:
 };
 
 template <typename T>
+class FastLookAheadLimiter : public Limiter<T> {
+  FastSmoothHoldFollower<T> follower;
+public:
+  void setPredictionAndThreshold(size_t prediction, T threshold,
+                                 T sampleRate) override {
+    T predictionSeconds = 1.0 * prediction / sampleRate;
+    follower.setPredictionAndThreshold(
+        predictionSeconds,
+        threshold,
+        sampleRate,
+        std::clamp(predictionSeconds * 5, 0.003, 0.02),
+        threshold);
+  }
+
+  size_t latency() const noexcept override { return follower.latency(); }
+
+  T getGain(T sample) noexcept override {
+    return follower.getGain(sample);
+  }
+};
+
+template <typename T>
 class ZeroPredictionHardAttackLimiter : public Limiter<T> {
   IntegrationCoefficients<T> release_;
   T integrated1_ = 0;
@@ -104,6 +127,7 @@ public:
     release_.setCharacteristicSamples(release * M_SQRT1_2);
     threshold_ = threshold;
     integrated1_ = integrated2_ = threshold_;
+    std::cout << "HARD no prediction limiter" << std::endl;
   }
 
   size_t latency() const noexcept override { return 0; }
@@ -146,6 +170,7 @@ public:
     follower_.setTimeConstantAndSamples(attack, release, adjustedThreshold_);
     release_.setCharacteristicSamples(release * RELEASE_SMOOTHFACTOR);
     integrated_ = adjustedThreshold_;
+    std::cout << "TriangularLimiter" << std::endl;
   }
 
   size_t latency() const noexcept override { return latency_; }
