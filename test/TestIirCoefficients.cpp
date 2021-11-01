@@ -203,8 +203,8 @@ template <size_t CHANNELS, size_t ORDER> struct CoefficientMeasurements {
            CHANNELS);
 
     Experiment experiment[] = {{"Multi-channel naive", calcMulti},
-                               {"Raw data block", calcRawBlock, false},
-//                               {"Block of frames", calcFrameBlock},
+//                               {"Raw data block", calcRawBlock, false},
+                               {"Block of frames", calcFrameBlock},
 //                               {"Frame history shift", calcFrameShift},
 //                               {"Frame with time ptr", calcFrameTimePtr}
     };
@@ -234,24 +234,24 @@ template <size_t CHANNELS, size_t ORDER> struct CoefficientMeasurements {
       if (fault >= 0) {
         printf("Calculation via %s does not yield same result as %s.\n",
                experiment[e].name, experiment[0].name);
-        for (ptrdiff_t frame = fault - 2; frame < fault + ORDER + 1; frame++) {
-          if (frame < 0) {
-            continue;
-          }
-          printf("frame[%zu]", frame);
-          if (!compareFrames(outputBuffer[frame], refOutputBuffer[frame])) {
-            printf(" * ");
-          }
-          printf("\n\tref={");
-          for (size_t channel = 0; channel < Frame::channels; channel++) {
-            printf(" %10.3le", refOutputBuffer[frame][channel]);
-          }
-          printf(" }\n\tout={");
-          for (size_t channel = 0; channel < Frame::channels; channel++) {
-            printf(" %10.3le", outputBuffer[frame][channel]);
-          }
-          printf(" }\n");
-        }
+//        for (ptrdiff_t frame = fault - 2; frame < fault + ORDER + 1; frame++) {
+//          if (frame < 0) {
+//            continue;
+//          }
+//          printf("frame[%zu]", frame);
+//          if (!compareFrames(outputBuffer[frame], refOutputBuffer[frame])) {
+//            printf(" * ");
+//          }
+//          printf("\n\tref={");
+//          for (size_t channel = 0; channel < Frame::channels; channel++) {
+//            printf(" %10.3le", refOutputBuffer[frame][channel]);
+//          }
+//          printf(" }\n\tout={");
+//          for (size_t channel = 0; channel < Frame::channels; channel++) {
+//            printf(" %10.3le", outputBuffer[frame][channel]);
+//          }
+//          printf(" }\n");
+//        }
       }
     }
 

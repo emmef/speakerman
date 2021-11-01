@@ -278,11 +278,6 @@ namespace tdap {
             std::unique_lock<std::mutex> lock(mutex_);
             return *object_;
         }
-        const Object &get() const
-        {
-            std::unique_lock<std::mutex> lock(mutex_);
-            return *object_;
-        }
         operator Object &() const
         {
             return *get();
