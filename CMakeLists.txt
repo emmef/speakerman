@@ -80,7 +80,9 @@ set(SOURCE_FILES
         src/SocketStream.cpp
         src/SpeakermanConfig.cpp
         src/SpeakermanWebServer.cpp
-        src/Stream.cpp )
+        src/Stream.cpp)
+
+# Removed: src/include/speakerman/webserver.h src/webserver.cc src/include/util/FileBuffer.h src/FileBuffer.cc
 
 find_path(LOCAL_TDAP_PATH, README-TAP.md HINTS ../ ../../ NO_DEFAULT_PATH)
 
@@ -91,8 +93,10 @@ set(LIBRARIES
         pthread
         )
 link_libraries(jack pthread)
-target_link_libraries(speakerman jack pthread)
-add_executable(test_speakerman  ${TDAP_HEADERS} test/main.cpp test/TestIirCoefficients.hpp test/TestIirCoefficients.cpp test/TestAlignedFrame.cpp test/TestAlignedFrame.hpp test/TestVolumeMatrix.hpp test/TestVolumeMatrix.cpp)
+target_link_libraries(speakerman jack pthread stdc++ m)
+target_compile_options(speakerman PRIVATE -fno-trapping-math -fdenormal-fp-math=positive-zero -fno-math-errno)
+add_executable(test_speakerman ${TDAP_HEADERS} test/main.cpp test/TestIirCoefficients.hpp test/TestIirCoefficients.cpp test/TestAlignedFrame.cpp test/TestAlignedFrame.hpp test/TestVolumeMatrix.hpp test/TestVolumeMatrix.cpp)
+target_link_libraries(test_speakerman stdc++ m)
 install(TARGETS speakerman RUNTIME DESTINATION bin)
 install(FILES web/index.html web/speakerman.js web/speakerman.css DESTINATION share/speakerman/web)
 install(PROGRAMS src/speakerman-watchdog.sh DESTINATION share/speakerman/script)
