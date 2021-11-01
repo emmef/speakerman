@@ -64,6 +64,8 @@ public:
     // rounding 14:13, 00 = nearest, 01 = neg, 10 = pos, 11 = to zero
     // The enum above is defined in the same order so just shift it up
     _mm_setcsr(0x8040 | 0x1f80 | ((unsigned int)mode << 13));
+    _MM_SET_DENORMALS_ZERO_MODE(_MM_DENORMALS_ZERO_ON);
+    _MM_SET_FLUSH_ZERO_MODE(_MM_FLUSH_ZERO_ON);
 #endif
   }
 
