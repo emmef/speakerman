@@ -300,6 +300,7 @@ using FloatValueParser = ValueParser<double>;
 
 class VariableReader {
   bool runtime_changeable_ = false;
+  bool is_deprecated_ = false;
 
 protected:
   virtual void read(SpeakermanConfig &config, const char *key,
@@ -309,13 +310,14 @@ protected:
                     const SpeakermanConfig &basedUpon) const = 0;
 
 public:
-  bool runtime_changeable() const { return runtime_changeable_; }
+  [[nodiscard]] bool runtime_changeable() const { return runtime_changeable_; }
+  [[nodiscard]] bool is_deprecated() const { return is_deprecated_; }
 
   virtual void write(const SpeakermanConfig &config, const char *key,
                      ostream &stream) const = 0;
 
-  VariableReader(bool runtime_changeable)
-      : runtime_changeable_(runtime_changeable) {}
+  VariableReader(bool runtime_changeable, bool is_deprecated)
+      : runtime_changeable_(runtime_changeable), is_deprecated_(is_deprecated) {}
 
   bool read(SpeakermanConfig &config, const char *key, const char *value,
             const SpeakermanConfig &basedUpon) const {
@@ -369,9 +371,13 @@ protected:
 
 public:
   PositionedVariableReader(bool runtime_changeable,
-                           const SpeakermanConfig &config, const void *field)
-      : VariableReader(runtime_changeable),
+                           const SpeakermanConfig &config, const void *field, bool is_deprecated)
+      : VariableReader(runtime_changeable, is_deprecated),
         offset_(valid_offset(config, field)) {}
+
+//  PositionedVariableReader(bool runtime_changeable,
+//                           const SpeakermanConfig &config, const void *field)
+//      : PositionedVariableReader(runtime_changeable, false, config, field) {}
 };
 
 template <typename T>
@@ -392,9 +398,9 @@ protected:
 
 public:
   TypedVariableReader(bool runtime_changeable, const SpeakermanConfig &config,
-                      const T &field)
+                      const T &field, bool is_deprecated)
       : PositionedVariableReader<sizeof(T)>(runtime_changeable, config,
-                                            &field){};
+                                            &field, is_deprecated){};
 
   void write(const SpeakermanConfig &config, const char *key,
              ostream &stream) const override {
@@ -434,9 +440,9 @@ protected:
 
 public:
   TypedArrayVariableReader(bool runtime_changeable,
-                           const SpeakermanConfig &config, const T &field)
+                           const SpeakermanConfig &config, const T &field, bool is_deprecated)
       : PositionedVariableReader<N * sizeof(T)>(runtime_changeable, config,
-                                                &field){};
+                                                &field, is_deprecated){};
 
   void write(const SpeakermanConfig &config, const char *key,
              ostream &stream) const override {
@@ -543,6 +549,9 @@ public:
 
   bool read(SpeakermanConfig &manager, const string &key, const char *value,
             const SpeakermanConfig &basedUpon) {
+    if (reader_->is_deprecated()) {
+        std::cout << "Warning: variable \"" << key_ << "\" is deprecated!" << std::endl;
+    }
     return reader_->read(manager, key.c_str(), value, basedUpon);
   }
 
@@ -601,17 +610,29 @@ class ConfigManager : protected SpeakermanConfig {
     size_ = new_size;
   }
 
-  template <typename T>
-  void add_reader(const string &name, bool runtime_changeable, T &field) {
-    add(new KeyVariableReader(
-        name, new TypedVariableReader<T>(runtime_changeable, *this, field)));
-  }
+    template <typename T>
+    void add_reader(const string &name, bool runtime_changeable, T &field) {
+      add(new KeyVariableReader(
+          name, new TypedVariableReader<T>(runtime_changeable, *this, field, false)));
+    }
 
-  template <typename T, size_t N>
-  void add_array_reader(const string &name, bool runtime_changeable, T &field) {
-    add(new KeyVariableReader(name, new TypedArrayVariableReader<T, N>(
-                                        runtime_changeable, *this, field)));
-  }
+    template <typename T, size_t N>
+    void add_array_reader(const string &name, bool runtime_changeable, T &field) {
+      add(new KeyVariableReader(name, new TypedArrayVariableReader<T, N>(
+                                          runtime_changeable, *this, field, false)));
+    }
+
+    template <typename T>
+    void add_deprecated_reader(const string &name, bool runtime_changeable, T &field) {
+      add(new KeyVariableReader(
+          name, new TypedVariableReader<T>(runtime_changeable, *this, field, true)));
+    }
+
+    template <typename T, size_t N>
+    void add_deprecated_array_reader(const string &name, bool runtime_changeable, T &field) {
+      add(new KeyVariableReader(name, new TypedArrayVariableReader<T, N>(
+                                          runtime_changeable, *this, field, true)));
+    }
 
 public:
   ConfigManager() {
@@ -624,7 +645,7 @@ public:
     add_reader(KEY_SNIPPET_SUB_OUTPUT, false, subOutput);
 
     add_reader(KEY_SNIPPET_GENERATE_NOISE, true, generateNoise);
-    add_reader(KEY_SNIPPET_INPUT_OFFSET, false, inputOffset);
+    add_deprecated_reader(KEY_SNIPPET_INPUT_OFFSET, false, inputOffset);
 
     add_reader(DetectionConfig::KEY_SNIPPET_MAXIMUM_WINDOW_SECONDS, false,
                detection.maximum_window_seconds);
@@ -741,7 +762,6 @@ public:
     if (status != ReaderStatus::SUCCESS) {
       return false;
     }
-
     return reader->read(config, reader->get_key(), value_start, basedUpon);
   }
 
