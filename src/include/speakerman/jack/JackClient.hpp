@@ -23,14 +23,51 @@
 #define SMS_SPEAKERMAN_JACKCLIENT_GUARD_H_
 
 #include "Port.hpp"
+#include <algorithm>
 #include <atomic>
+#include <cstdio>
 #include <condition_variable>
 #include <jack/types.h>
 #include <mutex>
 #include <speakerman/jack/JackProcessor.hpp>
+#include <speakerman/jack/SignalHandler.hpp>
 #include <thread>
 
 namespace speakerman {
+
+namespace  {
+
+class NullRedirect {
+  FILE *& file_;
+  FILE * old_;
+  FILE *null_;
+  const char * message_;
+public:
+  NullRedirect(FILE *&file, const char *message) : file_(file), old_(file), null_(nullptr) , message_(message) {
+  }
+
+  void redirect() {
+    if (!null_) {
+      null_ = fopen("/dev/null", "w");
+      if (null_) {
+        if (message_) {
+          fprintf(old_, "\nSupressing output: %s\n", message_);
+        }
+        file_ = null_;
+      }
+    }
+  }
+
+  ~NullRedirect() {
+    if (null_) {
+      FILE *cleanup = file_;
+      file_ = old_;
+      fclose(cleanup);
+      fprintf(old_, "Enabling output: %s\n", message_);
+    }
+  }
+};
+}
 
 using namespace std;
 using namespace tdap;
@@ -162,11 +199,16 @@ public:
   template <typename... A>
   static CreateClientResult create(const char *serverName,
                                    jack_options_t options, A... args) {
+    static constexpr long maxSleepMillis = 10000;
+    static constexpr long maxTotalMillis = 3600 * 1000 * 24;
+
     MessageSuppress suppress;
     jack_status_t lastState = static_cast<JackStatus>(0);
     long sleepMillis = 100;
+
     suppress.suppress();
-    for (int i = 1; i <= 10; i++) {
+    for (long sleptMillis = 0, i = 0; sleptMillis < maxTotalMillis; i++) {
+      SignalHandler::check_raised();
       jack_client_t *c =
           jack_client_open(serverName, options, &lastState, args...);
       if (c) {
@@ -176,17 +218,23 @@ public:
                 << " failed with status " << lastState << " (sleep "
                 << sleepMillis << "msec." << std::endl;
       std::this_thread::sleep_for(std::chrono::milliseconds(sleepMillis));
-      sleepMillis *= 1.7;
+      sleptMillis += sleepMillis;
+      sleepMillis = std::min(maxSleepMillis, long(sleepMillis * 1.7));
     }
     return {nullptr, lastState, serverName};
   }
 
   static CreateClientResult createDefault(const char *serverName) {
+    static constexpr long maxSleepMillis = 10000;
+    static constexpr long maxTotalMillis = 3600 * 1000 * 24;
+
     MessageSuppress suppress;
+
     jack_status_t lastState = static_cast<JackStatus>(0);
     long sleepMillis = 100;
     suppress.suppress();
-    for (int i = 1; i <= 9; i++) {
+    for (long sleptMillis = 0, i = 0; sleptMillis < maxTotalMillis; i++) {
+      SignalHandler::check_raised();
       jack_client_t *c =
           jack_client_open(serverName, JackOptions::JackNullOption, &lastState);
       if (c) {
@@ -196,7 +244,8 @@ public:
                 << " failed with status " << lastState << " (sleep "
                 << sleepMillis << "ms.)" << std::endl;
       std::this_thread::sleep_for(std::chrono::milliseconds(sleepMillis));
-      sleepMillis *= 1.7;
+      sleptMillis += sleepMillis;
+      sleepMillis = std::min(maxSleepMillis, long(sleepMillis * 1.7));
     }
     return {nullptr, lastState, serverName};
   }
