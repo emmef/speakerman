@@ -194,6 +194,10 @@ public:
 };
 
 template <typename T, size_t GROUPS, size_t BANDS> class SpeakermanRuntimeData {
+  static constexpr size_t CONTROL_INTERVAL = 16;
+  static constexpr double CONTROL_CHANGE_SECONDS = 0.25;
+  static constexpr double CONTROL_RATE_FACTOR =
+      CONTROL_CHANGE_SECONDS / CONTROL_INTERVAL;
   FixedSizeArray<GroupRuntimeData<T, BANDS>, GROUPS> groupConfig_;
   T subLimiterScale_;
   T subLimiterThreshold_;
@@ -202,6 +206,7 @@ template <typename T, size_t GROUPS, size_t BANDS> class SpeakermanRuntimeData {
   size_t subDelay_;
   T noiseScale_;
   IntegrationCoefficients<T> controlSpeed_;
+  size_t controlCount_ = 0;
   EqualizerFilterData<T> filterConfig_;
 
   void compensateDelays() {
@@ -254,6 +259,7 @@ public:
     for (size_t group = 0; group < GROUPS; group++) {
       groupConfig_[group].reset();
     }
+    controlCount_ = 0;
     controlSpeed_.setCharacteristicSamples(5000);
     filterConfig_.reset();
   }
@@ -266,14 +272,18 @@ public:
   }
 
   void approach(const SpeakermanRuntimeData<T, GROUPS, BANDS> &target) {
-    controlSpeed_.integrate(target.subLimiterThreshold_, subLimiterThreshold_);
-    controlSpeed_.integrate(target.subLimiterScale_, subLimiterScale_);
-    controlSpeed_.integrate(target.subRmsThreshold_, subRmsThreshold_);
-    controlSpeed_.integrate(target.subRmsScale_, subRmsScale_);
+    if (controlCount_ == 0) {
+      controlSpeed_.integrate(target.subLimiterThreshold_, subLimiterThreshold_);
+      controlSpeed_.integrate(target.subLimiterScale_, subLimiterScale_);
+      controlSpeed_.integrate(target.subRmsThreshold_, subRmsThreshold_);
+      controlSpeed_.integrate(target.subRmsScale_, subRmsScale_);
 
-    for (size_t group = 0; group < GROUPS; group++) {
-      groupConfig_[group].approach(target.groupConfig_[group], controlSpeed_);
+      for (size_t group = 0; group < GROUPS; group++) {
+        groupConfig_[group].approach(target.groupConfig_[group], controlSpeed_);
+      }
     }
+    controlCount_++;
+    controlCount_ %= CONTROL_INTERVAL;
   }
 
   template <typename... A>
@@ -332,7 +342,8 @@ public:
         0.5 + sampleRate * Values::force_between(
                                config.subDelay, SpeakermanConfig::MIN_SUB_DELAY,
                                SpeakermanConfig::MAX_SUB_DELAY);
-    controlSpeed_.setCharacteristicSamples(0.25 * sampleRate);
+    controlSpeed_.setCharacteristicSamples(CONTROL_RATE_FACTOR * sampleRate);
+    controlCount_ = 0;
     setFilterConfig(
         EqualizerFilterData<T>::createConfigured(config, sampleRate));
 
