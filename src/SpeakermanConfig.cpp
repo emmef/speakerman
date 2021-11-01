@@ -254,16 +254,11 @@ template <typename T> struct ValueParser_<T, 4> {
 };
 
 template <typename T> static constexpr int get_value_parser_type() {
-  return std::is_floating_point<T>::value
-             ? 3
-             : std::is_same<int, T>::value
-                   ? 2
-                   : std::is_integral<T>::value
-                         ? 1
-                         : std::is_same<char[GroupConfig::NAME_LENGTH + 1],
-                                        T>::value
-                               ? 4
-                               : 5;
+  return std::is_floating_point<T>::value                             ? 3
+         : std::is_same<int, T>::value                                ? 2
+         : std::is_integral<T>::value                                 ? 1
+         : std::is_same<char[GroupConfig::NAME_LENGTH + 1], T>::value ? 4
+                                                                      : 5;
 }
 
 template <typename T>
@@ -768,24 +763,52 @@ static bool fileExists(const char *fileName) {
   return false;
 }
 
-static string internalGetInstallBase() {
-  static constexpr const char *prefix = INSTALLATION_PREFIX;
-  if (access(prefix, F_OK) != 0) {
-    return "";
-  }
-  string prefixDir = prefix;
-  if (prefixDir.at(prefixDir.length() - 1) != '/') {
-    prefixDir += '/';
-  }
-  std::cout << "Install prefix: " << prefixDir << std::endl;
-  return prefixDir;
-}
+class InstallBase {
+  static const string internalGetInstallBase() {
+    static string error_message;
 
-const char *getInstallBaseDirectory() {
-  static const string base = internalGetInstallBase();
+    const char *used_prefix_type;
+    const char *prefix_value = nullptr;
 
-  return base.length() > 0 ? base.c_str() : nullptr;
-}
+    prefix_value = getenv("SPEAKERMAN_INSTALLATION_PREFIX");
+    if (prefix_value && strnlen(prefix_value, 2) > 0) {
+      used_prefix_type = "Environment";
+    } else if (INSTALLATION_PREFIX && strnlen(INSTALLATION_PREFIX, 2) > 0) {
+      used_prefix_type = "Compile-time";
+      prefix_value = INSTALLATION_PREFIX;
+    }
+
+    if (!prefix_value) {
+      throw std::runtime_error(
+          "Installation prefix not set. This should be done at compile time or "
+          "using the SPEAKERMAN_INSTALLATION_PREFIX environment variable");
+    }
+
+    if (access(INSTALLATION_PREFIX, F_OK) == 0) {
+      string prefixDir = prefix_value;
+      if (prefixDir.at(prefixDir.length() - 1) != '/') {
+        prefixDir += '/';
+      }
+      std::cout << "Using installation base (" << used_prefix_type << ") \"" << prefixDir << "\"" << std::endl;
+      return prefixDir;
+    }
+    error_message = "Installation base (";
+    error_message += used_prefix_type;
+    error_message += ") does not point to an existing/accessible directory: ";
+    error_message += prefix_value;
+
+    throw std::runtime_error(error_message);
+  }
+
+public:
+  static const char *getBase() {
+    static const string base = internalGetInstallBase();
+
+    return base.c_str();
+  }
+};
+
+const char *getInstallBaseDirectory() { return InstallBase::getBase(); }
 
 static string internalGetWebSiteDirectory() {
   static const char *prefix = getInstallBaseDirectory();
@@ -1046,9 +1069,9 @@ void DetectionConfig::set_if_unset(const DetectionConfig &config_if_unset) {
   box_if_out_of_range(minimum_window_seconds,
                       config_if_unset.minimum_window_seconds,
                       MIN_MINIMUM_WINDOW_SECONDS, MAX_MINIMUM_WINDOW_SECONDS);
-  box_if_out_of_range(rms_fast_release_seconds,
-                      config_if_unset.rms_fast_release_seconds,
-                      MIN_RMS_FAST_RELEASE_SECONDS, MAX_RMS_FAST_RELEASE_SECONDS);
+  box_if_out_of_range(
+      rms_fast_release_seconds, config_if_unset.rms_fast_release_seconds,
+      MIN_RMS_FAST_RELEASE_SECONDS, MAX_RMS_FAST_RELEASE_SECONDS);
   box_if_out_of_range(perceptive_levels, config_if_unset.perceptive_levels,
                       MIN_PERCEPTIVE_LEVELS, MAX_PERCEPTIVE_LEVELS);
 }

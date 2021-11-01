@@ -120,7 +120,7 @@ struct DetectionConfig {
 
   static constexpr size_t MIN_PERCEPTIVE_LEVELS = 2;
   static constexpr size_t DEFAULT_PERCEPTIVE_LEVELS = 11;
-  static constexpr size_t MAX_PERCEPTIVE_LEVELS = 20;
+  static constexpr size_t MAX_PERCEPTIVE_LEVELS = 32;
   static constexpr const char *KEY_SNIPPET_PERCEPTIVE_LEVELS =
       "detection.time-constants";
 

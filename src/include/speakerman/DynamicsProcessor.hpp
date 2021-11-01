@@ -62,7 +62,7 @@ public:
   // OUTPUTS
   static constexpr size_t OUTPUTS = INPUTS + 1;
 
-  static constexpr size_t RMS_DETECTION_LEVELS = 20;
+  static constexpr size_t RMS_DETECTION_LEVELS = DetectionConfig::MAX_PERCEPTIVE_LEVELS;
 
   static constexpr double GROUP_MAX_DELAY = GroupConfig::MAX_DELAY;
   static constexpr double LIMITER_MAX_DELAY = 0.01;

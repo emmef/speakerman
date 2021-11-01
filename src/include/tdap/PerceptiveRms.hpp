@@ -50,7 +50,7 @@ struct Perceptive {
   static constexpr double MAX_SLOW_SECONDS = 10.0000;
   static constexpr double PERCEPTIVE_WEIGHT_POWER = 0.25;
 
-  static constexpr double MIN_STEP_FACTOR = M_SQRT2;
+  static constexpr double MIN_STEP_FACTOR = 1.2;
   static constexpr double MAX_HOLD_SECONDS = 0.02;
   static constexpr double MAX_RELEASE_SECONDS = 0.04;
 
@@ -105,7 +105,7 @@ struct Perceptive {
       IndexPolicy::method(index, count_);
       double exponent = double(index - perceptive_) / fastSteps();
       double base = fastSeconds_ / PERCEPTIVE_SECONDS;
-      return std::max(0.1, pow(base, exponent * PERCEPTIVE_WEIGHT_POWER));
+      return std::max(0.25, pow(base, exponent * PERCEPTIVE_WEIGHT_POWER));
     }
 
     [[nodiscard]] double seconds(size_t index) const {
@@ -193,8 +193,8 @@ static std::ostream &operator<<(std::ostream &stream,
 namespace tdap {
 template <typename S, size_t MAX_WINDOW_SAMPLES, size_t LEVELS>
 class PerceptiveRms {
-  static_assert(Values::is_between(LEVELS, (size_t)3, (size_t)24),
-                "Levels must be between 3 and 16");
+  static_assert(Values::is_between(LEVELS, (size_t)3, (size_t)32),
+                "Levels must be between 3 and 32");
 
   TrueFloatingPointWeightedMovingAverageSet<S> rms_;
 
