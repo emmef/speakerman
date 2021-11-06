@@ -187,6 +187,10 @@ struct SpeakermanConfig {
   static constexpr size_t DEFAULT_INPUT_OFFSET = 0;
   static constexpr size_t MAX_INPUT_OFFSET = MAX_GROUPS * MAX_GROUP_CHANNELS;
 
+  static constexpr size_t MIN_INPUT_COUNT = 1;
+  static constexpr size_t DEFAULT_INPUT_COUNT = -1;
+  static constexpr size_t MAX_INPUT_COUNT = MAX_GROUPS * MAX_GROUP_CHANNELS;
+
   static constexpr double MIN_THRESHOLD_SCALING = 1;
   static constexpr double DEFAULT_THRESHOLD_SCALING = 1;
   static constexpr double MAX_THRESHOLD_SCALING = 5;
@@ -201,6 +205,7 @@ struct SpeakermanConfig {
   static constexpr const char *KEY_SNIPPET_SUB_OUTPUT = "sub-output";
   static constexpr const char *KEY_SNIPPET_CROSSOVERS = "crossovers";
   static constexpr const char *KEY_SNIPPET_INPUT_OFFSET = "input-offset";
+  static constexpr const char *KEY_SNIPPET_INPUT_COUNT = "input-count";
   static constexpr const char *KEY_SNIPPET_GENERATE_NOISE = "generate-noise";
 
   size_t groups = DEFAULT_GROUPS;
@@ -208,6 +213,7 @@ struct SpeakermanConfig {
   size_t subOutput = DEFAULT_SUB_OUTPUT;
   size_t crossovers = DEFAULT_CROSSOVERS;
   size_t inputOffset = DEFAULT_INPUT_OFFSET;
+  size_t inputCount = DEFAULT_INPUT_COUNT;
   double relativeSubThreshold = DEFAULT_REL_SUB_THRESHOLD;
   double subDelay = DEFAULT_SUB_DELAY;
   int generateNoise = DEFAULT_GENERATE_NOISE;
