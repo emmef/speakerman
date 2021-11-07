@@ -100,6 +100,7 @@ target_link_libraries(test_speakerman stdc++ m)
 install(TARGETS speakerman RUNTIME DESTINATION bin)
 install(FILES web/index.html web/speakerman.js web/speakerman.css DESTINATION share/speakerman/web)
 install(PROGRAMS src/speakerman-watchdog.sh DESTINATION share/speakerman/script)
-install(FILES service/speakerman.service DESTINATION /lib/systemd/system)
+install(PROGRAMS src/startjack.sh DESTINATION bin)
+install(FILES service/speakerman.service service/jack.service DESTINATION /lib/systemd/system)
 
 add_definitions(-DSPEAKERMAN_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX})
