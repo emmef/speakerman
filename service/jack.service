@@ -8,7 +8,7 @@ After=usb-reset.service
 [Service]
 Type=simple
 BusName=org.jackaudio.Controller
-ExecStart=/usr/local/bin/startjack.sh
+ExecStart=/usr/bin/dbus-run-session -- /usr/local/bin/startjack.sh
 ExecStopPost=/usr/local/bin/startjack.sh --stop
 
 RemainAfterExit=true
