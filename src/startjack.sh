@@ -1,4 +1,20 @@
-#!/usr/bin/env bash
+#!/bin/bash
+
+last_stamp=
+last_action=
+user=
+device=
+current_stamp=
+current_action=
+jack_pid=
+
+set_current_values() {
+  local action_data
+  action_data=`/usr/local/bin/speakerman-device-action.sh --get-command`
+  
+  current_stamp=`echo "$action_data" | sed -r 's|^([-_0-9]+).*$|\1|'`
+  current_action=`echo "$action_data" | sed -r 's|^[-_0-9]+ ([A-Z]+)\s*$|\1|'`
+}
 
 jack_running() {
   pidof jackd >/dev/null
@@ -28,14 +44,43 @@ kill_jack() {
   done
 }
 
-kill_jack
 
-if [ "x$1" == "x--stop" ]
-then
-  echo "Stop command given: not starting jack"
-  exit 0
-fi
+start_jackd() {
+  local jack_command
+  
+  kill_jack
+  jack_command=`cat ~/.jackdrc`
+  $jack_command & 
+  jack_pid="$!"
+  disown
+  echo "JAck started with PID $jack_pid"
+}
 
-echo "Execute $HOME/.jackdrc"
+while sleep 5
+do
+  set_current_values 
+  if [ "$current_stamp" == "$last_stamp" ]
+  then
+    continue
+  fi
+  case "$current_action" in
+    ADD) 
+      start_jackd
+      ;;
+    REMOVE)
+      echo "Kill speakerman"
+      killall -TERM speakerman
+      if [ -n "$jack_pid" ]
+      then
+        echo "Kill jackd $jack_pid"
+        kill -TERM $jack_pid
+        jack_pid=
+      fi
+    ;;
+    *) 
+      echo "Idle"
+  esac
+  last_stamp="$current_stamp"
+done 
 
-. /home/speakerman/.jackdrc
+
