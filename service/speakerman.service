@@ -21,8 +21,8 @@ User=speakerman
 LimitRTPRIO=infinity
 LimitMEMLOCK=infinity
 LimitRTTIME=20000
-#ExecStart=/usr/bin/dbus-run-session /usr/local/bin/speakerman
-ExecStart=/usr/local/bin/speakerman
+ExecStart=/usr/bin/dbus-run-session -- /usr/local/bin/speakerman
+#ExecStart=/usr/local/bin/speakerman
 Restart=always
 RestartSec=1
 
