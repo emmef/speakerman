@@ -103,5 +103,6 @@ install(PROGRAMS src/speakerman-watchdog.sh DESTINATION share/speakerman/script)
 install(FILES service/speakerman.service DESTINATION /lib/systemd/system)
 install(PROGRAMS service/speakerman-device-action.sh DESTINATION /usr/local/bin/)
 install(PROGRAMS service/99-speakerman-device.rules DESTINATION /lib/udev/rules.d/)
+install(PROGRAMS src/startjack.sh DESTINATION bin)
 
 add_definitions(-DSPEAKERMAN_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX})

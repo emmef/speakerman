@@ -8,22 +8,21 @@ After=usb-reset.service
 #Requires=dbus-org.freedesktop.network1.service
 #Requires=dbus-org.freedesktop.resolve1.service
 #Requires=dbus-org.freedesktop.timedate1.service
-Requires=dbus.service
-Requires=dbus.socket
+#Requires=dbus.service
+#Requires=dbus.socket
 Requires=sockets.target
 Requires=alsa-state.service
 
 [Service]
 Type=simple
+SyslogIdentifier=speakerman
 Group=audio
 User=speakerman
-StandardOutput=syslog
-StandardError=syslog
-SyslogIdentifier=speakerman
 LimitRTPRIO=infinity
 LimitMEMLOCK=infinity
 LimitRTTIME=20000
-ExecStart=/usr/bin/dbus-run-session /usr/local/bin/speakerman
+#ExecStart=/usr/bin/dbus-run-session /usr/local/bin/speakerman
+ExecStart=/usr/local/bin/speakerman
 Restart=always
 RestartSec=1
 

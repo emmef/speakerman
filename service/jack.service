@@ -1,0 +1,25 @@
+[Unit]
+Description=JACK 2
+Before=sound.target
+Before=speakerman.service
+Requires=dbus.socket
+After=usb-reset.service
+
+[Service]
+Type=simple
+BusName=org.jackaudio.Controller
+ExecStart=/usr/bin/dbus-run-session -- /usr/local/bin/startjack.sh
+ExecStopPost=/usr/local/bin/startjack.sh --stop
+
+RemainAfterExit=true
+Restart=always
+RestartSec=10
+Group=audio
+User=speakerman
+LimitRTPRIO=infinity
+LimitMEMLOCK=infinity
+LimitRTTIME=20000
+
+[Install]
+WantedBy=session.target
+WantedBy=sound.target
