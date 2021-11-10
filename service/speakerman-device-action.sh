@@ -59,13 +59,17 @@ then
   log_warning "User directory for speakerman user \"$speakerman_user\" not found: $user_directory"
   exit 0
 fi
-config_file="$user_directory/.config/speakerman/speakerman.conf"
+config_file="$user_directory/.jackdrc"
 if [ ! -f "$config_file" ]
 then
   log_warning "Speakerman configuration not found: $config_file"
   exit 0
 fi
-device_name=`cat "$config_file" | grep -E '^\s*device-name\s*\=' | tail -n 1 | sed -r 's/^\s*device-name\s*=\s*([-_0-9A-Za-z]+).*/\1/'`
+#device_name=`cat "$config_file" | grep -E '^\s*device-name\s*\=' | tail -n 1 | sed -r 's/^\s*device-name\s*=\s*([-_0-9A-Za-z]+).*/\1/'`
+device_name=`cat "$config_file" |\
+    grep -E '\s-dalsa\s|\s-d\salsa' |\
+    grep -E '\s-dhw:[-_A-Za-z0-9]+\s|-d\shw:[-_A-Za-z0-9]+\s' |\
+    sed -r 's/^.*-d\s*hw:([-_a-zA-Z0-9]+)\s*.*/\1/'`
 
 if [ -z "$device_name" ]
 then
