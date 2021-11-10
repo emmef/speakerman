@@ -210,7 +210,7 @@ public:
     for (long sleptMillis = 0, i = 0; sleptMillis < maxTotalMillis; i++) {
       SignalHandler::check_raised();
       jack_client_t *c =
-          jack_client_open(serverName, options, &lastState, args...);
+          jack_client_open(serverName, options | JackOptions::JackNoStartServer, &lastState, args...);
       if (c) {
         return {new JackClient(c), static_cast<JackStatus>(0), serverName};
       }
@@ -236,7 +236,7 @@ public:
     for (long sleptMillis = 0, i = 0; sleptMillis < maxTotalMillis; i++) {
       SignalHandler::check_raised();
       jack_client_t *c =
-          jack_client_open(serverName, JackOptions::JackNullOption, &lastState);
+          jack_client_open(serverName, JackOptions::JackNoStartServer, &lastState);
       if (c) {
         return {new JackClient(c), static_cast<JackStatus>(0), serverName};
       }
