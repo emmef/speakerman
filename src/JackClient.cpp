@@ -34,6 +34,8 @@ namespace speakerman {
 using namespace std;
 using namespace tdap;
 
+thread_local long ClientOpenRetryPolicy::suppressed_errors_ = 0;
+
 const char *client_state_name(ClientState state) {
   switch (state) {
   case ClientState::CLOSED:
@@ -73,6 +75,7 @@ bool client_state_is_shutdown_state(ClientState state) {
     return false;
   }
 }
+
 
 void JackClient::awaitShutdownCaller(JackClient *client) {
   CountedThreadGuard guard("Jack client - await shutdown");

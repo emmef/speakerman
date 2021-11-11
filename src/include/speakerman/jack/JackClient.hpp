@@ -25,49 +25,87 @@
 #include "Port.hpp"
 #include <algorithm>
 #include <atomic>
-#include <cstdio>
 #include <condition_variable>
+#include <cstdio>
 #include <jack/types.h>
 #include <mutex>
 #include <speakerman/jack/JackProcessor.hpp>
 #include <speakerman/jack/SignalHandler.hpp>
+#include <string>
 #include <thread>
+#include <unordered_set>
 
 namespace speakerman {
 
-namespace  {
+class ClientOpenRetryPolicy {
+  static constexpr long minWaitMillis = 100;
+  static constexpr long maxWaitMillis = 2000;
+  static constexpr long maxPrintInterVal = 3600000 / maxWaitMillis;
+  static constexpr double waitExponent = 1.1;
+  static thread_local long suppressed_errors_;
 
-class NullRedirect {
-  FILE *& file_;
-  FILE * old_;
-  FILE *null_;
-  const char * message_;
-public:
-  NullRedirect(FILE *&file, const char *message) : file_(file), old_(file), null_(nullptr) , message_(message) {
+  static void no_error_function(const char *err) {
+    if (getenv("SPEAKERMAN_LOG_OPEN_CLIENT_ERRORS")) {
+      std::cerr << "jack_open_client() error: " << err << std::endl;
+    } else {
+      suppressed_errors_++;
+    }
   }
 
-  void redirect() {
-    if (!null_) {
-      null_ = fopen("/dev/null", "w");
-      if (null_) {
-        if (message_) {
-          fprintf(old_, "\nSupressing output: %s\n", message_);
-        }
-        file_ = null_;
+  long attempt_ = 0;
+  long waitMillis_ = minWaitMillis;
+  long printInterval_ = 8;
+  char milliseconds[16];
+  std::chrono::time_point<std::chrono::steady_clock> start =
+      std::chrono::steady_clock::now();
+
+  void write_milliseconds() {
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now() - start);
+    sprintf(milliseconds, "%12.3f", 0.001f * ms.count());
+  }
+
+public:
+  ClientOpenRetryPolicy() {
+    jack_set_error_function(no_error_function);
+    suppressed_errors_ = 0;
+  }
+
+  ~ClientOpenRetryPolicy() { jack_set_error_function(NULL); }
+  long attempt() const { return attempt_; }
+
+  bool must_print() const { return (attempt_ % printInterval_) == 0; }
+
+  long errors() const { return suppressed_errors_; }
+
+  long waitMillis() const { return waitMillis_; }
+
+  void printFailureAndWait(jack_status_t status) {
+    if (must_print()) {
+      write_milliseconds();
+      std::cerr << milliseconds << " JackClient::create() attempt "
+                << (attempt() + 1) << " failed with status " << status
+                << " (sleep " << waitMillis() << "msec.";
+      if (errors() > 0) {
+        std::cerr << " (" << errors() << " errors suppressed)";
+      }
+      std::cerr << std::endl;
+      if (waitMillis_ >= maxWaitMillis) {
+        printInterval_ = std::min(printInterval_ * 2, maxPrintInterVal);
       }
     }
+    std::this_thread::sleep_for(std::chrono::milliseconds(waitMillis()));
+    attempt_++;
+    waitMillis_ = std::min(long(waitMillis_ * waitExponent), maxWaitMillis);
   }
 
-  ~NullRedirect() {
-    if (null_) {
-      FILE *cleanup = file_;
-      file_ = old_;
-      fclose(cleanup);
-      fprintf(old_, "Enabling output: %s\n", message_);
-    }
+  void printSuccess(const char *name) {
+    write_milliseconds();
+    const char *serverName = name ? name : "default";
+    std::cout << milliseconds << " Created jack client \"" << name << "\"!"
+              << std::endl;
   }
 };
-}
 
 using namespace std;
 using namespace tdap;
@@ -167,21 +205,6 @@ class JackClient {
 
   static void jack_portnames_free(const char **names);
 
-  static void suppress_message(const char *msg) {}
-
-  class MessageSuppress {
-  public:
-    void suppress() {
-      jack_set_error_function(suppress_message);
-      jack_set_info_function(suppress_message);
-    }
-
-    ~MessageSuppress() {
-      jack_set_error_function(nullptr);
-      jack_set_info_function(nullptr);
-    }
-  };
-
 protected:
   virtual void registerAdditionalCallbacks(jack_client_t *client);
 
@@ -196,56 +219,37 @@ protected:
 public:
   virtual int onXRun();
 
-  template <typename... A>
-  static CreateClientResult create(const char *serverName,
-                                   jack_options_t options, A... args) {
-    static constexpr long maxSleepMillis = 10000;
-    static constexpr long maxTotalMillis = 3600 * 1000 * 24;
-
-    MessageSuppress suppress;
+  static CreateClientResult createDefault(const char *serverName) {
     jack_status_t lastState = static_cast<JackStatus>(0);
-    long sleepMillis = 100;
+    ClientOpenRetryPolicy policy;
 
-    suppress.suppress();
-    for (long sleptMillis = 0, i = 0; sleptMillis < maxTotalMillis; i++) {
-      SignalHandler::check_raised();
-      jack_client_t *c =
-          jack_client_open(serverName, options | JackOptions::JackNoStartServer, &lastState, args...);
+    while (!SignalHandler::check_raised()) {
+      jack_client_t *c = jack_client_open(
+          serverName, JackOptions::JackNoStartServer, &lastState);
       if (c) {
+        policy.printSuccess(serverName);
         return {new JackClient(c), static_cast<JackStatus>(0), serverName};
       }
-      std::cerr << "JackClient::create() attempt " << i
-                << " failed with status " << lastState << " (sleep "
-                << sleepMillis << "msec." << std::endl;
-      std::this_thread::sleep_for(std::chrono::milliseconds(sleepMillis));
-      sleptMillis += sleepMillis;
-      sleepMillis = std::min(maxSleepMillis, long(sleepMillis * 1.7));
+      policy.printFailureAndWait(lastState);
     }
     return {nullptr, lastState, serverName};
   }
 
-  static CreateClientResult createDefault(const char *serverName) {
-    static constexpr long maxSleepMillis = 10000;
-    static constexpr long maxTotalMillis = 3600 * 1000 * 24;
-
-    MessageSuppress suppress;
-
+  template <typename... A>
+  static CreateClientResult create(const char *serverName,
+                                   jack_options_t options, A... args) {
     jack_status_t lastState = static_cast<JackStatus>(0);
-    long sleepMillis = 100;
-    suppress.suppress();
-    for (long sleptMillis = 0, i = 0; sleptMillis < maxTotalMillis; i++) {
-      SignalHandler::check_raised();
+    ClientOpenRetryPolicy policy;
+
+    while (!SignalHandler::check_raised()) {
       jack_client_t *c =
-          jack_client_open(serverName, JackOptions::JackNoStartServer, &lastState);
+          jack_client_open(serverName, options | JackOptions::JackNoStartServer,
+                           &lastState, args...);
       if (c) {
+        policy.printSuccess(serverName);
         return {new JackClient(c), static_cast<JackStatus>(0), serverName};
       }
-      std::cerr << "JackClient::create() attempt " << i
-                << " failed with status " << lastState << " (sleep "
-                << sleepMillis << "ms.)" << std::endl;
-      std::this_thread::sleep_for(std::chrono::milliseconds(sleepMillis));
-      sleptMillis += sleepMillis;
-      sleepMillis = std::min(maxSleepMillis, long(sleepMillis * 1.7));
+      policy.printFailureAndWait(lastState);
     }
     return {nullptr, lastState, serverName};
   }
