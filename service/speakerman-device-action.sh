@@ -1,34 +1,43 @@
 #!/bin/bash
 
 warning_file="/tmp/speakerman.warn"
+time_stamp=`date +'%Y-%m-%d_%H:%M:%S.%N'`
 
 log_warning() {
-  if [ ! -f "$warning_file" ]
+  if [ -w "$warning_file" ]
   then
-    echo "$*" | tee -a "$warning_file" >&2
-    chmod a+rw "$warning_file"
-  elif [ -w "$warning_file" ]
-  then
-    echo $* | tee -a "$warning_file" >&2
+    echo "$time_stamp # $*" | tee -a "$warning_file" >&2
   else
-    echo $* >&2
+    echo "$time_stamp # $*" >&2
   fi
 }
 
-
 if [ -z "$1" ]
 then
-  log_warning "requires action argument"
+  log_warning "Requires action argument"
   exit 0
 fi
 
 device_action=
-if [[ $1 =~ --add|--remove|--get-config|--get-command ]]
+device_number=
+if [[ $1 =~ --add|--remove ]]
+then
+  device_action="$1"
+  shift
+  if [ -n "$1" ] && [[ $1 =~ ^[0-9]$ ]]
+  then
+    device_number="$1"
+    shift
+  else
+    log_warning "Require device number argument for --add and --remove."
+    exit 0
+  fi
+elif [[ $1 =~ --get-config|--get-command ]]
 then
   device_action="$1"
   shift
 else
-  log_warning  "Unknown action: $1"
+  log_warning "Unknown action: $1"
   exit 0
 fi
 
@@ -65,11 +74,11 @@ then
   log_warning "Speakerman configuration not found: $config_file"
   exit 0
 fi
-#device_name=`cat "$config_file" | grep -E '^\s*device-name\s*\=' | tail -n 1 | sed -r 's/^\s*device-name\s*=\s*([-_0-9A-Za-z]+).*/\1/'`
-device_name=`cat "$config_file" |\
+
+device_name=$(cat "$config_file" |\
     grep -E '\s-dalsa\s|\s-d\salsa' |\
     grep -E '\s-dhw:[-_A-Za-z0-9]+\s|-d\shw:[-_A-Za-z0-9]+\s' |\
-    sed -r 's/^.*-d\s*hw:([-_a-zA-Z0-9]+)\s*.*/\1/'`
+    sed -r 's/^.*-d\s*hw:([-_a-zA-Z0-9]+)\s*.*/\1/')
 
 if [ -z "$device_name" ]
 then
@@ -77,83 +86,129 @@ then
   exit 0
 fi  
 
-message_file="/tmp/speakerman-${device_name}-${speakerman_user}"
 alsa_device="/proc/asound/${device_name}"
-time_stamp=`date +'%Y-%m-%d_%H_%M_%N'`
+message_file="/tmp/speakerman-${device_name}"
 
-device_exists() {
-  test -L "${alsa_device}" || test -f "${alsa_device}"
-}
+get_last_command_line() {
+  local commands
 
-get_last_command() {
-  if [ -f "$message_file" ]
+  if [ -n "$1" ]
   then
-    if [ "x$1" == "x--stamp" ] 
-    then
-      cat "$message_file" | grep -E '^[-_0-9]+ (ADD|REMOVE)\s*$' | tail -n 1 | sed -r 's/^([-_0-9]+) ([A-Z]+)\s*$/\1 \2/' 2>/dev/null
-    else
-      cat "$message_file" | grep -E '^[-_0-9]+ (ADD|REMOVE)\s*$' | tail -n 1 | sed -r 's/^[-_0-9]+ ([A-Z]+)\s*$/\1/' 2>/dev/null
-    fi
-  fi
-}
-
-set_status() {
-  local last_command
-  local status
-  
-  status="$1"
-  
-  if [ -f "$message_file" ]
-  then
-    if echo "$status" | grep -E "^(ADD|REMOVE)$" >/dev/null
-    then
-      last_command=`get_last_command`
-    fi
-    line_count=`wc -l "$message_file" | sed -r 's|^([0-9]+)\s.*$|\1|'`
-    if [ "0$line_count" -gt "0100" ] 
-    then
-      mv "$message_file" "$message_file~"
-    fi
-  fi
-  
-  if [ "x$status" == "x$last_command" ]
-  then
-    status="ignored $status"
-  elif [ -n "$2" ]
-  then
-    status="$status $2"
-  fi
-  
-  if [ ! -f "$message_file" ]
-  then
-    echo "$time_stamp $status" >>"$message_file"
-    chmod a+w "$message_file" >/dev/null
+    commands="$1"
   else
-    echo "$time_stamp $status" >>"$message_file"
+    commands="(ADD|REMOVE)"
   fi
+  if [ -f "$message_file" ]
+  then
+    grep -E "^[-.:_0-9]+ ${commands} ([0-9]+)\$" "$message_file"| tail -n 1
+  fi
+}
+
+last_command_line=$(get_last_command_line)
+last_stamp=$(echo "$last_command_line" | sed -r 's/^([-._:0-9]+) ([A-Z]+) ([0-9]+)$/\1/' 2>/dev/null)
+last_command=$(echo "$last_command_line" | sed -r 's/^([-._:0-9]+) ([A-Z]+) ([0-9]+)$/\2/' 2>/dev/null)
+
+#if [[ $device_action =~ ^--remove$ ]]
+#then
+  last_added_device=$(get_last_command_line "ADD" | sed -r 's/^[-._:0-9]+ [A-Z]+ ([0-9]+)$/\1/' 2>/dev/null)
+#fi
+
+device_state_message=
+
+device_state() {
+
+  device_state_message=
+
+  case "$1" in
+    ADD)
+      if ! [ -L "${alsa_device}" ]
+      then
+        device_state_message="ALSA device $alsa_device does not exist"
+        return 1
+      fi
+      local link_number
+      link_number=$(readlink "${alsa_device}")
+      if [ "$link_number" != "card${device_number}" ]
+      then
+        device_state_message="ALSA device $alsa_device ($link_number) does not match event device number $device_number"
+        return 1
+      fi
+      return 0
+      ;;
+    REMOVE)
+      if [ "$last_added_device" != "$device_number" ]
+      then
+        device_state_message="Event device number $device_number does not match last number $last_added_device for ALSA device $alsa_device"
+        return 1
+      fi
+      if [ -L "${alsa_device}" ]
+      then
+        device_state_message="Inconsistent remove: ALSA device $alsa_device still exists"
+        return 1
+      fi
+      return 0
+      ;;
+  esac
+  device_state_message="not intended device or inconsistent state (last-added-device=$last_added_device event-device-num=$device_number action=$1)"
+  return 1
+}
+
+write_status() {
+  local output_file
+  local max_size
+  local message
+
+  if [ "x$1" == "xignore" ]
+  then
+    shift
+    output_file="$message_file.ignored";
+    max_size="1000000"
+    message="Ignored $* : $device_state_message"
+  elif [ "x$1" == "x$last_command" ]
+  then
+    output_file="$message_file.ignored";
+    max_size="1000000"
+    message="Ignored $* : duplicate command"
+  else
+    output_file="$message_file"
+    max_size="10000"
+    message="$*"
+  fi
+
+  if [ -f "$output_file" ]
+  then
+    local file_size
+    files_size=$(stat -c "%s" "$output_file")
+    if [ "0$files_size" -gt "0100000" ]
+    then
+      mv "$output_file" "$output_file~"
+    fi
+  fi
+
+  echo "$time_stamp $message" >>"$output_file"
 }
 
 case "$device_action" in
   --add)
-    if ! device_exists
+    if device_state ADD
     then
-      set_status ignored ADD
-    else 
-      set_status ADD
+      write_status ADD $device_number
+    else
+      write_status ignore ADD
     fi
     exit 0
   ;;
   --remove)
-    if ! device_exists
+    if device_state REMOVE
     then
-      set_status REMOVE
-    else 
-      set_status ignored REMOVE
+      write_status REMOVE $device_number
+    else
+      write_status ignore REMOVE
     fi
     exit 0
   ;;
   --get-command) 
-    get_last_command --stamp
+    echo "$last_stamp $last_command"
   ;;
   *)
     echo "--user '$speakerman_user' device='$alsa_device' id='$device_name' messages='$message_file'"

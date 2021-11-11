@@ -56,7 +56,7 @@ start_jackd() {
   echo "JAck started with PID $jack_pid"
 }
 
-while sleep 5
+while sleep 2
 do
   set_current_values 
   if [ "$current_stamp" == "$last_stamp" ]
