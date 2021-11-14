@@ -1,5 +1,6 @@
 #!/bin/bash
 
+action_data=
 last_stamp=
 last_action=
 user=
@@ -9,11 +10,10 @@ current_action=
 jack_pid=
 
 set_current_values() {
-  local action_data
   action_data=`/usr/local/bin/speakerman-device-action.sh --get-command`
   
-  current_stamp=`echo "$action_data" | sed -r 's|^([-_0-9]+).*$|\1|'`
-  current_action=`echo "$action_data" | sed -r 's|^[-_0-9]+ ([A-Z]+)\s*$|\1|'`
+  current_stamp=`echo "$action_data" | sed -r 's/^([-._:0-9]+) ([A-Z]+)$/\1/'`
+  current_action=`echo "$action_data" | sed -r 's/^([-._:0-9]+) ([A-Z]+)$/\2/'`
 }
 
 jack_running() {
@@ -78,7 +78,7 @@ do
       fi
     ;;
     *) 
-      echo "Idle"
+      echo "Idle (data=$action_data; stamp=$current_stamp; action=$current_action"
   esac
   last_stamp="$current_stamp"
 done 
