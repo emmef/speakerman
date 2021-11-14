@@ -108,10 +108,7 @@ last_command_line=$(get_last_command_line)
 last_stamp=$(echo "$last_command_line" | sed -r 's/^([-._:0-9]+) ([A-Z]+) ([0-9]+)$/\1/' 2>/dev/null)
 last_command=$(echo "$last_command_line" | sed -r 's/^([-._:0-9]+) ([A-Z]+) ([0-9]+)$/\2/' 2>/dev/null)
 
-#if [[ $device_action =~ ^--remove$ ]]
-#then
-  last_added_device=$(get_last_command_line "ADD" | sed -r 's/^[-._:0-9]+ [A-Z]+ ([0-9]+)$/\1/' 2>/dev/null)
-#fi
+last_added_device=$(get_last_command_line "ADD" | sed -r 's/^[-._:0-9]+ [A-Z]+ ([0-9]+)$/\1/' 2>/dev/null)
 
 device_state_message=
 
