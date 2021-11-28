@@ -53,217 +53,48 @@ public:
   }
 };
 
-template <typename T> struct UnsetValue {};
 
-template <> struct UnsetValue<size_t> {
-  static constexpr size_t value = static_cast<size_t>(-1);
-
-  static bool is(size_t test) { return test == value; }
-};
-
-template <> struct UnsetValue<char[GroupConfig::NAME_LENGTH + 1]> {
-  static constexpr char *value = {0};
-
-  static bool is(const char *test) {
-    int characters = -1;
-    for (size_t i = 0; i < GroupConfig::NAME_LENGTH; i++) {
-      if (test[i] == '\0') {
-        break;
-      }
-      if (test[i] > ' ') {
-        return false;
-      }
+template <typename T, size_t N>
+static ValueSetResult read_value_array(ConfigNumericArray<T, N> &values,
+                                       const char *value, char *&end) {
+  ConfigNumericArray<T, N> readValues(values, false);
+  const char *read_from = value;
+  for (size_t i = 0; i < N; i++) {
+    T parsed;
+    if (!ValueParser<T>::parse(parsed, read_from, end)) {
+      return ValueSetResult::Fail;
     }
-    return true;
-  }
-};
-
-template <> struct UnsetValue<double> {
-  static constexpr double value = std::numeric_limits<double>::quiet_NaN();
-
-  union Tester {
-    long long l;
-    double f;
-
-    Tester(double v) : l(0) { f = v; }
-
-    bool operator==(const Tester &other) const { return l == other.l; }
-  };
-
-  static bool is(double test) {
-    static const Tester sNan = {std::numeric_limits<double>::signaling_NaN()};
-    static const Tester qNan = {value};
-    Tester t{test};
-    return t == sNan || t == qNan;
-  }
-};
-
-template <> struct UnsetValue<int> {
-  static constexpr int value = -1;
-
-  static bool is(size_t test) { return test == value; }
-};
-
-template <typename T> static void unset_config_value(T &value) {
-  value = UnsetValue<T>::value;
-}
-
-template <typename T>
-static bool set_if_unset_config_value(T &value, T value_if_unset) {
-  if (UnsetValue<T>::is(value)) {
-    value = value_if_unset;
-    return true;
-  }
-  return false;
-}
-
-template <typename T>
-static bool set_if_unset_or_invalid_config_value(T &value, T value_if_unset,
-                                                 T minimum, T maximum) {
-  if (UnsetValue<T>::is(value) || value < minimum || value > maximum) {
-    value = value_if_unset;
-    return true;
-  }
-  return false;
-}
-
-template <typename T>
-static bool unset_if_invalid(T &value, T minimum, T maximum) {
-  if (value < minimum || value > maximum) {
-    value = UnsetValue<T>::value;
-    return true;
-  }
-  return false;
-}
-
-template <typename T>
-static void box_if_out_of_range(T &value, T minimum, T maximum) {
-  if (UnsetValue<T>::is(value)) {
-    return;
-  }
-  if (value < minimum) {
-    value = minimum;
-  } else if (value > maximum) {
-    value = maximum;
-  }
-}
-
-template <typename T>
-static void box_if_out_of_range(T &value, T value_if_unset, T minimum,
-                                T maximum) {
-  if (UnsetValue<T>::is(value)) {
-    value = value_if_unset;
-  } else if (value < minimum) {
-    value = minimum;
-  } else if (value > maximum) {
-    value = maximum;
-  }
-}
-
-template <typename T, int type> struct ValueParser_ {};
-
-template <typename T> struct ValueParser_<T, 1> {
-  static_assert(is_integral<T>::value, "Expected integral type parameter");
-  using V = long long int;
-
-  static bool parse(T &field, const char *value, char *&end) {
-    V parsed = strtoll(value, &end, 10);
-    if (*end == '\0' || config::isWhiteSpace(*end) ||
-        config::isCommentStart(*end)) {
-      field = tdap::Value<T>::force_between(parsed,
-                                            std::numeric_limits<T>::lowest(),
-                                            std::numeric_limits<T>::max());
-      return true;
-    }
-    cerr << "Error parsing integer" << endl;
-    return false;
-  }
-};
-
-template <typename T> struct ValueParser_<T, 2> {
-  static_assert(is_integral<T>::value, "Expected integral type parameter");
-  using V = int;
-
-  static bool matches(const char *keyword, const char *value, const char *end) {
-    size_t scan_length = end - value;
-    size_t key_length = strnlen(keyword, 128);
-    if (scan_length < key_length) {
-      return false;
-    }
-
-    return strncasecmp(keyword, value, key_length) == 0 &&
-           (value[key_length] == '\0' ||
-            config::isWhiteSpace(value[key_length]));
-  }
-
-  static bool parse(T &field, const char *value, char *&end) {
-    for (end = const_cast<char *>(value); config::isAlphaNum(*end); end++) {
-    }
-
-    if (matches("true", value, end) || matches("1", value, end) ||
-        matches("yes", value, end)) {
-      field = 1;
-      return true;
-    }
-    if (matches("false", value, end) || matches("0", value, end) ||
-        matches("no", value, end)) {
-      field = 0;
-      return true;
-    }
-    cerr << "Error parsing boolean" << endl;
-    return false;
-  }
-};
-
-template <typename T> struct ValueParser_<T, 3> {
-  static_assert(is_floating_point<T>::value,
-                "Expected floating point type parameter");
-  using V = long double;
-
-  static bool parse(T &field, const char *value, char *&end) {
-    V parsed = strtold(value, &end);
-    if (*end == '\0' || config::isWhiteSpace(*end) ||
-        config::isCommentStart(*end)) {
-      field = tdap::Value<V>::force_between(parsed,
-                                            std::numeric_limits<T>::lowest(),
-                                            std::numeric_limits<T>::max());
-      return true;
-    }
-    cerr << "Error parsing float" << endl;
-    return false;
-  }
-};
-
-template <typename T> struct ValueParser_<T, 4> {
-  static bool parse(T &field, const char *value, char *&end) {
-    const char *src = value;
-    char *dst = field;
-    while (src != 0 && (dst - field) < GroupConfig::NAME_LENGTH) {
-      char c = *src++;
-      if (c == '\t' || c == ' ') {
-        if (dst > field) {
-          *dst++ = ' ';
+    if (readValues.set(parsed) == ValueSetResult::Fail) {
+      return ValueSetResult::Fail;
+    };
+    bool hadDelimiter = false;
+    while (config::isWhiteSpace(*end) || *end == ';' || *end == ',') {
+      if (*end == ';' || *end == ',') {
+        if (hadDelimiter) {
+          return ValueSetResult::Fail;
         }
-      } else if (config::isAlphaNum(c) || config::isQuote(c) ||
-                 strchr(".!|,;:/[]{}*#@~%^()-_+=\\", c) != nullptr) {
-        *dst++ = c;
+        hadDelimiter = true;
       }
+      end++;
     }
-    *dst++ = '\0';
-    return true;
+    if (*end == '\0' || config::isCommentStart(*end)) {
+      break;
+    }
+    read_from = end;
   }
+  values = readValues;
+  return ValueSetResult::Ok;
 };
 
-template <typename T> static constexpr int get_value_parser_type() {
-  return std::is_floating_point<T>::value                             ? 3
-         : std::is_same<int, T>::value                                ? 2
-         : std::is_integral<T>::value                                 ? 1
-         : std::is_same<char[GroupConfig::NAME_LENGTH + 1], T>::value ? 4
-                                                                      : 5;
-}
-
 template <typename T>
-struct ValueParser : public ValueParser_<T, get_value_parser_type<T>()> {};
+static ValueSetResult read_value(ConfigNumeric<T> &values, const char *value,
+                                 char *&end) {
+  T parsed;
+  if (!ValueParser<T>::parse(parsed, value, end)) {
+    return ValueSetResult::Fail;
+  }
+  return values.set(values);
+};
 
 template <typename T, size_t N>
 static int read_value_array(FixedSizeArray<T, N> &values, const char *value,
@@ -673,7 +504,7 @@ public:
                detection.useBrickWallPrediction);
 
     string key;
-    add_reader(GroupConfig::KEY_SNIPPET_EQ_COUNT, true, eqs);
+    add_reader(GroupConfig::Definitions::equalizers.name(), true, eqs);
     string eqBase = "";
     eqBase += EqualizerConfig::KEY_SNIPPET_EQUALIZER;
     eqBase += "/";
@@ -683,13 +514,13 @@ public:
       eqKey += "/";
 
       key = eqKey;
-      key += EqualizerConfig::KEY_SNIPPET_CENTER;
+      key += EqualizerConfig::Definitions::center.name();
       add_reader(key, true, eq[eq_idx].center);
       key = eqKey;
-      key += EqualizerConfig::KEY_SNIPPET_GAIN;
+      key += EqualizerConfig::Definitions::gain.name();
       add_reader(key, true, eq[eq_idx].gain);
       key = eqKey;
-      key += EqualizerConfig::KEY_SNIPPET_BANDWIDTH;
+      key += EqualizerConfig::Definitions::bandwidth.name();
       add_reader(key, true, eq[eq_idx].bandwidth);
     }
 
@@ -701,23 +532,24 @@ public:
       groupKey += "/";
 
       key = groupKey;
-      key += GroupConfig::KEY_SNIPPET_EQ_COUNT;
+      key += GroupConfig::Definitions::equalizers.name();
       add_reader(key, true, group[group_idx].eqs);
       key = groupKey;
-      key += GroupConfig::KEY_SNIPPET_THRESHOLD;
+      key += GroupConfig::Definitions::threshold.name();
       add_reader(key, true, group[group_idx].threshold);
       key = groupKey;
-      key += GroupConfig::KEY_SNIPPET_VOLUME;
+      key += GroupConfig::Definitions::volume.name();
       add_array_reader<double, MAX_SPEAKERMAN_GROUPS>(
           key, true, group[group_idx].volume[0]);
       key = groupKey;
-      key += GroupConfig::KEY_SNIPPET_DELAY;
+      key += GroupConfig::Definitions::delay.name();
       add_reader(key, true, group[group_idx].delay);
       key = groupKey;
-      key += GroupConfig::KEY_SNIPPET_USE_SUB;
+      key += GroupConfig::Definitions::useSub.name();
       add_reader(key, true, group[group_idx].use_sub);
       key = groupKey;
-      key += GroupConfig::KEY_SNIPPET_MONO;
+      key += GroupConfig::Definitions::mono.name();
+      ;
       add_reader(key, true, group[group_idx].mono);
       key = groupKey;
       key += GroupConfig::KEY_SNIPPET_NAME;
@@ -732,13 +564,13 @@ public:
         eqKey += "/";
 
         key = eqKey;
-        key += EqualizerConfig::KEY_SNIPPET_CENTER;
+        key += EqualizerConfig::Definitions::center.name();
         add_reader(key, true, group[group_idx].eq[eq_idx].center);
         key = eqKey;
-        key += EqualizerConfig::KEY_SNIPPET_GAIN;
+        key += EqualizerConfig::Definitions::gain.name();
         add_reader(key, true, group[group_idx].eq[eq_idx].gain);
         key = eqKey;
-        key += EqualizerConfig::KEY_SNIPPET_BANDWIDTH;
+        key += EqualizerConfig::Definitions::bandwidth.name();
         add_reader(key, true, group[group_idx].eq[eq_idx].bandwidth);
       }
     }
@@ -1065,24 +897,6 @@ const GroupConfig GroupConfig::with_groups_mixed() const
   return result;
 }
 
-const EqualizerConfig EqualizerConfig::unsetConfig() {
-  return {UnsetValue<double>::value, UnsetValue<double>::value,
-          UnsetValue<double>::value};
-}
-
-void EqualizerConfig::set_if_unset(
-    const EqualizerConfig &base_config_if_unset) {
-  if (set_if_unset_or_invalid_config_value(center, base_config_if_unset.center,
-                                           MIN_CENTER_FREQ, MAX_CENTER_FREQ)) {
-    (*this) = base_config_if_unset;
-  } else {
-    unset_if_invalid(center, MIN_CENTER_FREQ, MAX_CENTER_FREQ);
-    box_if_out_of_range(gain, DEFAULT_GAIN, MIN_GAIN, MAX_GAIN);
-    box_if_out_of_range(bandwidth, DEFAULT_BANDWIDTH, MIN_BANDWIDTH,
-                        MAX_BANDWIDTH);
-  }
-}
-
 const DetectionConfig DetectionConfig::unsetConfig() {
   DetectionConfig result;
 
@@ -1118,7 +932,7 @@ const SpeakermanConfig SpeakermanConfig::defaultConfig() {
   }
   result.detection = DetectionConfig::defaultConfig();
   for (size_t i = 0; i < MAX_EQS; i++) {
-    result.eq[i] = EqualizerConfig::defaultConfig();
+    result.eq[i] = EqualizerConfig::unsetConfig();
   }
   return result;
 }
@@ -1174,7 +988,7 @@ void SpeakermanConfig::set_if_unset(const SpeakermanConfig &config_if_unset) {
     }
   }
   for (; eq_idx < MAX_EQS; eq_idx++) {
-    eq[eq_idx] = EqualizerConfig::defaultConfig();
+    eq[eq_idx] = EqualizerConfig::unsetConfig();
   }
 
   set_if_unset_or_invalid_config_value(groupChannels,
@@ -1187,7 +1001,8 @@ void SpeakermanConfig::set_if_unset(const SpeakermanConfig &config_if_unset) {
 
   set_if_unset_or_invalid_config_value(
       inputCount,
-      !UnsetValue<size_t>::is(config_if_unset.inputOffset) && config_if_unset.inputOffset > 0
+      !UnsetValue<size_t>::is(config_if_unset.inputOffset) &&
+              config_if_unset.inputOffset > 0
           ? config_if_unset.inputOffset
           : groups * groupChannels,
       MIN_INPUT_COUNT, MAX_INPUT_COUNT);

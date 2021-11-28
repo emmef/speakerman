@@ -28,77 +28,84 @@
 #include <iostream>
 #include <tdap/IndexPolicy.hpp>
 #include <tdap/Value.hpp>
+#include <speakerman/utils/Config.hpp>
 
 namespace speakerman {
 static constexpr size_t MAX_SPEAKERMAN_GROUPS = 4;
 
+static constexpr double MAXIMUM_DELAY_SECONDS = 0.02;
+
 struct EqualizerConfig {
-  static constexpr double MIN_CENTER_FREQ = 20;
-  static constexpr double DEFAULT_CENTER_FREQ = 1000;
-  static constexpr double MAX_CENTER_FREQ = 22000;
+  struct Definitions {
+    static constexpr ConfigNumericDefinition<double> center{
+        20, 1000, 22000, "center", ValueSetPolicy::BoxValue};
+    static constexpr ConfigNumericDefinition<double> gain{
+        0.1, 1, 10, "gain", ValueSetPolicy::BoxValue};
+    static constexpr ConfigNumericDefinition<double> bandwidth{
+        0.125, 1, 8, "bandwidth", ValueSetPolicy::BoxValue};
+  };
 
-  static constexpr double MIN_GAIN = 0.10;
-  static constexpr double DEFAULT_GAIN = 1.0;
-  static constexpr double MAX_GAIN = 10.0;
+  ConfigNumeric<double> center;
+  ConfigNumeric<double> gain;
+  ConfigNumeric<double> bandwidth;
 
-  static constexpr double MIN_BANDWIDTH = 0.25;
-  static constexpr double DEFAULT_BANDWIDTH = 1;
-  static constexpr double MAX_BANDWIDTH = 8.0;
+  EqualizerConfig()
+      : center(Definitions::center), gain(Definitions::gain),
+        bandwidth(Definitions::bandwidth) {}
+
+  EqualizerConfig &operator=(const EqualizerConfig &source) {
+    center = source.center;
+    gain = source.gain;
+    bandwidth = source.bandwidth;
+    return *this;
+  }
 
   static constexpr const char *KEY_SNIPPET_EQUALIZER = "equalizer";
-  static constexpr const char *KEY_SNIPPET_CENTER = "center";
-  static constexpr const char *KEY_SNIPPET_GAIN = "gain";
-  static constexpr const char *KEY_SNIPPET_BANDWIDTH = "bandwidth";
 
-  static const EqualizerConfig defaultConfig() { return {}; }
+  static const EqualizerConfig unsetConfig() { return {}; }
 
-  static const EqualizerConfig unsetConfig();
-  void set_if_unset(const EqualizerConfig &base_config_if_unset);
-
-  double center = DEFAULT_CENTER_FREQ;
-  double gain = DEFAULT_GAIN;
-  double bandwidth = DEFAULT_BANDWIDTH;
+  void set_if_unset(const EqualizerConfig &base_config_if_unset) {
+    if (center.is_set() || !base_config_if_unset.center.is_set()) {
+      return;
+    }
+    this->operator=(base_config_if_unset);
+  }
 };
 
 struct GroupConfig {
-  static constexpr size_t MIN_EQS = 0;
-  static constexpr size_t DEFAULT_EQS = 0;
   static constexpr size_t MAX_EQS = 2;
-  static constexpr const char *KEY_SNIPPET_EQ_COUNT = "equalizers";
-
-  static constexpr double MIN_THRESHOLD = 0.001;
-  static constexpr double DEFAULT_THRESHOLD = 0.1;
-  static constexpr double MAX_THRESHOLD = 0.9;
-  static constexpr const char *KEY_SNIPPET_THRESHOLD = "threshold";
-
-  static constexpr double MIN_VOLUME = 0;
-  static constexpr double DEFAULT_VOLUME = 1.0;
-  static constexpr double MAX_VOLUME = 40.0;
-  static constexpr const char *KEY_SNIPPET_VOLUME = "volume";
-
-  static constexpr double MIN_DELAY = 0;
-  static constexpr double DEFAULT_DELAY = 0;
-  static constexpr double MAX_DELAY = 0.020;
-  static constexpr const char *KEY_SNIPPET_DELAY = "delay";
-
-  static constexpr int DEFAULT_USE_SUB = 1;
-  static constexpr const char *KEY_SNIPPET_USE_SUB = "use-sub";
-
-  static constexpr int DEFAULT_MONO = 0;
-  static constexpr const char *KEY_SNIPPET_MONO = "mono";
+  struct Definitions {
+    static constexpr ConfigNumericDefinition<size_t> equalizers{
+        0, 0, MAX_EQS, "equalizers", ValueSetPolicy::BoxValue};
+    static constexpr ConfigNumericDefinition<double> threshold{
+        0.001, 0.1, 0.99, "threshold", ValueSetPolicy::BoxValue};
+    static constexpr ConfigNumericDefinition<double> volume{
+        0, 1.0, 40, "volume", ValueSetPolicy::BoxValue};
+    static constexpr ConfigNumericDefinition<double> delay{
+        0, 0, MAXIMUM_DELAY_SECONDS, "delay", ValueSetPolicy::BoxValue};
+    static constexpr ConfigNumericDefinition<int> useSub{
+        0, 1, 1, "use-sub", ValueSetPolicy::BoxValue};
+    static constexpr ConfigNumericDefinition<int> mono{0, 0, 1, "mono",
+                                                     ValueSetPolicy::BoxValue};
+  };
 
   static constexpr const char *KEY_SNIPPET_GROUP = "group";
   static constexpr const char *KEY_SNIPPET_NAME = "name";
   static constexpr size_t NAME_LENGTH = 32;
 
-  double threshold = DEFAULT_THRESHOLD;
-  double volume[MAX_SPEAKERMAN_GROUPS];
-  double delay = DEFAULT_DELAY;
-  int use_sub = DEFAULT_USE_SUB;
-  int mono = DEFAULT_MONO;
+  ConfigNumeric<double> threshold;
+  ConfigNumericArray<double, MAX_SPEAKERMAN_GROUPS> volume;
+  ConfigNumeric<double> delay;
+  ConfigNumeric<int> use_sub;
+  ConfigNumeric<int> mono;
+  ConfigNumeric<size_t> eqs;
   EqualizerConfig eq[MAX_EQS];
-  size_t eqs = DEFAULT_EQS;
   char name[NAME_LENGTH + 1];
+
+  GroupConfig()
+      : threshold(Definitions::threshold), volume(Definitions::volume),
+        delay(Definitions::delay), use_sub(Definitions::useSub),
+        mono(Definitions::mono), eqs(Definitions::equalizers) {}
 
   static const GroupConfig defaultConfig(size_t group_id);
 
@@ -171,9 +178,9 @@ struct SpeakermanConfig {
   static constexpr double DEFAULT_REL_SUB_THRESHOLD = M_SQRT2;
   static constexpr double MAX_REL_SUB_THRESHOLD = 2.0;
 
-  static constexpr double MIN_SUB_DELAY = GroupConfig::MIN_DELAY;
-  static constexpr double DEFAULT_SUB_DELAY = GroupConfig::DEFAULT_DELAY;
-  static constexpr double MAX_SUB_DELAY = GroupConfig::MAX_DELAY;
+  static constexpr double MIN_SUB_DELAY = 0;
+  static constexpr double DEFAULT_SUB_DELAY = 0;
+  static constexpr double MAX_SUB_DELAY = MAXIMUM_DELAY_SECONDS;
 
   static constexpr size_t MIN_SUB_OUTPUT = 0;
   static constexpr size_t DEFAULT_SUB_OUTPUT = 1;
