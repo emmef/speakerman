@@ -717,6 +717,77 @@ public:
 };
 
 
+class StringValueValidator {
+public:
+  virtual bool validate(const char *value, size_t maxLength, const char **end) const {
+    if (!value) {
+      return false;
+    }
+    size_t i;
+    for (i = 0; i < maxLength; i++) {
+      if (!value[i]) {
+        return true;
+      }
+    }
+    if (end) {
+      *end = value + i;
+    }
+    return false;
+  };
+  virtual ~StringValueValidator() = default;
+};
+
+template<size_t N, class V = StringValueValidator>
+class ConfigStringFormatDefinition {
+  static_assert(std::is_base_of<StringValueValidator, V>::value);
+
+public:
+  static bool validate(const char *value, const char **end) {
+    static const V validator_instance;
+    return validator_instance.validate(value, N, end);
+  }
+};
+
+template<class V>
+class ConfigStringDefinition {
+  typedef bool(*validate_function)(const char *, const char **);
+
+  struct SFINAE {
+    template<size_t N1, typename V2>
+    static constexpr ssize_t detectLength(const ConfigStringFormatDefinition<N1, V2> *) {
+      return N1;
+    }
+    static constexpr ssize_t detectLength(...) {
+      return 0;
+    }
+    template<size_t N1, typename V2>
+    static constexpr validate_function getValidationArg(const ConfigStringFormatDefinition<N1, V2> *) {
+      return ConfigStringFormatDefinition<N1, V2>::validate;
+    }
+    static constexpr int getValidationArg(...) { return 0; }
+    static auto constexpr getValidation() { return getValidationArg(static_cast<const V *>(nullptr)); }
+
+    static_assert(std::is_same<decltype(getValidation()), validate_function>::value);
+    static constexpr ssize_t LENGTH = detectLength(static_cast<const V *>(nullptr));
+    static_assert(LENGTH > 0, "");
+  };
+
+  const char * const name_;
+public:
+  static constexpr size_t LENGTH = SFINAE::LENGTH;
+
+  ConfigStringDefinition(const char *name) : name_(name) {}
+
+  static bool static_validate(const char *value, const char **end) {
+    return SFINAE::getValidation()(value, end);
+  }
+
+  bool validate(const char *value, const char **end) {
+    return static_validate(value, end);
+  }
+};
+
+
 
 } /* End of namespace speakerman */
 
