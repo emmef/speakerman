@@ -26,23 +26,28 @@
 #include <cmath>
 #include <fstream>
 #include <iostream>
+#include <speakerman/utils/Config.hpp>
 #include <tdap/IndexPolicy.hpp>
 #include <tdap/Value.hpp>
-#include <speakerman/utils/Config.hpp>
 
 namespace speakerman {
+
 static constexpr size_t MAX_SPEAKERMAN_GROUPS = 4;
+static constexpr size_t NAME_LENGTH = 32;
+typedef ConfigStringDefinition<ConfigStringFormatDefinition<NAME_LENGTH>>
+    NameDefinition;
+typedef ConfigString<NameDefinition> NameVariable;
+static constexpr NameDefinition nameDefinition("name", "noname");
 
 static constexpr double MAXIMUM_DELAY_SECONDS = 0.02;
 
 struct EqualizerConfig {
   struct Definitions {
-    static constexpr ConfigNumericDefinition<double> center{
-        20, 1000, 22000, "center", ValueSetPolicy::BoxValue};
-    static constexpr ConfigNumericDefinition<double> gain{
-        0.1, 1, 10, "gain", ValueSetPolicy::BoxValue};
-    static constexpr ConfigNumericDefinition<double> bandwidth{
-        0.125, 1, 8, "bandwidth", ValueSetPolicy::BoxValue};
+    static constexpr ConfigNumericDefinition<double> center{20, 1000, 22000,
+                                                            "center"};
+    static constexpr ConfigNumericDefinition<double> gain{0.1, 1, 10, "gain"};
+    static constexpr ConfigNumericDefinition<double> bandwidth{0.125, 1, 8,
+                                                               "bandwidth"};
   };
 
   ConfigNumeric<double> center;
@@ -72,21 +77,19 @@ struct EqualizerConfig {
   }
 };
 
-struct GroupConfig {
+typedef struct GroupConfig {
   static constexpr size_t MAX_EQS = 2;
   struct Definitions {
-    static constexpr ConfigNumericDefinition<size_t> equalizers{
-        0, 0, MAX_EQS, "equalizers", ValueSetPolicy::BoxValue};
-    static constexpr ConfigNumericDefinition<double> threshold{
-        0.001, 0.1, 0.99, "threshold", ValueSetPolicy::BoxValue};
-    static constexpr ConfigNumericDefinition<double> volume{
-        0, 1.0, 40, "volume", ValueSetPolicy::BoxValue};
+    static constexpr ConfigNumericDefinition<size_t> equalizers{0, 0, MAX_EQS,
+                                                                "equalizers"};
+    static constexpr ConfigNumericDefinition<double> threshold{0.001, 0.1, 0.99,
+                                                               "threshold"};
+    static constexpr ConfigNumericDefinition<double> volume{0, 1.0, 40,
+                                                            "volume"};
     static constexpr ConfigNumericDefinition<double> delay{
-        0, 0, MAXIMUM_DELAY_SECONDS, "delay", ValueSetPolicy::BoxValue};
-    static constexpr ConfigNumericDefinition<int> useSub{
-        0, 1, 1, "use-sub", ValueSetPolicy::BoxValue};
-    static constexpr ConfigNumericDefinition<int> mono{0, 0, 1, "mono",
-                                                     ValueSetPolicy::BoxValue};
+        0, 0, MAXIMUM_DELAY_SECONDS, "delay"};
+    static constexpr ConfigNumericDefinition<int> useSub{0, 1, 1, "use-sub"};
+    static constexpr ConfigNumericDefinition<int> mono{0, 0, 1, "mono"};
   };
 
   static constexpr const char *KEY_SNIPPET_GROUP = "group";
@@ -100,12 +103,13 @@ struct GroupConfig {
   ConfigNumeric<int> mono;
   ConfigNumeric<size_t> eqs;
   EqualizerConfig eq[MAX_EQS];
-  char name[NAME_LENGTH + 1];
+  NameVariable name;
 
   GroupConfig()
       : threshold(Definitions::threshold), volume(Definitions::volume),
         delay(Definitions::delay), use_sub(Definitions::useSub),
-        mono(Definitions::mono), eqs(Definitions::equalizers) {}
+        mono(Definitions::mono), eqs(Definitions::equalizers),
+        name(nameDefinition) {}
 
   static const GroupConfig defaultConfig(size_t group_id);
 
@@ -119,39 +123,32 @@ struct GroupConfig {
 };
 
 struct DetectionConfig {
-  static constexpr double MIN_MAXIMUM_WINDOW_SECONDS = 0.4;
-  static constexpr double DEFAULT_MAXIMUM_WINDOW_SECONDS = 0.4;
-  static constexpr double MAX_MAXIMUM_WINDOW_SECONDS = 8.0;
-  static constexpr const char *KEY_SNIPPET_MAXIMUM_WINDOW_SECONDS =
-      "detection.slow-seconds";
+  struct Definitions {
+    static constexpr ConfigNumericDefinition<double> slowSeconds{
+        0.4, 0.4, 8.0, "detection.slow-seconds"};
+    static constexpr ConfigNumericDefinition<double> fastSeconds{
+        0.0001, 0.001, 0.01, "detection.fast-seconds",
+        ValueSetPolicy::BoxValue};
+    static constexpr ConfigNumericDefinition<double> fastReleaseSeconds{
+        0.001, 0.02, 0.1, "detection.fast-release-seconds",
+        ValueSetPolicy::BoxValue};
+    static constexpr ConfigNumericDefinition<size_t> perceptiveLevels{
+        2, 11, 32, "detection.time-constants"};
+    static constexpr ConfigNumericDefinition<int> brickWallLimiterType{
+        0, 1, 2, "detection.brick-wall-limiter-type"};
+  };
+  ConfigNumeric<double> maximum_window_seconds;
+  ConfigNumeric<double> minimum_window_seconds;
+  ConfigNumeric<double> rms_fast_release_seconds;
+  ConfigNumeric<size_t> perceptive_levels;
+  ConfigNumeric<int> brickWallLimiterType;
 
-  static constexpr size_t MIN_PERCEPTIVE_LEVELS = 2;
-  static constexpr size_t DEFAULT_PERCEPTIVE_LEVELS = 11;
-  static constexpr size_t MAX_PERCEPTIVE_LEVELS = 32;
-  static constexpr const char *KEY_SNIPPET_PERCEPTIVE_LEVELS =
-      "detection.time-constants";
-
-  static constexpr double MIN_MINIMUM_WINDOW_SECONDS = 0.0001;
-  static constexpr double DEFAULT_MINIMUM_WINDOW_SECONDS = 0.001;
-  static constexpr double MAX_MINIMUM_WINDOW_SECONDS = 0.010;
-  static constexpr const char *KEY_SNIPPET_MINIMUM_WINDOW_SECONDS =
-      "detection.fast-seconds";
-
-  static constexpr double MIN_RMS_FAST_RELEASE_SECONDS = 0.001;
-  static constexpr double DEFAULT_RMS_FAST_RELEASE_SECONDS = 0.02;
-  static constexpr double MAX_RMS_FAST_RELEASE_SECONDS = 0.10;
-  static constexpr const char *KEY_SNIPPET_RMS_FAST_RELEASE_SECONDS =
-      "detection.rms-fast-release-seconds";
-
-  static constexpr int DEFAULT_USE_BRICK_WALL_PREDICTION = 1;
-  static constexpr const char *KEY_SNIPPET_USE_BRICK_WALL_PREDICTION =
-      "detection.use-brick-wall-prediction";
-
-  double maximum_window_seconds = DEFAULT_MAXIMUM_WINDOW_SECONDS;
-  double minimum_window_seconds = DEFAULT_MINIMUM_WINDOW_SECONDS;
-  double rms_fast_release_seconds = DEFAULT_RMS_FAST_RELEASE_SECONDS;
-  size_t perceptive_levels = DEFAULT_PERCEPTIVE_LEVELS;
-  int useBrickWallPrediction = DEFAULT_USE_BRICK_WALL_PREDICTION;
+  DetectionConfig()
+      : maximum_window_seconds(Definitions::slowSeconds),
+        minimum_window_seconds(Definitions::fastSeconds),
+        rms_fast_release_seconds(Definitions::fastReleaseSeconds),
+        perceptive_levels(Definitions::perceptiveLevels),
+        brickWallLimiterType(Definitions::brickWallLimiterType) {}
 
   static const DetectionConfig defaultConfig() { return {}; }
 

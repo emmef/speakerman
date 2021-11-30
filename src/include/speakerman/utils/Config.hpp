@@ -22,17 +22,17 @@
 #ifndef SMS_SPEAKERMAN_CONFIG_GUARD_H_
 #define SMS_SPEAKERMAN_CONFIG_GUARD_H_
 
+#include <algorithm>
 #include <fstream>
 #include <istream>
+#include <tdap/IndexPolicy.hpp>
 #include <type_traits>
 #include <unordered_map>
 
 namespace speakerman {
 
-using namespace tdap;
-
 struct config {
-  enum class CallbackResult { CONTINUE, STOP };
+  enum class CallbackResult { Continue [[maybe_unused]], Stop };
 
   /**
    * A callback that is called by #readConfig() each time a
@@ -42,19 +42,19 @@ struct config {
                                                  const char *value, void *data);
 
   enum class ReadResult {
-    SUCCESS,
-    STOPPED,
-    NO_CALLBACK,
-    KEY_TOO_LONG,
-    VALUE_TOO_LONG,
-    INVALID_START_OF_LINE,
-    INVALID_KEY_CHARACTER,
-    INVALID_ASSIGNMENT,
-    UNEXPECTED_EOL,
-    UNEXPECTED_EOF
+    Success,
+    Stopped,
+    NoCallback,
+    KeyTooLong,
+    ValueTooLong,
+    InvalidStartOfLine,
+    InvalidKeyCharacter,
+    InvalidAssignment,
+    UnexpectedEol,
+    UnexpectedEof
   };
 
-  static char getEscaped(char c) {
+  [[maybe_unused]] static char getEscaped(char c) {
     switch (c) {
     case '\\':
       return '\\';
@@ -101,248 +101,247 @@ struct config {
 
   static constexpr bool isNum(char c) { return c >= '0' && c <= '9'; }
 
-//  class Reader {
-//    enum class ParseState {
-//      START,
-//      COMMENT,
-//      KEYNAME,
-//      ASSIGNMENT,
-//      START_VALUE,
-//      VALUE,
-//      QUOTE,
-//      ESC
-//    };
-//
-//  public:
-//    static constexpr size_t MAX_KEY_LENGTH = 127;
-//    static constexpr size_t MAX_VALUE_LENGTH = 1023;
-//
-//    Reader() { setStartState(); }
-//
-//    ReadResult read(std::istream &stream, configReaderCallback callback,
-//                    void *data) {
-//      if (callback == nullptr) {
-//        return ReadResult::NO_CALLBACK;
-//      }
-//      CallbackResult cbr;
-//      setStartState();
-//      ParseState popState_ = state_;
-//      char quote = 0;
-//      while (!stream.eof()) {
-//        int i = stream.get();
-//        if (i == -1) {
-//          break;
-//        }
-//        char c = i;
-//        switch (state_) {
-//        case ParseState::START:
-//          if (isCommentStart(c)) {
-//            state_ = ParseState::COMMENT;
-//            break;
-//          }
-//          if (isLineDelimiter(c)) {
-//            break;
-//          }
-//          if (isKeyStartChar(c)) {
-//            state_ = ParseState::KEYNAME;
-//            addKeyChar(c);
-//            break;
-//          }
-//          if (isWhiteSpace(c)) {
-//            break;
-//          }
-//          return ReadResult::INVALID_START_OF_LINE;
-//
-//        case ParseState::COMMENT:
-//          if (isLineDelimiter(c)) {
-//            setStartState();
-//          }
-//          break;
-//
-//        case ParseState::KEYNAME:
-//          if (isKeyChar(c)) {
-//            if (!addKeyChar(c)) {
-//              return ReadResult::KEY_TOO_LONG;
-//            }
-//            break;
-//          }
-//          if (isWhiteSpace(c)) {
-//            state_ = ParseState::ASSIGNMENT;
-//            break;
-//          }
-//          if (isAssignment(c)) {
-//            state_ = ParseState::START_VALUE;
-//            break;
-//          }
-//          return ReadResult::INVALID_KEY_CHARACTER;
-//
-//        case ParseState::ASSIGNMENT:
-//          if (isAssignment(c)) {
-//            state_ = ParseState::START_VALUE;
-//            break;
-//          }
-//          if (isLineDelimiter(c)) {
-//            if (reportKeyValue(callback, data) == CallbackResult::STOP) {
-//              return ReadResult::STOPPED;
-//            }
-//            setStartState();
-//            break;
-//          }
-//          if (isWhiteSpace(c)) {
-//            break;
-//          }
-//
-//          return ReadResult::INVALID_ASSIGNMENT;
-//
-//        case ParseState::START_VALUE:
-//          if (isLineDelimiter(c)) {
-//            if (reportKeyValue(callback, data) == CallbackResult::STOP) {
-//              return ReadResult::STOPPED;
-//            }
-//            setStartState();
-//            break;
-//          }
-//          if (isWhiteSpace(c)) {
-//            break;
-//          }
-//          if (isEscape(c)) {
-//            popState_ = ParseState::VALUE;
-//            state_ = ParseState::ESC;
-//            break;
-//          }
-//          if (isQuote(c)) {
-//            state_ = ParseState::QUOTE;
-//            quote = c;
-//            break;
-//          }
-//          addValueChar(c);
-//          break;
-//
-//        case ParseState::ESC:
-//          if (isLineDelimiter(c)) {
-//            return ReadResult::UNEXPECTED_EOL;
-//          }
-//          if (!addValueChar(getEscaped(c))) {
-//            return ReadResult::VALUE_TOO_LONG;
-//          }
-//          state_ = popState_;
-//
-//          break;
-//        case ParseState::VALUE:
-//        case ParseState::QUOTE:
-//          if (isLineDelimiter(c)) {
-//            if (state_ == ParseState::QUOTE) {
-//              return ReadResult::UNEXPECTED_EOL;
-//            }
-//            if (reportKeyValue(callback, data) == CallbackResult::STOP) {
-//              return ReadResult::STOPPED;
-//            }
-//            setStartState();
-//            break;
-//          }
-//          if (isEscape(c)) {
-//            popState_ = state_;
-//            state_ = ParseState::ESC;
-//            break;
-//          }
-//          if (c == quote) {
-//            if (reportKeyValue(callback, data) == CallbackResult::STOP) {
-//              return ReadResult::STOPPED;
-//            }
-//            setStartState();
-//          }
-//          if (!addValueChar(c)) {
-//            return ReadResult::VALUE_TOO_LONG;
-//          }
-//          break;
-//        }
-//      }
-//      switch (state_) {
-//      case ParseState::COMMENT:
-//      case ParseState::START:
-//        return ReadResult::SUCCESS;
-//
-//      case ParseState::VALUE:
-//      case ParseState::START_VALUE:
-//        if (reportKeyValue(callback, data) == CallbackResult::STOP) {
-//          return ReadResult::STOPPED;
-//        }
-//        return ReadResult::SUCCESS;
-//
-//      default:
-//        return ReadResult::UNEXPECTED_EOF;
-//      }
-//    }
-//
-//    ReadResult readFile(const char *fileName, configReaderCallback callback,
-//                        void *data) {
-//      std::ifstream stream;
-//      stream.open(fileName);
-//      if (stream.is_open()) {
-//        try {
-//          return read(stream, callback, data);
-//        } catch (...) {
-//          throw;
-//        }
-//      }
-//      return ReadResult::UNEXPECTED_EOF;
-//    }
-//
-//  private:
-//    char key_[MAX_KEY_LENGTH + 1];
-//    size_t keyLen_;
-//    char value_[MAX_VALUE_LENGTH + 1];
-//    size_t valueLen_;
-//    ParseState state_;
-//
-//    bool addKeyChar(char c) {
-//      if (keyLen_ == MAX_KEY_LENGTH) {
-//        return false;
-//      }
-//      key_[keyLen_++] = c;
-//      return true;
-//    }
-//
-//    bool addValueChar(char c) {
-//      if (valueLen_ == MAX_VALUE_LENGTH) {
-//        return false;
-//      }
-//      value_[valueLen_++] = c;
-//      return true;
-//    }
-//
-//    void setStartState() {
-//      state_ = ParseState::START;
-//      keyLen_ = 0;
-//      valueLen_ = 0;
-//    }
-//
-//    CallbackResult reportKeyValue(configReaderCallback callback, void *data) {
-//      key_[keyLen_] = 0;
-//      value_[valueLen_] = 0;
-//      return callback(key_, value_, data);
-//    }
-//  };
-//
-//  class Typed : protected Reader {
-//    static CallbackResult callback(const char *key, const char *value,
-//                                   void *data) {
-//      return static_cast<Typed *>(data)->onKeyValue(key, value);
-//    }
-//
-//  public:
-//    ReadResult read(std::istream &stream) {
-//      return Reader::read(stream, Typed::callback, this);
-//    }
-//
-//    ReadResult readFile(const char *fileName) {
-//      return Reader::readFile(fileName, Typed::callback, this);
-//    }
-//
-//    virtual CallbackResult onKeyValue(const char *key, const char *value) = 0;
-//
-//    virtual ~Typed() = default;
-//  };
+  class Reader {
+    enum class ParseState {
+      START,
+      COMMENT,
+      KEYNAME,
+      ASSIGNMENT,
+      START_VALUE,
+      VALUE,
+      QUOTE,
+      ESC
+    };
+
+  public:
+    static constexpr size_t MAX_KEY_LENGTH = 127;
+    static constexpr size_t MAX_VALUE_LENGTH = 1023;
+
+    Reader() { setStartState(); }
+
+    ReadResult read(std::istream &stream, configReaderCallback callback,
+                    void *data) {
+      if (callback == nullptr) {
+        return ReadResult::NoCallback;
+      }
+      setStartState();
+      ParseState popState_ = state_;
+      char quote = 0;
+      while (!stream.eof()) {
+        int i = stream.get();
+        if (i == -1) {
+          break;
+        }
+        char c = static_cast<char>(i & 0x7f);
+        switch (state_) {
+        case ParseState::START:
+          if (isCommentStart(c)) {
+            state_ = ParseState::COMMENT;
+            break;
+          }
+          if (isLineDelimiter(c)) {
+            break;
+          }
+          if (isKeyStartChar(c)) {
+            state_ = ParseState::KEYNAME;
+            addKeyChar(c);
+            break;
+          }
+          if (isWhiteSpace(c)) {
+            break;
+          }
+          return ReadResult::InvalidStartOfLine;
+
+        case ParseState::COMMENT:
+          if (isLineDelimiter(c)) {
+            setStartState();
+          }
+          break;
+
+        case ParseState::KEYNAME:
+          if (isKeyChar(c)) {
+            if (!addKeyChar(c)) {
+              return ReadResult::KeyTooLong;
+            }
+            break;
+          }
+          if (isWhiteSpace(c)) {
+            state_ = ParseState::ASSIGNMENT;
+            break;
+          }
+          if (isAssignment(c)) {
+            state_ = ParseState::START_VALUE;
+            break;
+          }
+          return ReadResult::InvalidKeyCharacter;
+
+        case ParseState::ASSIGNMENT:
+          if (isAssignment(c)) {
+            state_ = ParseState::START_VALUE;
+            break;
+          }
+          if (isLineDelimiter(c)) {
+            if (reportKeyValue(callback, data) == CallbackResult::Stop) {
+              return ReadResult::Stopped;
+            }
+            setStartState();
+            break;
+          }
+          if (isWhiteSpace(c)) {
+            break;
+          }
+
+          return ReadResult::InvalidAssignment;
+
+        case ParseState::START_VALUE:
+          if (isLineDelimiter(c)) {
+            if (reportKeyValue(callback, data) == CallbackResult::Stop) {
+              return ReadResult::Stopped;
+            }
+            setStartState();
+            break;
+          }
+          if (isWhiteSpace(c)) {
+            break;
+          }
+          if (isEscape(c)) {
+            popState_ = ParseState::VALUE;
+            state_ = ParseState::ESC;
+            break;
+          }
+          if (isQuote(c)) {
+            state_ = ParseState::QUOTE;
+            quote = c;
+            break;
+          }
+          addValueChar(c);
+          break;
+
+        case ParseState::ESC:
+          if (isLineDelimiter(c)) {
+            return ReadResult::UnexpectedEol;
+          }
+          if (!addValueChar(getEscaped(c))) {
+            return ReadResult::ValueTooLong;
+          }
+          state_ = popState_;
+
+          break;
+        case ParseState::VALUE:
+        case ParseState::QUOTE:
+          if (isLineDelimiter(c)) {
+            if (state_ == ParseState::QUOTE) {
+              return ReadResult::UnexpectedEol;
+            }
+            if (reportKeyValue(callback, data) == CallbackResult::Stop) {
+              return ReadResult::Stopped;
+            }
+            setStartState();
+            break;
+          }
+          if (isEscape(c)) {
+            popState_ = state_;
+            state_ = ParseState::ESC;
+            break;
+          }
+          if (c == quote) {
+            if (reportKeyValue(callback, data) == CallbackResult::Stop) {
+              return ReadResult::Stopped;
+            }
+            setStartState();
+          }
+          if (!addValueChar(c)) {
+            return ReadResult::ValueTooLong;
+          }
+          break;
+        }
+      }
+      switch (state_) {
+      case ParseState::COMMENT:
+      case ParseState::START:
+        return ReadResult::Success;
+
+      case ParseState::VALUE:
+      case ParseState::START_VALUE:
+        if (reportKeyValue(callback, data) == CallbackResult::Stop) {
+          return ReadResult::Stopped;
+        }
+        return ReadResult::Success;
+
+      default:
+        return ReadResult::UnexpectedEof;
+      }
+    }
+
+    ReadResult readFile(const char *fileName, configReaderCallback callback,
+                        void *data) {
+      std::ifstream stream;
+      stream.open(fileName);
+      if (stream.is_open()) {
+        try {
+          return read(stream, callback, data);
+        } catch (...) {
+          throw;
+        }
+      }
+      return ReadResult::UnexpectedEof;
+    }
+
+  private:
+    char key_[MAX_KEY_LENGTH + 1] = {0};
+    size_t keyLen_ = 0;
+    char value_[MAX_VALUE_LENGTH + 1] = {0};
+    size_t valueLen_ = 0;
+    ParseState state_ = ParseState::START;
+
+    bool addKeyChar(char c) {
+      if (keyLen_ == MAX_KEY_LENGTH) {
+        return false;
+      }
+      key_[keyLen_++] = c;
+      return true;
+    }
+
+    bool addValueChar(char c) {
+      if (valueLen_ == MAX_VALUE_LENGTH) {
+        return false;
+      }
+      value_[valueLen_++] = c;
+      return true;
+    }
+
+    void setStartState() {
+      state_ = ParseState::START;
+      keyLen_ = 0;
+      valueLen_ = 0;
+    }
+
+    CallbackResult reportKeyValue(configReaderCallback callback, void *data) {
+      key_[keyLen_] = 0;
+      value_[valueLen_] = 0;
+      return callback(key_, value_, data);
+    }
+  };
+
+  class [[maybe_unused]] Typed : protected Reader {
+    static CallbackResult callback(const char *key, const char *value,
+                                   void *data) {
+      return static_cast<Typed *>(data)->onKeyValue(key, value);
+    }
+
+  public:
+    ReadResult read(std::istream &stream) {
+      return Reader::read(stream, Typed::callback, this);
+    }
+
+    [[maybe_unused]] ReadResult readFile(const char *fileName) {
+      return Reader::readFile(fileName, Typed::callback, this);
+    }
+
+    virtual CallbackResult onKeyValue(const char *key, const char *value) = 0;
+
+    virtual ~Typed() = default;
+  };
 };
 
 enum class ValueSetPolicy { Fail, BoxValue, DefaultValue, FailReset };
@@ -351,19 +350,19 @@ enum class ValueSetResult { Ok, AppliedPolicy, Fail };
 
 enum class ParserValueType { Integral, Boolean, Float, String, Unsupported };
 
-template <typename T, ParserValueType type, size_t LENGTH = 0> struct ValueParser_ {};
+template <typename T, ParserValueType type, size_t LENGTH = 0>
+struct ValueParser_ {};
 
 template <typename T> struct ValueParser_<T, ParserValueType::Integral> {
   static_assert(std::is_integral<T>::value, "Expected integral type parameter");
   using V = long long int;
 
-  static bool parse(T &value, const char *start, char *&end) {
+  [[maybe_unused]] static bool parse(T &value, const char *start, char *&end) {
     V parsed = strtoll(start, &end, 10);
     if (*end == '\0' || config::isWhiteSpace(*end) ||
         config::isCommentStart(*end)) {
-      value = tdap::Value<T>::force_between(parsed,
-                                            std::numeric_limits<T>::lowest(),
-                                            std::numeric_limits<T>::max());
+      value = std::clamp(parsed, std::numeric_limits<T>::lowest(),
+                         std::numeric_limits<T>::max());
       return true;
     }
     return false;
@@ -386,7 +385,7 @@ template <typename T> struct ValueParser_<T, ParserValueType::Boolean> {
             config::isWhiteSpace(start[key_length]));
   }
 
-  static bool parse(T &field, const char *value, char *&end) {
+  [[maybe_unused]] static bool parse(T &field, const char *value, char *&end) {
     for (end = const_cast<char *>(value); config::isAlphaNum(*end); end++) {
     }
 
@@ -409,24 +408,24 @@ template <typename T> struct ValueParser_<T, ParserValueType::Float> {
                 "Expected floating point type parameter");
   using V = long double;
 
-  static bool parse(T &field, const char *value, char *&end) {
+  [[maybe_unused]] static bool parse(T &field, const char *value, char *&end) {
     V parsed = strtold(value, &end);
     if (*end == '\0' || config::isWhiteSpace(*end) ||
         config::isCommentStart(*end)) {
-      field = tdap::Value<V>::force_between(parsed,
-                                            std::numeric_limits<T>::lowest(),
-                                            std::numeric_limits<T>::max());
+      field = std::clamp(parsed, std::numeric_limits<T>::lowest(),
+                         std::numeric_limits<T>::max());
       return true;
     }
     return false;
   }
 };
 
-template <typename T, size_t NAME_LENGTH> struct ValueParser_<T, ParserValueType::String, NAME_LENGTH> {
-  static bool parse(T field, const char *value, char *&end) {
+template <typename T, size_t NAME_LENGTH>
+struct ValueParser_<T, ParserValueType::String, NAME_LENGTH> {
+  [[maybe_unused]] static bool parse(T field, const char *value, char *&end) {
     const char *src = value;
     char *dst = field;
-    while (src != 0 && (dst - field) < NAME_LENGTH) {
+    while (src != nullptr && (dst - field) < NAME_LENGTH) {
       char c = *src++;
       if (c == '\t' || c == ' ') {
         if (dst > field) {
@@ -437,7 +436,7 @@ template <typename T, size_t NAME_LENGTH> struct ValueParser_<T, ParserValueType
         *dst++ = c;
       }
     }
-    *dst++ = '\0';
+    *dst = '\0';
     return true;
   }
 };
@@ -446,13 +445,13 @@ template <typename T> static constexpr ParserValueType get_value_parser_type() {
   return std::is_floating_point<T>::value ? ParserValueType::Float
          : std::is_same<int, T>::value    ? ParserValueType::Boolean
          : std::is_integral<T>::value     ? ParserValueType::Integral
-         : std::is_same<char*, T>::value
-             ? ParserValueType::String
-             : ParserValueType::Unsupported;
+         : std::is_same<char *, T>::value ? ParserValueType::String
+                                          : ParserValueType::Unsupported;
 }
 
 template <typename T, size_t NAME_LENGTH = 0>
-struct ValueParser : public ValueParser_<T, get_value_parser_type<T>(), NAME_LENGTH> {};
+struct ValueParser
+    : public ValueParser_<T, get_value_parser_type<T>(), NAME_LENGTH> {};
 
 template <typename T> class ConfigNumericDefinition {
 public:
@@ -502,7 +501,7 @@ private:
   }
 
 public:
-  constexpr ConfigNumericDefinition(
+  [[maybe_unused]] constexpr ConfigNumericDefinition(
       T min, T def, T max, const char *name,
       ValueSetPolicy policy = ValueSetPolicy::BoxValue)
       : min_(min < max ? min : max), max_(max > min ? max : min),
@@ -521,7 +520,7 @@ public:
                            policy());
   }
 
-  ValueAndResult setWithLower(T newValue, T lower) const {
+  [[maybe_unused]] ValueAndResult setWithLower(T newValue, T lower) const {
     return set_with_policy(newValue, std::max(lower, min()), def(), max(),
                            policy());
   }
@@ -541,17 +540,8 @@ public:
             (name_ == other.name_ || strncmp(name_, other.name_, 128) == 0));
   }
 
-  bool same_range(const ConfigNumericDefinition &other) const {
-    return &other == this || (min_ == other.min_ && max_ == other.max_);
-  }
-
   bool compatible_range(const ConfigNumericDefinition &other) const {
     return &other == this || (min_ <= other.min_ && max_ >= other.max_);
-  }
-
-  bool same_number(const ConfigNumericDefinition &other) const {
-    return &other == this ||
-           (min_ == other.min_ && def_ == other.def_ && max_ == other.max_);
   }
 };
 
@@ -561,9 +551,12 @@ template <typename T> class ConfigNumeric {
   typename ConfigNumericDefinition<T>::Value value_;
 
 public:
-  ConfigNumeric(const ConfigNumericDefinition<T> &definition)
+  [[maybe_unused]] explicit ConfigNumeric(
+      const ConfigNumericDefinition<T> &definition)
       : definition_(definition), value_({definition_.def(), false}) {}
-  const ConfigNumericDefinition<T> &definition() const { return definition_; }
+  [[maybe_unused]] const ConfigNumericDefinition<T> &definition() const {
+    return definition_;
+  }
 
   ConfigNumeric &operator=(const ConfigNumeric &source) {
     if (&source == this) {
@@ -575,15 +568,16 @@ public:
 
   void reset() { value_ = {definition_.def(), false}; }
 
-  ValueSetResult setWithUpper(T newValue, T upper) {
+  [[maybe_unused]] ValueSetResult setWithUpper(T newValue, T upper) {
     return value_.assign(definition_.setWithUpper(newValue, upper));
   }
 
-  ValueSetResult setWithLower(T newValue, T lower) {
+  [[maybe_unused]] ValueSetResult setWithLower(T newValue, T lower) {
     return value_.assign(definition_.setWithUpper(newValue, lower));
   }
 
-  ValueSetResult setBounded(T &value, bool &set, T newValue, T lower, T upper) {
+  [[maybe_unused]] ValueSetResult setBounded(T &value, bool &set, T newValue,
+                                             T lower, T upper) {
     return value_.assign(definition_.setBounded(newValue, upper, lower));
   }
 
@@ -591,16 +585,20 @@ public:
     return value_.assign(definition_.set(newValue));
   }
 
-  bool is_set() const { return value_.set; }
+  [[nodiscard]] bool is_set() const { return value_.set; }
 
   T get() const { return is_set() ? value_.value : definition_.def(); }
 
-  T get_with_fallback(const T fallback) const {
+  [[maybe_unused]] T getWithFallback(const T fallback) const {
     if (is_set()) {
       return value_;
     }
     auto r = definition_.set(fallback);
     return r.set ? r.value : definition_.def();
+  }
+
+  bool operator==(const ConfigNumeric &other) const {
+    return get() == other.get();
   }
 };
 
@@ -613,32 +611,30 @@ private:
   using Value = typename ConfigNumericDefinition<T>::Value;
   Value data_[CAPACITY];
 
-  Value &ref(size_t i) { return data_[tdap::IndexPolicy::force(i, CAPACITY)]; }
-
   const Value &ref(size_t i) const {
     return data_[tdap::IndexPolicy::force(i, CAPACITY)];
   }
 
 public:
-  ConfigNumericArray(const ConfigNumericDefinition<T> &definition)
+  [[maybe_unused]] explicit ConfigNumericArray(
+      const ConfigNumericDefinition<T> &definition)
       : definition_(definition) {}
 
-  explicit ConfigNumericArray(const ConfigNumericArray &source)
+  ConfigNumericArray(const ConfigNumericArray &source)
       : definition_(source.definition_) {
     this->operator=(source);
   }
 
   const ConfigNumericDefinition<T> &definition() const { return definition_; }
 
-  constexpr size_t capacity() const { return CAPACITY; }
+  [[nodiscard]] constexpr size_t capacity() const { return CAPACITY; }
 
-  size_t length() const {
-    for (size_t i = 0; i < CAPACITY; i++) {
-      if (!data_[i].set) {
-        return i + 1;
-      }
+  [[nodiscard]] size_t length() const {
+    size_t len = 0;
+    while (len < CAPACITY && data_[len].set) {
+      len++;
     }
-    return CAPACITY;
+    return len;
   }
 
   void reset() {
@@ -648,7 +644,7 @@ public:
   }
 
   ConfigNumericArray &operator=(const ConfigNumericArray &source) {
-    if (source == *this) {
+    if (&source == this) {
       return *this;
     }
     size_t i;
@@ -675,16 +671,18 @@ public:
     return *this;
   }
 
-  ValueSetResult setWithUpper(size_t index, T newValue, T upper) {
+  [[maybe_unused]] ValueSetResult setWithUpper(size_t index, T newValue,
+                                               T upper) {
     return ref(index).assign(definition_.setWithUpper(newValue, upper));
   }
 
-  ValueSetResult setWithLower(size_t index, T newValue, T lower) {
+  [[maybe_unused]] ValueSetResult setWithLower(size_t index, T newValue,
+                                               T lower) {
     return ref(index).assign(definition_.setWithUpper(newValue, lower));
   }
 
-  ValueSetResult setBounded(size_t index, T &value, bool &set, T newValue,
-                            T lower, T upper) {
+  [[maybe_unused]] ValueSetResult setBounded(size_t index, T &value, bool &set,
+                                             T newValue, T lower, T upper) {
     return ref(index).assign(definition_.setBounded(newValue, upper, lower));
   }
 
@@ -692,7 +690,7 @@ public:
     return ref(index).assign(definition_.set(newValue));
   }
 
-  bool is_set(size_t index) const {
+  [[nodiscard]] bool is_set(size_t index) const {
     if (index >= CAPACITY) {
       throw std::out_of_range("Index out of range for config value array");
     }
@@ -707,19 +705,45 @@ public:
     auto e = ref(index);
     return e.set ? e.value : definition_.def();
   }
-  T get_with_fallback(size_t index, const T fallback) {
+  [[maybe_unused]] T getWithFallback(size_t index, const T fallback) {
     if (is_set(index)) {
       return ref(index).value;
     }
     auto r = definition_.set(fallback);
     return r.set ? r.value : definition_.def();
   }
-};
 
+  bool operator==(const ConfigNumericArray &other) const {
+    bool mineDone = false;
+    bool yoursDone = false;
+    for (size_t i = 0; i < CAPACITY; i++) {
+      const Value mine = data_[i];
+      const Value yours = other.data_[i];
+      mineDone |= !mine.set;
+      yoursDone |= !yours.set;
+      if (mineDone) {
+        if (yoursDone) {
+          break;
+        }
+        if (yours.value != definition_.def()) {
+          return false;
+        }
+      } else if (yoursDone) {
+        if (mine.value != definition_.def()) {
+          return false;
+        }
+      } else if (mine.value != yours.value) {
+        return false;
+      }
+    }
+    return true;
+  }
+};
 
 class StringValueValidator {
 public:
-  virtual bool validate(const char *value, size_t maxLength, const char **end) const {
+  virtual bool validate(const char *value, size_t maxLength,
+                        const char **end) const {
     if (!value) {
       return false;
     }
@@ -727,6 +751,10 @@ public:
     for (i = 0; i < maxLength; i++) {
       if (!value[i]) {
         return true;
+      }
+      // Does not accept UTF-8 more than one byte characters
+      if ((value[i] & 0x80) != 0) {
+        break;
       }
     }
     if (end) {
@@ -737,8 +765,9 @@ public:
   virtual ~StringValueValidator() = default;
 };
 
-template<size_t N, class V = StringValueValidator>
+template <size_t N, class V = StringValueValidator>
 class ConfigStringFormatDefinition {
+  static_assert(N > 0);
   static_assert(std::is_base_of<StringValueValidator, V>::value);
 
 public:
@@ -748,46 +777,146 @@ public:
   }
 };
 
-template<class V>
-class ConfigStringDefinition {
-  typedef bool(*validate_function)(const char *, const char **);
+template <class V> class ConfigStringDefinition {
+  /**
+   * Using "substitution failure is not an error" techniques to establish that
+   * the template type argument is a ConfigStringFormatDefinition, and if so:
+   * pick the important parts of it.
+   */
+  static constexpr auto substitutionArgument = static_cast<const V *>(nullptr);
+  template <size_t N1, typename V2>
+  [[maybe_unused]] static constexpr auto
+  subst(const ConfigStringFormatDefinition<N1, V2> *p) {
+    return p;
+  }
+  static constexpr bool subst(...) { return false; }
+  [[maybe_unused]] static constexpr auto configFmtPtr =
+      subst(substitutionArgument);
+  static_assert(std::is_same_v<decltype(configFmtPtr), const V *const>);
 
-  struct SFINAE {
-    template<size_t N1, typename V2>
-    static constexpr ssize_t detectLength(const ConfigStringFormatDefinition<N1, V2> *) {
-      return N1;
-    }
-    static constexpr ssize_t detectLength(...) {
-      return 0;
-    }
-    template<size_t N1, typename V2>
-    static constexpr validate_function getValidationArg(const ConfigStringFormatDefinition<N1, V2> *) {
-      return ConfigStringFormatDefinition<N1, V2>::validate;
-    }
-    static constexpr int getValidationArg(...) { return 0; }
-    static auto constexpr getValidation() { return getValidationArg(static_cast<const V *>(nullptr)); }
+  template <size_t N1, typename V2>
+  static constexpr auto
+  getValidator(const ConfigStringFormatDefinition<N1, V2> *) {
+    return ConfigStringFormatDefinition<N1, V2>::validate;
+  }
+  template <size_t N1, typename V2>
+  static constexpr auto
+  getLength(const ConfigStringFormatDefinition<N1, V2> *) {
+    return N1;
+  }
 
-    static_assert(std::is_same<decltype(getValidation()), validate_function>::value);
-    static constexpr ssize_t LENGTH = detectLength(static_cast<const V *>(nullptr));
-    static_assert(LENGTH > 0, "");
-  };
-
-  const char * const name_;
 public:
-  static constexpr size_t LENGTH = SFINAE::LENGTH;
+  static constexpr size_t length = getLength(substitutionArgument);
+  static constexpr auto validateFunction = getValidator(substitutionArgument);
 
-  ConfigStringDefinition(const char *name) : name_(name) {}
+  [[maybe_unused]] constexpr ConfigStringDefinition(const char *name,
+                                                    const char *defaultValue)
+      : name_(name), def_(defaultValue) {}
 
-  static bool static_validate(const char *value, const char **end) {
-    return SFINAE::getValidation()(value, end);
+  static bool validate(const char *value, const char **end) {
+    return validateFunction(value, end);
   }
 
-  bool validate(const char *value, const char **end) {
-    return static_validate(value, end);
+  [[nodiscard]] const char *name() const {
+    return name_ != nullptr ? name_ : "[no-name]";
   }
+  [[nodiscard]] const char *def() const {
+    return def_ != nullptr ? def_ : "[no-default]";
+  }
+
+private:
+  const char *const name_;
+  const char *const def_;
 };
 
+template <class Def> class [[maybe_unused]] ConfigString {
+  static constexpr auto substitutionArgument =
+      static_cast<const Def *>(nullptr);
+  template <class V>
+  [[maybe_unused]] static constexpr auto
+  subst(const ConfigStringDefinition<V> *p) {
+    return p;
+  }
+  static constexpr bool subst(...) { return false; }
+  [[maybe_unused]] static constexpr auto configDef =
+      subst(substitutionArgument);
 
+  static_assert(std::is_same_v<decltype(configDef), const Def *const>);
+
+  template <class V>
+  static constexpr auto getValidator(const ConfigStringDefinition<V> *) {
+    return ConfigStringDefinition<V>::validateFunction;
+  }
+  template <class V>
+  static constexpr size_t getLength(const ConfigStringDefinition<V> *) {
+    return ConfigStringDefinition<V>::length;
+  }
+  template <class V>
+  static const char *getName(const ConfigStringDefinition<V> &def) {
+    return def.name();
+  }
+  template <class V>
+  static const char *getDefault(const ConfigStringDefinition<V> &def) {
+    return def.def();
+  }
+
+public:
+  static constexpr size_t length = getLength(substitutionArgument);
+  static constexpr auto validateFunction = getValidator(substitutionArgument);
+
+private:
+  char value_[length + 1] = {0};
+  bool set_ = false;
+  const Def &definition_;
+
+public:
+  [[nodiscard]] const char *name() const { return getName(definition_); }
+
+  [[nodiscard]] const char *def() const { return getDefault(definition_); }
+
+  explicit ConfigString(const Def &definition) : definition_(definition) {
+    value_[0] = 0;
+  }
+
+  [[nodiscard]] bool is_set() const { return set_; }
+
+  [[nodiscard]] const char *get() const { return set_ ? value_ : def(); }
+
+  void reset() {
+    value_[0] = 0;
+    set_ = false;
+  }
+
+  ValueSetResult setValue(const char *newValue,
+                          ValueSetPolicy policy = ValueSetPolicy::Fail) {
+    if (newValue && validateFunction(newValue, nullptr)) {
+      strncpy(value_, newValue, length);
+      value_[length] = 0;
+      set_ = true;
+      return ValueSetResult::Ok;
+    }
+    if (policy == ValueSetPolicy::FailReset) {
+      reset();
+    }
+    return ValueSetResult::Fail;
+  }
+
+  ConfigString &operator=(const ConfigString &source) {
+    if (&source != this && source.is_set()) {
+      strncpy(value_, source.value_, length);
+      value_[length] = 0;
+      set_ = true;
+    }
+    return *this;
+  }
+
+  template <class X> ConfigString &operator=(const ConfigString<X> &source) {
+    if (source.is_set()) {
+      setValue(source.get());
+    }
+    return *this;
+  }
+};
 
 } /* End of namespace speakerman */
 

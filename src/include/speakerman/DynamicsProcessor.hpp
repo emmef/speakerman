@@ -250,7 +250,7 @@ public:
            sampleRate);
     limiter.setPredictionAndThreshold(
         predictionSamples, peakThreshold, sampleRate,
-        detection.useBrickWallPrediction == 1 ? LimiterClass::SMOOTH_TRIANGULAR
+        detection.brickWallLimiterType == 1 ? LimiterClass::SMOOTH_TRIANGULAR
                                               : LimiterClass::CRUDE);
     size_t latency = limiter.getLatency();
     for (size_t l = 0; l < DELAY_CHANNELS; l++) {
