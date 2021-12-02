@@ -6,14 +6,13 @@
 
 namespace tdap::config {
 
-KeyValueParser::KeyValueParser(
-    const tdap::config::CharClassifier &classifier)
-    : cls(classifier) {
+KeyValueParser::KeyValueParser(const tdap::config::CharClassifier &classifier,
+                               size_t keyLength, size_t valueLength)
+    : cls(classifier), maxKeyLen_(std::clamp(keyLength, 1lu, MAX_KEY_LENGTH)),
+      maxValueLen_(std::clamp(valueLength, 1lu, MAX_VALUE_LENGTH)),
+      key_(new char[maxKeyLen_ + 1]), value_(new char[maxValueLen_ + 1]) {
   setStartState();
 }
-
-KeyValueParser::KeyValueParser()
-    : KeyValueParser(tdap::config::AsciiCharClassifier::instance()) {}
 
 ReadResult KeyValueParser::read(KeyValueParser::Reader &reader,
                                 configReaderCallback callback, void *data) {
@@ -168,14 +167,14 @@ ReadResult KeyValueParser::read(KeyValueParser::Reader &reader,
   }
 }
 bool KeyValueParser::addKeyChar(char c) {
-  if (keyLen_ == MAX_KEY_LENGTH) {
+  if (keyLen_ == maxKeyLen_) {
     return false;
   }
   key_[keyLen_++] = c;
   return true;
 }
 bool KeyValueParser::addValueChar(char c) {
-  if (valueLen_ == MAX_VALUE_LENGTH) {
+  if (valueLen_ == maxValueLen_) {
     return false;
   }
   value_[valueLen_++] = c;
@@ -191,6 +190,10 @@ CallbackResult KeyValueParser::reportKeyValue(configReaderCallback callback,
   key_[keyLen_] = 0;
   value_[valueLen_] = 0;
   return callback(key_, value_, data);
+}
+KeyValueParser::~KeyValueParser() {
+  delete key_;
+  delete value_;
 }
 
 ReadResult MappingKeyValueParser::parse(KeyValueParser::Reader &reader) {
@@ -266,5 +269,4 @@ CallbackResult MappingKeyValueParser::handleKeyAndValue(const char *key,
   }
   return CallbackResult::Continue;
 }
-}
-
+} // namespace tdap::config

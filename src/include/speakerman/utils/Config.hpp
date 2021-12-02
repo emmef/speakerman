@@ -149,23 +149,26 @@ class KeyValueParser {
   };
 
 public:
-  static constexpr size_t MAX_KEY_LENGTH = 127;
-  static constexpr size_t MAX_VALUE_LENGTH = 1023;
+  static constexpr size_t MAX_KEY_LENGTH = 0xffff;
+  static constexpr size_t MAX_VALUE_LENGTH = 0xffffffff;
 
   class Reader {
   public:
     virtual bool read(char &result) = 0;
   };
 
-  KeyValueParser(const tdap::config::CharClassifier &classifier);
-  KeyValueParser();
+  KeyValueParser(const tdap::config::CharClassifier &classifier, size_t keyLength, size_t valueLength);
 
   ReadResult read(Reader &reader, configReaderCallback callback, void *data);
 
+  ~KeyValueParser();
+
 private:
-  char key_[MAX_KEY_LENGTH + 1] = {0};
+  char * const key_;
+  const size_t maxKeyLen_;
   size_t keyLen_ = 0;
-  char value_[MAX_VALUE_LENGTH + 1] = {0};
+  char * const value_;
+  const size_t maxValueLen_;
   size_t valueLen_ = 0;
   ParseState state_ = ParseState::Start;
 
