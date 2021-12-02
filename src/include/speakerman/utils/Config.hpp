@@ -23,330 +23,206 @@
 #define SMS_SPEAKERMAN_CONFIG_GUARD_H_
 
 #include <algorithm>
-#include <fstream>
+#include <cstring>
 #include <istream>
+#include <mutex>
 #include <tdap/IndexPolicy.hpp>
 #include <type_traits>
 #include <unordered_map>
 
-namespace speakerman {
+namespace tdap::config {
 
-struct config {
-  enum class CallbackResult { Continue [[maybe_unused]], Stop };
+class CharClassifier {
+public:
+  virtual bool isWhiteSpace(char c) const = 0;
 
-  /**
-   * A callback that is called by #readConfig() each time a
-   * key-value pair has been parsed.
-   */
-  typedef CallbackResult (*configReaderCallback)(const char *key,
-                                                 const char *value, void *data);
+  virtual bool isLineDelimiter(char c) const = 0;
 
-  enum class ReadResult {
-    Success,
-    Stopped,
-    NoCallback,
-    KeyTooLong,
-    ValueTooLong,
-    InvalidStartOfLine,
-    InvalidKeyCharacter,
-    InvalidAssignment,
-    UnexpectedEol,
-    UnexpectedEof
-  };
+  virtual bool isAssignment(char c) const = 0;
 
-  [[maybe_unused]] static char getEscaped(char c) {
-    switch (c) {
-    case '\\':
-      return '\\';
-    case 'b':
-      return '\b';
-    case 'r':
-      return '\r';
-    case 'n':
-      return '\n';
-    case 't':
-      return '\t';
-    default:
-      return c;
-    }
+  virtual bool isCommentStart(char c) const = 0;
+
+  virtual bool isEscape(char c) const = 0;
+
+  virtual bool isQuote(char c) const = 0;
+
+  virtual bool isKeyChar(char c) const const = 0;
+
+  virtual bool isKeyStartChar(char c) const const = 0;
+
+  virtual bool isAlpha(char c) const = 0;
+
+  virtual bool isNum(char c) const = 0;
+
+  virtual char getEscaped(char escapeChar, char c) const = 0;
+
+  virtual ~CharClassifier() = default;
+
+  bool isAlphaNum(char c) const { return isAlpha(c) || isNum(c); }
+};
+
+struct AsciiCharClassifier : public CharClassifier {
+  bool isWhiteSpace(char c) const final { return c == ' ' || c == '\t'; }
+
+  bool isLineDelimiter(char c) const final { return c == '\n' || c == '\r'; }
+
+  bool isAssignment(char c) const final { return c == '=' || c == ':'; }
+
+  bool isCommentStart(char c) const final { return c == ';' || c == '#'; }
+
+  bool isEscape(char c) const final { return c == '\\'; }
+
+  bool isQuote(char c) const final { return c == '"' || c == '\''; }
+
+  bool isKeyChar(char c) const final {
+    return isKeyStartChar(c) || c == '-' || c == '.';
   }
 
-  static constexpr bool isWhiteSpace(char c) { return c == ' ' || c == '\t'; }
+  bool isKeyStartChar(char c) const final { return isAlpha(c) || c == '_'; }
 
-  static constexpr bool isLineDelimiter(char c) {
-    return c == '\n' || c == '\r';
-  }
-
-  static constexpr bool isAssignment(char c) { return c == '=' || c == ':'; }
-
-  static constexpr bool isCommentStart(char c) { return c == ';' || c == '#'; }
-
-  static constexpr bool isEscape(char c) { return c == '\\'; }
-
-  static constexpr bool isQuote(char c) { return c == '"' || c == '\''; }
-
-  static constexpr bool isKeyChar(char c) {
-    return isKeyStartChar(c) || c == '-' || c == '[' || c == ']';
-  }
-
-  static constexpr bool isKeyStartChar(char c) {
-    return isAlphaNum(c) || c == '_' || c == '.' || c == '/';
-  }
-
-  static constexpr bool isAlphaNum(char c) { return isAlpha(c) || isNum(c); }
-
-  static constexpr bool isAlpha(char c) {
+  bool isAlpha(char c) const final {
     return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
   }
 
-  static constexpr bool isNum(char c) { return c >= '0' && c <= '9'; }
+  bool isNum(char c) const final { return c >= '0' && c <= '9'; }
 
-  class Reader {
-    enum class ParseState {
-      START,
-      COMMENT,
-      KEYNAME,
-      ASSIGNMENT,
-      START_VALUE,
-      VALUE,
-      QUOTE,
-      ESC
-    };
-
-  public:
-    static constexpr size_t MAX_KEY_LENGTH = 127;
-    static constexpr size_t MAX_VALUE_LENGTH = 1023;
-
-    Reader() { setStartState(); }
-
-    ReadResult read(std::istream &stream, configReaderCallback callback,
-                    void *data) {
-      if (callback == nullptr) {
-        return ReadResult::NoCallback;
-      }
-      setStartState();
-      ParseState popState_ = state_;
-      char quote = 0;
-      while (!stream.eof()) {
-        int i = stream.get();
-        if (i == -1) {
-          break;
-        }
-        char c = static_cast<char>(i & 0x7f);
-        switch (state_) {
-        case ParseState::START:
-          if (isCommentStart(c)) {
-            state_ = ParseState::COMMENT;
-            break;
-          }
-          if (isLineDelimiter(c)) {
-            break;
-          }
-          if (isKeyStartChar(c)) {
-            state_ = ParseState::KEYNAME;
-            addKeyChar(c);
-            break;
-          }
-          if (isWhiteSpace(c)) {
-            break;
-          }
-          return ReadResult::InvalidStartOfLine;
-
-        case ParseState::COMMENT:
-          if (isLineDelimiter(c)) {
-            setStartState();
-          }
-          break;
-
-        case ParseState::KEYNAME:
-          if (isKeyChar(c)) {
-            if (!addKeyChar(c)) {
-              return ReadResult::KeyTooLong;
-            }
-            break;
-          }
-          if (isWhiteSpace(c)) {
-            state_ = ParseState::ASSIGNMENT;
-            break;
-          }
-          if (isAssignment(c)) {
-            state_ = ParseState::START_VALUE;
-            break;
-          }
-          return ReadResult::InvalidKeyCharacter;
-
-        case ParseState::ASSIGNMENT:
-          if (isAssignment(c)) {
-            state_ = ParseState::START_VALUE;
-            break;
-          }
-          if (isLineDelimiter(c)) {
-            if (reportKeyValue(callback, data) == CallbackResult::Stop) {
-              return ReadResult::Stopped;
-            }
-            setStartState();
-            break;
-          }
-          if (isWhiteSpace(c)) {
-            break;
-          }
-
-          return ReadResult::InvalidAssignment;
-
-        case ParseState::START_VALUE:
-          if (isLineDelimiter(c)) {
-            if (reportKeyValue(callback, data) == CallbackResult::Stop) {
-              return ReadResult::Stopped;
-            }
-            setStartState();
-            break;
-          }
-          if (isWhiteSpace(c)) {
-            break;
-          }
-          if (isEscape(c)) {
-            popState_ = ParseState::VALUE;
-            state_ = ParseState::ESC;
-            break;
-          }
-          if (isQuote(c)) {
-            state_ = ParseState::QUOTE;
-            quote = c;
-            break;
-          }
-          addValueChar(c);
-          break;
-
-        case ParseState::ESC:
-          if (isLineDelimiter(c)) {
-            return ReadResult::UnexpectedEol;
-          }
-          if (!addValueChar(getEscaped(c))) {
-            return ReadResult::ValueTooLong;
-          }
-          state_ = popState_;
-
-          break;
-        case ParseState::VALUE:
-        case ParseState::QUOTE:
-          if (isLineDelimiter(c)) {
-            if (state_ == ParseState::QUOTE) {
-              return ReadResult::UnexpectedEol;
-            }
-            if (reportKeyValue(callback, data) == CallbackResult::Stop) {
-              return ReadResult::Stopped;
-            }
-            setStartState();
-            break;
-          }
-          if (isEscape(c)) {
-            popState_ = state_;
-            state_ = ParseState::ESC;
-            break;
-          }
-          if (c == quote) {
-            if (reportKeyValue(callback, data) == CallbackResult::Stop) {
-              return ReadResult::Stopped;
-            }
-            setStartState();
-          }
-          if (!addValueChar(c)) {
-            return ReadResult::ValueTooLong;
-          }
-          break;
-        }
-      }
-      switch (state_) {
-      case ParseState::COMMENT:
-      case ParseState::START:
-        return ReadResult::Success;
-
-      case ParseState::VALUE:
-      case ParseState::START_VALUE:
-        if (reportKeyValue(callback, data) == CallbackResult::Stop) {
-          return ReadResult::Stopped;
-        }
-        return ReadResult::Success;
-
+  char getEscaped(char escapeChar, char c) const final {
+    if (isEscape(escapeChar)) {
+      switch (c) {
+      case '\\':
+        return '\\';
+      case 'b':
+        return '\b';
+      case 'r':
+        return '\r';
+      case 'n':
+        return '\n';
+      case 't':
+        return '\t';
       default:
-        return ReadResult::UnexpectedEof;
+        break;
       }
     }
+    return c;
+  }
 
-    ReadResult readFile(const char *fileName, configReaderCallback callback,
-                        void *data) {
-      std::ifstream stream;
-      stream.open(fileName);
-      if (stream.is_open()) {
-        try {
-          return read(stream, callback, data);
-        } catch (...) {
-          throw;
-        }
-      }
-      return ReadResult::UnexpectedEof;
-    }
-
-  private:
-    char key_[MAX_KEY_LENGTH + 1] = {0};
-    size_t keyLen_ = 0;
-    char value_[MAX_VALUE_LENGTH + 1] = {0};
-    size_t valueLen_ = 0;
-    ParseState state_ = ParseState::START;
-
-    bool addKeyChar(char c) {
-      if (keyLen_ == MAX_KEY_LENGTH) {
-        return false;
-      }
-      key_[keyLen_++] = c;
-      return true;
-    }
-
-    bool addValueChar(char c) {
-      if (valueLen_ == MAX_VALUE_LENGTH) {
-        return false;
-      }
-      value_[valueLen_++] = c;
-      return true;
-    }
-
-    void setStartState() {
-      state_ = ParseState::START;
-      keyLen_ = 0;
-      valueLen_ = 0;
-    }
-
-    CallbackResult reportKeyValue(configReaderCallback callback, void *data) {
-      key_[keyLen_] = 0;
-      value_[valueLen_] = 0;
-      return callback(key_, value_, data);
-    }
-  };
-
-  class [[maybe_unused]] Typed : protected Reader {
-    static CallbackResult callback(const char *key, const char *value,
-                                   void *data) {
-      return static_cast<Typed *>(data)->onKeyValue(key, value);
-    }
-
-  public:
-    ReadResult read(std::istream &stream) {
-      return Reader::read(stream, Typed::callback, this);
-    }
-
-    [[maybe_unused]] ReadResult readFile(const char *fileName) {
-      return Reader::readFile(fileName, Typed::callback, this);
-    }
-
-    virtual CallbackResult onKeyValue(const char *key, const char *value) = 0;
-
-    virtual ~Typed() = default;
-  };
+  static const AsciiCharClassifier &instance() {
+    static const AsciiCharClassifier c;
+    return c;
+  }
 };
 
-enum class ValueSetPolicy { Fail, BoxValue, DefaultValue, FailReset };
+enum class CallbackResult { Continue [[maybe_unused]], Stop };
 
-enum class ValueSetResult { Ok, AppliedPolicy, Fail };
+/**
+ * A callback that is called by #readConfig() each time a
+ * key-value pair has been parsed.
+ */
+typedef CallbackResult (*configReaderCallback)(const char *key,
+                                               const char *value, void *data);
+
+enum class ReadResult {
+  Success,
+  Stopped,
+  NoCallback,
+  KeyTooLong,
+  ValueTooLong,
+  InvalidStartOfLine,
+  InvalidKeyCharacter,
+  InvalidAssignment,
+  UnexpectedEol,
+  UnexpectedEof
+};
+
+class KeyValueParser {
+  const tdap::config::CharClassifier &cls;
+
+  enum class ParseState {
+    Start,
+    Comment,
+    KeyName,
+    Assignment,
+    StartValue,
+    Value,
+    Quote,
+    Escaped
+  };
+
+public:
+  static constexpr size_t MAX_KEY_LENGTH = 127;
+  static constexpr size_t MAX_VALUE_LENGTH = 1023;
+
+  class Reader {
+  public:
+    virtual bool read(char &result) = 0;
+  };
+
+  KeyValueParser(const tdap::config::CharClassifier &classifier);
+  KeyValueParser();
+
+  ReadResult read(Reader &reader, configReaderCallback callback, void *data);
+
+private:
+  char key_[MAX_KEY_LENGTH + 1] = {0};
+  size_t keyLen_ = 0;
+  char value_[MAX_VALUE_LENGTH + 1] = {0};
+  size_t valueLen_ = 0;
+  ParseState state_ = ParseState::Start;
+
+  bool addKeyChar(char c);
+  bool addValueChar(char c);
+  void setStartState();
+  CallbackResult reportKeyValue(configReaderCallback callback, void *data);
+};
+
+class AbstractValueHandler {
+public:
+  virtual bool handleValue(const char *value, const char **errorMessage,
+                           const char **errorPosition) {};
+  virtual ~AbstractValueHandler() = default;
+};
+
+class MappingKeyValueParser {
+public:
+  MappingKeyValueParser(KeyValueParser &parser) : parser_(parser) {}
+
+  ReadResult parse(KeyValueParser::Reader &reader);
+
+  bool add(const std::string &key, AbstractValueHandler *handler);
+
+  bool replace(const std::string &key, AbstractValueHandler *handler);
+
+  bool remove(const std::string &key);
+
+  void removeAll();
+
+  virtual void keyNotFound(const char *, const char *) {}
+  virtual void errorHandlingValue(const char *key, const char *value,
+                                  const char *message,
+                                  const char *errorPosition) {}
+
+  virtual ~MappingKeyValueParser();
+private:
+  std::unordered_map<std::string, AbstractValueHandler *> keyMap;
+  std::mutex m_;
+  KeyValueParser &parser_;
+  std::string keyString;
+
+  static CallbackResult callback(const char *key, const char *value,
+                                 void *data);
+
+  CallbackResult handleKeyAndValue(const char *key, const char *value);
+};
+
+} // namespace tdap::config
+
+namespace speakerman {
+
+struct config {};
+
+enum class InvalidValuePolicy { Fail, Fit };
+
+enum class ValueSetResult { Ok, Fitted, Fail };
 
 enum class ParserValueType { Integral, Boolean, Float, String, Unsupported };
 
@@ -355,12 +231,16 @@ struct ValueParser_ {};
 
 template <typename T> struct ValueParser_<T, ParserValueType::Integral> {
   static_assert(std::is_integral<T>::value, "Expected integral type parameter");
+  static const tdap::config::CharClassifier &classifier() {
+    return tdap::config::AsciiCharClassifier::instance();
+  }
+
   using V = long long int;
 
   [[maybe_unused]] static bool parse(T &value, const char *start, char *&end) {
     V parsed = strtoll(start, &end, 10);
-    if (*end == '\0' || config::isWhiteSpace(*end) ||
-        config::isCommentStart(*end)) {
+    if (*end == '\0' || classifier().isWhiteSpace(*end) ||
+        classifier().isCommentStart(*end)) {
       value = std::clamp(parsed, std::numeric_limits<T>::lowest(),
                          std::numeric_limits<T>::max());
       return true;
@@ -371,6 +251,9 @@ template <typename T> struct ValueParser_<T, ParserValueType::Integral> {
 
 template <typename T> struct ValueParser_<T, ParserValueType::Boolean> {
   static_assert(std::is_integral<T>::value, "Expected integral type parameter");
+  static const tdap::config::CharClassifier &classifier() {
+    return tdap::config::AsciiCharClassifier::instance();
+  }
   using V = int;
 
   static bool matches(const char *keyword, const char *start, const char *end) {
@@ -382,11 +265,12 @@ template <typename T> struct ValueParser_<T, ParserValueType::Boolean> {
 
     return strncasecmp(keyword, start, key_length) == 0 &&
            (start[key_length] == '\0' ||
-            config::isWhiteSpace(start[key_length]));
+            classifier().isWhiteSpace(start[key_length]));
   }
 
   [[maybe_unused]] static bool parse(T &field, const char *value, char *&end) {
-    for (end = const_cast<char *>(value); config::isAlphaNum(*end); end++) {
+    for (end = const_cast<char *>(value); classifier().isAlphaNum(*end);
+         end++) {
     }
 
     if (matches("true", value, end) || matches("1", value, end) ||
@@ -406,12 +290,15 @@ template <typename T> struct ValueParser_<T, ParserValueType::Boolean> {
 template <typename T> struct ValueParser_<T, ParserValueType::Float> {
   static_assert(std::is_floating_point<T>::value,
                 "Expected floating point type parameter");
+  static const tdap::config::CharClassifier &classifier() {
+    return tdap::config::AsciiCharClassifier::instance();
+  }
   using V = long double;
 
   [[maybe_unused]] static bool parse(T &field, const char *value, char *&end) {
     V parsed = strtold(value, &end);
-    if (*end == '\0' || config::isWhiteSpace(*end) ||
-        config::isCommentStart(*end)) {
+    if (*end == '\0' || classifier().isWhiteSpace(*end) ||
+        classifier().isCommentStart(*end)) {
       field = std::clamp(parsed, std::numeric_limits<T>::lowest(),
                          std::numeric_limits<T>::max());
       return true;
@@ -422,6 +309,9 @@ template <typename T> struct ValueParser_<T, ParserValueType::Float> {
 
 template <typename T, size_t NAME_LENGTH>
 struct ValueParser_<T, ParserValueType::String, NAME_LENGTH> {
+  static const tdap::config::CharClassifier &classifier() {
+    return tdap::config::AsciiCharClassifier::instance();
+  }
   [[maybe_unused]] static bool parse(T field, const char *value, char *&end) {
     const char *src = value;
     char *dst = field;
@@ -431,7 +321,7 @@ struct ValueParser_<T, ParserValueType::String, NAME_LENGTH> {
         if (dst > field) {
           *dst++ = ' ';
         }
-      } else if (config::isAlphaNum(c) || config::isQuote(c) ||
+      } else if (classifier().isAlphaNum(c) || classifier().isQuote(c) ||
                  strchr(".!|,;:/[]{}*#@~%^()-_+=\\", c) != nullptr) {
         *dst++ = c;
       }
@@ -452,6 +342,61 @@ template <typename T> static constexpr ParserValueType get_value_parser_type() {
 template <typename T, size_t NAME_LENGTH = 0>
 struct ValueParser
     : public ValueParser_<T, get_value_parser_type<T>(), NAME_LENGTH> {};
+
+template <typename T> struct StringValueOperations {
+
+  static bool equals(const T *const value1, const T *const value2,
+                     size_t length) {
+    if (!value1) {
+      return !value2;
+    } else if (!value2) {
+      return false;
+    }
+    const T *p1 = value1;
+    const T *p2 = value2;
+    const T *end = p1 + length;
+    for (const T *p1 = value1, *p2 = value2; p1 <= end && *p1 || *p2;
+         ++p1, ++p2) {
+      if (*p1 != *p2) {
+        return false;
+      }
+    }
+    return *p1 || *p2;
+  }
+
+  static ValueSetResult
+  copy(T *const destination, const T *const source, size_t maxLength,
+       InvalidValuePolicy policy = InvalidValuePolicy::Fit) {
+    if (!(source && *source)) {
+      if (!destination) {
+        return ValueSetResult::Fail;
+      }
+      destination[0] = 0;
+      return ValueSetResult::Ok;
+    }
+    size_t length = 0;
+    if (policy == InvalidValuePolicy::Fit) {
+      while (length <= maxLength && source[length]) {
+        destination[length] = source[length];
+        ++length;
+      }
+      destination[length] = 0;
+      return length <= maxLength || !source[length] ? ValueSetResult::Ok
+                                                    : ValueSetResult::Fitted;
+    }
+    while (length <= maxLength && source[length]) {
+      ++length;
+    }
+    if (length <= maxLength || !source[length]) {
+      for (size_t i = 0; i < length; i++) {
+        destination[i] == source[i];
+      }
+      destination[length] = 0;
+      return ValueSetResult::Ok;
+    }
+    return ValueSetResult::Fail;
+  }
+};
 
 template <typename T> class ConfigNumericDefinition {
 public:
@@ -478,23 +423,19 @@ private:
   const T def_;
   const T max_;
   const char *const name_;
-  const ValueSetPolicy policy_;
+  const InvalidValuePolicy policy_;
 
   static ValueAndResult set_with_policy(T newValue, T min, T def, T max,
-                                        ValueSetPolicy policy) {
+                                        InvalidValuePolicy policy) {
     if (newValue >= min && newValue <= max) {
       return {newValue, true, ValueSetResult::Ok};
     }
     switch (policy) {
-    case ValueSetPolicy::BoxValue:
+    case InvalidValuePolicy::Fit:
       return {newValue < min   ? min
               : newValue > max ? max
                                : newValue,
-              true, ValueSetResult::AppliedPolicy};
-    case ValueSetPolicy::DefaultValue:
-      return {def, true, ValueSetResult::AppliedPolicy};
-    case ValueSetPolicy::FailReset:
-    case ValueSetPolicy::Fail:
+              true, ValueSetResult::Fitted};
     default:
       return {def, false, ValueSetResult::Fail};
     }
@@ -503,7 +444,7 @@ private:
 public:
   [[maybe_unused]] constexpr ConfigNumericDefinition(
       T min, T def, T max, const char *name,
-      ValueSetPolicy policy = ValueSetPolicy::BoxValue)
+      InvalidValuePolicy policy = InvalidValuePolicy::Fit)
       : min_(min < max ? min : max), max_(max > min ? max : min),
         def_(def < min   ? min
              : def > max ? max
@@ -513,7 +454,7 @@ public:
   [[nodiscard]] T max() const { return max_; }
   [[nodiscard]] T def() const { return def_; }
   [[nodiscard]] const char *name() const { return name_; }
-  [[nodiscard]] ValueSetPolicy policy() const { return policy_; }
+  [[nodiscard]] InvalidValuePolicy policy() const { return policy_; }
 
   ValueAndResult setWithUpper(T newValue, T upper) const {
     return set_with_policy(newValue, min(), def(), std::min(upper, max()),
@@ -887,15 +828,16 @@ public:
     set_ = false;
   }
 
-  ValueSetResult setValue(const char *newValue,
-                          ValueSetPolicy policy = ValueSetPolicy::Fail) {
+  ValueSetResult
+  setValue(const char *newValue,
+           InvalidValuePolicy policy = InvalidValuePolicy::Fail) {
     if (newValue && validateFunction(newValue, nullptr)) {
       strncpy(value_, newValue, length);
       value_[length] = 0;
       set_ = true;
       return ValueSetResult::Ok;
     }
-    if (policy == ValueSetPolicy::FailReset) {
+    if (policy == InvalidValuePolicy::FailReset) {
       reset();
     }
     return ValueSetResult::Fail;

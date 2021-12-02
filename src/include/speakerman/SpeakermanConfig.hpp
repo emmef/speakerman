@@ -128,10 +128,10 @@ struct DetectionConfig {
         0.4, 0.4, 8.0, "detection.slow-seconds"};
     static constexpr ConfigNumericDefinition<double> fastSeconds{
         0.0001, 0.001, 0.01, "detection.fast-seconds",
-        ValueSetPolicy::BoxValue};
+        InvalidValuePolicy::Fit};
     static constexpr ConfigNumericDefinition<double> fastReleaseSeconds{
         0.001, 0.02, 0.1, "detection.fast-release-seconds",
-        ValueSetPolicy::BoxValue};
+        InvalidValuePolicy::Fit};
     static constexpr ConfigNumericDefinition<size_t> perceptiveLevels{
         2, 11, 32, "detection.time-constants"};
     static constexpr ConfigNumericDefinition<int> brickWallLimiterType{

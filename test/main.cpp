@@ -19,6 +19,7 @@
 #include "TestAlignedFrame.hpp"
 #include "TestIirCoefficients.hpp"
 #include "TestVolumeMatrix.hpp"
+#include "TestConfig.hh"
 
 using namespace tdap;
 using namespace std;
@@ -451,6 +452,7 @@ void printPinkNoise() {
 }
 
 int main(int c, const char *args[]) {
+  testConfig();
   testVolumeMatrix();
   testGroupVolumeMatrix();
   integrationTimes();
