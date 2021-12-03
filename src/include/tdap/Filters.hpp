@@ -74,7 +74,7 @@ template <typename Sample>
 struct IdentityMultiFilter : public MultiFilter<Sample> {
   virtual size_t channels() const { return Count<Sample>::max(); }
 
-  virtual Sample filter(size_t channel, Sample input) { return input; }
+  virtual Sample filter(size_t, Sample input) { return input; }
 
   virtual void reset() { /* No state */
   }
@@ -126,7 +126,8 @@ size_t effectiveLength(Filter<Sample> &filter, size_t bucketSize,
   double usedEpsilon = Value<double>::force_between(epsilon, 1e-24, 1);
 
   size_t windowPointer = 0;
-  double window[windowBuckets];
+  std::unique_ptr<double> window_ptr(new double[windowBuckets]);
+  double* window = window_ptr.get();
   double totalSum = 0.0;
   double bucketSum = 0.0;
   Sample input = std::is_floating_point<Sample>::value

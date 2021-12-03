@@ -1,7 +1,20 @@
 cmake_minimum_required(VERSION 3.6)
 project(speakerman)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
+
+if (MSVC)
+    # warning level 4
+    add_compile_options(/W4)
+    # all warnings as errors
+    add_compile_options(/WX)
+else ()
+    # lots of warnings
+    add_compile_options(-Wall -Wextra -pedantic)
+    # all warnings as errors
+    #add_compile_options(-Werror)
+endif ()
+
 
 find_path(LOCAL_TDAP_PATH, README-TAP.md HINTS ../ ../../ NO_DEFAULT_PATH)
 
@@ -9,7 +22,7 @@ include_directories(include src/include ${LOCAL_TDAP_PATH}/src /usr/include)
 set(Boost_USE_STATIC_LIBS OFF)
 set(Boost_USE_MULTITHREADED ON)
 set(Boost_USE_STATIC_RUNTIME OFF)
-find_package(Boost)
+find_package(Boost REQUIRED COMPONENTS unit_test_framework)
 
 set(TDAP_HEADERS
         src/include/tdap/Array.hpp
@@ -46,7 +59,7 @@ set(TDAP_HEADERS
         src/include/tdap/Limiter.hpp src/include/tdap/AlignedFrame.hpp src/include/tdap/Errors.hpp src/include/tdap/GroupVolume.hpp
         src/include/tdap/TrueRms.hpp)
 
-set(SOURCE_FILES
+set(HEADER_FILES
         src/include/speakerman/jack/ErrorHandler.hpp
         src/include/speakerman/jack/JackClient.hpp
         src/include/speakerman/jack/JackProcessor.hpp
@@ -66,6 +79,9 @@ set(SOURCE_FILES
         src/include/speakerman/SpeakermanRuntimeData.hpp
         src/include/speakerman/SpeakermanWebServer.hpp
         src/include/speakerman/Stream.hpp
+)
+
+set(SOURCE_FILES
         src/Allocation.cpp
         src/ErrorHandler.cpp
         src/HttpMessage.cpp
@@ -82,21 +98,18 @@ set(SOURCE_FILES
         src/SpeakermanWebServer.cpp
         src/Stream.cpp)
 
-# Removed: src/include/speakerman/webserver.h src/webserver.cc src/include/util/FileBuffer.h src/FileBuffer.cc
-
 find_path(LOCAL_TDAP_PATH, README-TAP.md HINTS ../ ../../ NO_DEFAULT_PATH)
 
 
-add_executable(speakerman  ${TDAP_HEADERS} ${SOURCE_FILES} src/speakerman.cpp)
+add_executable(speakerman  ${TDAP_HEADERS} ${HEADER_FILES} ${SOURCE_FILES} src/speakerman.cpp)
 set(LIBRARIES
         jack
         pthread
         )
+
 link_libraries(jack pthread)
 target_link_libraries(speakerman jack pthread stdc++ m)
 target_compile_options(speakerman PRIVATE -fno-trapping-math -fdenormal-fp-math=positive-zero -fno-math-errno)
-add_executable(test_speakerman ${TDAP_HEADERS} test/main.cpp test/TestIirCoefficients.hpp test/TestIirCoefficients.cpp test/TestAlignedFrame.cpp test/TestAlignedFrame.hpp test/TestVolumeMatrix.hpp test/TestVolumeMatrix.cpp)
-target_link_libraries(test_speakerman stdc++ m)
 install(TARGETS speakerman RUNTIME DESTINATION bin)
 install(FILES web/index.html web/speakerman.js web/speakerman.css DESTINATION share/speakerman/web)
 install(PROGRAMS src/speakerman-watchdog.sh DESTINATION share/speakerman/script)
@@ -106,3 +119,12 @@ install(PROGRAMS service/99-speakerman-device.rules DESTINATION /lib/udev/rules.
 install(PROGRAMS src/startjack.sh DESTINATION bin)
 
 add_definitions(-DSPEAKERMAN_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX})
+
+set(TEST_FILES
+test/main.cpp test/TestIirCoefficients.hpp test/TestIirCoefficients.cpp test/TestAlignedFrame.cpp test/TestAlignedFrame.hpp test/TestVolumeMatrix.cpp
+        )
+
+add_executable(test_speakerman ${TDAP_HEADERS} ${HEADER_FILES} ${TEST_FILES})
+target_link_libraries(test_speakerman stdc++ m)
+target_link_libraries(test_speakerman ${Boost_UNIT_TEST_FRAMEWORK_LIBRARY} ${CMAKE_THREAD_LIBS_INIT} stdc++ m)
+include_directories(test_speakerman ${CMAKE_SOURCE_DIR}/include)

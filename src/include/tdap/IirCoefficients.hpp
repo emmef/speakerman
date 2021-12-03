@@ -24,6 +24,7 @@
 #define TDAP_IIRCOEFFICIENTS_HEADER_GUARD
 
 #include <cstddef>
+#include <memory>
 #include <tdap/AlignedFrame.hpp>
 #include <tdap/Count.hpp>
 #include <tdap/Denormal.hpp>
@@ -264,7 +265,7 @@ public:
 
   bool hasFixedOrder() const { return true; }
 
-  void setOrder(size_t newOrder){};
+  void setOrder(size_t){};
 
   void setC(size_t idx, const C coefficient) { C_(idx) = coefficient; }
 
@@ -350,15 +351,15 @@ template <typename C> class VariableSizedIirCoefficients {
   size_t order_;
   C *data_;
 
-  const size_t getCBaseOffset() const { return 0; }
+  size_t getCBaseOffset() const { return 0; }
 
-  const size_t getDBaseOffset() const { return maxOrder_ + 1; }
+  size_t getDBaseOffset() const { return maxOrder_ + 1; }
 
-  const size_t getCOffset(size_t i) const {
+  size_t getCOffset(size_t i) const {
     return getCBaseOffset() + Value<size_t>::valid_below_or_same(i, order_);
   }
 
-  const size_t getDOffset(size_t i) const {
+  size_t getDOffset(size_t i) const {
     return getDBaseOffset() + Value<size_t>::valid_below_or_same(i, order_);
   }
 
@@ -370,9 +371,9 @@ template <typename C> class VariableSizedIirCoefficients {
 
   const C &D_(size_t i) const { return data_[getDOffset(i)]; }
 
-  const C *const unsafeC() const { return data_ + getCBaseOffset(); }
+  C *const unsafeC() const { return data_ + getCBaseOffset(); }
 
-  const C *const unsafeD() const { return data_ + getDBaseOffset(); }
+  C *const unsafeD() const { return data_ + getDBaseOffset(); }
 
 public:
   VariableSizedIirCoefficients(size_t maxOrder)
@@ -911,7 +912,7 @@ struct FixedOrderIirFrameFilter {
     }
     yN0 += c[0] * input;
 
-    y[0] = yN0;
+    output = y[0] = yN0;
   }
 
   inline void filterHistoryZero(Frame *__restrict out,
