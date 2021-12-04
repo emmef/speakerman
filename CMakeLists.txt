@@ -15,10 +15,23 @@ else ()
     #add_compile_options(-Werror)
 endif ()
 
+if (DEFINED ENV{ORG_SIMPLE_LOCAL_SOURCE})
+    set(orgSimpleHeaders $ENV{ORG_SIMPLE_LOCAL_SOURCE})
+    message(STATUS "Using environment-provided local org-simple path: ${orgSimpleHeaders}")
+else ()
+    find_package(org-simple)
+    if (DEFINED org-simple_INCLUDE_DIR)
+        set(orgSimpleHeaders ${org-simple_INCLUDE_DIR})
+        message(STATUS "Using package-provided local org-simple path: ${orgSimpleHeaders}")
+    else()
+        message(ERROR " Undefined 'required org-simple_INCLUDE_DIR'")
+        return()
+    endif()
+endif ()
 
 find_path(LOCAL_TDAP_PATH, README-TAP.md HINTS ../ ../../ NO_DEFAULT_PATH)
 
-include_directories(include src/include ${LOCAL_TDAP_PATH}/src /usr/include)
+include_directories(include src/include ${LOCAL_TDAP_PATH}/src /usr/include ${orgSimpleHeaders})
 set(Boost_USE_STATIC_LIBS OFF)
 set(Boost_USE_MULTITHREADED ON)
 set(Boost_USE_STATIC_RUNTIME OFF)
@@ -79,7 +92,7 @@ set(HEADER_FILES
         src/include/speakerman/SpeakermanRuntimeData.hpp
         src/include/speakerman/SpeakermanWebServer.hpp
         src/include/speakerman/Stream.hpp
-)
+        )
 
 set(SOURCE_FILES
         src/Allocation.cpp
@@ -101,7 +114,7 @@ set(SOURCE_FILES
 find_path(LOCAL_TDAP_PATH, README-TAP.md HINTS ../ ../../ NO_DEFAULT_PATH)
 
 
-add_executable(speakerman  ${TDAP_HEADERS} ${HEADER_FILES} ${SOURCE_FILES} src/speakerman.cpp)
+add_executable(speakerman ${TDAP_HEADERS} ${HEADER_FILES} ${SOURCE_FILES} src/speakerman.cpp)
 set(LIBRARIES
         jack
         pthread
@@ -121,10 +134,10 @@ install(PROGRAMS src/startjack.sh DESTINATION bin)
 add_definitions(-DSPEAKERMAN_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX})
 
 set(TEST_FILES
-test/main.cpp test/TestIirCoefficients.hpp test/TestIirCoefficients.cpp test/TestAlignedFrame.cpp test/TestAlignedFrame.hpp test/TestVolumeMatrix.cpp
+        test/main.cpp test/TestIirCoefficients.hpp test/TestIirCoefficients.cpp test/TestAlignedFrame.cpp test/TestAlignedFrame.hpp test/TestVolumeMatrix.cpp
         )
 
 add_executable(test_speakerman ${TDAP_HEADERS} ${HEADER_FILES} ${TEST_FILES})
 target_link_libraries(test_speakerman stdc++ m)
 target_link_libraries(test_speakerman ${Boost_UNIT_TEST_FRAMEWORK_LIBRARY} ${CMAKE_THREAD_LIBS_INIT} stdc++ m)
-include_directories(test_speakerman ${CMAKE_SOURCE_DIR}/include)
+include_directories(test_speakerman ${CMAKE_SOURCE_DIR}/include  ${orgSimpleHeaders})
