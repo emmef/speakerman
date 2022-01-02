@@ -224,7 +224,8 @@ int JackClient::onXRun() {
   if (!processor_) {
     return 0;
   }
-  long long cycles = processor_->getProcessingCycles();
+  const ProcessingStatistics statistics = processor_->getStatistics();
+  long long cycles = statistics.getProcessingCycles();
   if (xRuns == 0) {
     lastXrunProcessingCycle = cycles;
   }
@@ -232,7 +233,7 @@ int JackClient::onXRun() {
   long long cyclesSinceFirstXrun = Value<long long>::max(
       XRUNS_FOR_MEASUREMENT, cycles - lastXrunProcessingCycle);
   cerr << "Xrun(" << xRuns << ") out of " << cyclesSinceFirstXrun
-       << " processing cycles" << endl;
+       << " processing cycles" << "; CPU: recent= " << statistics.getShortTermCorePercentage() << "%; overall=" << statistics.getLongTermCorePercentage() << "%" << endl;
   if (xRuns < XRUNS_FOR_MEASUREMENT) {
     return 0;
   }

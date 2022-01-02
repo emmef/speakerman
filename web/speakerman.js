@@ -281,6 +281,15 @@ function setMeters(levels) {
             modeElements[i].setAttribute("class", modeElements[i] == selected ? "mix-mode-message-enabled" : "mix-mode-message-disabled");
         }
     }
+    var cpuElement = document.getElementById("cpu-usage-stats");
+    if (cpuElement) {
+        var message = "CPU: now=";
+        message += levels.cpuShortTerm;
+        message += "%; average="
+        message += levels.cpuLongTerm;
+        message += "%";
+        cpuElement.innerText=message;
+    }
 }
 
 function setMixMode(newMode) {

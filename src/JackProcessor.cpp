@@ -26,6 +26,7 @@
 #include <tdap/Guards.hpp>
 #include <tdap/MemoryFence.hpp>
 #include <thread>
+#include <chrono>
 
 namespace speakerman {
 
@@ -74,11 +75,14 @@ int JackProcessor::realtimeCallback(jack_nframes_t frames, void *data) {
 
 int JackProcessor::realtimeProcessWrapper(jack_nframes_t frames) {
   TryEnter guard(running_);
+  auto start = std::chrono::system_clock::now();
   MemoryFence fence;
-  processingCycles++;
   if (guard.entered() && ports_) {
     ports_->getBuffers(frames);
-    return process(frames, *ports_) ? 0 : 1;
+    int result = process(frames, *ports_) ? 0 : 1;
+    auto end = std::chrono::system_clock::now();
+    auto processingMicros = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+    statistics.updateFrame(frames, processingMicros);
   }
   return 0;
 }
@@ -107,7 +111,7 @@ void JackProcessor::unsafeResetState() {
   }
 }
 
-JackProcessor::JackProcessor() : processingCycles(0) {
+JackProcessor::JackProcessor() {
   running_.test_and_set();
 }
 
@@ -137,6 +141,7 @@ bool JackProcessor::updateMetrics(jack_client_t *client,
       }
       metrics_ = relevantMetrics;
       running_.clear();
+      statistics.setSampleRate(metrics_.sampleRate, metrics_.bufferSize);
       return true;
     }
     return false;
@@ -157,9 +162,9 @@ void JackProcessor::reset() {
   onReset();
 }
 
-long long JackProcessor::getProcessingCycles() const {
+const ProcessingStatistics JackProcessor::getStatistics() const {
   MemoryFence fence;
-  return processingCycles;
+  return statistics;
 }
 
 JackProcessor::~JackProcessor() {

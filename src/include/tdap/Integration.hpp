@@ -160,7 +160,7 @@ struct Integration {
   static F valid_samples(double sampleRate, double seconds) {
     double samples = Value<double>::valid_positive(sampleRate) *
                      Value<double>::valid_positive(seconds);
-    if (samples < max_samples<F>() && samples < Count<char>::max()) {
+    if (samples < max_samples<F>() && samples < (double)std::numeric_limits<std::size_t>::max()) {
       return samples;
     }
     throw std::invalid_argument("Average:: Combination of sampleRate_ and "

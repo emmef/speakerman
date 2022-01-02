@@ -27,6 +27,7 @@
 #include <jack/types.h>
 #include <mutex>
 #include <speakerman/jack/Port.hpp>
+#include <tdap/Integration.hpp>
 
 namespace speakerman {
 
@@ -53,6 +54,52 @@ struct ProcessingMetrics {
   }
 };
 
+class ProcessingStatistics {
+  uint64_t processingCycles = 0;
+  uint64_t totalProcessedSamples = 0;
+  uint64_t totalProcessingMicros = 0;
+  uint64_t sampleRate = 0;
+  tdap::Integrator<double> cpuAveraging1 = {{48000.0}, 1.0};
+  tdap::Integrator<double> cpuAveraging2 = {{48000.0}, 1.0};
+public:
+  void reset() { *this = {}; }
+
+  void setSampleRate(uint64_t rate, uint64_t bufferSize) {
+    reset();
+    sampleRate = rate ? rate : 48000;
+  }
+
+  void updateFrame(uint64_t frames, uint64_t processingMicros) {
+    totalProcessedSamples += frames;
+    processingCycles++;
+    totalProcessingMicros += processingMicros;
+    if (frames) {
+      cpuAveraging1.coefficients_ = {1.0 * sampleRate / frames, 1.0};
+      cpuAveraging2.coefficients_ = cpuAveraging1.coefficients_;
+      double soundMicros = 1e6 * frames / sampleRate;
+      double percentage = 100.0 * processingMicros /soundMicros;
+      cpuAveraging1.integrate(percentage);
+      cpuAveraging2.integrate(cpuAveraging1.output_);
+    }
+  }
+
+  uint64_t getProcessingCycles() const {
+    return processingCycles;
+  }
+
+  double getShortTermCorePercentage() const {
+    return cpuAveraging2.output_;
+  }
+
+  double getLongTermCorePercentage() const {
+    if (totalProcessedSamples == 0 || sampleRate == 0) {
+      return 1.0;
+    }
+    double soundMicros = 1e6 * totalProcessedSamples / sampleRate;
+    return 100.0 * totalProcessingMicros / soundMicros;
+  }
+};
+
 class JackProcessor {
   mutex mutex_;
   Ports *ports_ = nullptr;
@@ -60,7 +107,8 @@ class JackProcessor {
   using lock = unique_lock<mutex>;
 
   std::atomic_flag running_ = ATOMIC_FLAG_INIT;
-  long long processingCycles;
+  ProcessingStatistics statistics;
+  tdap::Integrator<double> cpuAveraging;
 
   class Reset {
     JackProcessor *owner_;
@@ -167,7 +215,7 @@ public:
 
   void reset();
 
-  long long getProcessingCycles() const;
+  const ProcessingStatistics getStatistics() const;
 
   virtual ~JackProcessor();
 };

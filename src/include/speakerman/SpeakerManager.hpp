@@ -319,6 +319,10 @@ public:
     }
     return false;
   }
+
+  const ProcessingStatistics getStatistics() const override {
+    return JackProcessor::getStatistics();
+  }
 };
 
 } /* End of namespace speakerman */

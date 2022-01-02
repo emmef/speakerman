@@ -390,6 +390,12 @@ void web_server::handle_request() {
         response().write_string("\t\"periods\": \"");
         response().write_string(itostr(numbers, 30, levels.count()));
         response().write_string("\", \r\n");
+        const ProcessingStatistics &statistics = manager_.getStatistics();
+        response().write_string("\t\"cpuLongTerm\": \"");
+        response().write_string(itostr(numbers, 10, statistics.getLongTermCorePercentage()));
+        response().write_string("\",\r\n\t\"cpuShortTerm\": \"");
+        response().write_string(itostr(numbers, 10, statistics.getShortTermCorePercentage()));
+        response().write_string("\",\r\n");
         response().write_string("\t\"mixMode\": \"");
         {
           MemoryFence fence;

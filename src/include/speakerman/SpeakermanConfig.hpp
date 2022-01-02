@@ -28,6 +28,7 @@
 #include <iostream>
 #include <tdap/IndexPolicy.hpp>
 #include <tdap/Value.hpp>
+#include <speakerman/jack/JackProcessor.hpp>
 
 namespace speakerman {
 static constexpr size_t MAX_SPEAKERMAN_GROUPS = 4;
@@ -301,6 +302,7 @@ public:
   virtual bool getLevels(DynamicProcessorLevels *levels,
                          std::chrono::milliseconds timeoutMillis) = 0;
 
+  virtual const ProcessingStatistics getStatistics() const = 0;
   virtual ~SpeakerManagerControl() = default;
 };
 
