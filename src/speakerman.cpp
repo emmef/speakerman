@@ -210,15 +210,19 @@ void display_owner_info(ConsecutiveAllocationOwner &owner,
 }
 
 int main(int count, char *arguments[]) {
-  configFileConfig = readSpeakermanConfig();
-
-  AwaitThreadFinishedAfterExit await(5000, "Await thread shutdown...");
-  MemoryFence::release();
 
   cout << "Executing " << arguments[0] << endl;
-  cout << "# Config dump start" << endl;
-  dumpSpeakermanConfig(configFileConfig, std::cout);
-  cout << "# Config dump end" << endl;
+  configFileConfig = readSpeakermanConfig();
+
+  if (count > 1) {
+    if (strncmp(arguments[1], "--dump-config", 20) == 0) {
+      // There is already a dump made when reading the configuration
+      //      dumpSpeakermanConfig(configFileConfig, std::cout);
+      return 0;
+    }
+  }
+  AwaitThreadFinishedAfterExit await(5000, "Await thread shutdown...");
+  MemoryFence::release();
 
   manager.generate<AbstractSpeakerManager, const SpeakermanConfig &>(
       create_manager, configFileConfig);

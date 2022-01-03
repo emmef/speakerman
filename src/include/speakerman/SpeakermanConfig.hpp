@@ -26,12 +26,105 @@
 #include <cmath>
 #include <fstream>
 #include <iostream>
+#include <speakerman/jack/JackProcessor.hpp>
 #include <tdap/IndexPolicy.hpp>
 #include <tdap/Value.hpp>
-#include <speakerman/jack/JackProcessor.hpp>
 
 namespace speakerman {
-static constexpr size_t MAX_SPEAKERMAN_GROUPS = 4;
+
+static constexpr size_t MAX_PHYSICAL_PORTS = 64;
+static constexpr size_t MAX_LOGICAL_GROUPS = 8;
+static constexpr size_t MAX_LOGICAL_CHANNELS = 16;
+static constexpr size_t MAX_PROCESSING_GROUPS = 4;
+static constexpr size_t MAX_NAME_LENGTH = 32;
+
+template <typename T> struct UnsetValue {};
+
+template <> struct UnsetValue<size_t> {
+  static constexpr size_t value = static_cast<size_t>(-1);
+
+  static bool is(size_t test) { return test == value; }
+
+  static void set(size_t &destination) { destination = value; }
+};
+
+template <> struct UnsetValue<char *> {
+  static constexpr char *value = {0};
+
+  static bool is(const char *test) { return !test || !*test; }
+
+  static void set(char *destination) {
+    if (destination) {
+      *destination = 0;
+    }
+  }
+};
+
+template <> struct UnsetValue<char[MAX_NAME_LENGTH + 1]> {
+  static constexpr char *value = {0};
+
+  static bool is(const char *test) { return !test || !*test; }
+
+  static void set(char *destination) {
+    if (destination) {
+      *destination = 0;
+    }
+  }
+};
+
+template <> struct UnsetValue<double> {
+  static constexpr double value = std::numeric_limits<double>::quiet_NaN();
+
+  union Tester {
+    long long l;
+    double f;
+
+    Tester(double v) : l(0) { f = v; }
+
+    bool operator==(const Tester &other) const { return l == other.l; }
+  };
+
+  static bool is(double test) {
+    static const Tester sNan = {std::numeric_limits<double>::signaling_NaN()};
+    static const Tester qNan = {value};
+    Tester t{test};
+    return t == sNan || t == qNan;
+  }
+
+  static void set(double &destination) { destination = value; }
+};
+
+template <> struct UnsetValue<int> {
+  static constexpr int value = -1;
+
+  static bool is(size_t test) { return test == value; }
+
+  static void set(int &destination) { destination = value; }
+};
+
+template <typename T> static void unsetConfigValue(T &target) {
+  UnsetValue<T>::set(target);
+}
+
+template <typename T> static bool setConfigValueIfUnset(T &target, T copyFrom) {
+  if (UnsetValue<T>::is(target)) {
+    target = copyFrom;
+    return true;
+  }
+  return false;
+}
+
+template <typename T> static bool isUnsetConfigValue(const T &value) {
+  return UnsetValue<T>::is(value);
+}
+
+struct NamedConfig {
+  static constexpr const char *KEY_SNIPPET_NAME = "name";
+  static constexpr size_t NAME_LENGTH = MAX_NAME_LENGTH;
+  char name[NAME_LENGTH + 1] = "[No name]";
+
+  void unset(NamedConfig &config) { UnsetValue<char *>::set(name); }
+};
 
 struct EqualizerConfig {
   static constexpr double MIN_CENTER_FREQ = 20;
@@ -61,7 +154,143 @@ struct EqualizerConfig {
   double bandwidth = DEFAULT_BANDWIDTH;
 };
 
-struct GroupConfig {
+struct PhysicalPortConfig {
+  static_assert(MAX_LOGICAL_GROUPS > 1);
+  static_assert(MAX_PHYSICAL_PORTS > 0);
+  static constexpr size_t MIN_GROUP_OF_PHYS_PORT = UnsetValue<size_t>::value;
+  static constexpr size_t DEFAULT_GROUP_OF_PHYS_PORT = MIN_GROUP_OF_PHYS_PORT;
+  static constexpr size_t MAX_GROUP_OF_PHYS_PORT = MAX_LOGICAL_GROUPS - 1;
+  static constexpr const char *KEY_SNIPPET_INPUT_MAPS_TO_GROUP =
+      "physical-input";
+  static constexpr const char *KEY_SNIPPET_OUTPUT_MAPS_TO_GROUP =
+      "physical-output";
+  static constexpr const char *KEY_SNIPPET_GROUP_SUF = "maps-to";
+  size_t logicalGroupOf[MAX_PHYSICAL_PORTS];
+
+  static const PhysicalPortConfig defaultConfig() {
+    static PhysicalPortConfig config;
+    return config;
+  }
+
+  static const PhysicalPortConfig unsetConfig() {
+    static PhysicalPortConfig config;
+    for (size_t i = 0; i < MAX_PHYSICAL_PORTS; i++) {
+      UnsetValue<size_t>::set(config.logicalGroupOf[i]);
+    }
+    return config;
+  }
+
+  void set_if_unset(const PhysicalPortConfig &config_if_unset) {
+    for (size_t i = 0; i < MAX_PHYSICAL_PORTS; i++) {
+      size_t group = config_if_unset.logicalGroupOf[i];
+      if (group >= 0 && group < MAX_LOGICAL_GROUPS) {
+        setConfigValueIfUnset(logicalGroupOf[i],group);
+      }
+    }
+  }
+
+  PhysicalPortConfig() {
+    for (size_t i = 0; i < MAX_PHYSICAL_PORTS; i++) {
+      UnsetValue<size_t>::set(logicalGroupOf[i]);
+    }
+  }
+
+  std::array<size_t , MAX_LOGICAL_GROUPS> getListWithUsedGroups() const {
+    std::array<size_t, MAX_LOGICAL_GROUPS> marked;
+    marked.fill(0);
+    for (size_t i = 0; i < MAX_PHYSICAL_PORTS; i++) {
+      auto mappedTo = logicalGroupOf[i];
+      if (mappedTo >= 0 && mappedTo < MAX_LOGICAL_GROUPS) {
+        marked[mappedTo]++;
+      }
+    }
+    return marked;
+  }
+
+  size_t getNumberOfAssignedInputPorts() const {
+    size_t count = 0;
+    for (size_t port = 0; port < MAX_PHYSICAL_PORTS; port++) {
+      size_t group = logicalGroupOf[port];
+      if (group >= 0 && group < MAX_PHYSICAL_PORTS) {
+        count++;
+      }
+    }
+    return count;
+  }
+};
+
+struct LogicalGroupConfig : public NamedConfig {
+  static_assert(MAX_LOGICAL_GROUPS > 1);
+
+  static constexpr const char *KEY_SNIPPET_INPUT = "logical-input";
+  static constexpr const char *KEY_SNIPPET_OUTPUT = "logical-output";
+  static constexpr int DEFAULT_IS_MUTED = 0;
+  static constexpr const char *KEY_SNIPPET_MUTED = "mute";
+  int muted = DEFAULT_IS_MUTED;
+
+  static constexpr double MIN_VOLUME = 0.0;
+  static constexpr double DEFAULT_VOLUME = 1.0;
+  static constexpr double MAX_VOLUME = 1.0;
+  static constexpr const char *KEY_SNIPPET_VOLUME = "volume";
+  double volume = DEFAULT_VOLUME;
+
+  static const LogicalGroupConfig defaultConfig() {
+    static LogicalGroupConfig config;
+    return config;
+  }
+
+  static const LogicalGroupConfig unsetConfig() {
+    LogicalGroupConfig result;
+    unsetConfigValue(result.name);
+    unsetConfigValue(result.muted);
+    unsetConfigValue(result.volume);
+    return result;
+  };
+
+  void set_if_unset(const LogicalGroupConfig &config_if_unset) {
+    setConfigValueIfUnset(muted, config_if_unset.muted);
+    setConfigValueIfUnset(volume, config_if_unset.volume);
+  }
+
+  static void reorganize(PhysicalPortConfig &outPhysicalInputs,
+                         LogicalGroupConfig *outGroupConfigs,
+                         const PhysicalPortConfig &inPhysicalInputs,
+                         const LogicalGroupConfig *inGroupConfigs) {
+    auto usedGroups = inPhysicalInputs.getListWithUsedGroups();
+    size_t destination = 0;
+    for (size_t group = 0; group < MAX_LOGICAL_GROUPS; group++) {
+      if (usedGroups[group] > 0) {
+        for (size_t input = 0; input < MAX_PHYSICAL_PORTS; input++) {
+          if (inPhysicalInputs.logicalGroupOf[input] == group) {
+            outPhysicalInputs.logicalGroupOf[input] = destination;
+          }
+        }
+        outGroupConfigs[destination] = inGroupConfigs[group];
+        destination++;
+      }
+    }
+    for (; destination < MAX_LOGICAL_GROUPS; destination++) {
+      outGroupConfigs[destination] = unsetConfig();
+    }
+  }
+  static void reorganize(PhysicalPortConfig &physicalInputs,
+                         LogicalGroupConfig *groupConfigs) {
+    reorganize(physicalInputs, groupConfigs, physicalInputs, groupConfigs);
+  }
+  void setMissingValues(size_t groupNumber) {
+    if (isUnsetConfigValue(muted)) {
+      muted = DEFAULT_IS_MUTED;
+    }
+    if (isUnsetConfigValue(volume)) {
+      volume = DEFAULT_VOLUME;
+    }
+    if (isUnsetConfigValue(name)) {
+      snprintf(name, MAX_NAME_LENGTH, "Group %lu", groupNumber);
+    }
+  }
+};
+
+struct ProcessingGroupConfig : public NamedConfig {
   static constexpr size_t MIN_EQS = 0;
   static constexpr size_t DEFAULT_EQS = 0;
   static constexpr size_t MAX_EQS = 2;
@@ -89,27 +318,24 @@ struct GroupConfig {
   static constexpr const char *KEY_SNIPPET_MONO = "mono";
 
   static constexpr const char *KEY_SNIPPET_GROUP = "group";
-  static constexpr const char *KEY_SNIPPET_NAME = "name";
-  static constexpr size_t NAME_LENGTH = 32;
 
   double threshold = DEFAULT_THRESHOLD;
-  double volume[MAX_SPEAKERMAN_GROUPS];
+  double volume[MAX_PROCESSING_GROUPS];
   double delay = DEFAULT_DELAY;
   int use_sub = DEFAULT_USE_SUB;
   int mono = DEFAULT_MONO;
   EqualizerConfig eq[MAX_EQS];
   size_t eqs = DEFAULT_EQS;
-  char name[NAME_LENGTH + 1];
 
-  static const GroupConfig defaultConfig(size_t group_id);
+  static const ProcessingGroupConfig defaultConfig(size_t group_id);
 
-  static const GroupConfig unsetConfig();
+  static const ProcessingGroupConfig unsetConfig();
 
-  void set_if_unset(const GroupConfig &config_if_unset);
+  void set_if_unset(const ProcessingGroupConfig &config_if_unset);
 
-  const GroupConfig with_groups_separated(size_t group_id) const;
+  const ProcessingGroupConfig with_groups_separated(size_t group_id) const;
 
-  const GroupConfig with_groups_mixed() const;
+  const ProcessingGroupConfig with_groups_mixed() const;
 };
 
 struct DetectionConfig {
@@ -162,7 +388,7 @@ struct SpeakermanConfig {
 
   static constexpr size_t MIN_GROUPS = 1;
   static constexpr size_t DEFAULT_GROUPS = 1;
-  static constexpr size_t MAX_GROUPS = MAX_SPEAKERMAN_GROUPS;
+  static constexpr size_t MAX_GROUPS = MAX_PROCESSING_GROUPS;
 
   static constexpr size_t MIN_GROUP_CHANNELS = 1;
   static constexpr size_t DEFAULT_GROUP_CHANNELS = 2;
@@ -172,9 +398,10 @@ struct SpeakermanConfig {
   static constexpr double DEFAULT_REL_SUB_THRESHOLD = M_SQRT2;
   static constexpr double MAX_REL_SUB_THRESHOLD = 2.0;
 
-  static constexpr double MIN_SUB_DELAY = GroupConfig::MIN_DELAY;
-  static constexpr double DEFAULT_SUB_DELAY = GroupConfig::DEFAULT_DELAY;
-  static constexpr double MAX_SUB_DELAY = GroupConfig::MAX_DELAY;
+  static constexpr double MIN_SUB_DELAY = ProcessingGroupConfig::MIN_DELAY;
+  static constexpr double DEFAULT_SUB_DELAY =
+      ProcessingGroupConfig::DEFAULT_DELAY;
+  static constexpr double MAX_SUB_DELAY = ProcessingGroupConfig::MAX_DELAY;
 
   static constexpr size_t MIN_SUB_OUTPUT = 0;
   static constexpr size_t DEFAULT_SUB_OUTPUT = 1;
@@ -221,7 +448,11 @@ struct SpeakermanConfig {
   long long timeStamp = -1;
   double threshold_scaling = DEFAULT_THRESHOLD_SCALING;
   DetectionConfig detection;
-  GroupConfig group[MAX_GROUPS];
+  PhysicalPortConfig inputPorts;
+  LogicalGroupConfig logicalInputs[MAX_LOGICAL_GROUPS];
+  PhysicalPortConfig outputPorts;
+  LogicalGroupConfig logicalOutputs[MAX_LOGICAL_GROUPS];
+  ProcessingGroupConfig group[MAX_GROUPS];
   EqualizerConfig eq[MAX_EQS];
   size_t eqs = DEFAULT_EQS;
 
@@ -236,6 +467,11 @@ struct SpeakermanConfig {
   const SpeakermanConfig with_groups_separated() const;
 
   const SpeakermanConfig with_groups_first() const;
+  void
+  reorganizePortsAndLogicalGroups(PhysicalPortConfig &myPorts,
+                                  LogicalGroupConfig *myGroups,
+                                  const PhysicalPortConfig &yourPorts,
+                                  const LogicalGroupConfig *yourGroups);
 };
 
 using tdap::IndexPolicy;

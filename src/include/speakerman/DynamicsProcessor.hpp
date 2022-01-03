@@ -64,14 +64,14 @@ public:
 
   static constexpr size_t RMS_DETECTION_LEVELS = DetectionConfig::MAX_PERCEPTIVE_LEVELS;
 
-  static constexpr double GROUP_MAX_DELAY = GroupConfig::MAX_DELAY;
+  static constexpr double GROUP_MAX_DELAY = ProcessingGroupConfig::MAX_DELAY;
   static constexpr double LIMITER_MAX_DELAY = 0.01;
   static constexpr double RMS_MAX_DELAY = 0.01;
   static constexpr double LIMITER_PREDICTION_SECONDS = 0.001;
   static constexpr double peakThreshold = 1.0;
 
   static constexpr size_t GROUP_MAX_DELAY_SAMPLES =
-      0.5 + 192000 * GroupConfig::MAX_DELAY;
+      0.5 + 192000 * ProcessingGroupConfig::MAX_DELAY;
   static constexpr size_t LIMITER_MAX_DELAY_SAMPLES =
       0.5 + 192000 * LIMITER_MAX_DELAY;
   static constexpr size_t RMS_MAX_DELAY_SAMPLES = 0.5 + 192000 * RMS_MAX_DELAY;

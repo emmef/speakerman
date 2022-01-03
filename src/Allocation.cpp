@@ -247,7 +247,7 @@ namespace tdap {
                 cerr << "Alignment criterium failed: align=" << sizeof(max_align_t) << "; alloc_start~=" << ((data_.alloc_start_ - (char *)nullptr) % sizeof(max_align_t)) << endl;
                 throw runtime_error("Alignment criterium failed");
             }
-            cout << "Created handle " << this << "; data=" << (void *)data_.data_start_ << "; alloc=" << (void *)data_.alloc_start_ << "; end=" << (void *)alloc_end_ << "; size=" << block_size << endl;
+//            cout << "Created handle " << this << "; data=" << (void *)data_.data_start_ << "; alloc=" << (void *)data_.alloc_start_ << "; end=" << (void *)alloc_end_ << "; size=" << block_size << endl;
             link_handle(this);
         }
 

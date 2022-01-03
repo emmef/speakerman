@@ -30,8 +30,9 @@ namespace speakerman {
 using namespace tdap;
 struct SpeakerManLevels {
   static constexpr double getThreshold(double threshold) {
-    return Values::force_between(threshold, GroupConfig::MIN_THRESHOLD,
-                                 GroupConfig::MAX_THRESHOLD);
+    return Values::force_between(threshold,
+                                 ProcessingGroupConfig::MIN_THRESHOLD,
+                                 ProcessingGroupConfig::MAX_THRESHOLD);
   }
 
   static constexpr double getLimiterThreshold(double threshold,
@@ -81,7 +82,7 @@ public:
     }
   }
 
-  static EqualizerFilterData<T> createConfigured(const GroupConfig &config,
+  static EqualizerFilterData<T> createConfigured(const ProcessingGroupConfig &config,
                                                  double sampleRate) {
     return createConfigured(config.eqs, config.eq, sampleRate);
   }
@@ -148,19 +149,20 @@ public:
   }
 
   template <typename... A>
-  void setLevels(const GroupConfig &conf, double threshold_scaling,
+  void setLevels(const ProcessingGroupConfig &conf, double threshold_scaling,
                  size_t channels, double sloppyFactor, size_t delay,
                  const ArrayTraits<A...> &relativeBandWeights) {
     for (size_t i = 0; i < SpeakermanConfig::MAX_GROUPS; i++) {
-      double v = Values::force_between(conf.volume[i], GroupConfig::MIN_VOLUME,
-                                       GroupConfig::MAX_VOLUME);
+      double v = Values::force_between(conf.volume[i],
+                                       ProcessingGroupConfig::MIN_VOLUME,
+                                       ProcessingGroupConfig::MAX_VOLUME);
       volume_[i] = v < 1e-6 ? 0 : v;
     }
     delay_ = delay;
     useSub_ = conf.use_sub == 1;
     mono_ = conf.mono == 1;
     double threshold = Value<double>::min(conf.threshold * threshold_scaling,
-                                          GroupConfig::MAX_THRESHOLD);
+                                          ProcessingGroupConfig::MAX_THRESHOLD);
     limiterThreshold_ =
         SpeakerManLevels::getLimiterThreshold(threshold, sloppyFactor);
     limiterScale_ = 1.0 / limiterThreshold_;
@@ -293,12 +295,12 @@ public:
     if (config.groups != GROUPS) {
       throw std::invalid_argument("Cannot change number of groups run-time");
     }
-    double subBaseThreshold = GroupConfig::MAX_THRESHOLD;
+    double subBaseThreshold = ProcessingGroupConfig::MAX_THRESHOLD;
     double peakWeight = Values::force_between(fastestPeakWeight, 0.1, 1.0);
     double max_group_threshold = 0;
 
     for (size_t group = 0; group < config.groups; group++) {
-      speakerman::GroupConfig sourceConf = config.group[group];
+      speakerman::ProcessingGroupConfig sourceConf = config.group[group];
 
       GroupRuntimeData<T, BANDS> &targetConf = groupConfig_[group];
       targetConf.setFilterConfig(
@@ -306,14 +308,14 @@ public:
 
       double groupThreshold =
           Value<double>::min(sourceConf.threshold * config.threshold_scaling,
-                             GroupConfig::MAX_THRESHOLD);
+                             ProcessingGroupConfig::MAX_THRESHOLD);
       max_group_threshold =
           Value<double>::max(max_group_threshold, groupThreshold);
 
       size_t delay =
           0.5 + sampleRate * Values::force_between(sourceConf.delay,
-                                                   GroupConfig::MIN_DELAY,
-                                                   GroupConfig::MAX_DELAY);
+                                            ProcessingGroupConfig::MIN_DELAY,
+                                            ProcessingGroupConfig::MAX_DELAY);
       targetConf.setLevels(sourceConf, config.threshold_scaling,
                            config.groupChannels, fastestPeakWeight, delay,
                            bandWeights);

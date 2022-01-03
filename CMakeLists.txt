@@ -106,3 +106,4 @@ install(PROGRAMS service/99-speakerman-device.rules DESTINATION /lib/udev/rules.
 install(PROGRAMS src/startjack.sh DESTINATION bin)
 
 add_definitions(-DSPEAKERMAN_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX})
+
