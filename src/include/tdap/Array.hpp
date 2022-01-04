@@ -59,7 +59,7 @@ template <typename T> class Array : public ArrayTraits<T, Array<T>> {
       std::is_trivially_copyable<T>::value,
       "Type must be trivial to copy, move or destroy and have standard layout");
 
-  friend class ArrayTraits<T, Array<T>>;
+  friend struct ArrayTraits<T, Array<T>>;
 
   using Parent = ArrayTraits<T, Array<T>>;
 
@@ -162,7 +162,7 @@ template <typename T> class RefArray : public ArrayTraits<T, RefArray<T>> {
       std::is_trivially_copyable<T>::value,
       "Type must be trivial to copy, move or destroy and have standard layout");
 
-  friend class ArrayTraits<T, RefArray<T>>;
+  friend struct ArrayTraits<T, RefArray<T>>;
 
   size_t size_ = 0;
   T *data_ = 0;

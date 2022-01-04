@@ -29,7 +29,7 @@ namespace speakerman {
 using namespace tdap;
 using namespace std;
 
-const char *const port_direction_name(PortDirection direction) {
+const char *port_direction_name(PortDirection direction) {
   switch (direction) {
   case PortDirection::IN:
     return "IN";

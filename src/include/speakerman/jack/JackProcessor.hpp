@@ -64,7 +64,7 @@ class ProcessingStatistics {
 public:
   void reset() { *this = {}; }
 
-  void setSampleRate(uint64_t rate, uint64_t bufferSize) {
+  void setSampleRate(uint64_t rate) {
     reset();
     sampleRate = rate ? rate : 48000;
   }
@@ -180,7 +180,7 @@ public:
    * and after updateMetrics was executed successfully.
    * @return the sample rate
    */
-  const jack_nframes_t getSampleRate() const { return metrics_.sampleRate; }
+  jack_nframes_t getSampleRate() const { return metrics_.sampleRate; }
 
   /**
    * Returns the jack buffer size.
@@ -189,7 +189,7 @@ public:
    * @return the buffer size.
    *
    */
-  const jack_nframes_t getBufferSize() const { return metrics_.bufferSize; }
+  jack_nframes_t getBufferSize() const { return metrics_.bufferSize; }
 
   /**
    * returns whether the buffer size is relevant for this processor.

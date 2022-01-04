@@ -165,7 +165,7 @@ protected:
     std::cout << "Outputs: playback " << playbackPortNames.count() << " out "
               << outputs.count() << std::endl;
     for (size_t out = groupOutputStart, port = 0; out < outputCount; port++) {
-      if (port == subOutPut) {
+      if (int(port) == subOutPut) {
         continue;
       }
       connectPorts(client, outputs.get(out++), playbackPortNames.get(port));

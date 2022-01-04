@@ -205,8 +205,8 @@ public:
   DynamicProcessorLevels levels;
 
   DynamicsProcessor()
-      : sampleRate_(0), noise(1.0, 9600), levels(GROUPS, CROSSOVERS),
-        groupDetector(new DetectorGroup[DETECTORS]) {
+      : noise(1.0, 9600),
+        groupDetector(new DetectorGroup[DETECTORS]), sampleRate_(0), levels(GROUPS, CROSSOVERS) {
     levels.reset();
   }
 

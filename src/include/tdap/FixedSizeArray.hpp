@@ -34,7 +34,7 @@ class alignas(Count<T>::align()) FixedSizeArray
       std::is_trivially_copyable<T>::value,
       "Type must be trivial to copy, move or destroy and have standard layout");
 
-  friend class ArrayTraits<T, FixedSizeArray<T, SIZE>>;
+  friend struct ArrayTraits<T, FixedSizeArray<T, SIZE>>;
 
   T data_[SIZE];
 

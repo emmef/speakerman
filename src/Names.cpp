@@ -46,7 +46,7 @@ void Names::checkLengthOrThrow(size_t bufferSize, int result) {
       "Jack port/client name regular expression initialization error");
 }
 
-const size_t Names::client_port_separator_length() {
+size_t Names::client_port_separator_length() {
   return strlen(client_port_separator());
 }
 
@@ -54,11 +54,11 @@ const char *Names::template_name_regex() {
   return "[-_\\.,0-9a-zA-Z ]{%zu,%zu}";
 }
 
-const size_t Names::template_name_regex_length() {
+size_t Names::template_name_regex_length() {
   return strlen(template_name_regex());
 }
 
-const size_t Names::pattern_max_length() {
+size_t Names::pattern_max_length() {
   static const size_t value =
       2 +                                // Begin and end markers ^$
       2 * template_name_regex_length() + // basic tempates without length
@@ -67,7 +67,7 @@ const size_t Names::pattern_max_length() {
   return value;
 }
 
-const size_t Names::pattern_max_buffer_size() {
+size_t Names::pattern_max_buffer_size() {
   return pattern_max_length() + 1;
 }
 
@@ -116,7 +116,7 @@ const char *Names::valid_name(const regex &regex, const char *name,
   throw std::invalid_argument(message);
 }
 
-const char *const Names::client_port_separator() { return ":"; }
+const char *Names::client_port_separator() { return ":"; }
 
 size_t Names::get_full_size() {
   static const size_t value = jack_port_name_size();

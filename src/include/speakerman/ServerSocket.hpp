@@ -97,7 +97,7 @@ public:
   bool open(const char *service, int timeoutSeconds, int backLog,
             int *errorCode);
 
-  const char *const service() const { return service_; }
+  const char *service() const { return service_; }
 
   State state() const;
 

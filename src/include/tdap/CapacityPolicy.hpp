@@ -29,7 +29,7 @@ namespace tdap {
 
 class CapacityPolicy {
 public:
-  static size_t defaultNewCapacity(size_t currentCapacity, size_t currentSize,
+  static size_t defaultNewCapacity(size_t currentCapacity, size_t,
                                    size_t neededSize) {
     size_t capacity = Value<size_t>::max(
         Value<size_t>::max(currentCapacity, 1) * 3 / 2, neededSize, 16);

@@ -37,7 +37,7 @@ enum class PortDirection { IN, OUT };
 
 enum class PortIsTerminal { NO, YES };
 
-const char *const port_direction_name(PortDirection direction);
+const char *port_direction_name(PortDirection direction);
 
 /**
  * Conveniently defines an audio port.

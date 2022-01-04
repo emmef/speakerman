@@ -39,15 +39,15 @@ class Names {
 
   static constexpr size_t minimum_name_length = 2;
 
-  static const size_t client_port_separator_length();
+  static size_t client_port_separator_length();
 
   static const char *template_name_regex();
 
-  static const size_t template_name_regex_length();
+  static size_t template_name_regex_length();
 
-  static const size_t pattern_max_length();
+  static size_t pattern_max_length();
 
-  static const size_t pattern_max_buffer_size();
+  static size_t pattern_max_buffer_size();
 
   static string get_name_pattern(size_t clientLength, size_t portLength);
 
@@ -57,7 +57,7 @@ class Names {
 public:
   Names();
 
-  static const char *const client_port_separator();
+  static const char *client_port_separator();
 
   static size_t get_full_size();
 

@@ -97,7 +97,7 @@ template <> struct UnsetValue<double> {
 template <> struct UnsetValue<int> {
   static constexpr int value = -1;
 
-  static bool is(size_t test) { return test == value; }
+  static bool is(int test) { return test == value; }
 
   static void set(int &destination) { destination = value; }
 };
@@ -122,8 +122,6 @@ struct NamedConfig {
   static constexpr const char *KEY_SNIPPET_NAME = "name";
   static constexpr size_t NAME_LENGTH = MAX_NAME_LENGTH;
   char name[NAME_LENGTH + 1] = "[No name]";
-
-  void unset(NamedConfig &config) { UnsetValue<char *>::set(name); }
 };
 
 struct EqualizerConfig {
@@ -180,7 +178,7 @@ struct LogicalGroupConfig : public NamedConfig {
 
   LogicalGroupConfig();
 
-  static const LogicalGroupConfig unsetConfig();;
+  static const LogicalGroupConfig unsetConfig();
 
   void set_if_unset(const LogicalGroupConfig &config_if_unset);
 
@@ -382,7 +380,7 @@ class DynamicProcessorLevels {
 public:
   DynamicProcessorLevels() : channels_(0), count_(0){};
 
-  DynamicProcessorLevels(size_t groups, size_t crossovers)
+  DynamicProcessorLevels(size_t groups)
       : channels_(groups + 1), count_(0) {}
 
   size_t groups() const { return channels_ - 1; }
@@ -459,9 +457,9 @@ class StreamOwner {
   std::ifstream &stream_;
   bool owns_;
 
-  void operator=(const StreamOwner &source) {}
+  void operator=(const StreamOwner &) {}
 
-  void operator=(StreamOwner &&source) noexcept {}
+  void operator=(StreamOwner &&) noexcept {}
 
 public:
   explicit StreamOwner(std::ifstream &owned);

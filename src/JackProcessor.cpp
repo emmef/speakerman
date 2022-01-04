@@ -141,7 +141,7 @@ bool JackProcessor::updateMetrics(jack_client_t *client,
       }
       metrics_ = relevantMetrics;
       running_.clear();
-      statistics.setSampleRate(metrics_.sampleRate, metrics_.bufferSize);
+      statistics.setSampleRate(metrics_.sampleRate);
       return true;
     }
     return false;
