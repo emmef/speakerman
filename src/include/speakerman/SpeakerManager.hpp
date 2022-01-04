@@ -259,7 +259,7 @@ public:
   virtual bool needsSampleRate() const override { return true; }
 
   SpeakerManager(const SpeakermanConfig &config)
-      : portDefinitions_(1 + 2 * SpeakermanConfig::MAX_GROUPS *
+      : portDefinitions_(1 + 2 * MAX_PROCESSING_GROUPS *
                                  SpeakermanConfig::MAX_GROUP_CHANNELS),
         config_(config) {
     char name[1 + Names::get_port_size()];

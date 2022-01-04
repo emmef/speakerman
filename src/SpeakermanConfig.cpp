@@ -28,6 +28,7 @@ static constexpr const char *INSTALLATION_PREFIX =
     TO_STR(SPEAKERMAN_INSTALL_PREFIX);
 #endif
 
+#include <algorithm>
 #include <cmath>
 #include <cstring>
 #include <mutex>
@@ -597,20 +598,6 @@ class ConfigManager : protected SpeakermanConfig {
   }
 
 public:
-  void addPhysicalPorts(PhysicalPortConfig &ports, const char *snippet) {
-    string physInput = snippet;
-    physInput += "/";
-    for (size_t i = 0; i < MAX_PHYSICAL_PORTS; i++) {
-      string item = physInput;
-      if (i >= 10) {
-        item += char('0' + i / 10);
-      }
-      item += char('0' + i % 10);
-      item += "/";
-      item += PhysicalPortConfig::KEY_SNIPPET_GROUP_SUF;
-      add_reader(item, false, ports.logicalGroupOf[i]);
-    }
-  }
   void addLogicalGroups(LogicalGroupConfig *logicalGroup, const char *snippet) {
     string logicalInput = snippet;
     logicalInput += "/";
@@ -631,6 +618,10 @@ public:
       item = grp;
       item += LogicalGroupConfig::KEY_SNIPPET_MUTED;
       add_reader(item, false, logicalGroup[i].muted);
+      item = grp;
+      item += LogicalGroupConfig::KEY_PORT_NUMBER;
+      add_array_reader<size_t, MAX_LOGICAL_CHANNELS>(item, false,
+                                                     logicalGroup[i].ports[0]);
     }
   }
 
@@ -658,11 +649,7 @@ public:
     add_reader(DetectionConfig::KEY_SNIPPET_USE_BRICK_WALL_PREDICTION, false,
                detection.useBrickWallPrediction);
 
-    addPhysicalPorts(inputPorts,
-                     PhysicalPortConfig::KEY_SNIPPET_INPUT_MAPS_TO_GROUP);
     addLogicalGroups(logicalInputs, LogicalGroupConfig::KEY_SNIPPET_INPUT);
-    addPhysicalPorts(outputPorts,
-                     PhysicalPortConfig::KEY_SNIPPET_OUTPUT_MAPS_TO_GROUP);
     addLogicalGroups(logicalOutputs, LogicalGroupConfig::KEY_SNIPPET_OUTPUT);
 
     string key;
@@ -687,7 +674,7 @@ public:
       add_reader(key, true, eq[eq_idx].bandwidth);
     }
 
-    for (size_t group_idx = 0; group_idx < SpeakermanConfig::MAX_GROUPS;
+    for (size_t group_idx = 0; group_idx < MAX_PROCESSING_GROUPS;
          group_idx++) {
       string groupKey = ProcessingGroupConfig::KEY_SNIPPET_GROUP;
       groupKey += "/";
@@ -702,7 +689,7 @@ public:
       add_reader(key, true, group[group_idx].threshold);
       key = groupKey;
       key += ProcessingGroupConfig::KEY_SNIPPET_VOLUME;
-      add_array_reader<double, MAX_PROCESSING_GROUPS>(
+      add_array_reader<double, MAX_LOGICAL_CHANNELS>(
           key, true, group[group_idx].volume[0]);
       key = groupKey;
       key += ProcessingGroupConfig::KEY_SNIPPET_DELAY;
@@ -774,27 +761,10 @@ public:
     return reader->read(config, reader->get_key(), value_start, basedUpon);
   }
 
-  void writeLogicalGroupChannelCounts(ostream &stream,
-                                      const PhysicalPortConfig &groups,
-                                      const char *snippet) const {
-    auto channels = groups.getListWithUsedGroups();
-    for (size_t group = 0; group < MAX_LOGICAL_GROUPS; group++) {
-      auto groupChannels = channels[group];
-      if (!isUnsetConfigValue(groupChannels) && groupChannels > 0) {
-        stream << snippet << "/" << group << "/channels = " << groupChannels
-               << endl;
-      }
-    }
-  }
   void dump(const SpeakermanConfig &config, ostream &stream) {
     for (size_t i = 0; i < size(); i++) {
       readers_[i]->write(config, stream);
     }
-    writeLogicalGroupChannelCounts(stream, config.inputPorts, LogicalGroupConfig::KEY_SNIPPET_INPUT);
-    stream << PhysicalPortConfig::KEY_SNIPPET_INPUT_MAPS_TO_GROUP << "/total-ports-used = " << config.inputPorts.getNumberOfAssignedInputPorts() << endl;
-    writeLogicalGroupChannelCounts(stream, config.outputPorts, LogicalGroupConfig::KEY_SNIPPET_OUTPUT);
-    stream << PhysicalPortConfig::KEY_SNIPPET_OUTPUT_MAPS_TO_GROUP << "/total-ports-used = " << config.inputPorts.getNumberOfAssignedInputPorts() << endl;
-
   }
 };
 
@@ -1128,8 +1098,6 @@ void DetectionConfig::set_if_unset(const DetectionConfig &config_if_unset) {
 
 const SpeakermanConfig SpeakermanConfig::defaultConfig() {
   SpeakermanConfig result;
-  result.inputPorts = PhysicalPortConfig::defaultConfig();
-  result.outputPorts = PhysicalPortConfig::defaultConfig();
   const LogicalGroupConfig config = LogicalGroupConfig::defaultConfig();
   for (size_t i = 0; i < MAX_LOGICAL_GROUPS; i++) {
     result.logicalInputs[i] = config;
@@ -1151,8 +1119,6 @@ const SpeakermanConfig SpeakermanConfig::defaultConfig() {
 const SpeakermanConfig SpeakermanConfig::unsetConfig() {
   SpeakermanConfig result;
 
-  result.inputPorts = PhysicalPortConfig::unsetConfig();
-  result.outputPorts = PhysicalPortConfig::unsetConfig();
   const LogicalGroupConfig config = LogicalGroupConfig::unsetConfig();
   for (size_t i = 0; i < MAX_LOGICAL_GROUPS; i++) {
     result.logicalInputs[i] = config;
@@ -1183,16 +1149,15 @@ const SpeakermanConfig SpeakermanConfig::unsetConfig() {
 }
 
 void SpeakermanConfig::set_if_unset(const SpeakermanConfig &config_if_unset) {
-  reorganizePortsAndLogicalGroups(inputPorts, logicalInputs,
-                                  config_if_unset.inputPorts,
-                                  config_if_unset.logicalInputs);
-  reorganizePortsAndLogicalGroups(outputPorts, logicalOutputs,
-                                  config_if_unset.outputPorts,
-                                  config_if_unset.logicalOutputs);
-
+  for (size_t group = 0; group < MAX_LOGICAL_GROUPS; group++) {
+    logicalInputs[group].set_if_unset(config_if_unset.logicalInputs[group]);
+    logicalOutputs[group].set_if_unset(config_if_unset.logicalOutputs[group]);
+  }
+  LogicalGroupConfig::sanitize(logicalInputs, MAX_LOGICAL_GROUPS, "input");
+  LogicalGroupConfig::sanitize(logicalOutputs, MAX_LOGICAL_GROUPS, "output");
   size_t group_idx;
   if (set_if_unset_or_invalid_config_value(groups, config_if_unset.groups,
-                                           MIN_GROUPS, MAX_GROUPS)) {
+                                           MIN_GROUPS, MAX_PROCESSING_GROUPS)) {
     for (group_idx = 0; group_idx < groups; group_idx++) {
       group[group_idx] = config_if_unset.group[group_idx];
     }
@@ -1201,7 +1166,7 @@ void SpeakermanConfig::set_if_unset(const SpeakermanConfig &config_if_unset) {
       group[group_idx].set_if_unset(config_if_unset.group[group_idx]);
     }
   }
-  for (; group_idx < MAX_GROUPS; group_idx++) {
+  for (; group_idx < MAX_PROCESSING_GROUPS; group_idx++) {
     group[group_idx] = ProcessingGroupConfig::unsetConfig();
   }
   detection.set_if_unset(config_if_unset.detection);
@@ -1246,26 +1211,6 @@ void SpeakermanConfig::set_if_unset(const SpeakermanConfig &config_if_unset) {
       threshold_scaling, config_if_unset.threshold_scaling,
       MIN_THRESHOLD_SCALING, MAX_THRESHOLD_SCALING);
   timeStamp = -1;
-}
-void SpeakermanConfig::reorganizePortsAndLogicalGroups(
-    PhysicalPortConfig &myPorts, LogicalGroupConfig *myGroups,
-    const PhysicalPortConfig &yourPorts, const LogicalGroupConfig *yourGroups) {
-  PhysicalPortConfig yourReorganizedPorts = yourPorts;
-  LogicalGroupConfig yourReorganizedGroups[MAX_LOGICAL_GROUPS];
-
-  LogicalGroupConfig::reorganize(yourReorganizedPorts, yourReorganizedGroups,
-                                 yourPorts, yourGroups);
-  LogicalGroupConfig::reorganize(myPorts, myGroups);
-  myPorts.set_if_unset(yourReorganizedPorts);
-  auto usedGroups = inputPorts.getListWithUsedGroups();
-  for (size_t i = 0; i < MAX_LOGICAL_GROUPS; i++) {
-    if (usedGroups[i] > 0) {
-      myGroups[i].set_if_unset(yourReorganizedGroups[i]);
-      myGroups[i].setMissingValues(i);
-    } else {
-      myGroups[i] = LogicalGroupConfig::unsetConfig();
-    }
-  }
 }
 
 const SpeakermanConfig SpeakermanConfig::with_groups_mixed() const {
@@ -1325,4 +1270,103 @@ StreamOwner::~StreamOwner() {
 }
 bool StreamOwner::is_open() const { return stream_.is_open(); }
 
+const LogicalGroupConfig LogicalGroupConfig::unsetConfig() {
+  LogicalGroupConfig result;
+  unsetConfigValue(result.name);
+  unsetConfigValue(result.muted);
+  unsetConfigValue(result.volume);
+  for (size_t &port : result.ports) {
+    unsetConfigValue(port);
+  }
+  return result;
+}
+void LogicalGroupConfig::set_if_unset(
+    const LogicalGroupConfig &config_if_unset) {
+  setConfigValueIfUnset(muted, config_if_unset.muted);
+  setConfigValueIfUnset(volume, config_if_unset.volume);
+}
+void LogicalGroupConfig::sanitize(size_t groupNumber, const char *typeOfGroup) {
+  size_t hasPorts = getPortCount();
+  if (hasPorts > 0) {
+    if (isUnsetConfigValue(muted)) {
+      muted = DEFAULT_IS_MUTED;
+    }
+    if (isUnsetConfigValue(volume)) {
+      volume = DEFAULT_VOLUME;
+    }
+    if (isUnsetConfigValue(name)) {
+      snprintf(name, MAX_NAME_LENGTH, "Logical %s group %lu", typeOfGroup,
+               groupNumber);
+    }
+    size_t destination = 0;
+    for (size_t i = 0; i < MAX_LOGICAL_CHANNELS; i++) {
+      if (!isUnsetConfigValue(ports[i])) {
+        ports[destination++] = ports[i];
+      }
+    }
+  } else {
+    *this = unsetConfig();
+  }
+}
+size_t LogicalGroupConfig::getPortCount() {
+  size_t count = 0;
+  for (const size_t port : ports) {
+    if (!isUnsetConfigValue(port)) {
+      count++;
+    }
+  }
+  return count;
+}
+LogicalGroupConfig::LogicalGroupConfig() {
+  for (size_t &port : ports) {
+    unsetConfigValue(port);
+  }
+}
+void LogicalGroupConfig::sanitize(LogicalGroupConfig *pConfig,
+                                  const size_t groups,
+                                  const char *typeOfGroup) {
+  // First sanitize individual logical groups
+  for (size_t group = 0; group < groups; group++) {
+    pConfig->sanitize(group, typeOfGroup);
+  }
+  // Strip doubly-used I/O ports
+  std::array<size_t, MAX_LOGICAL_CHANNELS> usedPorts;
+  usedPorts.fill(UnsetValue<size_t>::value);
+  size_t count = 0;
+  for (size_t group = 0; group < groups; group++) {
+    LogicalGroupConfig &config = pConfig[group];
+    for (size_t &port : config.ports) {
+      if (isUnsetConfigValue(port)) {
+        break; // sanitize on individual group moved all ports tro the front of
+               // the arrays.
+      }
+      if (std::find(usedPorts.begin(), usedPorts.end(), port) ==
+          usedPorts.end()) {
+        if (count < MAX_LOGICAL_CHANNELS) {
+          usedPorts[count++] = port;
+        } else {
+          std::cerr
+              << "Logical " << typeOfGroup << " group \"" << config.name
+              << "\" removed port " << port
+              << " as the maximum number of associated ports was exceeded."
+              << std::endl;
+          port = UnsetValue<size_t>::value;
+        }
+      } else {
+        std::cerr << "Logical " << typeOfGroup << " group \"" << config.name
+                  << "\" removed port " << port
+                  << " that was already in use." << std::endl;
+        port = UnsetValue<size_t>::value;
+      }
+    }
+    if (pConfig[groups].getPortCount() == 0) {
+      if (!isUnsetConfigValue(config.name)) {
+        std::cerr << "Logical " << typeOfGroup << " group \"" << config.name
+                  << "\" removed, as it is not associated with any port."
+                  << std::endl;
+      }
+      config.sanitize(group, nullptr);
+    }
+  }
+}
 } /* End of namespace speakerman */

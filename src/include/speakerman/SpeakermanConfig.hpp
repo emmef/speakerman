@@ -153,72 +153,6 @@ struct EqualizerConfig {
   double gain = DEFAULT_GAIN;
   double bandwidth = DEFAULT_BANDWIDTH;
 };
-
-struct PhysicalPortConfig {
-  static_assert(MAX_LOGICAL_GROUPS > 1);
-  static_assert(MAX_PHYSICAL_PORTS > 0);
-  static constexpr size_t MIN_GROUP_OF_PHYS_PORT = UnsetValue<size_t>::value;
-  static constexpr size_t DEFAULT_GROUP_OF_PHYS_PORT = MIN_GROUP_OF_PHYS_PORT;
-  static constexpr size_t MAX_GROUP_OF_PHYS_PORT = MAX_LOGICAL_GROUPS - 1;
-  static constexpr const char *KEY_SNIPPET_INPUT_MAPS_TO_GROUP =
-      "physical-input";
-  static constexpr const char *KEY_SNIPPET_OUTPUT_MAPS_TO_GROUP =
-      "physical-output";
-  static constexpr const char *KEY_SNIPPET_GROUP_SUF = "maps-to";
-  size_t logicalGroupOf[MAX_PHYSICAL_PORTS];
-
-  static const PhysicalPortConfig defaultConfig() {
-    static PhysicalPortConfig config;
-    return config;
-  }
-
-  static const PhysicalPortConfig unsetConfig() {
-    static PhysicalPortConfig config;
-    for (size_t i = 0; i < MAX_PHYSICAL_PORTS; i++) {
-      UnsetValue<size_t>::set(config.logicalGroupOf[i]);
-    }
-    return config;
-  }
-
-  void set_if_unset(const PhysicalPortConfig &config_if_unset) {
-    for (size_t i = 0; i < MAX_PHYSICAL_PORTS; i++) {
-      size_t group = config_if_unset.logicalGroupOf[i];
-      if (group >= 0 && group < MAX_LOGICAL_GROUPS) {
-        setConfigValueIfUnset(logicalGroupOf[i],group);
-      }
-    }
-  }
-
-  PhysicalPortConfig() {
-    for (size_t i = 0; i < MAX_PHYSICAL_PORTS; i++) {
-      UnsetValue<size_t>::set(logicalGroupOf[i]);
-    }
-  }
-
-  std::array<size_t , MAX_LOGICAL_GROUPS> getListWithUsedGroups() const {
-    std::array<size_t, MAX_LOGICAL_GROUPS> marked;
-    marked.fill(0);
-    for (size_t i = 0; i < MAX_PHYSICAL_PORTS; i++) {
-      auto mappedTo = logicalGroupOf[i];
-      if (mappedTo >= 0 && mappedTo < MAX_LOGICAL_GROUPS) {
-        marked[mappedTo]++;
-      }
-    }
-    return marked;
-  }
-
-  size_t getNumberOfAssignedInputPorts() const {
-    size_t count = 0;
-    for (size_t port = 0; port < MAX_PHYSICAL_PORTS; port++) {
-      size_t group = logicalGroupOf[port];
-      if (group >= 0 && group < MAX_PHYSICAL_PORTS) {
-        count++;
-      }
-    }
-    return count;
-  }
-};
-
 struct LogicalGroupConfig : public NamedConfig {
   static_assert(MAX_LOGICAL_GROUPS > 1);
 
@@ -226,68 +160,34 @@ struct LogicalGroupConfig : public NamedConfig {
   static constexpr const char *KEY_SNIPPET_OUTPUT = "logical-output";
   static constexpr int DEFAULT_IS_MUTED = 0;
   static constexpr const char *KEY_SNIPPET_MUTED = "mute";
-  int muted = DEFAULT_IS_MUTED;
+  int muted = UnsetValue<int>::value;
 
   static constexpr double MIN_VOLUME = 0.0;
   static constexpr double DEFAULT_VOLUME = 1.0;
   static constexpr double MAX_VOLUME = 1.0;
   static constexpr const char *KEY_SNIPPET_VOLUME = "volume";
-  double volume = DEFAULT_VOLUME;
+  double volume = UnsetValue<double>::value;
+
+  static constexpr size_t MIN_PORT_NUMBER = 0;
+  static constexpr size_t MAX_PORT_NUMBER = 0xfffflu;
+  static constexpr const char *KEY_PORT_NUMBER = "port-numbers";
+  size_t ports[MAX_LOGICAL_CHANNELS];
 
   static const LogicalGroupConfig defaultConfig() {
     static LogicalGroupConfig config;
     return config;
   }
 
-  static const LogicalGroupConfig unsetConfig() {
-    LogicalGroupConfig result;
-    unsetConfigValue(result.name);
-    unsetConfigValue(result.muted);
-    unsetConfigValue(result.volume);
-    return result;
-  };
+  LogicalGroupConfig();
 
-  void set_if_unset(const LogicalGroupConfig &config_if_unset) {
-    setConfigValueIfUnset(muted, config_if_unset.muted);
-    setConfigValueIfUnset(volume, config_if_unset.volume);
-  }
+  static const LogicalGroupConfig unsetConfig();;
 
-  static void reorganize(PhysicalPortConfig &outPhysicalInputs,
-                         LogicalGroupConfig *outGroupConfigs,
-                         const PhysicalPortConfig &inPhysicalInputs,
-                         const LogicalGroupConfig *inGroupConfigs) {
-    auto usedGroups = inPhysicalInputs.getListWithUsedGroups();
-    size_t destination = 0;
-    for (size_t group = 0; group < MAX_LOGICAL_GROUPS; group++) {
-      if (usedGroups[group] > 0) {
-        for (size_t input = 0; input < MAX_PHYSICAL_PORTS; input++) {
-          if (inPhysicalInputs.logicalGroupOf[input] == group) {
-            outPhysicalInputs.logicalGroupOf[input] = destination;
-          }
-        }
-        outGroupConfigs[destination] = inGroupConfigs[group];
-        destination++;
-      }
-    }
-    for (; destination < MAX_LOGICAL_GROUPS; destination++) {
-      outGroupConfigs[destination] = unsetConfig();
-    }
-  }
-  static void reorganize(PhysicalPortConfig &physicalInputs,
-                         LogicalGroupConfig *groupConfigs) {
-    reorganize(physicalInputs, groupConfigs, physicalInputs, groupConfigs);
-  }
-  void setMissingValues(size_t groupNumber) {
-    if (isUnsetConfigValue(muted)) {
-      muted = DEFAULT_IS_MUTED;
-    }
-    if (isUnsetConfigValue(volume)) {
-      volume = DEFAULT_VOLUME;
-    }
-    if (isUnsetConfigValue(name)) {
-      snprintf(name, MAX_NAME_LENGTH, "Group %lu", groupNumber);
-    }
-  }
+  void set_if_unset(const LogicalGroupConfig &config_if_unset);
+
+  void sanitize(size_t groupNumber, const char *typeOfGroup);
+  static void sanitize(LogicalGroupConfig *pConfig, const size_t groups,
+                       const char *typeOfGroup);
+  size_t getPortCount();
 };
 
 struct ProcessingGroupConfig : public NamedConfig {
@@ -320,7 +220,7 @@ struct ProcessingGroupConfig : public NamedConfig {
   static constexpr const char *KEY_SNIPPET_GROUP = "group";
 
   double threshold = DEFAULT_THRESHOLD;
-  double volume[MAX_PROCESSING_GROUPS];
+  double volume[MAX_LOGICAL_CHANNELS];
   double delay = DEFAULT_DELAY;
   int use_sub = DEFAULT_USE_SUB;
   int mono = DEFAULT_MONO;
@@ -388,7 +288,6 @@ struct SpeakermanConfig {
 
   static constexpr size_t MIN_GROUPS = 1;
   static constexpr size_t DEFAULT_GROUPS = 1;
-  static constexpr size_t MAX_GROUPS = MAX_PROCESSING_GROUPS;
 
   static constexpr size_t MIN_GROUP_CHANNELS = 1;
   static constexpr size_t DEFAULT_GROUP_CHANNELS = 2;
@@ -405,7 +304,7 @@ struct SpeakermanConfig {
 
   static constexpr size_t MIN_SUB_OUTPUT = 0;
   static constexpr size_t DEFAULT_SUB_OUTPUT = 1;
-  static constexpr size_t MAX_SUB_OUTPUT = MAX_GROUPS * MAX_GROUP_CHANNELS + 1;
+  static constexpr size_t MAX_SUB_OUTPUT = MAX_PROCESSING_GROUPS * MAX_GROUP_CHANNELS + 1;
 
   static constexpr size_t MIN_CROSSOVERS = 1;
   static constexpr size_t DEFAULT_CROSSOVERS = 2;
@@ -413,11 +312,11 @@ struct SpeakermanConfig {
 
   static constexpr size_t MIN_INPUT_OFFSET = 0;
   static constexpr size_t DEFAULT_INPUT_OFFSET = 0;
-  static constexpr size_t MAX_INPUT_OFFSET = MAX_GROUPS * MAX_GROUP_CHANNELS;
+  static constexpr size_t MAX_INPUT_OFFSET = MAX_PROCESSING_GROUPS * MAX_GROUP_CHANNELS;
 
   static constexpr size_t MIN_INPUT_COUNT = 1;
   static constexpr size_t DEFAULT_INPUT_COUNT = -1;
-  static constexpr size_t MAX_INPUT_COUNT = MAX_GROUPS * MAX_GROUP_CHANNELS;
+  static constexpr size_t MAX_INPUT_COUNT = MAX_PROCESSING_GROUPS * MAX_GROUP_CHANNELS;
 
   static constexpr double MIN_THRESHOLD_SCALING = 1;
   static constexpr double DEFAULT_THRESHOLD_SCALING = 1;
@@ -448,11 +347,9 @@ struct SpeakermanConfig {
   long long timeStamp = -1;
   double threshold_scaling = DEFAULT_THRESHOLD_SCALING;
   DetectionConfig detection;
-  PhysicalPortConfig inputPorts;
   LogicalGroupConfig logicalInputs[MAX_LOGICAL_GROUPS];
-  PhysicalPortConfig outputPorts;
   LogicalGroupConfig logicalOutputs[MAX_LOGICAL_GROUPS];
-  ProcessingGroupConfig group[MAX_GROUPS];
+  ProcessingGroupConfig group[MAX_PROCESSING_GROUPS];
   EqualizerConfig eq[MAX_EQS];
   size_t eqs = DEFAULT_EQS;
 
@@ -467,18 +364,13 @@ struct SpeakermanConfig {
   const SpeakermanConfig with_groups_separated() const;
 
   const SpeakermanConfig with_groups_first() const;
-  void
-  reorganizePortsAndLogicalGroups(PhysicalPortConfig &myPorts,
-                                  LogicalGroupConfig *myGroups,
-                                  const PhysicalPortConfig &yourPorts,
-                                  const LogicalGroupConfig *yourGroups);
 };
 
 using tdap::IndexPolicy;
 using tdap::Values;
 
 class DynamicProcessorLevels {
-  double signal_square_[SpeakermanConfig::MAX_GROUPS + 1];
+  double signal_square_[MAX_PROCESSING_GROUPS + 1];
   size_t channels_;
   size_t count_;
 
