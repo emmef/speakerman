@@ -43,3 +43,5 @@ src/speakerman
 .autotools
 speakerman.kdev4
 
+build-*
+DEADJOE

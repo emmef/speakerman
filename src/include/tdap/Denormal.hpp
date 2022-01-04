@@ -85,7 +85,7 @@ template <typename FPTYPE, size_t selector> struct Normalize {
 
   static inline FPTYPE getFlushedToZero(FPTYPE &value) { return value; }
 
-  static inline void flushToZero(FPTYPE value) {}
+  static inline void flushToZero(FPTYPE) {}
 
   static constexpr bool normalizes = false;
 
@@ -103,7 +103,7 @@ template <typename FPTYPE, size_t selector> struct Normalize {
 template <typename FPTYPE> struct Normalize<FPTYPE, 0> {
   static inline FPTYPE getFlushedToZero(FPTYPE &value) { return value; }
 
-  static inline void flushToZero(FPTYPE value) {}
+  static inline void flushToZero(FPTYPE) {}
 
   static constexpr bool normalizes = false;
 

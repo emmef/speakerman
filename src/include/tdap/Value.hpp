@@ -265,7 +265,7 @@ template <typename T, unsigned P> struct helper_constexpr_power {
 };
 
 template <typename T> struct helper_constexpr_power<T, 0> {
-  static constexpr const T value(const T value) { return 1; }
+  static constexpr const T value(const T) { return 1; }
 };
 
 template <typename T, unsigned P>

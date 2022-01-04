@@ -1,12 +1,12 @@
-#ifndef SPEAKERMAN_TESTVOLUMEMATRIX_HPP
-#define SPEAKERMAN_TESTVOLUMEMATRIX_HPP
+#ifndef ORG_SIMPLE_BOOST_UNIT_TESTS_H
+#define ORG_SIMPLE_BOOST_UNIT_TESTS_H
 /*
- * speakerman/TestVolumeMatrix.hpp
+ * org-simple/boost-unit-tests.h
  *
- * Added by michel on 2020-02-16
+ * Added by michel on 2020-09-25
  * Copyright (C) 2015-2020 Michel Fleur.
- * Source https://github.com/emmef/speakerman
- * Email speakerman@emmef.org
+ * Source https://github.com/emmef/org-simple
+ * Email org-simple@emmef.org
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,7 +21,10 @@
  * limitations under the License.
  */
 
-void testVolumeMatrix();
-void testGroupVolumeMatrix();
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wall"
+#include <boost/test/data/test_case.hpp>
+#include <boost/test/unit_test.hpp>
+#pragma clang diagnostic pop
 
-#endif // SPEAKERMAN_TESTVOLUMEMATRIX_HPP
+#endif // ORG_SIMPLE_BOOST_UNIT_TESTS_H

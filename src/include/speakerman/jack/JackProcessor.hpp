@@ -38,7 +38,7 @@ struct ProcessingMetrics {
   jack_nframes_t sampleRate;
   jack_nframes_t bufferSize;
 
-  bool operator==(const ProcessingMetrics &o) {
+  bool operator==(const ProcessingMetrics &o) const {
     return sampleRate == o.sampleRate && bufferSize == o.bufferSize;
   }
 

@@ -73,7 +73,7 @@ public:
       return Error::setReturn(Error::BOUND);
     }
     ptrdiff_t &mapped = map_[channel];
-    if (!force && mapped >= 0 && mapped != group) {
+    if (!force && mapped >= 0 && mapped != (ptrdiff_t )group) {
       return Error::setReturn(Error::FULL);
     }
     mapped = group;
@@ -187,7 +187,7 @@ public:
     }
     size_t count = 0;
     for (size_t channel = 0; channel < CHANNELS; channel++) {
-      if (map_[channel] == group) {
+      if (map_[channel] == (ptrdiff_t)group) {
         count++;
       }
     }
@@ -205,8 +205,8 @@ public:
   size_t getGroupChannel(size_t group, size_t n) const noexcept {
     ptrdiff_t count = -1;
     for (size_t channel = 0; channel < CHANNELS; channel++) {
-      if (map_[channel] == group) {
-        if (++count == n) {
+      if (map_[channel] == (ptrdiff_t )group) {
+        if (++count == (ptrdiff_t )n) {
           return channel;
         }
       }

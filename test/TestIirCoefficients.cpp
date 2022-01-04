@@ -175,9 +175,9 @@ template <size_t CHANNELS, size_t ORDER> struct CoefficientMeasurements {
 
   CoefficientMeasurements() :
   calcMulti(*this),
-  calcFrameShift(*this),
+                              calcFrameBlock(*this),
   calcRawBlock(*this),
-  calcFrameBlock(*this)
+                              calcFrameShift(*this)
   {
 
   }
@@ -188,8 +188,6 @@ template <size_t CHANNELS, size_t ORDER> struct CoefficientMeasurements {
 
     tdap::BiQuad::setParametric(multiwrap, sampleRate, center, gain, bandwidth);
     tdap::BiQuad::setParametric(frameFilter.coeffs, sampleRate, center, gain, bandwidth);
-
-    bool fail = false;
 
     struct Experiment {
       const char *name;
@@ -218,7 +216,7 @@ template <size_t CHANNELS, size_t ORDER> struct CoefficientMeasurements {
     for (size_t e = 1; e < count; e++) {
       experiment[e].calculation.calculate();
       if (!experiment[e].useFrames) {
-        for (int i = 0, j = 0; i < BUFFERSIZE; i++, j += Frame::frameSize) {
+        for (size_t i = 0, j = 0; i < BUFFERSIZE; i++, j += Frame::frameSize) {
           for (size_t channel = 0; channel < Frame::channels; channel++) {
             outputBuffer[i][channel] = outputArray[j + channel];
           }

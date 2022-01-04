@@ -410,7 +410,7 @@ template <typename F> struct AttackReleaseIntegrator {
   }
 
   template <typename V> V integrate(const V input) {
-    return integrate(output_);
+    return integrate(input, output_);
   }
 
   template <typename V> void setOutput(V new_output) { output_ = new_output; }

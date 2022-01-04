@@ -65,7 +65,7 @@ struct IndexPolicy {
     throw std::out_of_range("Index out of range");
   }
 
-  static inline size_t array(size_t index, size_t size) TDAP_ARRAY_INDEX_NOEXCEPT {
+  static inline size_t array(size_t index, [[maybe_unused]] size_t size) TDAP_ARRAY_INDEX_NOEXCEPT {
 #ifdef TDAP_ARRAY_INDEX_CHECK
     return force(index, size);
 #else
@@ -89,7 +89,7 @@ struct IndexPolicy {
       throw std::out_of_range("Index out of range");
     }
 
-    static inline size_t array(size_t index, size_t high_value) TDAP_ARRAY_INDEX_NOEXCEPT {
+    static inline size_t array(size_t index, [[maybe_unused]] size_t high_value) TDAP_ARRAY_INDEX_NOEXCEPT {
 #ifdef TDAP_ARRAY_INDEX_CHECK
       return force(index, high_value);
 #else
