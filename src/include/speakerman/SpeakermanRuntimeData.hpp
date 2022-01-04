@@ -153,9 +153,10 @@ public:
                  size_t channels, double sloppyFactor, size_t delay,
                  const ArrayTraits<A...> &relativeBandWeights) {
     for (size_t i = 0; i < MAX_PROCESSING_GROUPS; i++) {
-      double v = Values::force_between(conf.volume[i],
-                                       ProcessingGroupConfig::MIN_VOLUME,
-                                       ProcessingGroupConfig::MAX_VOLUME);
+      // TODO This is a shortcut to make old configurations work but is actually lousy.
+      double v = Values::force_between(conf.inputWeights[0][i],
+                                       ProcessingGroupConfig::MIN_INPUT_WEIGHTS,
+                                       ProcessingGroupConfig::MAX_INPUT_WEIGHTS);
       volume_[i] = v < 1e-6 ? 0 : v;
     }
     delay_ = delay;

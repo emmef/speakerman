@@ -46,6 +46,24 @@ namespace speakerman {
 using namespace std;
 using namespace tdap;
 
+class StreamOwner {
+  std::ifstream &stream_;
+  bool owns_;
+
+  void operator=(const StreamOwner &source) {}
+
+  void operator=(StreamOwner &&source) noexcept {}
+
+public:
+  explicit StreamOwner(std::ifstream &owned);
+  StreamOwner(const StreamOwner &source);
+  StreamOwner(StreamOwner &&source) noexcept;
+  static StreamOwner open(const char *file_name);
+  bool is_open() const;
+  std::ifstream &stream() const { return stream_; };
+  ~StreamOwner();
+};
+
 class ReadConfigException : public runtime_error {
 public:
   explicit ReadConfigException(const char *message) : runtime_error(message) {}
@@ -687,10 +705,25 @@ public:
       key = groupKey;
       key += ProcessingGroupConfig::KEY_SNIPPET_THRESHOLD;
       add_reader(key, true, group[group_idx].threshold);
-      key = groupKey;
-      key += ProcessingGroupConfig::KEY_SNIPPET_VOLUME;
-      add_array_reader<double, MAX_LOGICAL_CHANNELS>(
-          key, true, group[group_idx].volume[0]);
+      for (size_t channel = 0;
+           channel < ProcessingGroupConfig::MAX_GROUP_CHANNELS; channel++) {
+        std::string channelEntry = groupKey;
+        channelEntry += "channel/";
+        channelEntry += char('0' + channel);
+        channelEntry += "/";
+        key = channelEntry;
+        key += ProcessingGroupConfig::KEY_INPUT_WEIGHTS;
+        add_array_reader<double, MAX_LOGICAL_CHANNELS>(
+            key, true, group[group_idx].inputWeights[channel][0]);
+        key = channelEntry;
+        key += ProcessingGroupConfig::KEY_OUTPUT_WEIGHTS;
+        add_array_reader<double, MAX_LOGICAL_CHANNELS>(
+            key, true, group[group_idx].outputWeights[channel][0]);
+        key = channelEntry;
+        key += ProcessingGroupConfig::KEY_SUB_OUTPUT_WEIGHTS;
+        add_array_reader<double, MAX_LOGICAL_CHANNELS>(
+            key, true, group[group_idx].subOutputWeights[channel][0]);
+      }
       key = groupKey;
       key += ProcessingGroupConfig::KEY_SNIPPET_DELAY;
       add_reader(key, true, group[group_idx].delay);
@@ -991,8 +1024,20 @@ void ProcessingGroupConfig::set_if_unset(
   }
 
   for (size_t group = 0; group < MAX_PROCESSING_GROUPS; group++) {
-    set_if_unset_or_invalid_config_value(
-        volume[group], config_if_unset.volume[group], MIN_VOLUME, MAX_VOLUME);
+    for (size_t channel = 0; channel < MAX_GROUP_CHANNELS; channel++) {
+      set_if_unset_or_invalid_config_value(
+          inputWeights[channel][group],
+          config_if_unset.inputWeights[channel][group], MIN_INPUT_WEIGHTS,
+          MAX_INPUT_WEIGHTS);
+      set_if_unset_or_invalid_config_value(
+          outputWeights[channel][group],
+          config_if_unset.outputWeights[channel][group], MIN_INPUT_WEIGHTS,
+          MAX_INPUT_WEIGHTS);
+      set_if_unset_or_invalid_config_value(
+          subOutputWeights[channel][group],
+          config_if_unset.subOutputWeights[channel][group], MIN_INPUT_WEIGHTS,
+          MAX_INPUT_WEIGHTS);
+    }
   }
 
   box_if_out_of_range(threshold, config_if_unset.threshold, MIN_THRESHOLD,
@@ -1024,8 +1069,12 @@ const ProcessingGroupConfig ProcessingGroupConfig::unsetConfig() {
   for (size_t i = 0; i < MAX_EQS; i++) {
     result.eq[i] = EqualizerConfig::unsetConfig();
   }
-  for (size_t i = 0; i < MAX_PROCESSING_GROUPS; i++) {
-    unset_config_value(result.volume[i]);
+  for (size_t channel = 0; channel < MAX_GROUP_CHANNELS; channel++) {
+    for (size_t i = 0; i < MAX_LOGICAL_CHANNELS; i++) {
+      unset_config_value(result.inputWeights[channel][i]);
+      unset_config_value(result.outputWeights[channel][i]);
+      unset_config_value(result.subOutputWeights[channel][i]);
+    }
   }
   unset_config_value(result.eqs);
   unset_config_value(result.threshold);
@@ -1248,42 +1297,6 @@ void SpeakermanConfig::set_if_unset(const SpeakermanConfig &config_if_unset) {
   timeStamp = -1;
 }
 
-const SpeakermanConfig SpeakermanConfig::with_groups_mixed() const {
-  SpeakermanConfig result = *this;
-
-  for (size_t i = 0; i < groups; i++) {
-    for (size_t j = 0; j < groups; j++) {
-      result.group[i].volume[j] = group[j].volume[j];
-    }
-  }
-
-  return result;
-}
-
-const SpeakermanConfig SpeakermanConfig::with_groups_separated() const {
-  SpeakermanConfig result = *this;
-
-  for (size_t i = 0; i < groups; i++) {
-    for (size_t j = 0; j < groups; j++) {
-      result.group[i].volume[j] = i == j ? group[j].volume[j] : 0;
-    }
-  }
-
-  return result;
-}
-
-const SpeakermanConfig SpeakermanConfig::with_groups_first() const {
-  SpeakermanConfig result = *this;
-
-  for (size_t i = 0; i < groups; i++) {
-    for (size_t j = 0; j < groups; j++) {
-      result.group[i].volume[j] = j == 0 ? group[0].volume[0] : 0;
-    }
-  }
-
-  return result;
-}
-
 StreamOwner::StreamOwner(std::ifstream &owned) : stream_(owned), owns_(true) {}
 
 StreamOwner::StreamOwner(const StreamOwner &source)
@@ -1404,5 +1417,25 @@ size_t LogicalGroupConfig::sanitizeGetTotalChannels(LogicalGroupConfig *pConfig,
     }
   }
   return count;
+}
+void DynamicProcessorLevels::operator+=(const DynamicProcessorLevels &levels) {
+  size_t count = Values::min(channels_, levels.channels_);
+  for (size_t i = 0; i < count; i++) {
+    signal_square_[i] =
+        Values::max(signal_square_[i], levels.signal_square_[i]);
+  }
+  count_ += levels.count_;
+}
+void DynamicProcessorLevels::reset() {
+  for (size_t limiter = 0; limiter < channels_; limiter++) {
+    signal_square_[limiter] = 0.0;
+  }
+  count_ = 0;
+}
+double DynamicProcessorLevels::getSignal(size_t group) const {
+  return sqrt(signal_square_[IndexPolicy::array(group, channels_)]);
+}
+void DynamicProcessorLevels::addValues(size_t group, double signal) {
+  addGainAndSquareSignal(group, signal);
 }
 } /* End of namespace speakerman */

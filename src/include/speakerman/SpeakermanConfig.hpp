@@ -205,11 +205,21 @@ struct ProcessingGroupConfig : public NamedConfig {
   static constexpr double MAX_THRESHOLD = 0.9;
   static constexpr const char *KEY_SNIPPET_THRESHOLD = "threshold";
 
-  static constexpr double MIN_VOLUME = 0;
-  static constexpr double DEFAULT_VOLUME = 1.0;
-  static constexpr double MAX_VOLUME = 40.0;
-  static constexpr const char *KEY_SNIPPET_VOLUME = "volume";
+  static constexpr double MIN_INPUT_WEIGHTS = 0;
+  static constexpr double DEF_INPUT_WEIGHTS = MIN_INPUT_WEIGHTS;
+  static constexpr double MAX_INPUT_WEIGHTS = 40.0;
+  static constexpr const char *KEY_INPUT_WEIGHTS = "input-weights";
 
+  static constexpr double MIN_OUTPUT_WEIGHTS = 0;
+  static constexpr double DEF_OUTPUT_WEIGHTS = MIN_OUTPUT_WEIGHTS;
+  static constexpr double MAX_OUTPUT_WEIGHTS = 1.0;
+  static constexpr const char *KEY_OUTPUT_WEIGHTS = "output-weights";
+  
+  static constexpr double MIN_SUB_OUTPUT_WEIGHTS = 0;
+  static constexpr double DEF_SUB_OUTPUT_WEIGHTS = MIN_SUB_OUTPUT_WEIGHTS;
+  static constexpr double MAX_SUB_OUTPUT_WEIGHTS = 1.0;
+  static constexpr const char *KEY_SUB_OUTPUT_WEIGHTS = "sub-output-weights";
+  
   static constexpr double MIN_DELAY = 0;
   static constexpr double DEFAULT_DELAY = 0;
   static constexpr double MAX_DELAY = 0.020;
@@ -224,7 +234,10 @@ struct ProcessingGroupConfig : public NamedConfig {
   static constexpr const char *KEY_SNIPPET_GROUP = "group";
 
   double threshold = DEFAULT_THRESHOLD;
-  double volume[MAX_LOGICAL_CHANNELS];
+  double inputWeights[MAX_GROUP_CHANNELS][MAX_LOGICAL_CHANNELS];
+  double outputWeights[MAX_GROUP_CHANNELS][MAX_LOGICAL_CHANNELS];
+  double subOutputWeights[MAX_GROUP_CHANNELS][MAX_LOGICAL_CHANNELS];
+
   double delay = DEFAULT_DELAY;
   int use_sub = DEFAULT_USE_SUB;
   int mono = DEFAULT_MONO;
@@ -381,31 +394,15 @@ public:
 
   size_t count() const { return count_; }
 
-  void operator+=(const DynamicProcessorLevels &levels) {
-    size_t count = Values::min(channels_, levels.channels_);
-    for (size_t i = 0; i < count; i++) {
-      signal_square_[i] =
-          Values::max(signal_square_[i], levels.signal_square_[i]);
-    }
-    count_ += levels.count_;
-  }
+  void operator+=(const DynamicProcessorLevels &levels);
 
   void next() { count_++; }
 
-  void reset() {
-    for (size_t limiter = 0; limiter < channels_; limiter++) {
-      signal_square_[limiter] = 0.0;
-    }
-    count_ = 0;
-  }
+  void reset();
 
-  void addValues(size_t group, double signal) {
-    addGainAndSquareSignal(group, signal);
-  }
+  void addValues(size_t group, double signal);
 
-  double getSignal(size_t group) const {
-    return sqrt(signal_square_[IndexPolicy::array(group, channels_)]);
-  }
+  double getSignal(size_t group) const;
 };
 
 class SpeakerManagerControl {
@@ -446,24 +443,6 @@ void dumpSpeakermanConfig(const SpeakermanConfig &dump, std::ostream &output);
 long long getFileTimeStamp(const char *fileName);
 
 long long getConfigFileTimeStamp();
-
-class StreamOwner {
-  std::ifstream &stream_;
-  bool owns_;
-
-  void operator=(const StreamOwner &source) {}
-
-  void operator=(StreamOwner &&source) noexcept {}
-
-public:
-  explicit StreamOwner(std::ifstream &owned);
-  StreamOwner(const StreamOwner &source);
-  StreamOwner(StreamOwner &&source) noexcept;
-  static StreamOwner open(const char *file_name);
-  bool is_open() const;
-  std::ifstream &stream() const { return stream_; };
-  ~StreamOwner();
-};
 
 } /* End of namespace speakerman */
 
