@@ -1359,7 +1359,7 @@ void LogicalGroupConfig::sanitize(LogicalGroupConfig *pConfig,
         port = UnsetValue<size_t>::value;
       }
     }
-    if (pConfig[groups].getPortCount() == 0) {
+    if (config.getPortCount() == 0) {
       if (!isUnsetConfigValue(config.name)) {
         std::cerr << "Logical " << typeOfGroup << " group \"" << config.name
                   << "\" removed, as it is not associated with any port."

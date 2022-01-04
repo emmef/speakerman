@@ -103,7 +103,7 @@ class SpeakerManager : public AbstractSpeakerManager {
     Levels levels;
     bool configChanged;
 
-    TransportData() : levels(GROUPS, CROSSOVERS), configChanged(false) {}
+    TransportData() : levels(GROUPS), configChanged(false) {}
   };
 
   Transport<TransportData> transport;
@@ -118,7 +118,7 @@ protected:
     std::cout << "Updated metrics: {rate:" << metrics.sampleRate
               << ", bsize:" << metrics.bufferSize << "}" << std::endl;
     processor.setSampleRate(metrics.sampleRate, crossovers(), config_);
-    Levels levels(GROUPS, CROSSOVERS);
+    Levels levels(GROUPS);
     levels.reset();
     preparedConfigData.configData = processor.getConfigData();
     preparedConfigData.configChanged =
