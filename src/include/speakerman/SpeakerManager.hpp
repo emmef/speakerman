@@ -23,6 +23,7 @@
 #define SMS_SPEAKERMAN_SPEAKERMANAGER_GUARD_H_
 
 #include "DynamicsProcessor.hpp"
+#include "SpeakermanConfig.hpp"
 #include <cmath>
 #include <iostream>
 #include <speakerman/jack/JackClient.hpp>
@@ -260,7 +261,7 @@ public:
 
   SpeakerManager(const SpeakermanConfig &config)
       : portDefinitions_(1 + 2 * MAX_PROCESSING_GROUPS *
-                                 SpeakermanConfig::MAX_GROUP_CHANNELS),
+                                 ProcessingGroupConfig::MAX_GROUP_CHANNELS),
         config_(config) {
     char name[1 + Names::get_port_size()];
     if (config.subOutput > 0) {

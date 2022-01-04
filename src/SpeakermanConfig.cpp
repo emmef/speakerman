@@ -32,6 +32,7 @@ static constexpr const char *INSTALLATION_PREFIX =
 #include <cmath>
 #include <cstring>
 #include <mutex>
+#include <numeric>
 #include <speakerman/SpeakermanConfig.hpp>
 #include <speakerman/utils/Config.hpp>
 #include <string>
@@ -674,8 +675,7 @@ public:
       add_reader(key, true, eq[eq_idx].bandwidth);
     }
 
-    for (size_t group_idx = 0; group_idx < MAX_PROCESSING_GROUPS;
-         group_idx++) {
+    for (size_t group_idx = 0; group_idx < MAX_PROCESSING_GROUPS; group_idx++) {
       string groupKey = ProcessingGroupConfig::KEY_SNIPPET_GROUP;
       groupKey += "/";
       groupKey += (char)(group_idx + '0');
@@ -1008,7 +1008,13 @@ void ProcessingGroupConfig::set_if_unset(
 const ProcessingGroupConfig
 ProcessingGroupConfig::defaultConfig(size_t group_id) {
   ProcessingGroupConfig result;
-  result = result.with_groups_separated(group_id);
+  for (size_t channel = 0; channel < MAX_GROUP_CHANNELS; channel++) {
+    for (size_t i = 0; i < MAX_LOGICAL_CHANNELS; i++) {
+      result.inputWeights[channel][i] = 0;
+      result.outputWeights[channel][i] = 0;
+      result.subOutputWeights[channel][i] = 0;
+    }
+  }
   snprintf(result.name, NAME_LENGTH, "Group %zd", group_id + 1);
   return result;
 }
@@ -1029,24 +1035,44 @@ const ProcessingGroupConfig ProcessingGroupConfig::unsetConfig() {
   result.name[0] = 0;
   return result;
 }
+void ProcessingGroupConfig::sanitize(size_t inputChannels,
+                                     size_t outputChannels,
+                                     size_t groupChannels) {
+  size_t channel;
+  double unsetValue = UnsetValue<double>::value;
+  for (channel = 0; channel < groupChannels; channel++) {
+    std::fill(&inputWeights[channel][inputChannels],
+              &inputWeights[channel][MAX_LOGICAL_CHANNELS], unsetValue);
+    std::fill(&outputWeights[channel][outputChannels],
+              &outputWeights[channel][MAX_LOGICAL_CHANNELS], unsetValue);
+    std::fill(&subOutputWeights[channel][outputChannels],
+              &subOutputWeights[channel][MAX_LOGICAL_CHANNELS], unsetValue);
 
-const ProcessingGroupConfig
-ProcessingGroupConfig::with_groups_separated(size_t group_id) const {
-  ProcessingGroupConfig result = *this;
-  for (size_t i = 0; i < MAX_PROCESSING_GROUPS; i++) {
-    result.volume[i] = i == group_id ? DEFAULT_VOLUME : 0;
+    for (size_t logicalIn = 0; logicalIn < inputChannels; logicalIn++) {
+      double &target = inputWeights[channel][logicalIn];
+      if (isUnsetConfigValue(target)) {
+        target = ProcessingGroupConfig::DEF_INPUT_WEIGHTS;
+      }
+    }
+    for (size_t logicalOut = 0; logicalOut < outputChannels; logicalOut++) {
+      double &ow = outputWeights[channel][logicalOut];
+      if (isUnsetConfigValue(ow)) {
+        ow = ProcessingGroupConfig::DEF_OUTPUT_WEIGHTS;
+      }
+      double &sow = subOutputWeights[channel][logicalOut];
+      if (isUnsetConfigValue(sow)) {
+        sow = ProcessingGroupConfig::DEF_OUTPUT_WEIGHTS;
+      }
+    }
   }
-  return result;
-}
-
-const ProcessingGroupConfig ProcessingGroupConfig::with_groups_mixed() const
-
-{
-  ProcessingGroupConfig result = *this;
-  for (size_t i = 0; i < MAX_PROCESSING_GROUPS; i++) {
-    result.volume[i] = DEFAULT_VOLUME;
+  for (; channel < MAX_GROUP_CHANNELS; channel++) {
+    std::fill(&inputWeights[channel][0],
+              &inputWeights[channel][MAX_LOGICAL_CHANNELS], unsetValue);
+    std::fill(&outputWeights[channel][0],
+              &outputWeights[channel][MAX_LOGICAL_CHANNELS], unsetValue);
+    std::fill(&subOutputWeights[channel][0],
+              &subOutputWeights[channel][MAX_LOGICAL_CHANNELS], unsetValue);
   }
-  return result;
 }
 
 const EqualizerConfig EqualizerConfig::unsetConfig() {
@@ -1153,17 +1179,29 @@ void SpeakermanConfig::set_if_unset(const SpeakermanConfig &config_if_unset) {
     logicalInputs[group].set_if_unset(config_if_unset.logicalInputs[group]);
     logicalOutputs[group].set_if_unset(config_if_unset.logicalOutputs[group]);
   }
-  LogicalGroupConfig::sanitize(logicalInputs, MAX_LOGICAL_GROUPS, "input");
-  LogicalGroupConfig::sanitize(logicalOutputs, MAX_LOGICAL_GROUPS, "output");
+  size_t logicalInputChannels = LogicalGroupConfig::sanitizeGetTotalChannels(
+      logicalInputs, MAX_LOGICAL_GROUPS, "input");
+  size_t logicalOutputChannels = LogicalGroupConfig::sanitizeGetTotalChannels(
+      logicalOutputs, MAX_LOGICAL_GROUPS, "output");
+
+  set_if_unset_or_invalid_config_value(
+      groupChannels, config_if_unset.groupChannels,
+      ProcessingGroupConfig::MIN_GROUP_CHANNELS,
+      ProcessingGroupConfig::MAX_GROUP_CHANNELS);
+
   size_t group_idx;
   if (set_if_unset_or_invalid_config_value(groups, config_if_unset.groups,
                                            MIN_GROUPS, MAX_PROCESSING_GROUPS)) {
     for (group_idx = 0; group_idx < groups; group_idx++) {
       group[group_idx] = config_if_unset.group[group_idx];
+      group[group_idx].sanitize(logicalInputChannels, logicalOutputChannels,
+                                groupChannels);
     }
   } else {
     for (group_idx = 0; group_idx < groups; group_idx++) {
       group[group_idx].set_if_unset(config_if_unset.group[group_idx]);
+      group[group_idx].sanitize(logicalInputChannels, logicalOutputChannels,
+                                groupChannels);
     }
   }
   for (; group_idx < MAX_PROCESSING_GROUPS; group_idx++) {
@@ -1185,9 +1223,6 @@ void SpeakermanConfig::set_if_unset(const SpeakermanConfig &config_if_unset) {
     eq[eq_idx] = EqualizerConfig::defaultConfig();
   }
 
-  set_if_unset_or_invalid_config_value(groupChannels,
-                                       config_if_unset.groupChannels,
-                                       MIN_GROUP_CHANNELS, MAX_GROUP_CHANNELS);
   set_if_unset_or_invalid_config_value(subOutput, config_if_unset.subOutput,
                                        MIN_SUB_OUTPUT, MAX_SUB_OUTPUT);
   set_if_unset_or_invalid_config_value(inputOffset, config_if_unset.inputOffset,
@@ -1322,9 +1357,9 @@ LogicalGroupConfig::LogicalGroupConfig() {
     unsetConfigValue(port);
   }
 }
-void LogicalGroupConfig::sanitize(LogicalGroupConfig *pConfig,
-                                  const size_t groups,
-                                  const char *typeOfGroup) {
+size_t LogicalGroupConfig::sanitizeGetTotalChannels(LogicalGroupConfig *pConfig,
+                                                    const size_t groups,
+                                                    const char *typeOfGroup) {
   // First sanitize individual logical groups
   for (size_t group = 0; group < groups; group++) {
     pConfig->sanitize(group, typeOfGroup);
@@ -1354,8 +1389,8 @@ void LogicalGroupConfig::sanitize(LogicalGroupConfig *pConfig,
         }
       } else {
         std::cerr << "Logical " << typeOfGroup << " group \"" << config.name
-                  << "\" removed port " << port
-                  << " that was already in use." << std::endl;
+                  << "\" removed port " << port << " that was already in use."
+                  << std::endl;
         port = UnsetValue<size_t>::value;
       }
     }
@@ -1368,5 +1403,6 @@ void LogicalGroupConfig::sanitize(LogicalGroupConfig *pConfig,
       config.sanitize(group, nullptr);
     }
   }
+  return count;
 }
 } /* End of namespace speakerman */

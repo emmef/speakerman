@@ -128,7 +128,6 @@ void web_server::thread_function() {
   {
     tdap::MemoryFence fence;
     configFileConfig = manager_.getConfig();
-    current_mix_mode = mix_mode;
   }
   DynamicProcessorLevels levels;
   string range_file;
@@ -145,15 +144,6 @@ void web_server::thread_function() {
                                  threshold_scaling_setting);
 
       bool read = false;
-      bool mode_change = false;
-      {
-        MemoryFence fence;
-        if (current_mix_mode != mix_mode) {
-          current_mix_mode = mix_mode;
-          mode_change = true;
-        }
-      }
-
       auto stamp = getConfigFileTimeStamp();
       if (stamp != configFileConfig.timeStamp) {
         cout << "read config!" << std::endl;
@@ -170,27 +160,8 @@ void web_server::thread_function() {
         configFileConfig.threshold_scaling = threshold_scaling;
         read = true;
       }
-      if (read || mode_change) {
+      if (read) {
         SpeakermanConfig usedConfig;
-        switch (current_mix_mode) {
-        case SpeakerManagerControl::MixMode::OWN:
-          usedConfig = configFileConfig.with_groups_separated();
-          cout << "Mix mode set to OWN" << std::endl;
-
-          break;
-        case SpeakerManagerControl::MixMode::ALL:
-          usedConfig = configFileConfig.with_groups_mixed();
-          cout << "Mix mode set to ALL" << std::endl;
-          break;
-        case SpeakerManagerControl::MixMode::FIRST:
-          usedConfig = configFileConfig.with_groups_first();
-          cout << "Mix mode set to FIRST" << std::endl;
-          break;
-        default:
-          usedConfig = configFileConfig;
-          cout << "Mix mode set to AS CONFIGURED" << std::endl;
-          break;
-        }
         if (!read) {
           dumpSpeakermanConfig(usedConfig, std::cout);
         }
@@ -396,25 +367,6 @@ void web_server::handle_request() {
         response().write_string("\",\r\n\t\"cpuShortTerm\": \"");
         response().write_string(itostr(numbers, 10, statistics.getShortTermCorePercentage()));
         response().write_string("\",\r\n");
-        response().write_string("\t\"mixMode\": \"");
-        {
-          MemoryFence fence;
-          switch (mix_mode) {
-          case SpeakerManagerControl::MixMode::ALL:
-            response().write_string("all");
-            break;
-          case SpeakerManagerControl::MixMode::OWN:
-            response().write_string("own");
-            break;
-          case SpeakerManagerControl::MixMode::FIRST:
-            response().write_string("first");
-            break;
-          default:
-            response().write_string("def");
-            break;
-          }
-        }
-        response().write_string("\", \r\n");
         response().write_string("\t\"group\" : [\r\n");
         for (size_t i = 0; i < levels.groups(); i++) {
           response().write_string("\t\t{\r\n");
@@ -460,38 +412,17 @@ void web_server::handle_request() {
     }
   } else if (method == Method::PUT) {
     set_content_type("text/plain");
-    MemoryFence fence;
-    auto previous = mix_mode;
     if (strncasecmp(url_, "/mix-mode-all", 32) == 0) {
-      mix_mode = SpeakerManagerControl::MixMode::ALL;
-      response().write_string("Mix-mode-request: all\r\n");
+      response().write_string("DEPRECATED *** Mix-mode-request: all\r\n");
     } else if (strncasecmp(url_, "/mix-mode-own", 32) == 0) {
-      mix_mode = SpeakerManagerControl::MixMode::OWN;
-      response().write_string("Mix-mode-request: own\r\n");
+      response().write_string("DEPRECATED *** Mix-mode-request: own\r\n");
     } else if (strncasecmp(url_, "/mix-mode-first", 32) == 0) {
-      mix_mode = SpeakerManagerControl::MixMode::FIRST;
-      response().write_string("Mix-mode-request: first\r\n");
+      response().write_string("DEPRECATED *** Mix-mode-request: first\r\n");
     } else if (strncasecmp(url_, "/mix-mode-default", 32) == 0) {
-      mix_mode = SpeakerManagerControl::MixMode::AS_CONFIGURED;
-      response().write_string("Mix-mode-request: default (as configured)\r\n");
+      response().write_string("DEPRECATED *** Mix-mode-request: default (as configured)\r\n");
     } else {
       set_error(404);
       return;
-    }
-    switch (previous) {
-    case SpeakerManagerControl::MixMode::ALL:
-      response().write_string("Mix-mode-old-value: all\r\n");
-      break;
-    case SpeakerManagerControl::MixMode::OWN:
-      response().write_string("Mix-mode-old-value: own\r\n");
-      break;
-    case SpeakerManagerControl::MixMode::FIRST:
-      response().write_string("Mix-mode-old-value: first\r\n");
-      break;
-    default:
-      response().write_string(
-          "Mix-mode-old-value: default (as configured)\r\n");
-      break;
     }
   }
 }

@@ -185,12 +185,16 @@ struct LogicalGroupConfig : public NamedConfig {
   void set_if_unset(const LogicalGroupConfig &config_if_unset);
 
   void sanitize(size_t groupNumber, const char *typeOfGroup);
-  static void sanitize(LogicalGroupConfig *pConfig, const size_t groups,
+  static size_t sanitizeGetTotalChannels(LogicalGroupConfig *pConfig, const size_t groups,
                        const char *typeOfGroup);
   size_t getPortCount();
 };
 
 struct ProcessingGroupConfig : public NamedConfig {
+  static constexpr size_t MIN_GROUP_CHANNELS = 1;
+  static constexpr size_t DEFAULT_GROUP_CHANNELS = 2;
+  static constexpr size_t MAX_GROUP_CHANNELS = 5;
+
   static constexpr size_t MIN_EQS = 0;
   static constexpr size_t DEFAULT_EQS = 0;
   static constexpr size_t MAX_EQS = 2;
@@ -232,10 +236,8 @@ struct ProcessingGroupConfig : public NamedConfig {
   static const ProcessingGroupConfig unsetConfig();
 
   void set_if_unset(const ProcessingGroupConfig &config_if_unset);
-
-  const ProcessingGroupConfig with_groups_separated(size_t group_id) const;
-
-  const ProcessingGroupConfig with_groups_mixed() const;
+  void sanitize(size_t inputChannels, size_t outputChannels,
+                size_t groupChannels);
 };
 
 struct DetectionConfig {
@@ -289,10 +291,6 @@ struct SpeakermanConfig {
   static constexpr size_t MIN_GROUPS = 1;
   static constexpr size_t DEFAULT_GROUPS = 1;
 
-  static constexpr size_t MIN_GROUP_CHANNELS = 1;
-  static constexpr size_t DEFAULT_GROUP_CHANNELS = 2;
-  static constexpr size_t MAX_GROUP_CHANNELS = 5;
-
   static constexpr double MIN_REL_SUB_THRESHOLD = 0.25;
   static constexpr double DEFAULT_REL_SUB_THRESHOLD = M_SQRT2;
   static constexpr double MAX_REL_SUB_THRESHOLD = 2.0;
@@ -304,7 +302,7 @@ struct SpeakermanConfig {
 
   static constexpr size_t MIN_SUB_OUTPUT = 0;
   static constexpr size_t DEFAULT_SUB_OUTPUT = 1;
-  static constexpr size_t MAX_SUB_OUTPUT = MAX_PROCESSING_GROUPS * MAX_GROUP_CHANNELS + 1;
+  static constexpr size_t MAX_SUB_OUTPUT = MAX_PROCESSING_GROUPS * ProcessingGroupConfig::MAX_GROUP_CHANNELS + 1;
 
   static constexpr size_t MIN_CROSSOVERS = 1;
   static constexpr size_t DEFAULT_CROSSOVERS = 2;
@@ -312,11 +310,11 @@ struct SpeakermanConfig {
 
   static constexpr size_t MIN_INPUT_OFFSET = 0;
   static constexpr size_t DEFAULT_INPUT_OFFSET = 0;
-  static constexpr size_t MAX_INPUT_OFFSET = MAX_PROCESSING_GROUPS * MAX_GROUP_CHANNELS;
+  static constexpr size_t MAX_INPUT_OFFSET = MAX_PROCESSING_GROUPS * ProcessingGroupConfig::MAX_GROUP_CHANNELS;
 
   static constexpr size_t MIN_INPUT_COUNT = 1;
   static constexpr size_t DEFAULT_INPUT_COUNT = -1;
-  static constexpr size_t MAX_INPUT_COUNT = MAX_PROCESSING_GROUPS * MAX_GROUP_CHANNELS;
+  static constexpr size_t MAX_INPUT_COUNT = MAX_PROCESSING_GROUPS * ProcessingGroupConfig::MAX_GROUP_CHANNELS;
 
   static constexpr double MIN_THRESHOLD_SCALING = 1;
   static constexpr double DEFAULT_THRESHOLD_SCALING = 1;
@@ -336,7 +334,7 @@ struct SpeakermanConfig {
   static constexpr const char *KEY_SNIPPET_GENERATE_NOISE = "generate-noise";
 
   size_t groups = DEFAULT_GROUPS;
-  size_t groupChannels = DEFAULT_GROUP_CHANNELS;
+  size_t groupChannels = ProcessingGroupConfig::DEFAULT_GROUP_CHANNELS;
   size_t subOutput = DEFAULT_SUB_OUTPUT;
   size_t crossovers = DEFAULT_CROSSOVERS;
   size_t inputOffset = DEFAULT_INPUT_OFFSET;
@@ -358,12 +356,6 @@ struct SpeakermanConfig {
   static const SpeakermanConfig unsetConfig();
 
   void set_if_unset(const SpeakermanConfig &config_if_unset);
-
-  const SpeakermanConfig with_groups_mixed() const;
-
-  const SpeakermanConfig with_groups_separated() const;
-
-  const SpeakermanConfig with_groups_first() const;
 };
 
 using tdap::IndexPolicy;
