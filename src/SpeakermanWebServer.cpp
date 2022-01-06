@@ -252,7 +252,7 @@ web_server::Result web_server::worker_function(server_socket::Stream &stream,
 void web_server::close() { socket_.close(); }
 
 web_server::Result web_server::accept_work(Stream &stream,
-                                           const server_socket &socket) {
+                                           const server_socket &) {
   levelTimeStamp = 0;
   handle(stream);
   return Result::CONTINUE;

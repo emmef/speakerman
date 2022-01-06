@@ -95,7 +95,6 @@ public:
 ConsecutiveAllocatedObjectOwner<AbstractSpeakerManager> manager(100 * 1000 *
                                                                 1000);
 SpeakermanConfig configFileConfig;
-static volatile int userInput;
 
 static void webServer() {
   CountedThreadGuard guard("Web server listening thread");
@@ -113,21 +112,16 @@ static void webServer() {
   }
 }
 
-int mainLoop(ConsecutiveAllocatedObjectOwner<JackClient> &owner) {
+int mainLoop(ConsecutiveAllocatedObjectOwner<JackClient> &) {
   std::thread webServerThread(webServer);
   webServerThread.detach();
 
-  const std::chrono::milliseconds thread_grace_timeout(5000);
   const std::chrono::milliseconds sleep_time(100);
-  auto t = std::chrono::steady_clock::now();
   try {
     while (true) {
       this_thread::sleep_for(sleep_time);
-      t = std::chrono::steady_clock::now();
       SignalHandler::check_raised();
     }
-    cout << "Bye!";
-    return 0;
   } catch (const signal_exception &e) {
     e.handle();
     return e.signal();

@@ -634,7 +634,7 @@ void* operator new  ( std::size_t count )
     return tdap::Handle::allocate_static(count, false);
 }
 
-void* operator new  ( std::size_t count, std::align_val_t al)
+void* operator new  ( std::size_t count, std::align_val_t )
 {
     return tdap::Handle::allocate_static(count, true);
 }
@@ -644,7 +644,7 @@ void operator delete  ( void* ptr ) noexcept
     tdap::Handle::free_static(ptr);
 }
 
-void operator delete  ( void* ptr, std::align_val_t al ) noexcept
+void operator delete  ( void* ptr, std::align_val_t ) noexcept
 {
     tdap::Handle::free_static(ptr);
 }

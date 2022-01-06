@@ -160,12 +160,8 @@ int socket_output_stream::write(char c) {
   return unsafe_write(c);
 }
 
-int socket_output_stream::write_string(const char *str, size_t max_len,
-                                       size_t *written) {
+long socket_output_stream::write_string(const char *str, size_t max_len) {
   if (file_descriptor() == -1) {
-    if (written) {
-      *written = 0;
-    }
     return stream_result::INVALID_HANDLE;
   }
   if (max_len == 0) {
@@ -174,21 +170,45 @@ int socket_output_stream::write_string(const char *str, size_t max_len,
   for (size_t i = 0; max_len == 0 || i < max_len; i++) {
     char c = str[i];
     if (c == 0) {
-      if (written) {
-        *written = i;
-      }
       return i;
     }
     int w = unsafe_write(c);
     if (w < 0) {
-      if (written) {
-        *written = i;
-      }
       return w;
     }
   }
   return stream_result::DATA_TRUNCATED;
 }
+
+//int socket_output_stream::write_string(const char *str, size_t max_len,
+//                                       size_t *written) override {
+//  if (file_descriptor() == -1) {
+//    if (written) {
+//      *written = 0;
+//    }
+//    return stream_result::INVALID_HANDLE;
+//  }
+//  if (max_len == 0) {
+//    max_len = std::numeric_limits<size_t>::max();
+//  }
+//  for (size_t i = 0; max_len == 0 || i < max_len; i++) {
+//    char c = str[i];
+//    if (c == 0) {
+//      if (written) {
+//        *written = i;
+//      }
+//      return i;
+//    }
+//    int w = unsafe_write(c);
+//    if (w < 0) {
+//      if (written) {
+//        *written = i;
+//      }
+//      return w;
+//    }
+//  }
+//  return stream_result::DATA_TRUNCATED;
+//}
 
 void socket_output_stream::flush() {
   if (file_descriptor() >= 0) {

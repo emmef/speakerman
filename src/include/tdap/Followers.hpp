@@ -29,19 +29,20 @@
 #include <cstdio>
 #define TDAP_FOLLOWERS_INFO(...) std::printf(__VA_ARGS__)
 #else
+static inline int dummyLog(...) { return 0; }
 #define TDAP_FOLLOWERS_INFO(...)
 #endif
 
 #if TDAP_FOLLOWERS_DEBUG_LOGGING > 1
 #define TDAP_FOLLOWERS_DEBUG(...) std::printf(__VA_ARGS__)
 #else
-#define TDAP_FOLLOWERS_DEBUG(...)
+#define TDAP_FOLLOWERS_DEBUG(...) dummyLog(__VA_ARGS__)
 #endif
 
 #if TDAP_FOLLOWERS_DEBUG_LOGGING > 2
 #define TDAP_FOLLOWERS_TRACE(...) std::printf(__VA_ARGS__)
 #else
-#define TDAP_FOLLOWERS_TRACE(...)
+#define TDAP_FOLLOWERS_TRACE(...) dummyLog(__VA_ARGS__)
 #endif
 
 namespace tdap {

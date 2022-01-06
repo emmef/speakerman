@@ -40,12 +40,6 @@ static long long current_millis() {
   return system_clock::now().time_since_epoch().count() / 1000000;
 }
 
-static long relative_milliseconds() {
-  static long long START = current_millis();
-
-  return current_millis() - START;
-}
-
 struct LevelEntry {
   DynamicProcessorLevels levels;
   bool set;
@@ -107,7 +101,7 @@ public:
   bool open(const char *service, int timeoutSeconds, int backLog,
             int *errorCode);
 
-  const char *const service() const { return socket_.service(); }
+  const char *service() const { return socket_.service(); }
 
   State state() const { return socket_.state(); }
 

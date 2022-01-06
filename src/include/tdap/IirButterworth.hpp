@@ -31,10 +31,14 @@ namespace tdap {
 struct Butterworth {
   enum class Pass { LOW, HIGH };
 
-  static constexpr size_t getMaxOrder() { return 20; }
+  static constexpr size_t MAX_ORDER = 8;
+  /**
+   * The number of feedback _or_ feed forward coefficients.
+   */
+  static constexpr size_t COEFFICIENTS = IirCoefficients::coefficientsForOrder(MAX_ORDER);
 
   static bool isValidOrder(size_t order) {
-    return order > 0 && order <= getMaxOrder();
+    return order > 0 && order <= MAX_ORDER;
   }
 
   static size_t checkValidOrder(size_t order) {
@@ -99,7 +103,7 @@ struct Butterworth {
                                      Coefficient scale = 1.0) {
     size_t order = coefficients.order();
     checkValidOrder(order);
-    int unscaledCCoefficients[IirCoefficients::coefficientsForOrder(order)];
+    int unscaledCCoefficients[COEFFICIENTS];
 
     fill_with_zero(unscaledCCoefficients, sizeof(unscaledCCoefficients));
 
@@ -120,7 +124,7 @@ struct Butterworth {
                                       Coefficient scale = 1.0) {
     size_t order = coefficients.order();
     checkValidOrder(order);
-    int unscaledCCoefficients[IirCoefficients::coefficientsForOrder(order)];
+    int unscaledCCoefficients[COEFFICIENTS];
     fill_with_zero(unscaledCCoefficients, sizeof(unscaledCCoefficients));
 
     getDCoefficients(order, relativeFrequency, coefficients);
@@ -153,10 +157,10 @@ private:
     double cparg; // cosine of the pole angle
     double a;     // workspace variable
 
-    double dcof[order * 2 + 1];
+    double dcof[MAX_ORDER * 2 + 1];
     fill_with_zero(dcof, sizeof(dcof));
     // binomial coefficients
-    double binomials[2 * order + 2];
+    double binomials[2 * MAX_ORDER + 2];
     fill_with_zero(binomials, sizeof(binomials));
 
     theta = M_PI * relativeFrequency * 2;

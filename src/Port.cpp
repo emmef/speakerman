@@ -43,8 +43,11 @@ int Port::disconnect_port_internal(jack_client_t *client, jack_port_t *port,
     return jack_disconnect(client, target, name);
   } else if (flags & JackPortFlags::JackPortIsInput) {
     return jack_disconnect(client, name, target);
-  } else {
+  } else if (throw_if_disconnect_fails) {
     throw std::runtime_error("Port must be input or output");
+  }
+  else {
+    return EBADR;
   }
 }
 
@@ -59,8 +62,11 @@ int Port::connect_port_internal(jack_client_t *client, jack_port_t *port,
     return jack_connect(client, target, name);
   } else if (flags & JackPortFlags::JackPortIsInput) {
     return jack_connect(client, name, target);
-  } else {
+  } else if (throw_if_disconnect_fails) {
     throw std::runtime_error("Port must be input or output");
+  }
+  else {
+    return EBADR;
   }
 }
 
@@ -165,7 +171,7 @@ speakerman::NameListPolicy &Ports::nameListPolicy() {
 
 void Ports::unregister(jack_client_t *client, size_t limit) {
   size_t bound = Value<size_t>::min(limit, ports_.size());
-  int i;
+  size_t i;
   try {
     for (i = 0; i < bound; i++) {
       ErrorHandler::setForceLogNext();

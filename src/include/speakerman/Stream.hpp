@@ -73,7 +73,9 @@ public:
 
   virtual signed long write(const void *buff, size_t offs, size_t length);
 
-  virtual signed long write_string(const char *string, size_t length = 1024);
+  virtual signed long write_string(const char *string, size_t length);
+
+  virtual signed long write_string(const char *string);
 
   virtual void flush() = 0;
 

@@ -179,7 +179,7 @@ template <typename T> struct ValueParser_<T, 4> {
   static bool parse(T &field, const char *value, char *&end) {
     const char *src = value;
     char *dst = field;
-    while (src != 0 && (dst - field) < NamedConfig::NAME_LENGTH) {
+    while (src != 0 && (dst - field) < ssize_t(NamedConfig::NAME_LENGTH)) {
       char c = *src++;
       if (c == '\t' || c == ' ') {
         if (dst > field) {
@@ -191,6 +191,7 @@ template <typename T> struct ValueParser_<T, 4> {
       }
     }
     *dst++ = '\0';
+    end = (char *)src;
     return true;
   }
 };
@@ -357,7 +358,6 @@ public:
 
   void write(const SpeakermanConfig &config, const char *key,
              ostream &stream) const override {
-    bool unset;
     if constexpr (std::is_same_v<const char[MAX_NAME_LENGTH + 1], T>) {
       write(static_cast<const char *>(variable(config)), key, stream);
     } else {
@@ -383,9 +383,10 @@ protected:
            << value << endl;
       return;
     }
+    size_t positiveCount = count;
 
     size_t i;
-    for (i = 0; i < count; i++) {
+    for (i = 0; i < positiveCount; i++) {
       field[i] = fieldValues[i];
     }
     for (; i < N; i++) {
@@ -770,15 +771,6 @@ public:
 
 static ConfigManager config_manager;
 
-static bool fileExists(const char *fileName) {
-  FILE *f = fopen(fileName, "r");
-  if (f != nullptr) {
-    fclose(f);
-    return true;
-  }
-  return false;
-}
-
 class InstallBase {
   static const string internalGetInstallBase() {
     static string error_message;
@@ -929,7 +921,6 @@ static void actualReadConfig(SpeakermanConfig &config, istream &stream,
 
 long long getFileTimeStamp(const char *fileName) {
   struct stat stats;
-  long long stamp = 0;
   if (stat(fileName, &stats) == 0) {
     return stats.st_mtim.tv_sec;
   }

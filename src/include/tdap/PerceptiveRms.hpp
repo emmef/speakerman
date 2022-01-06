@@ -203,8 +203,7 @@ class PerceptiveRms {
 
 public:
   PerceptiveRms()
-      : follower_(1, 1, 1, 1),
-        rms_(MAX_WINDOW_SAMPLES, MAX_WINDOW_SAMPLES * 10, LEVELS, 0){};
+      : rms_(MAX_WINDOW_SAMPLES, MAX_WINDOW_SAMPLES * 10, LEVELS, 0), follower_(1, 1, 1, 1) {};
 
   void configure(size_t sample_rate, const Perceptive::Metrics &metrics,
                  S initial_value = 0.0) {

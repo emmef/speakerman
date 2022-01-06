@@ -38,16 +38,7 @@ using namespace tdap;
 static int signal_number = -1;
 static bool user_raised = false;
 
-static atomic<long signed> guarded_threads(0);
 static atomic<unsigned> thread_numbers(1);
-
-static size_t next_thread_number() {
-  size_t result = thread_numbers.fetch_add(1);
-  while (result == 0) {
-    thread_numbers.fetch_add(1);
-  }
-  return result;
-}
 
 class thread_entry {
   static constexpr size_t NAME_SIZE = 127;
@@ -85,14 +76,6 @@ public:
   }
 
   const char *name() const { return name_; }
-};
-
-template <class Mutex> class FakeLock {
-  MemoryFence fence;
-
-public:
-  FakeLock(Mutex &mutex) {}
-  ~FakeLock() {}
 };
 
 class thread_entries {
@@ -216,7 +199,6 @@ static void set_signal_internal(int signum, bool is_user_raised) {
   signal_number = signum;
   user_raised = is_user_raised;
   MemoryFence::release();
-  thread::id x = this_thread::get_id();
 }
 
 extern "C" {

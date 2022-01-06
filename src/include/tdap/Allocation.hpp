@@ -292,7 +292,7 @@ namespace tdap {
             object_ = create_trivial_instance<Object>();
         }
         template <class... A>
-        ConsecutiveAllocatedObjectOwner(size_t block_size, A ...parameters) {
+        ConsecutiveAllocatedObjectOwner(size_t , A ...parameters) {
             consecutive_alloc::Enable guard = enable();
             object_ = new Object(parameters...);
         }

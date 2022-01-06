@@ -96,7 +96,7 @@ public:
 
   virtual int write(char c) override;
 
-  virtual int write_string(const char *str, size_t max_len, size_t *written);
+  long write_string(const char *str, size_t max_len) override ;
 
   virtual void flush() override;
 

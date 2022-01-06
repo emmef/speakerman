@@ -36,7 +36,7 @@ struct SpeakerManLevels {
   }
 
   static constexpr double getLimiterThreshold(double threshold,
-                                              double sloppyFactor) {
+                                              double ) {
     return Values::min(1.0, 4 * getThreshold(threshold));
   }
 

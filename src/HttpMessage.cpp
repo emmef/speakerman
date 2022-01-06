@@ -119,7 +119,7 @@ static constexpr bool isAlpha(char c) {
   return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
 }
 
-static constexpr bool isAlphaNum(char c) { return isAlpha(c) || isNum(c); }
+[[maybe_unused]] static constexpr bool isAlphaNum(char c) { return isAlpha(c) || isNum(c); }
 
 static constexpr bool isKeyStartChar(char c) { return isAlpha(c); }
 
@@ -254,12 +254,12 @@ const char *http_message::on_url(const char *url) {
   return "Only absolute paths allowed";
 }
 
-const char *http_message::on_version(const char *version) {
+const char *http_message::on_version(const char *) {
   //		std::cout << "D: VERSION = " << version << std::endl;
   return nullptr;
 }
 
-void http_message::on_header(const char *header, const char *value) {
+void http_message::on_header(const char *, const char *) {
   //		std::cout << "D: HEADER = " << header << " : " << value <<
   // std::endl;
 }

@@ -25,6 +25,7 @@
 #include "DynamicsProcessor.hpp"
 #include <cmath>
 #include <iostream>
+#include <memory>
 #include <speakerman/jack/JackClient.hpp>
 #include <speakerman/jack/JackProcessor.hpp>
 #include <speakerman/jack/Names.hpp>
@@ -262,25 +263,25 @@ public:
       : portDefinitions_(1 + 2 * MAX_PROCESSING_GROUPS *
                                  SpeakermanConfig::MAX_GROUP_CHANNELS),
         config_(config) {
-    char name[1 + Names::get_port_size()];
+    std::unique_ptr<char> name(new char[1 + Names::get_port_size()]);
     if (config.subOutput > 0) {
       portDefinitions_.addOutput("out_sub");
       cout << "I: added output "
            << "out_sub" << std::endl;
     }
     for (size_t channel = 0; channel < Processor::OUTPUTS - 1; channel++) {
-      snprintf(name, 1 + Names::get_port_size(), "out_%zu_%zu",
+      snprintf(name.get(), 1 + Names::get_port_size(), "out_%zu_%zu",
                1 + channel / CHANNELS_PER_GROUP,
                1 + channel % CHANNELS_PER_GROUP);
-      portDefinitions_.addOutput(name);
-      cout << "I: added output " << name << std::endl;
+      portDefinitions_.addOutput(name.get());
+      cout << "I: added output " << name.get() << std::endl;
     }
     for (size_t channel = 0; channel < Processor::INPUTS; channel++) {
-      snprintf(name, 1 + Names::get_port_size(), "in_%zu_%zu",
+      snprintf(name.get(), 1 + Names::get_port_size(), "in_%zu_%zu",
                1 + channel / CHANNELS_PER_GROUP,
                1 + channel % CHANNELS_PER_GROUP);
-      portDefinitions_.addInput(name);
-      cout << "I: added input " << name << std::endl;
+      portDefinitions_.addInput(name.get());
+      cout << "I: added input " << name.get() << std::endl;
     }
   }
 

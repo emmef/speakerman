@@ -73,8 +73,10 @@ size_t Names::pattern_max_buffer_size() {
 
 std::string Names::get_name_pattern(size_t clientLength, size_t portLength) {
   static const int SIZE = pattern_max_buffer_size();
-  char formatTemplate[SIZE];
-  char pattern[SIZE];
+  std::unique_ptr<char> formatTemplateP(new char [SIZE]);
+  auto formatTemplate = formatTemplateP.get();
+  std::unique_ptr<char> patternP(new char [SIZE]);
+  auto pattern = patternP.get();
   if (clientLength > 0 && portLength > 0) {
     checkLengthOrThrow(
         SIZE, snprintf(formatTemplate, SIZE, "^%s%s%s$", template_name_regex(),
@@ -219,7 +221,7 @@ const char *Names::valid_port(const char *unchecked) {
   return valid_name(get_port_regex(), unchecked, "port");
 }
 
-size_t NameListPolicy::checkAndGetlength(const NameList &list,
+size_t NameListPolicy::checkAndGetlength(const NameList &,
                                          const char *name) const {
   return strlen(name);
 }

@@ -42,7 +42,7 @@ bool set_recv_timeout_millis(int sock, long timeout_millis);
 class socket_selector;
 class socket_selector_iterator {
   socket_selector *selector_;
-  size_t position_ = 0;
+  int position_ = 0;
   int next_descriptor_ = -1;
   int error_code_;
 

@@ -101,7 +101,6 @@ public:
 
   void printSuccess(const char *name) {
     write_milliseconds();
-    const char *serverName = name ? name : "default";
     std::cout << milliseconds << " Created jack client \"" << name << "\"!"
               << std::endl;
   }
@@ -168,7 +167,6 @@ class JackClient {
   condition_variable awaitShutdownCondition_;
   thread awaitShutdownThread_;
   bool awaitShutdownThreadRunning_ = false;
-  volatile bool shutDownOnSignal = false;
 
   jack_client_t *client_ = nullptr;
   ShutDownInfo shutdownInfo_{static_cast<jack_status_t>(0), nullptr, false};
@@ -197,7 +195,7 @@ class JackClient {
 
   void awaitShutDownAndClose();
 
-  bool notifyShutdownUnsafe(ShutDownInfo info, unique_lock<mutex> &lock);
+  bool notifyShutdownUnsafe(ShutDownInfo info);
 
   void onShutdown(ShutDownInfo info);
 

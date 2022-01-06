@@ -173,11 +173,11 @@ struct MetricsForTrueFloatingPointMovingAverageMetyrics {
       MIN_ERROR_DECAY_TO_WINDOW_RATIO * MIN_MAX_WINDOW_SAMPLES;
 
 public:
-  static constexpr const size_t getMinimumWindowSizeInSamples() {
+  static constexpr size_t getMinimumWindowSizeInSamples() {
     return MIN_MAX_WINDOW_SAMPLES;
   }
 
-  static constexpr const size_t getMaximumWindowSizeInSamples() {
+  static constexpr size_t getMaximumWindowSizeInSamples() {
     return MAX_MAX_WINDOW_SAMPLES;
   }
 
@@ -225,11 +225,11 @@ public:
     throw std::invalid_argument(getWindowSizeInSamplesRangeMessage());
   }
 
-  static constexpr const size_t getMaximumErrorMitigatingDecaySamples() {
+  static constexpr size_t getMaximumErrorMitigatingDecaySamples() {
     return MAX_ERR_MITIGATING_DECAY_SAMPLES;
   }
 
-  static constexpr const size_t getMinimumErrorMitigatingDecaySamples() {
+  static constexpr size_t getMinimumErrorMitigatingDecaySamples() {
     return MIN_ERR_MITIGATING_DECAY_SAMPLES;
   }
 
@@ -511,10 +511,10 @@ public:
     history.write(input);
   }
 
-  const S getAverage() const { return window.getAverage(); }
+  S getAverage() const { return window.getAverage(); }
 
-  const size_t getReadPtr() const { return window.getReadPtr(); }
-  const size_t getWritePtr() const { return history.writePtr(); }
+  size_t getReadPtr() const { return window.getReadPtr(); }
+  size_t getWritePtr() const { return history.writePtr(); }
   const S getNextHistoryValue() const {
     return history.history()[window.getReadPtr()];
   }

@@ -59,11 +59,11 @@ typedef RandomNoise<double, std::minstd_rand0> DefaultNoise0;
 
 struct PinkNoise {
 public:
-  static constexpr size_t MAX_RANDOM_ROWS = 30;
-  static constexpr size_t RANDOM_BITS = 24;
-  static constexpr size_t RANDOM_SHIFT = 32 - RANDOM_BITS;
+  static constexpr int MAX_RANDOM_ROWS = 30;
+  static constexpr int RANDOM_BITS = 24;
+  static constexpr int RANDOM_SHIFT = 32 - RANDOM_BITS;
 
-  template <class Rnd, size_t ACCURACY> class Generator {
+  template <class Rnd, int ACCURACY> class Generator {
     static_assert(ACCURACY >= 4 && ACCURACY <= MAX_RANDOM_ROWS,
                   "Invalid accuracy");
 

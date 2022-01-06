@@ -143,8 +143,7 @@ void JackClient::awaitShutDownAndClose() {
   }
 }
 
-bool JackClient::notifyShutdownUnsafe(ShutDownInfo info,
-                                      unique_lock<mutex> &lock) {
+bool JackClient::notifyShutdownUnsafe(ShutDownInfo info) {
   if (!client_state_is_shutdown_state(state_)) {
     shutdownInfo_ = info;
     state_ = ClientState::SHUTTING_DOWN;
@@ -157,7 +156,7 @@ bool JackClient::notifyShutdownUnsafe(ShutDownInfo info,
 
 void JackClient::onShutdown(ShutDownInfo info) {
   unique_lock<mutex> lock(mutex_);
-  notifyShutdownUnsafe(info, lock);
+  notifyShutdownUnsafe(info);
 }
 
 void JackClient::closeUnsafe() {
@@ -184,7 +183,7 @@ void JackClient::closeUnsafe() {
 
 void JackClient::jack_portnames_free(const char **names) { jack_free(names); }
 
-void JackClient::registerAdditionalCallbacks(jack_client_t *client) {}
+void JackClient::registerAdditionalCallbacks(jack_client_t *) {}
 
 JackClient::JackClient(jack_client_t *client)
     : client_(client), xRuns(0), lastXrunProcessingCycle(0) {
@@ -334,7 +333,7 @@ speakerman::PortNames JackClient::portNames(const char *namePattern,
 
 speakerman::ShutDownInfo JackClient::close() {
   unique_lock<mutex> lock(mutex_);
-  if (notifyShutdownUnsafe(ShutDownInfo::withReason("Explicit close"), lock)) {
+  if (notifyShutdownUnsafe(ShutDownInfo::withReason("Explicit close"))) {
     closeUnsafe();
     while (awaitShutdownThreadRunning_) {
       cout << "Wait for terminate thread to end..." << endl;

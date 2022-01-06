@@ -271,7 +271,6 @@ public:
   }
 
   void updateConfig(const ConfigData &data) {
-    static const double sizeFactor = 0.8;
     runtime.modify(data);
     noise.setScale(data.noiseScale());
     size_t predictionSamples = 0.5 + sampleRate_ * LIMITER_PREDICTION_SECONDS;

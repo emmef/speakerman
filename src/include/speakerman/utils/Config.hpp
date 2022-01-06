@@ -122,7 +122,6 @@ struct config {
       if (callback == nullptr) {
         return ReadResult::NO_CALLBACK;
       }
-      CallbackResult cbr;
       setStartState();
       ParseState popState_ = state_;
       char quote = 0;

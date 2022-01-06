@@ -37,8 +37,8 @@ JackProcessor::Reset::Reset(JackProcessor *owner) : owner_(owner) {}
 
 JackProcessor::Reset::~Reset() { owner_->unsafeResetState(); }
 
-void JackProcessor::realtimeInitCallback(void *data) {
-  static constexpr size_t PRE_ALLOC_STACK_SIZE = 102400;
+void JackProcessor::realtimeInitCallback(void *) {
+  static constexpr size_t preAllocStackSize = 102400;
   auto self = pthread_self();
   pthread_attr_t self_attributes;
   if (pthread_getattr_np(self, &self_attributes)) {
@@ -51,12 +51,12 @@ void JackProcessor::realtimeInitCallback(void *data) {
     perror("Could not get RT thread address and size");
     return;
   }
-  unsigned long long id = static_cast<unsigned long long>(self);
-  char *start = static_cast<char *>(self_address);
-  char *end_address = start + self_size;
-  char mark[PRE_ALLOC_STACK_SIZE];
-  void *mark_addr = &mark;
-  for (size_t i = 0; i < PRE_ALLOC_STACK_SIZE; i++) {
+//  unsigned long long id = static_cast<unsigned long long>(self);
+//  char *start = static_cast<char *>(self_address);
+//  char *end_address = start + self_size;
+  char mark[preAllocStackSize];
+//  void *mark_addr = &mark;
+  for (size_t i = 0; i < preAllocStackSize; i++) {
     mark[i] = 0;
   }
 }
@@ -76,15 +76,16 @@ int JackProcessor::realtimeCallback(jack_nframes_t frames, void *data) {
 int JackProcessor::realtimeProcessWrapper(jack_nframes_t frames) {
   TryEnter guard(running_);
   auto start = std::chrono::system_clock::now();
+  int result = 0;// TODO Find out what the real error-behaviour should be!
   MemoryFence fence;
   if (guard.entered() && ports_) {
     ports_->getBuffers(frames);
-    int result = process(frames, *ports_) ? 0 : 1;
+    result = process(frames, *ports_) ? 0 : 1;
     auto end = std::chrono::system_clock::now();
     auto processingMicros = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
     statistics.updateFrame(frames, processingMicros);
   }
-  return 0;
+  return result;
 }
 
 void JackProcessor::ensurePorts(jack_client_t *client) {

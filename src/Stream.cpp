@@ -143,6 +143,15 @@ signed long output_stream::write(const void *buff, size_t offs, size_t length) {
 signed long output_stream::write_string(const char *string, size_t length) {
   return write_string_to_stream(*this, string, length);
 }
+signed long output_stream::write_string(const char *string) {
+  if (!string) {
+    return 0;
+  }
+  auto p = string;
+  size_t len;
+  for (len = 0; len < 1048576 && *p; len++, p++);
+  return write_string(string, len);
+}
 
 file_owner::file_owner() : file_descriptor_(-1), owns_file_(false) {}
 

@@ -140,7 +140,6 @@ static bool ensure_bind(const addrinfo_owner &info, int sockfd_,
     std::cerr << "Couldn't set socket to reuse address mode: "
               << strerror(errno) << std::endl;
   }
-  int error = 0;
   int sleep_time = 1;
   while (true) {
     SignalHandler::check_raised();
@@ -156,7 +155,8 @@ static bool ensure_bind(const addrinfo_owner &info, int sockfd_,
     if (sleep_time > 0) {
       sleep(sleep_time);
     } else {
-      sleep_time = 1;
+      *errorCode = result;
+      return false;
     }
   }
 }
@@ -171,7 +171,7 @@ static struct addrinfo create_hints() {
 }
 
 template <typename R>
-static R returnFalseWithCode(int *resultVariable, int errorCode, R falseValue) {
+static R returnFalseWithCode(int *resultVariable, R falseValue) {
   if (resultVariable) {
     *resultVariable = errno;
     return falseValue;
@@ -180,15 +180,11 @@ static R returnFalseWithCode(int *resultVariable, int errorCode, R falseValue) {
 }
 
 template <typename R> static R returnFalse(int *resultVariable, R falseValue) {
-  return returnFalseWithCode(resultVariable, errno, falseValue);
-}
-
-static bool returnFalseWithCode(int *resultVariable, int errorCode) {
-  return returnFalseWithCode(resultVariable, errorCode, false);
+  return returnFalseWithCode(resultVariable, falseValue);
 }
 
 static bool returnFalse(int *resultVariable) {
-  return returnFalseWithCode(resultVariable, errno, false);
+  return returnFalseWithCode(resultVariable, false);
 }
 
 int open_server_socket(const char *service, int timeoutSeconds, int backLog,
@@ -402,7 +398,6 @@ void server_socket::close(Lock &lock) {
     std::cerr << "Aborted waiting for work stop: " << strerror(error)
               << std::endl;
   }
-  int sdf = sockfd_;
   sockfd_ = -1;
   timeval tv;
   tv.tv_sec = 2;
@@ -552,7 +547,6 @@ socket_selector_iterator socket_selector::do_select(timeval tv,
   int acceptDescriptor = -1;
   sockaddr address;
   socklen_t length = sizeof(sockaddr_storage);
-  int read_sockets = 0;
   for (int i = 0; i <= max_fd_; i++) {
     if (FD_ISSET(i, &readers) && i == sdf_) {
       acceptDescriptor = accept(sdf_, &address, &length);
