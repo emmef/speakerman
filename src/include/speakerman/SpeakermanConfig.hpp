@@ -32,11 +32,13 @@
 
 namespace speakerman {
 
-static constexpr size_t MAX_PHYSICAL_PORTS = 64;
 static constexpr size_t MAX_LOGICAL_GROUPS = 8;
 static constexpr size_t MAX_LOGICAL_CHANNELS = 16;
+
 static constexpr size_t MAX_PROCESSING_GROUPS = 4;
-static constexpr size_t MAX_NAME_LENGTH = 32;
+static constexpr size_t MAX_PROCESSING_GROUP_CHANNELS = 5;
+
+static constexpr size_t MAX_NAME_LENGTH = 31;
 
 template <typename T> struct UnsetValue {};
 
@@ -151,14 +153,13 @@ struct EqualizerConfig {
   double gain = DEFAULT_GAIN;
   double bandwidth = DEFAULT_BANDWIDTH;
 };
+
+
 struct LogicalGroupConfig : public NamedConfig {
   static_assert(MAX_LOGICAL_GROUPS > 1);
 
   static constexpr const char *KEY_SNIPPET_INPUT = "logical-input";
   static constexpr const char *KEY_SNIPPET_OUTPUT = "logical-output";
-  static constexpr int DEFAULT_IS_MUTED = 0;
-  static constexpr const char *KEY_SNIPPET_MUTED = "mute";
-  int muted = UnsetValue<int>::value;
 
   static constexpr double MIN_VOLUME = 0.0;
   static constexpr double DEFAULT_VOLUME = 1.0;
@@ -289,7 +290,7 @@ struct SpeakermanConfig {
 
   static constexpr size_t MIN_GROUP_CHANNELS = 1;
   static constexpr size_t DEFAULT_GROUP_CHANNELS = 2;
-  static constexpr size_t MAX_GROUP_CHANNELS = 5;
+  static constexpr size_t MAX_PROCESSING_GROUP_CHANNELS = 5;
 
   static constexpr double MIN_REL_SUB_THRESHOLD = 0.25;
   static constexpr double DEFAULT_REL_SUB_THRESHOLD = M_SQRT2;
@@ -302,7 +303,7 @@ struct SpeakermanConfig {
 
   static constexpr size_t MIN_SUB_OUTPUT = 0;
   static constexpr size_t DEFAULT_SUB_OUTPUT = 1;
-  static constexpr size_t MAX_SUB_OUTPUT = MAX_PROCESSING_GROUPS * MAX_GROUP_CHANNELS + 1;
+  static constexpr size_t MAX_SUB_OUTPUT = MAX_PROCESSING_GROUPS * MAX_PROCESSING_GROUP_CHANNELS + 1;
 
   static constexpr size_t MIN_CROSSOVERS = 1;
   static constexpr size_t DEFAULT_CROSSOVERS = 2;
@@ -310,11 +311,11 @@ struct SpeakermanConfig {
 
   static constexpr size_t MIN_INPUT_OFFSET = 0;
   static constexpr size_t DEFAULT_INPUT_OFFSET = 0;
-  static constexpr size_t MAX_INPUT_OFFSET = MAX_PROCESSING_GROUPS * MAX_GROUP_CHANNELS;
+  static constexpr size_t MAX_INPUT_OFFSET = MAX_PROCESSING_GROUPS * MAX_PROCESSING_GROUP_CHANNELS;
 
   static constexpr size_t MIN_INPUT_COUNT = 1;
   static constexpr size_t DEFAULT_INPUT_COUNT = -1;
-  static constexpr size_t MAX_INPUT_COUNT = MAX_PROCESSING_GROUPS * MAX_GROUP_CHANNELS;
+  static constexpr size_t MAX_INPUT_COUNT = MAX_PROCESSING_GROUPS * MAX_PROCESSING_GROUP_CHANNELS;
 
   static constexpr double MIN_THRESHOLD_SCALING = 1;
   static constexpr double DEFAULT_THRESHOLD_SCALING = 1;

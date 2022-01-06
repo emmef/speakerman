@@ -617,9 +617,6 @@ public:
       item += LogicalGroupConfig::KEY_SNIPPET_VOLUME;
       add_reader(item, false, logicalGroup[i].volume);
       item = grp;
-      item += LogicalGroupConfig::KEY_SNIPPET_MUTED;
-      add_reader(item, false, logicalGroup[i].muted);
-      item = grp;
       item += LogicalGroupConfig::KEY_PORT_NUMBER;
       add_array_reader<size_t, MAX_LOGICAL_CHANNELS>(item, false,
                                                      logicalGroup[i].ports[0]);
@@ -1178,7 +1175,7 @@ void SpeakermanConfig::set_if_unset(const SpeakermanConfig &config_if_unset) {
 
   set_if_unset_or_invalid_config_value(groupChannels,
                                        config_if_unset.groupChannels,
-                                       MIN_GROUP_CHANNELS, MAX_GROUP_CHANNELS);
+                                       MIN_GROUP_CHANNELS, MAX_PROCESSING_GROUP_CHANNELS);
   set_if_unset_or_invalid_config_value(subOutput, config_if_unset.subOutput,
                                        MIN_SUB_OUTPUT, MAX_SUB_OUTPUT);
   set_if_unset_or_invalid_config_value(inputOffset, config_if_unset.inputOffset,
@@ -1264,7 +1261,6 @@ bool StreamOwner::is_open() const { return stream_.is_open(); }
 const LogicalGroupConfig LogicalGroupConfig::unsetConfig() {
   LogicalGroupConfig result;
   unsetConfigValue(result.name);
-  unsetConfigValue(result.muted);
   unsetConfigValue(result.volume);
   for (size_t &port : result.ports) {
     unsetConfigValue(port);
@@ -1273,15 +1269,11 @@ const LogicalGroupConfig LogicalGroupConfig::unsetConfig() {
 }
 void LogicalGroupConfig::set_if_unset(
     const LogicalGroupConfig &config_if_unset) {
-  setConfigValueIfUnset(muted, config_if_unset.muted);
   setConfigValueIfUnset(volume, config_if_unset.volume);
 }
 void LogicalGroupConfig::sanitize(size_t groupNumber, const char *typeOfGroup) {
   size_t hasPorts = getPortCount();
   if (hasPorts > 0) {
-    if (isUnsetConfigValue(muted)) {
-      muted = DEFAULT_IS_MUTED;
-    }
     if (isUnsetConfigValue(volume)) {
       volume = DEFAULT_VOLUME;
     }

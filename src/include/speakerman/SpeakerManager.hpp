@@ -261,7 +261,7 @@ public:
 
   SpeakerManager(const SpeakermanConfig &config)
       : portDefinitions_(1 + 2 * MAX_PROCESSING_GROUPS *
-                                 SpeakermanConfig::MAX_GROUP_CHANNELS),
+                                 MAX_PROCESSING_GROUP_CHANNELS),
         config_(config) {
     std::unique_ptr<char> name(new char[1 + Names::get_port_size()]);
     if (config.subOutput > 0) {
