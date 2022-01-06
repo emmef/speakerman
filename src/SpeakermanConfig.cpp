@@ -648,7 +648,8 @@ public:
                detection.useBrickWallPrediction);
 
     addLogicalGroups(logicalInputs, LogicalGroupConfig::KEY_SNIPPET_INPUT);
-    addLogicalGroups(logicalOutputs, LogicalGroupConfig::KEY_SNIPPET_OUTPUT);
+    // Disabled outputs for now, as we are not going to use them
+    // addLogicalGroups(logicalOutputs, LogicalGroupConfig::KEY_SNIPPET_OUTPUT);
 
     string key;
 
@@ -1199,42 +1200,6 @@ void SpeakermanConfig::set_if_unset(const SpeakermanConfig &config_if_unset) {
       threshold_scaling, config_if_unset.threshold_scaling,
       MIN_THRESHOLD_SCALING, MAX_THRESHOLD_SCALING);
   timeStamp = -1;
-}
-
-const SpeakermanConfig SpeakermanConfig::with_groups_mixed() const {
-  SpeakermanConfig result = *this;
-
-  for (size_t i = 0; i < groups; i++) {
-    for (size_t j = 0; j < groups; j++) {
-      result.group[i].volume[j] = group[j].volume[j];
-    }
-  }
-
-  return result;
-}
-
-const SpeakermanConfig SpeakermanConfig::with_groups_separated() const {
-  SpeakermanConfig result = *this;
-
-  for (size_t i = 0; i < groups; i++) {
-    for (size_t j = 0; j < groups; j++) {
-      result.group[i].volume[j] = i == j ? group[j].volume[j] : 0;
-    }
-  }
-
-  return result;
-}
-
-const SpeakermanConfig SpeakermanConfig::with_groups_first() const {
-  SpeakermanConfig result = *this;
-
-  for (size_t i = 0; i < groups; i++) {
-    for (size_t j = 0; j < groups; j++) {
-      result.group[i].volume[j] = j == 0 ? group[0].volume[0] : 0;
-    }
-  }
-
-  return result;
 }
 
 StreamOwner::StreamOwner(std::ifstream &owned) : stream_(owned), owns_(true) {}

@@ -143,8 +143,6 @@ private:
   std::thread level_fetch_thread;
   long long levelTimeStamp = 0;
   Method method = Method::GET;
-  SpeakerManagerControl::MixMode mix_mode =
-      SpeakerManagerControl::MixMode::AS_CONFIGURED;
 
   static void thread_static_function(web_server *);
 

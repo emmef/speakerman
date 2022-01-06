@@ -154,7 +154,6 @@ struct EqualizerConfig {
   double bandwidth = DEFAULT_BANDWIDTH;
 };
 
-
 struct LogicalGroupConfig : public NamedConfig {
   static_assert(MAX_LOGICAL_GROUPS > 1);
 
@@ -357,12 +356,6 @@ struct SpeakermanConfig {
   static const SpeakermanConfig unsetConfig();
 
   void set_if_unset(const SpeakermanConfig &config_if_unset);
-
-  const SpeakermanConfig with_groups_mixed() const;
-
-  const SpeakermanConfig with_groups_separated() const;
-
-  const SpeakermanConfig with_groups_first() const;
 };
 
 using tdap::IndexPolicy;
@@ -417,8 +410,6 @@ public:
 
 class SpeakerManagerControl {
 public:
-  enum class MixMode { AS_CONFIGURED, ALL, OWN, FIRST };
-
   virtual const SpeakermanConfig &getConfig() const = 0;
 
   virtual bool
