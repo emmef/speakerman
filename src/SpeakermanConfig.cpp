@@ -28,20 +28,20 @@ static constexpr const char *INSTALLATION_PREFIX =
     TO_STR(SPEAKERMAN_INSTALL_PREFIX);
 #endif
 
-#include <speakerman/SpeakermanConfig.hpp>
-#include <speakerman/utils/Config.hpp>
-#include <speakerman/UnsetValue.h>
-#include <speakerman/StreamOwner.h>
-#include <tdap/FixedSizeArray.hpp>
-#include <tdap/Value.hpp>
 #include <algorithm>
 #include <cmath>
-#include <iostream>
 #include <cstring>
+#include <iostream>
 #include <mutex>
+#include <speakerman/SpeakermanConfig.hpp>
+#include <speakerman/StreamOwner.h>
+#include <speakerman/UnsetValue.h>
+#include <speakerman/utils/Config.hpp>
 #include <string>
-#include <unistd.h>
 #include <sys/stat.h>
+#include <tdap/FixedSizeArray.hpp>
+#include <tdap/Value.hpp>
+#include <unistd.h>
 
 namespace speakerman {
 
@@ -64,8 +64,8 @@ static constexpr const char *EQ_CONFIG_KEY_CENTER = "center";
 static constexpr const char *EQ_CONFIG_KEY_GAIN = "gain";
 static constexpr const char *EQ_CONFIG_KEY_BANDWIDTH = "bandwidth";
 static constexpr const char *LOGICAL_GROUP_CONFIG_KEY_INPUT = "logical-input";
-[[maybe_unused]]
-static constexpr const char *LOGICAL_GROUP_CONFIG_KEY_OUTPUT = "logical-output";
+[[maybe_unused]] static constexpr const char *LOGICAL_GROUP_CONFIG_KEY_OUTPUT =
+    "logical-output";
 static constexpr const char *LOGICAL_GROUP_CONFIG_KEY_VOLUME = "volume";
 static constexpr const char *LOGICAL_GROUP_CONFIG_KEY_NUMBER = "port-numbers";
 static constexpr const char *NAMED_CONFIG_KEY_NAME = "name";
@@ -74,24 +74,28 @@ static constexpr const char *PROCESSING_GROUP_CONFIG_KEY_MONO = "mono";
 static constexpr const char *PROCESSING_GROUP_CONFIG_KEY_USE_SUB = "use-sub";
 static constexpr const char *PROCESSING_GROUP_CONFIG_KEY_DELAY = "delay";
 static constexpr const char *PROCESSING_GROUP_CONFIG_KEY_VOLUME = "volume";
-static constexpr const char *PROCESSING_GROUP_CONFIG_KEY_THRESHOLD = "threshold";
-static constexpr const char *PROCESSING_GROUP_CONFIG_KEY_EQ_COUNT = "equalizers";
-[[maybe_unused]]
-static constexpr const char *SPEAKER_MANAGER_CONFIG_KEY_EQ_COUNT = "equalizers";
+static constexpr const char *PROCESSING_GROUP_CONFIG_KEY_THRESHOLD =
+    "threshold";
+static constexpr const char *PROCESSING_GROUP_CONFIG_KEY_EQ_COUNT =
+    "equalizers";
+[[maybe_unused]] static constexpr const char
+    *SPEAKER_MANAGER_CONFIG_KEY_EQ_COUNT = "equalizers";
 static constexpr const char *SPEAKER_MANAGER_CONFIG_KEY_GROUP_COUNT = "groups";
-static constexpr const char *SPEAKER_MANAGER_CONFIG_KEY_CHANNELS = "group-channels";
+static constexpr const char *SPEAKER_MANAGER_CONFIG_KEY_CHANNELS =
+    "group-channels";
 static constexpr const char *SPEAKER_MANAGER_CONFIG_KEY_SUB_THRESHOLD =
     "sub-relative-threshold";
 static constexpr const char *SPEAKER_MANAGER_CONFIG_KEY_SUB_DELAY = "sub-delay";
-static constexpr const char *SPEAKER_MANAGER_CONFIG_KEY_SUB_OUTPUT = "sub-output";
-static constexpr const char *SPEAKER_MANAGER_CONFIG_KEY_CROSSOVERS = "crossovers";
-[[maybe_unused]]
-static constexpr const char *SPEAKER_MANAGER_CONFIG_KEY_INPUT_OFFSET = "input-offset";
-[[maybe_unused]]
-static constexpr const char *SPEAKER_MANAGER_CONFIG_KEY_INPUT_COUNT = "input-count";
-static constexpr const char *SPEAKER_MANAGER_CONFIG_KEY_GENERATE_NOISE = "generate-noise";
-
-
+static constexpr const char *SPEAKER_MANAGER_CONFIG_KEY_SUB_OUTPUT =
+    "sub-output";
+static constexpr const char *SPEAKER_MANAGER_CONFIG_KEY_CROSSOVERS =
+    "crossovers";
+[[maybe_unused]] static constexpr const char
+    *SPEAKER_MANAGER_CONFIG_KEY_INPUT_OFFSET = "input-offset";
+[[maybe_unused]] static constexpr const char
+    *SPEAKER_MANAGER_CONFIG_KEY_INPUT_COUNT = "input-count";
+static constexpr const char *SPEAKER_MANAGER_CONFIG_KEY_GENERATE_NOISE =
+    "generate-noise";
 
 } // anonymous namespace
 
@@ -602,10 +606,11 @@ class ConfigManager : protected SpeakermanConfig {
   }
 
 public:
-  void addLogicalGroups(LogicalGroupConfig *logicalGroup, const char *snippet) {
+  void addLogicalGroups(AbstractLogicalGroupsConfig &config,
+                        const char *snippet) {
     string logicalInput = snippet;
     logicalInput += "/";
-    for (size_t i = 0; i < LogicalGroupConfig::MAX_GROUPS; i++) {
+    for (size_t i = 0; i < AbstractLogicalGroupsConfig::MAX_GROUPS; i++) {
       string grp = logicalInput;
       if (i >= 10) {
         grp += char('0' + i / 10);
@@ -615,15 +620,23 @@ public:
       string item;
       item = grp;
       item += NAMED_CONFIG_KEY_NAME;
-      add_reader(item, false, logicalGroup[i].name);
+      add_reader(item, true, config.group[i].name);
       item = grp;
       item += LOGICAL_GROUP_CONFIG_KEY_VOLUME;
-      add_reader(item, false, logicalGroup[i].volume);
+      add_reader(item, true, config.group[i].volume);
       item = grp;
       item += LOGICAL_GROUP_CONFIG_KEY_NUMBER;
-      add_array_reader<size_t, LogicalGroupConfig::MAX_CHANNELS>(item, false,
-                                                     logicalGroup[i].ports[0]);
+      add_array_reader<size_t, LogicalGroupConfig::MAX_CHANNELS>(
+          item, false, config.group[i].ports[0]);
     }
+  }
+
+  template <LogicalGroupConfig::Direction D>
+  void addLogicalGroups(LogicalGroupsConfig<D> &logicalGroupsConfig) {
+    const char *snippet = D == LogicalGroupConfig::Direction::Input
+                              ? LOGICAL_GROUP_CONFIG_KEY_INPUT
+                              : LOGICAL_GROUP_CONFIG_KEY_OUTPUT;
+    addLogicalGroups(logicalGroupsConfig, snippet);
   }
 
   ConfigManager() {
@@ -631,7 +644,8 @@ public:
     add_reader(SPEAKER_MANAGER_CONFIG_KEY_CHANNELS, false, groupChannels);
     add_reader(SPEAKER_MANAGER_CONFIG_KEY_CROSSOVERS, false, crossovers);
 
-    add_reader(SPEAKER_MANAGER_CONFIG_KEY_SUB_THRESHOLD, true, relativeSubThreshold);
+    add_reader(SPEAKER_MANAGER_CONFIG_KEY_SUB_THRESHOLD, true,
+               relativeSubThreshold);
     add_reader(SPEAKER_MANAGER_CONFIG_KEY_SUB_DELAY, true, subDelay);
     add_reader(SPEAKER_MANAGER_CONFIG_KEY_SUB_OUTPUT, false, subOutput);
 
@@ -674,7 +688,8 @@ public:
       add_reader(key, true, eq[eq_idx].bandwidth);
     }
 
-    for (size_t group_idx = 0; group_idx < ProcessingGroupConfig::MAX_GROUPS; group_idx++) {
+    for (size_t group_idx = 0; group_idx < ProcessingGroupConfig::MAX_GROUPS;
+         group_idx++) {
       string groupKey = PROCESSING_GROUP_CONFIG_KEY_GROUP;
       groupKey += "/";
       groupKey += (char)(group_idx + '0');
@@ -913,7 +928,7 @@ static void actualReadConfig(SpeakermanConfig &config, istream &stream,
     line[std::min(line_pos, LINE_LENGTH)] = '\0';
     config_manager.read_line(config, line, initial ? config : basedUpon);
   }
-  config.set_if_unset(basedUpon);
+  config.set_if_unset(basedUpon, initial);
   config.threshold_scaling = basedUpon.threshold_scaling;
 }
 
@@ -964,13 +979,8 @@ void dumpSpeakermanConfig(const SpeakermanConfig &dump, ostream &output) {
 
 const SpeakermanConfig SpeakermanConfig::defaultConfig() {
   SpeakermanConfig result;
-  const LogicalGroupConfig config = LogicalGroupConfig::defaultConfig();
-  for (size_t i = 0; i < LogicalGroupConfig::MAX_GROUPS; i++) {
-    result.logicalInputs[i] = config;
-  }
-  for (size_t i = 0; i < LogicalGroupConfig::MAX_GROUPS; i++) {
-    result.logicalOutputs[i] = config;
-  }
+  result.logicalInputs = LogicalInputsConfig::defaultConfig();
+  result.logicalOutputs = LogicalOutputsConfig ::defaultConfig();
 
   for (size_t i = 0; i < ProcessingGroupConfig::MAX_GROUPS; i++) {
     result.group[i] = ProcessingGroupConfig::defaultConfig(i);
@@ -984,14 +994,8 @@ const SpeakermanConfig SpeakermanConfig::defaultConfig() {
 
 const SpeakermanConfig SpeakermanConfig::unsetConfig() {
   SpeakermanConfig result;
-
-  const LogicalGroupConfig config = LogicalGroupConfig::unsetConfig();
-  for (size_t i = 0; i < LogicalGroupConfig::MAX_GROUPS; i++) {
-    result.logicalInputs[i] = config;
-  }
-  for (size_t i = 0; i < LogicalGroupConfig::MAX_GROUPS; i++) {
-    result.logicalOutputs[i] = config;
-  }
+  result.logicalInputs = LogicalInputsConfig::unsetConfig();
+  result.logicalOutputs = LogicalOutputsConfig ::unsetConfig();
 
   for (size_t i = 0; i < ProcessingGroupConfig::MAX_GROUPS; i++) {
     result.group[i] = ProcessingGroupConfig::unsetConfig();
@@ -1013,17 +1017,21 @@ const SpeakermanConfig SpeakermanConfig::unsetConfig() {
   return result;
 }
 
-void SpeakermanConfig::set_if_unset(const SpeakermanConfig &config_if_unset) {
-  for (size_t group = 0; group < LogicalGroupConfig::MAX_GROUPS; group++) {
-    logicalInputs[group].set_if_unset(config_if_unset.logicalInputs[group]);
-    logicalOutputs[group].set_if_unset(config_if_unset.logicalOutputs[group]);
+void SpeakermanConfig::set_if_unset(const SpeakermanConfig &config_if_unset,
+                                    bool initial) {
+  if (initial) {
+    logicalInputs.sanitizeInitial();
+    logicalOutputs.sanitizeInitial();
   }
-  LogicalGroupConfig::sanitize(logicalInputs, LogicalGroupConfig::MAX_GROUPS, "input");
-  LogicalGroupConfig::sanitize(logicalOutputs, LogicalGroupConfig::MAX_GROUPS, "output");
+  else {
+    logicalInputs.changeRuntimeValues(config_if_unset.logicalInputs);
+    logicalOutputs.changeRuntimeValues(config_if_unset.logicalOutputs);
+  }
+
   size_t group_idx;
-  if (fixedValueIfUnsetOrOutOfRange(processingGroups,
-                                    config_if_unset.processingGroups,
-                                    MIN_GROUPS, ProcessingGroupConfig::MAX_GROUPS)) {
+  if (fixedValueIfUnsetOrOutOfRange(
+          processingGroups, config_if_unset.processingGroups, MIN_GROUPS,
+          ProcessingGroupConfig::MAX_GROUPS)) {
     for (group_idx = 0; group_idx < processingGroups; group_idx++) {
       group[group_idx] = config_if_unset.group[group_idx];
     }
@@ -1069,6 +1077,5 @@ void SpeakermanConfig::set_if_unset(const SpeakermanConfig &config_if_unset) {
                                 MIN_THRESHOLD_SCALING, MAX_THRESHOLD_SCALING);
   timeStamp = -1;
 }
-
 
 } /* End of namespace speakerman */

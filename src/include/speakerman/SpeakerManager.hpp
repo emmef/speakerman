@@ -23,13 +23,14 @@
 #define SMS_SPEAKERMAN_SPEAKERMANAGER_GUARD_H_
 
 #include "DynamicsProcessor.hpp"
+#include "LogicalGroupConfig.h"
 #include <cmath>
 #include <iostream>
 #include <memory>
+#include <speakerman/SpeakerManagerControl.h>
 #include <speakerman/jack/JackClient.hpp>
 #include <speakerman/jack/JackProcessor.hpp>
 #include <speakerman/jack/Names.hpp>
-#include <speakerman/SpeakerManagerControl.h>
 #include <tdap/Delay.hpp>
 #include <tdap/FixedSizeArray.hpp>
 #include <tdap/IirButterworth.hpp>
@@ -112,7 +113,7 @@ class SpeakerManager : public AbstractSpeakerManager {
   TransportData preparedConfigData;
 
 protected:
-  virtual const PortDefinitions &getDefinitions() override {
+  const PortDefinitions &getDefinitions() override {
     return portDefinitions_;
   }
 
@@ -173,14 +174,11 @@ protected:
       connectPorts(client, outputs.get(out++), playbackPortNames.get(port));
     }
 
-    for (size_t logicalInput = 0, i = 0; logicalInput < LogicalGroupConfig::MAX_GROUPS;
-         logicalInput++) {
-      LogicalGroupConfig group = config_.logicalInputs[logicalInput];
-      for (size_t channel = 0; channel < LogicalGroupConfig::MAX_CHANNELS; channel++) {
-        if (!isUnsetConfigValue(group.ports[channel])) {
-          connectPorts(client, capturePortNames.get(group.ports[channel] % captureCount), inputs.get(i++));
-        }
-      }
+    auto mapping = config_.logicalInputs.createMapping();
+    for (const auto entry : mapping) {
+      connectPorts(client,
+                   capturePortNames.get(entry.wrappedPort(captureCount)),
+                   inputs.get(entry.channel));
     }
   }
 
@@ -275,18 +273,12 @@ public:
       portDefinitions_.addOutput(name.get());
       cout << "I: added output " << name.get() << std::endl;
     }
-    for (size_t logicalInput = 0; logicalInput < LogicalGroupConfig::MAX_GROUPS;
-         logicalInput++) {
-      LogicalGroupConfig group = config_.logicalInputs[logicalInput];
-      for (size_t channel = 0; channel < LogicalGroupConfig::MAX_CHANNELS; channel++) {
-        size_t ch = 0;
-        if (!isUnsetConfigValue(group.ports[channel])) {
-          snprintf(name.get(), 1 + Names::get_port_size(), "in_%zu_%zu",
-                   1 + logicalInput, 1 + ch);
-          ch++;
-          portDefinitions_.addInput(name.get());
-        }
-      }
+    auto map = config.logicalInputs.createMapping();
+    for (const auto entry : map) {
+      snprintf(name.get(), 1 + Names::get_port_size(), "in_%zu_%zu",
+               entry.logicalGroup + 1, entry.groupChannel + 1);
+      portDefinitions_.addInput(name.get());
+      cout << "I: added input " << name.get() << std::endl;
     }
   }
 

@@ -27,6 +27,7 @@
 #include <speakerman/ProcessingGroupConfig.h>
 #include <speakerman/DetectionConfig.h>
 #include <speakerman/UnsetValue.h>
+#include "LogicalGroupConfig.h"
 
 namespace speakerman {
 
@@ -75,8 +76,8 @@ struct SpeakermanConfig {
   long long timeStamp = -1;
   double threshold_scaling = DEFAULT_THRESHOLD_SCALING;
   DetectionConfig detection;
-  LogicalGroupConfig logicalInputs[LogicalGroupConfig::MAX_GROUPS];
-  LogicalGroupConfig logicalOutputs[LogicalGroupConfig::MAX_GROUPS];
+  LogicalInputsConfig logicalInputs;
+  LogicalOutputsConfig logicalOutputs;
   ProcessingGroupConfig group[ProcessingGroupConfig::MAX_GROUPS];
 
   EqualizerConfig eq[MAX_EQS];
@@ -86,7 +87,7 @@ struct SpeakermanConfig {
 
   static const SpeakermanConfig unsetConfig();
 
-  void set_if_unset(const SpeakermanConfig &config_if_unset);
+  void set_if_unset(const SpeakermanConfig &config_if_unset, bool initial);
 };
 
 const char *getInstallBaseDirectory();

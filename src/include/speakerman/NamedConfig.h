@@ -43,7 +43,7 @@ struct NamedConfig {
    * @return Whether the arguments are valid and \c source is fully copied to
    * the destination.
    */
-  inline bool copyToName(const char *source);
+  bool copyToName(const char *source);
 
   /**
    * Prints a format and its arguments to the destination name. Returns \c true
@@ -56,7 +56,7 @@ struct NamedConfig {
    * @return Whether the arguments are valid and a valid formatted string was
    * fully generated into the destination.
    */
-  inline bool vPrintToName(const char *format, va_list arguments);
+  bool vPrintToName(const char *format, va_list arguments);
 
   /**
    * Prints a format and its arguments to the destination name. Returns \c true
