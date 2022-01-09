@@ -29,6 +29,7 @@
 #include <speakerman/jack/JackClient.hpp>
 #include <speakerman/jack/JackProcessor.hpp>
 #include <speakerman/jack/Names.hpp>
+#include <speakerman/SpeakerManagerControl.h>
 #include <tdap/Delay.hpp>
 #include <tdap/FixedSizeArray.hpp>
 #include <tdap/IirButterworth.hpp>
@@ -171,17 +172,15 @@ protected:
       }
       connectPorts(client, outputs.get(out++), playbackPortNames.get(port));
     }
-    std::cout << "Inputs: capture " << capturePortNames.count() << " in "
-              << inputs.count();
-    if (config_.inputOffset > 0) {
-      cout << " offset " << config_.inputOffset;
-    }
-    cout << endl;
-    for (size_t i = 0; i < inputCount; i++) {
-      connectPorts(
-          client,
-          capturePortNames.get((i + config_.inputOffset) % captureCount),
-          inputs.get(i));
+
+    for (size_t logicalInput = 0, i = 0; logicalInput < LogicalGroupConfig::MAX_GROUPS;
+         logicalInput++) {
+      LogicalGroupConfig group = config_.logicalInputs[logicalInput];
+      for (size_t channel = 0; channel < LogicalGroupConfig::MAX_CHANNELS; channel++) {
+        if (!isUnsetConfigValue(group.ports[channel])) {
+          connectPorts(client, capturePortNames.get(group.ports[channel] % captureCount), inputs.get(i++));
+        }
+      }
     }
   }
 
@@ -260,8 +259,8 @@ public:
   virtual bool needsSampleRate() const override { return true; }
 
   SpeakerManager(const SpeakermanConfig &config)
-      : portDefinitions_(1 + 2 * MAX_PROCESSING_GROUPS *
-                                 MAX_PROCESSING_GROUP_CHANNELS),
+      : portDefinitions_(1 + 2 * ProcessingGroupConfig::MAX_GROUPS *
+                                 ProcessingGroupConfig::MAX_CHANNELS),
         config_(config) {
     std::unique_ptr<char> name(new char[1 + Names::get_port_size()]);
     if (config.subOutput > 0) {
@@ -276,12 +275,18 @@ public:
       portDefinitions_.addOutput(name.get());
       cout << "I: added output " << name.get() << std::endl;
     }
-    for (size_t channel = 0; channel < Processor::INPUTS; channel++) {
-      snprintf(name.get(), 1 + Names::get_port_size(), "in_%zu_%zu",
-               1 + channel / CHANNELS_PER_GROUP,
-               1 + channel % CHANNELS_PER_GROUP);
-      portDefinitions_.addInput(name.get());
-      cout << "I: added input " << name.get() << std::endl;
+    for (size_t logicalInput = 0; logicalInput < LogicalGroupConfig::MAX_GROUPS;
+         logicalInput++) {
+      LogicalGroupConfig group = config_.logicalInputs[logicalInput];
+      for (size_t channel = 0; channel < LogicalGroupConfig::MAX_CHANNELS; channel++) {
+        size_t ch = 0;
+        if (!isUnsetConfigValue(group.ports[channel])) {
+          snprintf(name.get(), 1 + Names::get_port_size(), "in_%zu_%zu",
+                   1 + logicalInput, 1 + ch);
+          ch++;
+          portDefinitions_.addInput(name.get());
+        }
+      }
     }
   }
 

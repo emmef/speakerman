@@ -157,7 +157,7 @@ template <typename F, size_t CROSSOVERS>
 static AbstractSpeakerManager *
 createManagerGroup(const SpeakermanConfig &config) {
 
-  switch (config.groups) {
+  switch (config.processingGroups) {
   case 1:
     return createManagerSampleType<F, 1, CROSSOVERS>(config);
   case 2:

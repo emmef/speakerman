@@ -27,7 +27,8 @@
 #include <speakerman/HttpMessage.hpp>
 #include <speakerman/ServerSocket.hpp>
 #include <speakerman/SingleThreadFileCache.hpp>
-#include <speakerman/SpeakermanConfig.hpp>
+#include <speakerman/DynamicProcessorLevels.h>
+#include <speakerman/SpeakerManagerControl.h>
 #include <tdap/Count.hpp>
 #include <tdap/Power2.hpp>
 #include <thread>

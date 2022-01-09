@@ -24,6 +24,7 @@
 
 #include <cmath>
 #include <speakerman/SpeakermanRuntimeData.hpp>
+#include <speakerman/DynamicProcessorLevels.h>
 #include <tdap/Crossovers.hpp>
 #include <tdap/Delay.hpp>
 #include <tdap/Followers.hpp>
