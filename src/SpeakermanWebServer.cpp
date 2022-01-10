@@ -367,7 +367,7 @@ void web_server::handle_request() {
         for (size_t i = 0; i < levels.groups(); i++) {
           response().write_string("\t\t{\r\n");
           response().write_string("\t\t\t\"group_name\": \"");
-          response().write_string(manager_.getConfig().group[i].name);
+          response().write_string(manager_.getConfig().processingGroups.group[i].name);
           response().write_string("\", \r\n");
           response().write_string("\t\t\t\"level\": \"");
           response().write_string(ftostr(numbers, 30, levels.getSignal(i + 1)));

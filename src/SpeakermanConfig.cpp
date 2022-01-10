@@ -28,7 +28,6 @@ static constexpr const char *INSTALLATION_PREFIX =
     TO_STR(SPEAKERMAN_INSTALL_PREFIX);
 #endif
 
-#include <algorithm>
 #include <cmath>
 #include <cstring>
 #include <iostream>
@@ -640,8 +639,8 @@ public:
   }
 
   ConfigManager() {
-    add_reader(SPEAKER_MANAGER_CONFIG_KEY_GROUP_COUNT, false, processingGroups);
-    add_reader(SPEAKER_MANAGER_CONFIG_KEY_CHANNELS, false, groupChannels);
+    add_reader(SPEAKER_MANAGER_CONFIG_KEY_GROUP_COUNT, false, processingGroups.groups);
+    add_reader(SPEAKER_MANAGER_CONFIG_KEY_CHANNELS, false, processingGroups.channels);
     add_reader(SPEAKER_MANAGER_CONFIG_KEY_CROSSOVERS, false, crossovers);
 
     add_reader(SPEAKER_MANAGER_CONFIG_KEY_SUB_THRESHOLD, true,
@@ -688,7 +687,7 @@ public:
       add_reader(key, true, eq[eq_idx].bandwidth);
     }
 
-    for (size_t group_idx = 0; group_idx < ProcessingGrouspConfig::MAX_GROUPS;
+    for (size_t group_idx = 0; group_idx < ProcessingGroupsConfig::MAX_GROUPS;
          group_idx++) {
       string groupKey = PROCESSING_GROUP_CONFIG_KEY_GROUP;
       groupKey += "/";
@@ -697,26 +696,26 @@ public:
 
       key = groupKey;
       key += PROCESSING_GROUP_CONFIG_KEY_EQ_COUNT;
-      add_reader(key, true, group[group_idx].eqs);
+      add_reader(key, true, processingGroups.group[group_idx].eqs);
       key = groupKey;
       key += PROCESSING_GROUP_CONFIG_KEY_THRESHOLD;
-      add_reader(key, true, group[group_idx].threshold);
+      add_reader(key, true, processingGroups.group[group_idx].threshold);
       key = groupKey;
       key += PROCESSING_GROUP_CONFIG_KEY_VOLUME;
       add_array_reader<double, LogicalGroupConfig::MAX_CHANNELS>(
-          key, true, group[group_idx].volume[0]);
+          key, true, processingGroups.group[group_idx].volume[0]);
       key = groupKey;
       key += PROCESSING_GROUP_CONFIG_KEY_DELAY;
-      add_reader(key, true, group[group_idx].delay);
+      add_reader(key, true, processingGroups.group[group_idx].delay);
       key = groupKey;
       key += PROCESSING_GROUP_CONFIG_KEY_USE_SUB;
-      add_reader(key, true, group[group_idx].use_sub);
+      add_reader(key, true, processingGroups.group[group_idx].useSub);
       key = groupKey;
       key += PROCESSING_GROUP_CONFIG_KEY_MONO;
-      add_reader(key, true, group[group_idx].mono);
+      add_reader(key, true, processingGroups.group[group_idx].mono);
       key = groupKey;
       key += NAMED_CONFIG_KEY_NAME;
-      add_reader(key, true, group[group_idx].name);
+      add_reader(key, true, processingGroups.group[group_idx].name);
 
       string eqBase = groupKey;
       eqBase += EQ_CONFIG_KEY_EQUALIZER;
@@ -729,13 +728,13 @@ public:
 
         key = eqKey;
         key += EQ_CONFIG_KEY_CENTER;
-        add_reader(key, true, group[group_idx].eq[eq_idx].center);
+        add_reader(key, true, processingGroups.group[group_idx].eq[eq_idx].center);
         key = eqKey;
         key += EQ_CONFIG_KEY_GAIN;
-        add_reader(key, true, group[group_idx].eq[eq_idx].gain);
+        add_reader(key, true, processingGroups.group[group_idx].eq[eq_idx].gain);
         key = eqKey;
         key += EQ_CONFIG_KEY_BANDWIDTH;
-        add_reader(key, true, group[group_idx].eq[eq_idx].bandwidth);
+        add_reader(key, true, processingGroups.group[group_idx].eq[eq_idx].bandwidth);
       }
     }
   }
@@ -981,10 +980,8 @@ const SpeakermanConfig SpeakermanConfig::defaultConfig() {
   SpeakermanConfig result;
   result.logicalInputs = LogicalInputsConfig::defaultConfig();
   result.logicalOutputs = LogicalOutputsConfig ::defaultConfig();
-
-  for (size_t i = 0; i < ProcessingGrouspConfig::MAX_GROUPS; i++) {
-    result.group[i] = ProcessingGroupConfig::defaultConfig(i);
-  }
+  // (already defaults as empty)
+  // result.processingGroups = ProcessingGroupsConfig::defaultConfig();
   result.detection = DetectionConfig::defaultConfig();
   for (size_t i = 0; i < MAX_EQS; i++) {
     result.eq[i] = EqualizerConfig::defaultConfig();
@@ -997,15 +994,15 @@ const SpeakermanConfig SpeakermanConfig::unsetConfig() {
   result.logicalInputs = LogicalInputsConfig::unsetConfig();
   result.logicalOutputs = LogicalOutputsConfig ::unsetConfig();
 
-  for (size_t i = 0; i < ProcessingGrouspConfig::MAX_GROUPS; i++) {
-    result.group[i] = ProcessingGroupConfig::unsetConfig();
+  for (size_t i = 0; i < ProcessingGroupsConfig::MAX_GROUPS; i++) {
+    result.processingGroups.group[i] = ProcessingGroupConfig::unsetConfig();
   }
   result.detection.unsetConfig();
   for (size_t i = 0; i < MAX_EQS; i++) {
     result.eq[i] = EqualizerConfig::unsetConfig();
   }
-  unsetConfigValue(result.processingGroups);
-  unsetConfigValue(result.groupChannels);
+  unsetConfigValue(result.processingGroups.groups);
+  unsetConfigValue(result.processingGroups.channels);
   unsetConfigValue(result.subOutput);
   unsetConfigValue(result.crossovers);
   unsetConfigValue(result.relativeSubThreshold);
@@ -1022,27 +1019,14 @@ void SpeakermanConfig::set_if_unset(const SpeakermanConfig &config_if_unset,
   if (initial) {
     logicalInputs.sanitizeInitial();
     logicalOutputs.sanitizeInitial();
+    processingGroups.sanitizeInitial(logicalInputs.getTotalChannels());
   }
   else {
     logicalInputs.changeRuntimeValues(config_if_unset.logicalInputs);
     logicalOutputs.changeRuntimeValues(config_if_unset.logicalOutputs);
+    processingGroups.changeRuntimeValues(config_if_unset.processingGroups);
   }
 
-  size_t group_idx;
-  if (fixedValueIfUnsetOrOutOfRange(
-          processingGroups, config_if_unset.processingGroups, MIN_GROUPS,
-          ProcessingGrouspConfig::MAX_GROUPS)) {
-    for (group_idx = 0; group_idx < processingGroups; group_idx++) {
-      group[group_idx] = config_if_unset.group[group_idx];
-    }
-  } else {
-    for (group_idx = 0; group_idx < processingGroups; group_idx++) {
-      group[group_idx].set_if_unset(config_if_unset.group[group_idx]);
-    }
-  }
-  for (; group_idx < ProcessingGrouspConfig::MAX_GROUPS; group_idx++) {
-    group[group_idx] = ProcessingGroupConfig::unsetConfig();
-  }
   detection.set_if_unset(config_if_unset.detection);
   size_t eq_idx;
   if (fixedValueIfUnsetOrOutOfRange(eqs, config_if_unset.eqs, MIN_EQS,
@@ -1059,9 +1043,6 @@ void SpeakermanConfig::set_if_unset(const SpeakermanConfig &config_if_unset,
     eq[eq_idx] = EqualizerConfig::defaultConfig();
   }
 
-  fixedValueIfUnsetOrOutOfRange(groupChannels, config_if_unset.groupChannels,
-                                MIN_GROUP_CHANNELS,
-                                ProcessingGroupConfig::MAX_CHANNELS);
   fixedValueIfUnsetOrOutOfRange(subOutput, config_if_unset.subOutput,
                                 MIN_SUB_OUTPUT, MAX_SUB_OUTPUT);
 

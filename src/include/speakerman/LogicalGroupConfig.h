@@ -105,6 +105,7 @@ struct AbstractLogicalGroupsConfig {
   LogicalGroupConfig group[MAX_GROUPS];
 
   size_t getGroupCount() const;
+  size_t getTotalChannels() const;
 
   const LogicalPortMap createMapping() const;
 

@@ -37,12 +37,6 @@ struct SpeakermanConfig {
   static constexpr size_t DEFAULT_EQS = 0;
   static constexpr size_t MAX_EQS = 2;
 
-  static constexpr size_t MIN_GROUPS = 1;
-  static constexpr size_t DEFAULT_GROUPS = 1;
-
-  static constexpr size_t MIN_GROUP_CHANNELS = 1;
-  static constexpr size_t DEFAULT_GROUP_CHANNELS = 2;
-
   static constexpr double MIN_REL_SUB_THRESHOLD = 0.25;
   static constexpr double DEFAULT_REL_SUB_THRESHOLD = M_SQRT2;
   static constexpr double MAX_REL_SUB_THRESHOLD = 2.0;
@@ -66,8 +60,6 @@ struct SpeakermanConfig {
 
   static constexpr int DEFAULT_GENERATE_NOISE = 0;
 
-  size_t processingGroups = DEFAULT_GROUPS;
-  size_t groupChannels = DEFAULT_GROUP_CHANNELS;
   size_t subOutput = DEFAULT_SUB_OUTPUT;
   size_t crossovers = DEFAULT_CROSSOVERS;
   double relativeSubThreshold = DEFAULT_REL_SUB_THRESHOLD;
@@ -78,8 +70,7 @@ struct SpeakermanConfig {
   DetectionConfig detection;
   LogicalInputsConfig logicalInputs;
   LogicalOutputsConfig logicalOutputs;
-  ProcessingGroupConfig group[ProcessingGrouspConfig::MAX_GROUPS];
-
+  ProcessingGroupsConfig processingGroups;
   EqualizerConfig eq[MAX_EQS];
   size_t eqs = DEFAULT_EQS;
 

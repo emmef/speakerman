@@ -101,7 +101,7 @@ public:
 };
 
 template <typename T, size_t BANDS> class GroupRuntimeData {
-  FixedSizeArray<T, ProcessingGrouspConfig::MAX_GROUPS> volume_;
+  FixedSizeArray<T, ProcessingGroupsConfig::MAX_GROUPS> volume_;
   size_t delay_;
   bool useSub_;
   bool mono_;
@@ -112,7 +112,7 @@ template <typename T, size_t BANDS> class GroupRuntimeData {
   EqualizerFilterData<T> filterConfig_;
 
 public:
-  const FixedSizeArray<T, ProcessingGrouspConfig::MAX_GROUPS> &volume() const {
+  const FixedSizeArray<T, ProcessingGroupsConfig::MAX_GROUPS> &volume() const {
     return volume_;
   }
 
@@ -153,14 +153,14 @@ public:
   void setLevels(const ProcessingGroupConfig &conf, double threshold_scaling,
                  size_t channels, double sloppyFactor, size_t delay,
                  const ArrayTraits<A...> &relativeBandWeights) {
-    for (size_t i = 0; i < ProcessingGrouspConfig::MAX_GROUPS; i++) {
+    for (size_t i = 0; i < ProcessingGroupsConfig::MAX_GROUPS; i++) {
       double v = Values::force_between(conf.volume[i],
                                        ProcessingGroupConfig::MIN_VOLUME,
                                        ProcessingGroupConfig::MAX_VOLUME);
       volume_[i] = v < 1e-6 ? 0 : v;
     }
     delay_ = delay;
-    useSub_ = conf.use_sub == 1;
+    useSub_ = conf.useSub == 1;
     mono_ = conf.mono == 1;
     double threshold = Value<double>::min(conf.threshold * threshold_scaling,
                                           ProcessingGroupConfig::MAX_THRESHOLD);
@@ -185,7 +185,7 @@ public:
 
   void approach(const GroupRuntimeData<T, BANDS> &target,
                 const IntegrationCoefficients<T> &integrator) {
-    for (size_t i = 0; i < ProcessingGrouspConfig::MAX_GROUPS; i++) {
+    for (size_t i = 0; i < ProcessingGroupsConfig::MAX_GROUPS; i++) {
       integrator.integrate(target.volume_[i], volume_[i]);
     }
     integrator.integrate(target.limiterThreshold_, limiterThreshold_);
@@ -293,15 +293,15 @@ public:
   void configure(const SpeakermanConfig &config, double sampleRate,
                  const ArrayTraits<A...> &bandWeights,
                  double fastestPeakWeight) {
-    if (config.processingGroups != GROUPS) {
+    if (config.processingGroups.groups != GROUPS) {
       throw std::invalid_argument("Cannot change number of groups run-time");
     }
     double subBaseThreshold = ProcessingGroupConfig::MAX_THRESHOLD;
     double peakWeight = Values::force_between(fastestPeakWeight, 0.1, 1.0);
     double max_group_threshold = 0;
 
-    for (size_t group = 0; group < config.processingGroups; group++) {
-      speakerman::ProcessingGroupConfig sourceConf = config.group[group];
+    for (size_t group = 0; group < config.processingGroups.groups; group++) {
+      speakerman::ProcessingGroupConfig sourceConf = config.processingGroups.group[group];
 
       GroupRuntimeData<T, BANDS> &targetConf = groupConfig_[group];
       targetConf.setFilterConfig(
@@ -318,7 +318,7 @@ public:
                                             ProcessingGroupConfig::MIN_DELAY,
                                             ProcessingGroupConfig::MAX_DELAY);
       targetConf.setLevels(sourceConf, config.threshold_scaling,
-                           config.groupChannels, fastestPeakWeight, delay,
+                           config.processingGroups.channels, fastestPeakWeight, delay,
                            bandWeights);
 
       subBaseThreshold = Values::min(subBaseThreshold, groupThreshold);

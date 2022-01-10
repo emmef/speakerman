@@ -23,6 +23,7 @@
 
 #include <speakerman/NamedConfig.h>
 #include <limits>
+#include <algorithm>
 
 namespace speakerman {
 
@@ -149,6 +150,57 @@ static void fixedValueIfUnsetOrBoxedIfOutOfRange(T &value, T value_if_unset, T m
   }
 }
 
+template <typename T>
+static bool setDefaultOrBoxedFromSourceIfUnset(T &value, T defaultValue, T sourceValue, T minimum, T maximum) {
+  if (!isUnsetConfigValue(value)) {
+    return true;
+  }
+  if (isUnsetConfigValue(sourceValue)) {
+    if (isUnsetConfigValue(defaultValue)) {
+      return false;
+    }
+    value = defaultValue;
+  }
+  else {
+    value = std::clamp(sourceValue, minimum, maximum);
+  }
+  return true;
+}
+
+template <typename T>
+static bool setDefaultOrFromSourceIfUnset(T &value, T defaultValue, T sourceValue) {
+  if (!isUnsetConfigValue(value)) {
+    return true;
+  }
+  if (isUnsetConfigValue(sourceValue)) {
+    if (isUnsetConfigValue(defaultValue)) {
+      return false;
+    }
+    value = defaultValue;
+  }
+  else {
+    value = sourceValue;
+  }
+  return true;
+}
+
+template <typename T>
+static bool setBoxedFromSetSource(T &value, T sourceValue, T minimum, T maximum) {
+  if (isUnsetConfigValue(sourceValue)) {
+    return false;
+  }
+  value = std::clamp(sourceValue, minimum, maximum);
+  return true;
+}
+
+template <typename T>
+static bool setFromSetSource(T &value, T sourceValue) {
+  if (isUnsetConfigValue(sourceValue)) {
+    return false;
+  }
+  value = sourceValue;
+  return true;
+}
 
 } // namespace speakerman
 

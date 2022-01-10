@@ -251,6 +251,14 @@ const LogicalPortMap AbstractLogicalGroupsConfig::createMapping() const {
   }
   return map;
 }
+size_t AbstractLogicalGroupsConfig::getTotalChannels() const {
+  size_t channels = 0;
+  size_t groups = getGroupCount();
+  for (size_t i = 0; i < groups; i++) {
+    channels += group[i].getPortCount();
+  }
+  return channels;
+}
 
 LogicalPortMapEntry &LogicalPortMap::operator[](size_t i) {
   return entries[tdap::IndexPolicy::array(i, count)];

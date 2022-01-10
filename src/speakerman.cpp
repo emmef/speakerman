@@ -137,7 +137,7 @@ createManagerSampleType(const SpeakermanConfig &config) {
   static_assert(is_floating_point<F>::value,
                 "Sample type must be floating point");
 
-  switch (config.groupChannels) {
+  switch (config.processingGroups.channels) {
   case 1:
     return new SpeakerManager<F, 1, GROUPS, CROSSOVERS>(config);
   case 2:
@@ -157,7 +157,7 @@ template <typename F, size_t CROSSOVERS>
 static AbstractSpeakerManager *
 createManagerGroup(const SpeakermanConfig &config) {
 
-  switch (config.processingGroups) {
+  switch (config.processingGroups.groups) {
   case 1:
     return createManagerSampleType<F, 1, CROSSOVERS>(config);
   case 2:

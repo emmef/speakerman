@@ -50,26 +50,44 @@ struct ProcessingGroupConfig : public NamedConfig {
 
   static constexpr int DEFAULT_MONO = 0;
 
-  double threshold = DEFAULT_THRESHOLD;
-  double volume[LogicalGroupConfig::MAX_CHANNELS];
-  double delay = DEFAULT_DELAY;
-  int use_sub = DEFAULT_USE_SUB;
-  int mono = DEFAULT_MONO;
+  double threshold = UnsetValue<double>::value;
+  double volume[MAX_CHANNELS];
+  double delay = UnsetValue<double>::value;
+  int useSub = UnsetValue<int>::value;
+
+  int mono = UnsetValue<int>::value;
   EqualizerConfig eq[MAX_EQS];
-  size_t eqs = DEFAULT_EQS;
+  size_t eqs = UnsetValue<size_t>::value;
 
-  static const ProcessingGroupConfig defaultConfig(size_t group_id);
+  ProcessingGroupConfig();
 
-  static const ProcessingGroupConfig unsetConfig();
+  void makeValidateBasedOn(const ProcessingGroupConfig &copyFrom, size_t groupId,
+                           size_t logicalChannels);
 
-  void set_if_unset(const ProcessingGroupConfig &config_if_unset);
+  void copyRuntimeValues(const ProcessingGroupConfig &copyFrom);
+
+  static const ProcessingGroupConfig &unsetConfig();
 
   void setDefaultNumberedName(size_t i);
 };
 
-struct ProcessingGrouspConfig {
+struct ProcessingGroupsConfig {
   static constexpr size_t MAX_GROUPS = 4;
 
+  static constexpr size_t MIN_GROUPS = 1;
+  static constexpr size_t DEFAULT_GROUPS = 1;
+
+  static constexpr size_t MIN_GROUP_CHANNELS = 1;
+  static constexpr size_t DEFAULT_GROUP_CHANNELS = 2;
+
+  size_t groups = UnsetValue< size_t>::value;
+  size_t channels = UnsetValue< size_t>::value;
+
+  ProcessingGroupConfig group[MAX_GROUPS];
+
+  ProcessingGroupsConfig();
+  void sanitizeInitial(size_t totalLogicalChannels);
+  void changeRuntimeValues(const ProcessingGroupsConfig &runtime);
 };
 
 } // namespace speakerman

@@ -2,65 +2,60 @@
 // Created by michel on 09-01-22.
 //
 
+#include <algorithm>
 #include <speakerman/ProcessingGroupConfig.h>
 #include <speakerman/UnsetValue.h>
 
 namespace speakerman {
 
-void ProcessingGroupConfig::set_if_unset(
-    const ProcessingGroupConfig &config_if_unset) {
-  size_t eq_idx;
-  if (fixedValueIfUnsetOrOutOfRange(eqs, config_if_unset.eqs, MIN_EQS,
-                                    MAX_EQS)) {
-    for (eq_idx = 0; eq_idx < eqs; eq_idx++) {
-      eq[eq_idx] = config_if_unset.eq[eq_idx];
+void ProcessingGroupConfig::makeValidateBasedOn(
+    const ProcessingGroupConfig &copyFrom, size_t groupId,
+    size_t logicalChannels) {
+  // Number of EQs
+  setDefaultOrBoxedFromSourceIfUnset(eqs, DEFAULT_EQS, copyFrom.eqs, MIN_EQS,
+                                     MAX_EQS);
+  // Set EQs themselves
+  size_t i = 0;
+  for (; i < eqs; i++) {
+    eq[i].set_if_unset(copyFrom.eq[i]);
+  }
+  for (; i < MAX_EQS; i++) {
+    eq[i] = EqualizerConfig::unsetConfig();
+  }
+  // Name
+  if (isUnsetConfigValue(name)) {
+    if (isUnsetConfigValue(copyFrom.name)) {
+      setDefaultNumberedName(groupId + 1);
+    } else {
+      copyToName(copyFrom.name);
     }
-  } else {
-    for (eq_idx = 0; eq_idx < eqs; eq_idx++) {
-      eq[eq_idx].set_if_unset(config_if_unset.eq[eq_idx]);
-    }
   }
-  for (; eq_idx < MAX_EQS; eq_idx++) {
-    eq[eq_idx] = EqualizerConfig::unsetConfig();
+  // Volumes
+  size_t zeroCount = std::min(
+      logicalChannels ? logicalChannels : LogicalGroupConfig::DEFAULT_CHANNELS,
+      MAX_CHANNELS);
+  std::fill(volume, volume + zeroCount, 0.0);
+  if (zeroCount < MAX_CHANNELS) {
+    std::fill(volume + zeroCount, volume + MAX_CHANNELS,
+              UnsetValue<double>::value);
   }
-
-  for (size_t group = 0; group < ProcessingGrouspConfig::MAX_GROUPS; group++) {
-    fixedValueIfUnsetOrOutOfRange(volume[group], config_if_unset.volume[group],
-                                  MIN_VOLUME, MAX_VOLUME);
-  }
-
-  fixedValueIfUnsetOrBoxedIfOutOfRange(threshold, config_if_unset.threshold,
-                                       MIN_THRESHOLD, MAX_THRESHOLD);
-  fixedValueIfUnsetOrBoxedIfOutOfRange(delay, config_if_unset.delay, MIN_DELAY,
-                                       MAX_DELAY);
-  fixedValueIfUnsetOrBoxedIfOutOfRange(use_sub, config_if_unset.use_sub, 0, 1);
-  fixedValueIfUnsetOrBoxedIfOutOfRange(mono, config_if_unset.mono, 0, 1);
-  if (UnsetValue<char[NAME_LENGTH + 1]>::is(name)) {
-    name[0] = 0;
-  }
+  // Other values
+  setDefaultOrBoxedFromSourceIfUnset(delay, DEFAULT_DELAY, copyFrom.delay,
+                                     MIN_DELAY, MAX_DELAY);
+  setDefaultOrBoxedFromSourceIfUnset(threshold, DEFAULT_THRESHOLD,
+                                     copyFrom.threshold, MIN_THRESHOLD,
+                                     MAX_THRESHOLD);
+  setDefaultOrFromSourceIfUnset(mono, DEFAULT_MONO, copyFrom.mono);
+  setDefaultOrFromSourceIfUnset(useSub, DEFAULT_USE_SUB, copyFrom.useSub);
 }
 
-const ProcessingGroupConfig
-ProcessingGroupConfig::defaultConfig(size_t group_id) {
-  ProcessingGroupConfig result;
-  result.setDefaultNumberedName(group_id + 1);
-  return result;
+ProcessingGroupConfig::ProcessingGroupConfig() : NamedConfig({0}) {
+  std::fill(volume, volume + MAX_CHANNELS, UnsetValue<double>::value);
+  std::fill(eq, eq + MAX_EQS, EqualizerConfig::unsetConfig());
 }
 
-const ProcessingGroupConfig ProcessingGroupConfig::unsetConfig() {
-  ProcessingGroupConfig result;
-  for (size_t i = 0; i < MAX_EQS; i++) {
-    result.eq[i] = EqualizerConfig::unsetConfig();
-  }
-  for (size_t i = 0; i < ProcessingGrouspConfig::MAX_GROUPS; i++) {
-    unsetConfigValue(result.volume[i]);
-  }
-  unsetConfigValue(result.eqs);
-  unsetConfigValue(result.threshold);
-  unsetConfigValue(result.delay);
-  unsetConfigValue(result.use_sub);
-  unsetConfigValue(result.mono);
-  result.name[0] = 0;
+const ProcessingGroupConfig &ProcessingGroupConfig::unsetConfig() {
+  static ProcessingGroupConfig result;
   return result;
 }
 
@@ -68,6 +63,54 @@ void ProcessingGroupConfig::setDefaultNumberedName(size_t groupId) {
   printToName("Processing group %zd", groupId);
 }
 
+void ProcessingGroupConfig::copyRuntimeValues(
+    const ProcessingGroupConfig &copyFrom) {
+  setBoxedFromSetSource(eqs, copyFrom.eqs, MIN_EQS, MAX_EQS);
+  // Set EQs themselves
+  size_t i = 0;
+  for (; i < eqs; i++) {
+    eq[i].set_if_unset(copyFrom.eq[i]);
+  }
+  for (; i < MAX_EQS; i++) {
+    eq[i] = EqualizerConfig::unsetConfig();
+  }
+  for (size_t i = 0; i < MAX_CHANNELS && !isUnsetConfigValue(volume[i]); i++) {
+    setBoxedFromSetSource(volume[i], copyFrom.volume[i], MIN_VOLUME, MAX_VOLUME);
+  }
+  setBoxedFromSetSource(delay, copyFrom.delay,
+                                     MIN_DELAY, MAX_DELAY);
+  setBoxedFromSetSource(threshold, copyFrom.threshold, MIN_THRESHOLD,
+                                     MAX_THRESHOLD);
+  setFromSetSource(mono, copyFrom.mono);
+  setFromSetSource(useSub, copyFrom.useSub);
+}
 
+// ProcessingGroupsConfig
+
+ProcessingGroupsConfig::ProcessingGroupsConfig() {
+  std::fill(group, group + MAX_GROUPS, ProcessingGroupConfig::unsetConfig());
+}
+
+void ProcessingGroupsConfig::sanitizeInitial(size_t totalChannels) {
+  setDefaultOrBoxedFromSourceIfUnset(groups, DEFAULT_GROUPS, groups, MIN_GROUPS,
+                                     MAX_GROUPS);
+  size_t maxChannels = groups ? LogicalGroupConfig::MAX_CHANNELS / groups
+                              : LogicalGroupConfig::MAX_CHANNELS;
+  setDefaultOrBoxedFromSourceIfUnset(channels, DEFAULT_GROUP_CHANNELS, channels,
+                                     MIN_GROUP_CHANNELS, maxChannels);
+  size_t i = 0;
+  for (; i < groups; i++) {
+    group[i].makeValidateBasedOn(group[i], i, totalChannels);
+  }
+  for (; i < MAX_GROUPS; i++) {
+    group[i] = ProcessingGroupConfig::unsetConfig();
+  }
+}
+void ProcessingGroupsConfig::changeRuntimeValues(
+    const ProcessingGroupsConfig &runtime) {
+  for (size_t i = 0; i < groups; i++) {
+    group[i].copyRuntimeValues(runtime.group[i]);
+  }
+}
 
 } // namespace speakerman
