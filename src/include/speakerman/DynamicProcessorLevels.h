@@ -32,7 +32,7 @@ using tdap::IndexPolicy;
 using tdap::Values;
 
 class DynamicProcessorLevels {
-  double signal_square_[ProcessingGroupConfig::MAX_GROUPS + 1];
+  double signal_square_[ProcessingGrouspConfig::MAX_GROUPS + 1];
   size_t channels_;
   size_t count_;
 

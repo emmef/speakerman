@@ -688,7 +688,7 @@ public:
       add_reader(key, true, eq[eq_idx].bandwidth);
     }
 
-    for (size_t group_idx = 0; group_idx < ProcessingGroupConfig::MAX_GROUPS;
+    for (size_t group_idx = 0; group_idx < ProcessingGrouspConfig::MAX_GROUPS;
          group_idx++) {
       string groupKey = PROCESSING_GROUP_CONFIG_KEY_GROUP;
       groupKey += "/";
@@ -982,7 +982,7 @@ const SpeakermanConfig SpeakermanConfig::defaultConfig() {
   result.logicalInputs = LogicalInputsConfig::defaultConfig();
   result.logicalOutputs = LogicalOutputsConfig ::defaultConfig();
 
-  for (size_t i = 0; i < ProcessingGroupConfig::MAX_GROUPS; i++) {
+  for (size_t i = 0; i < ProcessingGrouspConfig::MAX_GROUPS; i++) {
     result.group[i] = ProcessingGroupConfig::defaultConfig(i);
   }
   result.detection = DetectionConfig::defaultConfig();
@@ -997,7 +997,7 @@ const SpeakermanConfig SpeakermanConfig::unsetConfig() {
   result.logicalInputs = LogicalInputsConfig::unsetConfig();
   result.logicalOutputs = LogicalOutputsConfig ::unsetConfig();
 
-  for (size_t i = 0; i < ProcessingGroupConfig::MAX_GROUPS; i++) {
+  for (size_t i = 0; i < ProcessingGrouspConfig::MAX_GROUPS; i++) {
     result.group[i] = ProcessingGroupConfig::unsetConfig();
   }
   result.detection.unsetConfig();
@@ -1031,7 +1031,7 @@ void SpeakermanConfig::set_if_unset(const SpeakermanConfig &config_if_unset,
   size_t group_idx;
   if (fixedValueIfUnsetOrOutOfRange(
           processingGroups, config_if_unset.processingGroups, MIN_GROUPS,
-          ProcessingGroupConfig::MAX_GROUPS)) {
+          ProcessingGrouspConfig::MAX_GROUPS)) {
     for (group_idx = 0; group_idx < processingGroups; group_idx++) {
       group[group_idx] = config_if_unset.group[group_idx];
     }
@@ -1040,7 +1040,7 @@ void SpeakermanConfig::set_if_unset(const SpeakermanConfig &config_if_unset,
       group[group_idx].set_if_unset(config_if_unset.group[group_idx]);
     }
   }
-  for (; group_idx < ProcessingGroupConfig::MAX_GROUPS; group_idx++) {
+  for (; group_idx < ProcessingGrouspConfig::MAX_GROUPS; group_idx++) {
     group[group_idx] = ProcessingGroupConfig::unsetConfig();
   }
   detection.set_if_unset(config_if_unset.detection);

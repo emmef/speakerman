@@ -28,7 +28,6 @@
 namespace speakerman {
 
 struct ProcessingGroupConfig : public NamedConfig {
-  static constexpr size_t MAX_GROUPS = 4;
   static constexpr size_t MAX_CHANNELS = 16;
 
   static constexpr size_t MIN_EQS = 0;
@@ -66,6 +65,11 @@ struct ProcessingGroupConfig : public NamedConfig {
   void set_if_unset(const ProcessingGroupConfig &config_if_unset);
 
   void setDefaultNumberedName(size_t i);
+};
+
+struct ProcessingGrouspConfig {
+  static constexpr size_t MAX_GROUPS = 4;
+
 };
 
 } // namespace speakerman

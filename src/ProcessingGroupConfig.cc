@@ -24,7 +24,7 @@ void ProcessingGroupConfig::set_if_unset(
     eq[eq_idx] = EqualizerConfig::unsetConfig();
   }
 
-  for (size_t group = 0; group < ProcessingGroupConfig::MAX_GROUPS; group++) {
+  for (size_t group = 0; group < ProcessingGrouspConfig::MAX_GROUPS; group++) {
     fixedValueIfUnsetOrOutOfRange(volume[group], config_if_unset.volume[group],
                                   MIN_VOLUME, MAX_VOLUME);
   }
@@ -52,7 +52,7 @@ const ProcessingGroupConfig ProcessingGroupConfig::unsetConfig() {
   for (size_t i = 0; i < MAX_EQS; i++) {
     result.eq[i] = EqualizerConfig::unsetConfig();
   }
-  for (size_t i = 0; i < ProcessingGroupConfig::MAX_GROUPS; i++) {
+  for (size_t i = 0; i < ProcessingGrouspConfig::MAX_GROUPS; i++) {
     unsetConfigValue(result.volume[i]);
   }
   unsetConfigValue(result.eqs);
