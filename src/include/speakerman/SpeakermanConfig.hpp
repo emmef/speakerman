@@ -54,7 +54,7 @@ struct SpeakermanConfig {
 
   static constexpr size_t MIN_SUB_OUTPUT = 0;
   static constexpr size_t DEFAULT_SUB_OUTPUT = 1;
-  static constexpr size_t MAX_SUB_OUTPUT = ProcessingGroupConfig::MAX_GROUPS * ProcessingGroupConfig::MAX_CHANNELS + 1;
+  static constexpr size_t MAX_SUB_OUTPUT = ProcessingGroupConfig::MAX_CHANNELS + 1;
 
   static constexpr size_t MIN_CROSSOVERS = 1;
   static constexpr size_t DEFAULT_CROSSOVERS = 2;
@@ -78,7 +78,7 @@ struct SpeakermanConfig {
   DetectionConfig detection;
   LogicalInputsConfig logicalInputs;
   LogicalOutputsConfig logicalOutputs;
-  ProcessingGroupConfig group[ProcessingGroupConfig::MAX_GROUPS];
+  ProcessingGroupConfig group[ProcessingGrouspConfig::MAX_GROUPS];
 
   EqualizerConfig eq[MAX_EQS];
   size_t eqs = DEFAULT_EQS;

@@ -257,8 +257,7 @@ public:
   virtual bool needsSampleRate() const override { return true; }
 
   SpeakerManager(const SpeakermanConfig &config)
-      : portDefinitions_(1 + 2 * ProcessingGroupConfig::MAX_GROUPS *
-                                 ProcessingGroupConfig::MAX_CHANNELS),
+      : portDefinitions_(1 + 2 * ProcessingGroupConfig::MAX_CHANNELS),
         config_(config) {
     std::unique_ptr<char> name(new char[1 + Names::get_port_size()]);
     if (config.subOutput > 0) {
