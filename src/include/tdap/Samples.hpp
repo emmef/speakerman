@@ -1,5 +1,7 @@
+#ifndef TDAP_M_SAMPLES_HPP
+#define TDAP_M_SAMPLES_HPP
 /*
- * Samples.hpp
+ * tdap/Samples.hpp
  *
  * Part of 'Speaker management system'
  *
@@ -18,9 +20,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-#ifndef SMS_SPEAKERMAN_SAMPLES_GUARD_H_
-#define SMS_SPEAKERMAN_SAMPLES_GUARD_H_
 
 #include <tdap/FixedSizeArray.hpp>
 
@@ -174,4 +173,4 @@ struct SampleMatrix
 
 } // namespace tdap
 
-#endif /* SMS_SPEAKERMAN_SAMPLES_GUARD_H_ */
+#endif // TDAP_M_SAMPLES_HPP

@@ -1,5 +1,5 @@
-#ifndef SPEAKERMAN_DETECTIONCONFIG_H
-#define SPEAKERMAN_DETECTIONCONFIG_H
+#ifndef SPEAKERMAN_M_DETECTION_CONFIG_H
+#define SPEAKERMAN_M_DETECTION_CONFIG_H
 /*
  * speakerman/DetectionConfig.h
  *
@@ -60,4 +60,4 @@ struct DetectionConfig {
 
 } // namespace speakerman
 
-#endif // SPEAKERMAN_DETECTIONCONFIG_H
+#endif // SPEAKERMAN_M_DETECTION_CONFIG_H

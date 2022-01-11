@@ -28,7 +28,7 @@
 #include <speakerman/jack/Port.hpp>
 #include <tdap/Array.hpp>
 
-namespace speakerman {
+namespace speakerman::jack {
 
 using namespace tdap;
 
@@ -164,7 +164,7 @@ bool Port::try_unregister_port(jack_client_t *client, jack_port_t *port,
   return ErrorHandler::returnIfZero(jack_port_unregister(client, port), result);
 }
 
-speakerman::NameListPolicy &Ports::nameListPolicy() {
+NameListPolicy &Ports::nameListPolicy() {
   static NameListPolicy policy;
   return policy;
 }
@@ -208,7 +208,7 @@ size_t Ports::totalPortNameLengthInDirection(PortDirection dir) const {
   return count;
 }
 
-speakerman::NameList Ports::portsInDirection(PortDirection dir) const {
+NameList Ports::portsInDirection(PortDirection dir) const {
   size_t nameLength = totalPortNameLengthInDirection(dir);
   size_t count = portCountInDirection(dir);
   NameList list(nameListPolicy(), count, nameLength + count);
@@ -234,11 +234,11 @@ size_t Ports::outputCount() const {
   return portCountInDirection(PortDirection::OUT);
 }
 
-speakerman::NameList Ports::inputNames() const {
+NameList Ports::inputNames() const {
   return portsInDirection(PortDirection::IN);
 }
 
-speakerman::NameList Ports::outputNames() const {
+NameList Ports::outputNames() const {
   return portsInDirection(PortDirection::OUT);
 }
 
@@ -282,4 +282,4 @@ void Ports::unregisterPorts(jack_client_t *client) {
   unregister(client, ports_.size());
 }
 
-} /* End of namespace speakerman */
+} // namespace speakerman

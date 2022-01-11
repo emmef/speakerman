@@ -1,3 +1,5 @@
+#ifndef TDAP_M_WEIGHTING_HPP
+#define TDAP_M_WEIGHTING_HPP
 /*
  * tdap/Weighting.hpp
  *
@@ -19,9 +21,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-#ifndef TDAP_WEIGHTING_HEADER_GUARD
-#define TDAP_WEIGHTING_HEADER_GUARD
 
 #include <cmath>
 #include <iostream>
@@ -253,4 +252,4 @@ struct ACurves {
 
 } // namespace tdap
 
-#endif /* TDAP_WEIGHTING_HEADER_GUARD */
+#endif // TDAP_M_WEIGHTING_HPP

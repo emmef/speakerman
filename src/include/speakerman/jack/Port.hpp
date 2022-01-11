@@ -1,5 +1,7 @@
+#ifndef SPEAKERMAN_JACK_M_PORT_HPP
+#define SPEAKERMAN_JACK_M_PORT_HPP
 /*
- * Port.hpp
+ * speakerman/jack/Port.hpp
  *
  * Part of 'Speaker management system'
  *
@@ -18,16 +20,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-#ifndef SMS_SPEAKERMAN_PORT_GUARD_H_
-#define SMS_SPEAKERMAN_PORT_GUARD_H_
-
 #include "Names.hpp"
 #include "PortDefinition.hpp"
 #include <jack/types.h>
 #include <tdap/Array.hpp>
 
-namespace speakerman {
+namespace speakerman::jack {
 
 using namespace tdap;
 
@@ -136,6 +134,6 @@ public:
   void unregisterPorts(jack_client_t *client);
 };
 
-} /* End of namespace speakerman */
+} // namespace speakerman::jack
 
-#endif /* SMS_SPEAKERMAN_PORT_GUARD_H_ */
+#endif // SPEAKERMAN_JACK_M_PORT_HPP

@@ -1,5 +1,5 @@
-#ifndef SPEAKERMAN_SPEAKERMANAGERCONTROL_H
-#define SPEAKERMAN_SPEAKERMANAGERCONTROL_H
+#ifndef SPEAKERMAN_M_SPEAKER_MANAGER_CONTROL_H
+#define SPEAKERMAN_M_SPEAKER_MANAGER_CONTROL_H
 /*
  * speakerman/SpeakerManagerControl.h
  *
@@ -38,10 +38,10 @@ public:
   virtual bool getLevels(DynamicProcessorLevels *levels,
                          std::chrono::milliseconds timeoutMillis) = 0;
 
-  virtual const ProcessingStatistics getStatistics() const = 0;
+  virtual const jack::ProcessingStatistics getStatistics() const = 0;
   virtual ~SpeakerManagerControl() = default;
 };
 
 } // namespace speakerman
 
-#endif // SPEAKERMAN_SPEAKERMANAGERCONTROL_H
+#endif // SPEAKERMAN_M_SPEAKER_MANAGER_CONTROL_H

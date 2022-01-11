@@ -1,5 +1,7 @@
+#ifndef SPEAKERMAN_M_SPEAKER_MANAGER_HPP
+#define SPEAKERMAN_M_SPEAKER_MANAGER_HPP
 /*
- * SpeakerManager.hpp
+ * speakerman/SpeakerManager.hpp
  *
  * Part of 'Speaker management system'
  *
@@ -18,9 +20,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-#ifndef SMS_SPEAKERMAN_SPEAKERMANAGER_GUARD_H_
-#define SMS_SPEAKERMAN_SPEAKERMANAGER_GUARD_H_
 
 #include "DynamicsProcessor.hpp"
 #include "LogicalGroupConfig.h"
@@ -41,7 +40,7 @@
 namespace speakerman {
 
 class AbstractSpeakerManager : public SpeakerManagerControl,
-                               public JackProcessor {};
+                               public jack::JackProcessor {};
 
 template <typename T, size_t CHANNELS_PER_GROUP, size_t GROUPS,
           size_t CROSSOVERS>
@@ -93,7 +92,7 @@ class SpeakerManager : public AbstractSpeakerManager {
     return thres;
   }
 
-  PortDefinitions portDefinitions_;
+  jack::PortDefinitions portDefinitions_;
   SpeakermanConfig config_;
   Processor processor;
   std::mutex mutex_;
@@ -113,11 +112,11 @@ class SpeakerManager : public AbstractSpeakerManager {
   TransportData preparedConfigData;
 
 protected:
-  const PortDefinitions &getDefinitions() override {
+  const jack::PortDefinitions &getDefinitions() override {
     return portDefinitions_;
   }
 
-  virtual bool onMetricsUpdate(ProcessingMetrics metrics) override {
+  virtual bool onMetricsUpdate(jack::ProcessingMetrics metrics) override {
     std::cout << "Updated metrics: {rate:" << metrics.sampleRate
               << ", bsize:" << metrics.bufferSize << "}" << std::endl;
     processor.setSampleRate(metrics.sampleRate, crossovers(), config_);
@@ -133,7 +132,7 @@ protected:
 
   void connectPorts(jack_client_t *client, const char *sourceName,
                     const char *destinationName) {
-    if (!Port::try_connect_ports(client, sourceName, destinationName)) {
+    if (!jack::Port::try_connect_ports(client, sourceName, destinationName)) {
       std::cout << "Could not connect \"" << sourceName << "\" with \""
                 << destinationName << "\"" << std::endl;
     } else {
@@ -143,14 +142,14 @@ protected:
   }
 
   virtual void onPortsEnabled(jack_client_t *client,
-                              const Ports &ports) override {
+                              const jack::Ports &ports) override {
     const char *unspecified = ".*";
-    PortNames playbackPortNames = JackClient::portNames(
+    jack::PortNames playbackPortNames = jack::JackClient::portNames(
         client, "^system", unspecified, JackPortIsPhysical | JackPortIsInput);
-    PortNames capturePortNames = JackClient::portNames(
+    jack::PortNames capturePortNames = jack::JackClient::portNames(
         client, "^system", unspecified, JackPortIsPhysical | JackPortIsOutput);
-    NameList inputs = ports.inputNames();
-    NameList outputs = ports.outputNames();
+    jack::NameList inputs = ports.inputNames();
+    jack::NameList outputs = ports.outputNames();
 
     size_t captureCount = capturePortNames.count();
     size_t inputCount = Values::min(inputs.count(), captureCount);
@@ -186,7 +185,7 @@ protected:
     std::cout << "No action on reset" << std::endl;
   }
 
-  virtual bool process(jack_nframes_t frames, const Ports &ports) override {
+  virtual bool process(jack_nframes_t frames, const jack::Ports &ports) override {
     auto lockFreeData =
         transport
             .getLockFreeNoFence(); // method already called from within a fence
@@ -259,14 +258,14 @@ public:
   SpeakerManager(const SpeakermanConfig &config)
       : portDefinitions_(1 + 2 * ProcessingGroupConfig::MAX_CHANNELS),
         config_(config) {
-    std::unique_ptr<char> name(new char[1 + Names::get_port_size()]);
+    std::unique_ptr<char> name(new char[1 + jack::Names::get_port_size()]);
     if (config.subOutput > 0) {
       portDefinitions_.addOutput("out_sub");
       cout << "I: added output "
            << "out_sub" << std::endl;
     }
     for (size_t channel = 0; channel < Processor::OUTPUTS - 1; channel++) {
-      snprintf(name.get(), 1 + Names::get_port_size(), "out_%zu_%zu",
+      snprintf(name.get(), 1 + jack::Names::get_port_size(), "out_%zu_%zu",
                1 + channel / CHANNELS_PER_GROUP,
                1 + channel % CHANNELS_PER_GROUP);
       portDefinitions_.addOutput(name.get());
@@ -274,7 +273,7 @@ public:
     }
     auto map = config.logicalInputs.createMapping();
     for (const auto entry : map) {
-      snprintf(name.get(), 1 + Names::get_port_size(), "in_%zu_%zu",
+      snprintf(name.get(), 1 + jack::Names::get_port_size(), "in_%zu_%zu",
                entry.logicalGroup + 1, entry.groupChannel + 1);
       portDefinitions_.addInput(name.get());
       cout << "I: added input " << name.get() << std::endl;
@@ -317,11 +316,11 @@ public:
     return false;
   }
 
-  const ProcessingStatistics getStatistics() const override {
+  const jack::ProcessingStatistics getStatistics() const override {
     return JackProcessor::getStatistics();
   }
 };
 
-} /* End of namespace speakerman */
+} // namespace speakerman
 
-#endif /* SMS_SPEAKERMAN_SPEAKERMANAGER_GUARD_H_ */
+#endif // SPEAKERMAN_M_SPEAKER_MANAGER_HPP

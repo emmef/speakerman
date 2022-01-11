@@ -1,5 +1,7 @@
+#ifndef SPEAKERMAN_UTILS_M_MUTEX_HPP
+#define SPEAKERMAN_UTILS_M_MUTEX_HPP
 /*
- * Mutex.hpp
+ * speakerman/utils/Mutex.hpp
  *
  * Part of 'Speaker management system'
  *
@@ -19,12 +21,9 @@
  * limitations under the License.
  */
 
-#ifndef SMS_SPEAKERMAN_MUTEX_GUARD_H_
-#define SMS_SPEAKERMAN_MUTEX_GUARD_H_
-
 #include <mutex>
 
-namespace speakerman {
+namespace speakerman::utils {
 
 class Mutex;
 
@@ -63,6 +62,6 @@ public:
 
 // Your definitions
 
-} /* End of namespace speakerman */
+} // namespace speakerman::utils
 
-#endif /* SMS_SPEAKERMAN_MUTEX_GUARD_H_ */
+#endif // SPEAKERMAN_UTILS_M_MUTEX_HPP

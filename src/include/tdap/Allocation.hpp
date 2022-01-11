@@ -1,3 +1,5 @@
+#ifndef TDAP_M_ALLOCATION_HPP
+#define TDAP_M_ALLOCATION_HPP
 /*
  * tdap/Allocation.hpp
  *
@@ -19,9 +21,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-#ifndef TDAP_ALLOCATION_HEADER_GUARD
-#define TDAP_ALLOCATION_HEADER_GUARD
 
 #include <cstdlib>
 #include <mutex>
@@ -345,9 +344,6 @@ namespace tdap {
         }
     };
 
-    
-    
-    
-} /* End of name space tdap */
+} // namespace tdap
 
-#endif /* TDAP_ALLOCATION_HEADER_GUARD */
+#endif // TDAP_M_ALLOCATION_HPP

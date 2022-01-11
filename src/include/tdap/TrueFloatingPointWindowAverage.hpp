@@ -1,3 +1,5 @@
+#ifndef TDAP_M_TRUE_FLOATING_POINT_WINDOW_AVERAGE_HPP
+#define TDAP_M_TRUE_FLOATING_POINT_WINDOW_AVERAGE_HPP
 /*
  * tdap/TrueFloatingPointWindowAverage.hpp
  *
@@ -19,9 +21,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-#ifndef TDAP_TRUE_RMS_HEADER_GUARD
-#define TDAP_TRUE_RMS_HEADER_GUARD
 
 #include <iostream>
 
@@ -679,4 +678,4 @@ public:
 
 } // namespace tdap
 
-#endif /* TDAP_TRUE_RMS_HEADER_GUARD */
+#endif // TDAP_M_TRUE_FLOATING_POINT_WINDOW_AVERAGE_HPP

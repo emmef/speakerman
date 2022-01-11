@@ -1,5 +1,5 @@
-#ifndef SPEAKERMAN_LIMITER_HPP
-#define SPEAKERMAN_LIMITER_HPP
+#ifndef TDAP_M_LIMITER_HPP
+#define TDAP_M_LIMITER_HPP
 /*
  * tdap/Limiter.hpp
  *
@@ -385,4 +385,4 @@ public:
 
 } // namespace tdap
 
-#endif // SPEAKERMAN_LIMITER_HPP
+#endif // TDAP_M_LIMITER_HPP

@@ -1,5 +1,5 @@
-#ifndef SPEAKERMAN_PROCESSINGGROUPCONFIG_H
-#define SPEAKERMAN_PROCESSINGGROUPCONFIG_H
+#ifndef SPEAKERMAN_M_PROCESSING_GROUP_CONFIG_H
+#define SPEAKERMAN_M_PROCESSING_GROUP_CONFIG_H
 /*
  * speakerman/ProcessingGroupConfig.h
  *
@@ -92,4 +92,4 @@ struct ProcessingGroupsConfig {
 
 } // namespace speakerman
 
-#endif // SPEAKERMAN_PROCESSINGGROUPCONFIG_H
+#endif // SPEAKERMAN_M_PROCESSING_GROUP_CONFIG_H

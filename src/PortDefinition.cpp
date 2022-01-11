@@ -24,7 +24,7 @@
 #include <speakerman/jack/ErrorHandler.hpp>
 #include <speakerman/jack/PortDefinition.hpp>
 
-namespace speakerman {
+namespace speakerman::jack {
 
 using namespace tdap;
 using namespace std;
@@ -173,7 +173,7 @@ void PortDefinitions::addOutput(const char *name) {
   add(PortDefinition::output(name));
 }
 
-const speakerman::PortDefinition::Data
+const PortDefinition::Data
 PortDefinitions::getByName(const char *name) const {
   int idx = indexOf(name);
   if (idx >= 0) {
@@ -186,20 +186,20 @@ PortDefinitions::getByName(const char *name) const {
   throw invalid_argument(message);
 }
 
-const speakerman::PortDefinition::Data *
+const PortDefinition::Data *
 PortDefinitions::getByNamePtr(const char *name) const {
   int idx = indexOf(name);
   return idx < 0 ? nullptr : &operator[](idx);
 }
 
-const speakerman::PortDefinition::Data &
+const PortDefinition::Data &
     PortDefinitions::operator[](size_t index) const {
   return definitions[index];
 }
 
-const speakerman::PortDefinition
+const PortDefinition
 PortDefinitions::operator()(size_t index) const {
   return PortDefinition(definitions[index]);
 }
 
-} /* End of namespace speakerman */
+} // namespace speakerman

@@ -25,7 +25,7 @@
 #include <tdap/Allocation.hpp>
 #include <tdap/Count.hpp>
 
-namespace speakerman {
+namespace speakerman::jack {
 
 using namespace std;
 using namespace tdap;
@@ -371,4 +371,4 @@ PortNames::~PortNames() {
   }
 }
 
-} /* End of namespace speakerman */
+} // namespace speakerman

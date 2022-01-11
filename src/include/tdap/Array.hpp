@@ -1,3 +1,5 @@
+#ifndef TDAP_M_ARRAY_HPP
+#define TDAP_M_ARRAY_HPP
 /*
  * tdap/Array.hpp
  *
@@ -19,9 +21,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-#ifndef TDAP_ARRAY_HEADER_GUARD
-#define TDAP_ARRAY_HEADER_GUARD
 
 #include "debug.hpp"
 #include <tdap/ArrayTraits.hpp>
@@ -211,4 +210,4 @@ public:
 
 } // namespace tdap
 
-#endif /* TDAP_ARRAY_HEADER_GUARD */
+#endif // TDAP_M_ARRAY_HPP

@@ -1,3 +1,5 @@
+#ifndef TDAP_M_IIR_BIQUAD_HPP
+#define TDAP_M_IIR_BIQUAD_HPP
 /*
  * tdap/IirBiquad.hpp
  *
@@ -19,9 +21,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-#ifndef TDAP_IIRBIQUAD_HEADER_GUARD
-#define TDAP_IIRBIQUAD_HEADER_GUARD
 
 #include <tdap/Frequency.hpp>
 #include <tdap/IirCoefficients.hpp>
@@ -262,4 +261,4 @@ struct BiquadFilter
 
 } // namespace tdap
 
-#endif /* TDAP_IIRBIQUAD_HEADER_GUARD */
+#endif // TDAP_M_IIR_BIQUAD_HPP

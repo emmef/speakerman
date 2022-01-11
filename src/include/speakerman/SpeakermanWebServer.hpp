@@ -1,5 +1,7 @@
+#ifndef SPEAKERMAN_M_SPEAKERMAN_WEB_SERVER_HPP
+#define SPEAKERMAN_M_SPEAKERMAN_WEB_SERVER_HPP
 /*
- * SpeakermanWebServer.hpp
+ * speakerman/SpeakermanWebServer.hpp
  *
  * Part of 'Speaker management system'
  *
@@ -18,9 +20,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-#ifndef SMS_SPEAKERMAN_WEBSERVER_GUARD_H_
-#define SMS_SPEAKERMAN_WEBSERVER_GUARD_H_
 
 #include <chrono>
 #include <mutex>
@@ -155,6 +154,6 @@ private:
                                 void *data);
 };
 
-} /* End of namespace speakerman */
+} // namespace speakerman
 
-#endif /* SMS_SPEAKERMAN_WEBSERVER_GUARD_H_ */
+#endif // SPEAKERMAN_M_SPEAKERMAN_WEB_SERVER_HPP

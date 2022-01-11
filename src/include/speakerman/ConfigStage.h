@@ -1,5 +1,5 @@
-#ifndef SPEAKERMAN_CONFIGSTAGE_H
-#define SPEAKERMAN_CONFIGSTAGE_H
+#ifndef SPEAKERMAN_M_CONFIG_STAGE_H
+#define SPEAKERMAN_M_CONFIG_STAGE_H
 /*
  * speakerman/ConfigStage.h
  *
@@ -26,4 +26,4 @@ enum class ConfigStage { Initial, Runtime };
 
 } // namespace speakerman
 
-#endif // SPEAKERMAN_CONFIGSTAGE_H
+#endif // SPEAKERMAN_M_CONFIG_STAGE_H

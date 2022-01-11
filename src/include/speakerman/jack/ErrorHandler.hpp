@@ -1,5 +1,7 @@
+#ifndef SPEAKERMAN_JACK_M_ERROR_HANDLER_HPP
+#define SPEAKERMAN_JACK_M_ERROR_HANDLER_HPP
 /*
- * ErrorHandler.hpp
+ * speakerman/jack/ErrorHandler.hpp
  *
  * Part of 'Speaker management system'
  *
@@ -19,15 +21,12 @@
  * limitations under the License.
  */
 
-#ifndef SMS_SPEAKERMAN_ERROR_HANDLER_GUARD_H_
-#define SMS_SPEAKERMAN_ERROR_HANDLER_GUARD_H_
-
 #include <atomic>
 #include <stdexcept>
 
 #include <jack/types.h>
 
-namespace speakerman {
+namespace speakerman::jack {
 
 using namespace std;
 
@@ -108,6 +107,6 @@ public:
   static bool returnIfZero(int value, int *result);
 };
 
-} /* End of namespace speakerman */
+} // namespace speakerman::jack
 
-#endif /* SMS_SPEAKERMAN_ERROR_HANDLER_GUARD_H_ */
+#endif // SPEAKERMAN_JACK_M_ERROR_HANDLER_HPP

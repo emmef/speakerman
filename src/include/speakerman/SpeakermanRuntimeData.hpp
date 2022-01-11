@@ -1,5 +1,7 @@
+#ifndef SPEAKERMAN_M_SPEAKERMAN_RUNTIME_DATA_HPP
+#define SPEAKERMAN_M_SPEAKERMAN_RUNTIME_DATA_HPP
 /*
- * SpeakermanConfig.hpp
+ * speakerman/SpeakermanRuntimeData.hpp
  *
  * Part of 'Speaker management system'
  *
@@ -18,9 +20,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-#ifndef SMS_SPEAKERMAN_SPEAKERMAN_RUNTIME_CONFIG_GUARD_H_
-#define SMS_SPEAKERMAN_SPEAKERMAN_RUNTIME_CONFIG_GUARD_H_
 
 #include <speakerman/SpeakermanConfig.hpp>
 #include <tdap/IirBiquad.hpp>
@@ -504,6 +503,6 @@ public:
   }
 };
 
-} /* End of namespace speakerman */
+} // namespace speakerman
 
-#endif /* SMS_SPEAKERMAN_SPEAKERMAN_RUNTIME_CONFIG_GUARD_H_ */
+#endif // SPEAKERMAN_M_SPEAKERMAN_RUNTIME_DATA_HPP

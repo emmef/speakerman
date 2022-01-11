@@ -1,3 +1,5 @@
+#ifndef TDAP_M_DEBUG_HPP
+#define TDAP_M_DEBUG_HPP
 /*
  * tdap/debug.hpp
  *
@@ -19,9 +21,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-#ifndef TDAP_DEBUG_HEADER_GUARD
-#define TDAP_DEBUG_HEADER_GUARD
 
 /**
  * Defining some facilities that can be used in unit tests
@@ -97,4 +96,4 @@ static inline void debugArrayResetCounts() {}
 
 } // namespace tdap
 
-#endif /* TDAP_DEBUG_HEADER_GUARD */
+#endif // TDAP_M_DEBUG_HPP

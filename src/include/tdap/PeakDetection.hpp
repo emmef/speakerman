@@ -1,3 +1,5 @@
+#ifndef TDAP_M_PEAK_DETECTION_HPP
+#define TDAP_M_PEAK_DETECTION_HPP
 /*
  * tdap/PeakDetection.hpp
  *
@@ -19,9 +21,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-#ifndef PEAK_DETECTION_HEADER_GUARD
-#define PEAK_DETECTION_HEADER_GUARD
 
 #if defined(PEAK_DETECTION_LOGGING) ||                                         \
     defined(PEAK_DETECTION_CHEAP_MEMORY_LOGGING) ||                            \
@@ -577,4 +576,4 @@ using CheapPeakDetector = PeakDetectorBase<S, CheapPeakMemory<S>>;
 
 } // namespace tdap
 
-#endif /* PEAK_DETECTION_HEADER_GUARD */
+#endif // TDAP_M_PEAK_DETECTION_HPP

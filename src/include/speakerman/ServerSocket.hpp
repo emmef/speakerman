@@ -1,5 +1,7 @@
+#ifndef SPEAKERMAN_M_SERVER_SOCKET_HPP
+#define SPEAKERMAN_M_SERVER_SOCKET_HPP
 /*
- * WebServer.hpp
+ * speakerman/ServerSocket.hpp
  *
  * Part of 'Speaker management system'
  *
@@ -18,9 +20,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-#ifndef SMS_SPEAKERMAN_SERVER_SOCKET_GUARD_H_
-#define SMS_SPEAKERMAN_SERVER_SOCKET_GUARD_H_
 
 #include <condition_variable>
 #include <iostream>
@@ -126,6 +125,6 @@ private:
   bool enterWork(int *errorCode);
 };
 
-} /* End of namespace speakerman */
+} // namespace speakerman
 
-#endif /* SMS_SPEAKERMAN_SERVER_SOCKET_GUARD_H_ */
+#endif // SPEAKERMAN_M_SERVER_SOCKET_HPP

@@ -1,5 +1,5 @@
-#ifndef SPEAKERMAN_EQUALIZERCONFIG_H
-#define SPEAKERMAN_EQUALIZERCONFIG_H
+#ifndef SPEAKERMAN_M_EQUALIZER_CONFIG_H
+#define SPEAKERMAN_M_EQUALIZER_CONFIG_H
 /*
  * speakerman/EqualizerConfig.h
  *
@@ -47,4 +47,4 @@ struct EqualizerConfig {
 
 } // namespace speakerman
 
-#endif // SPEAKERMAN_EQUALIZERCONFIG_H
+#endif // SPEAKERMAN_M_EQUALIZER_CONFIG_H

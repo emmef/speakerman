@@ -233,4 +233,4 @@ void buffer_stream::flush() { write_ = read_ = 0; }
 
 void buffer_stream::close() { write_ = read_ = 0; }
 
-} /* End of namespace speakerman */
+} // namespace speakerman

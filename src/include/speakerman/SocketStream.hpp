@@ -1,5 +1,7 @@
+#ifndef SPEAKERMAN_M_SOCKET_STREAM_HPP
+#define SPEAKERMAN_M_SOCKET_STREAM_HPP
 /*
- * SocketStream.hpp
+ * speakerman/SocketStream.hpp
  *
  * Part of 'Speaker management system'
  *
@@ -18,9 +20,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-#ifndef SMS_SPEAKERMAN_SOCKET_STREAM_GUARD_H_
-#define SMS_SPEAKERMAN_SOCKET_STREAM_GUARD_H_
 
 #include <cerrno>
 #include <cstddef>
@@ -137,6 +136,6 @@ public:
 
   virtual ~socket_stream() {}
 };
-} /* End of namespace speakerman */
+} // namespace speakerman
 
-#endif /* SMS_SPEAKERMAN_SOCKET_STREAM_GUARD_H_ */
+#endif // SPEAKERMAN_M_SOCKET_STREAM_HPP

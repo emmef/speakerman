@@ -1,5 +1,7 @@
+#ifndef SPEAKERMAN_M_SINGLE_THREAD_FILE_CACHE_HPP
+#define SPEAKERMAN_M_SINGLE_THREAD_FILE_CACHE_HPP
 /*
- * SingleThreadFileCache.hpp
+ * speakerman/SingleThreadFileCache.hpp
  *
  * Part of 'Speaker management system'
  *
@@ -19,8 +21,6 @@
  * limitations under the License.
  */
 
-#ifndef SMS_SPEAKERMAN_SINGLE_THREAD_FILE_CACHE_GUARD_H_
-#define SMS_SPEAKERMAN_SINGLE_THREAD_FILE_CACHE_GUARD_H_
 
 #include <speakerman/Stream.hpp>
 #include <string>
@@ -52,6 +52,6 @@ public:
   ~file_entry();
 };
 
-} /* End of namespace speakerman */
+} // namespace speakerman
 
-#endif /* SMS_SPEAKERMAN_SINGLE_THREAD_FILE_CACHE_GUARD_H_ */
+#endif // SPEAKERMAN_M_SINGLE_THREAD_FILE_CACHE_HPP

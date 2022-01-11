@@ -1,5 +1,5 @@
-#ifndef SPEAKERMAN_STREAMOWNER_H
-#define SPEAKERMAN_STREAMOWNER_H
+#ifndef SPEAKERMAN_M_STREAM_OWNER_H
+#define SPEAKERMAN_M_STREAM_OWNER_H
 /*
  * speakerman/StreamOwner.h
  *
@@ -45,4 +45,4 @@ public:
 
 } // namespace speakerman
 
-#endif // SPEAKERMAN_STREAMOWNER_H
+#endif // SPEAKERMAN_M_STREAM_OWNER_H

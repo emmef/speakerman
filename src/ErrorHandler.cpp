@@ -24,7 +24,7 @@
 #include <speakerman/jack/ErrorHandler.hpp>
 #include <string>
 
-namespace speakerman {
+namespace speakerman::jack {
 
 thread_local const char *ErrorHandler::message_ = 0;
 thread_local bool ErrorHandler::force_log_;
@@ -91,4 +91,4 @@ bool ErrorHandler::returnIfZero(int value, int *result) {
   return value == 0;
 }
 
-} /* End of namespace speakerman */
+} // namespace speakerman

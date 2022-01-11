@@ -1,3 +1,5 @@
+#ifndef TDAP_M_FOLLOWERS_HPP
+#define TDAP_M_FOLLOWERS_HPP
 /*
  * tdap/Followers.hpp
  *
@@ -19,9 +21,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-#ifndef TDAP_FOLLOWERS_HEADER_GUARD
-#define TDAP_FOLLOWERS_HEADER_GUARD
 
 #include <algorithm>
 #include <tdap/Integration.hpp>
@@ -726,4 +725,4 @@ public:
 
 } // namespace tdap
 
-#endif /* TDAP_FOLLOWERS_HEADER_GUARD */
+#endif // TDAP_M_FOLLOWERS_HPP

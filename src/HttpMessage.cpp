@@ -703,4 +703,4 @@ void http_message::read_headers() {
   }
 }
 
-} /* End of namespace speakerman */
+} // namespace speakerman

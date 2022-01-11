@@ -1,5 +1,7 @@
+#ifndef SPEAKERMAN_JACK_M_JACK_PROCESSOR_HPP
+#define SPEAKERMAN_JACK_M_JACK_PROCESSOR_HPP
 /*
- * JackProcessor.hpp
+ * speakerman/jack/JackProcessor.hpp
  *
  * Part of 'Speaker management system'
  *
@@ -19,9 +21,6 @@
  * limitations under the License.
  */
 
-#ifndef SMS_SPEAKERMAN_JACKPROCESSOR_GUARD_H_
-#define SMS_SPEAKERMAN_JACKPROCESSOR_GUARD_H_
-
 #include <atomic>
 #include <jack/jack.h>
 #include <jack/types.h>
@@ -29,7 +28,7 @@
 #include <speakerman/jack/Port.hpp>
 #include <tdap/Integration.hpp>
 
-namespace speakerman {
+namespace speakerman::jack {
 
 using namespace std;
 using namespace tdap;
@@ -220,6 +219,6 @@ public:
   virtual ~JackProcessor();
 };
 
-} /* End of namespace speakerman */
+} // namespace speakerman::jack
 
-#endif /* SMS_SPEAKERMAN_JACKPROCESSOR_GUARD_H_ */
+#endif // SPEAKERMAN_JACK_M_JACK_PROCESSOR_HPP

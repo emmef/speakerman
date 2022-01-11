@@ -1,7 +1,7 @@
-#ifndef SPEAKERMAN_ERRORS_HPP
-#define SPEAKERMAN_ERRORS_HPP
+#ifndef TDAP_M_ERRORS_HPP
+#define TDAP_M_ERRORS_HPP
 /*
- * speakerman/Errors.hpp
+ * tdap/Errors.hpp
  *
  * Added by michel on 2020-02-18
  * Copyright (C) 2015-2020 Michel Fleur.
@@ -119,4 +119,4 @@ public:
 
 } // namespace tdap
 
-#endif // SPEAKERMAN_ERRORS_HPP
+#endif // TDAP_M_ERRORS_HPP

@@ -26,6 +26,6 @@ namespace TemplateProjectNameSpace {
 
 // Your definitions
 
-} /* End of namespace TemplateProjectNameSpace */
+} // namespace TemplateProjectNameSpace
 
 #endif /* TemplateProjectFileGuard */

@@ -1,5 +1,5 @@
-#ifndef SPEAKERMAN_LOGICALGROUPCONFIG_H
-#define SPEAKERMAN_LOGICALGROUPCONFIG_H
+#ifndef SPEAKERMAN_M_LOGICAL_GROUP_CONFIG_H
+#define SPEAKERMAN_M_LOGICAL_GROUP_CONFIG_H
 /*
  * speakerman/LogicalGroupConfig.h
  *
@@ -171,4 +171,4 @@ typedef LogicalGroupsConfig<LogicalGroupConfig::Direction::Output>
 
 } // namespace speakerman
 
-#endif // SPEAKERMAN_LOGICALGROUPCONFIG_H
+#endif // SPEAKERMAN_M_LOGICAL_GROUP_CONFIG_H

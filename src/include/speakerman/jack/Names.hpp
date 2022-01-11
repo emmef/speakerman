@@ -1,5 +1,7 @@
+#ifndef SPEAKERMAN_JACK_M_NAMES_HPP
+#define SPEAKERMAN_JACK_M_NAMES_HPP
 /*
- * Names.cpp
+ * speakerman/jack/Names.hpp
  *
  * Part of 'Speaker management system'
  *
@@ -19,15 +21,12 @@
  * limitations under the License.
  */
 
-#ifndef SMS_SPEAKERMAN_NAMES_GUARD_H_
-#define SMS_SPEAKERMAN_NAMES_GUARD_H_
-
 #include <regex>
 
 #include <jack/jack.h>
 #include <tdap/CapacityPolicy.hpp>
 
-namespace speakerman {
+namespace speakerman::jack {
 
 using namespace std;
 using namespace tdap;
@@ -183,6 +182,6 @@ public:
   ~PortNames();
 };
 
-} /* End of namespace speakerman */
+} // namespace speakerman::jack
 
-#endif /* SMS_SPEAKERMAN_NAMES_GUARD_H_ */
+#endif // SPEAKERMAN_JACK_M_NAMES_HPP

@@ -1,3 +1,5 @@
+#ifndef TDAP_M_VOLUME_MATRIX_HPP
+#define TDAP_M_VOLUME_MATRIX_HPP
 /*
  * tdap/VolumeMatrix.hpp
  *
@@ -19,9 +21,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-#ifndef TDAP_VALUE_VOLUME_MATRIX_GUARD
-#define TDAP_VALUE_VOLUME_MATRIX_GUARD
 
 #include <algorithm>
 #include <tdap/AlignedFrame.hpp>
@@ -542,4 +541,4 @@ private:
 
 } // namespace tdap
 
-#endif /* TDAP_VALUE_VOLUME_MATRIX_GUARD */
+#endif // TDAP_M_VOLUME_MATRIX_HPP

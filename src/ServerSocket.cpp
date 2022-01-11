@@ -142,7 +142,7 @@ static bool ensure_bind(const addrinfo_owner &info, int sockfd_,
   }
   int sleep_time = 1;
   while (true) {
-    SignalHandler::check_raised();
+    jack::SignalHandler::check_raised();
     int result = bind(sockfd_, info->ai_addr, info->ai_addrlen);
     if (result != -1) {
       return true;
@@ -356,7 +356,7 @@ bool server_socket::work(int *errorCode, server_socket_worker worker,
 
   bool raised = false;
   while (state == State::WORKING && !raised) {
-    raised = SignalHandler::is_set();
+    raised = jack::SignalHandler::is_set();
 
     socket_selector_iterator iterator = selector_.do_select(tv, raised);
     if (iterator.error_occured()) {
@@ -565,4 +565,4 @@ socket_selector_iterator socket_selector::do_select(timeval tv,
   return socket_selector_iterator(this);
 }
 
-} /* End of namespace speakerman */
+} // namespace speakerman

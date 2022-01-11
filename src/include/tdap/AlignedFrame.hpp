@@ -1,7 +1,7 @@
-#ifndef SPEAKERMAN_ALIGNEDFRAME_HPP
-#define SPEAKERMAN_ALIGNEDFRAME_HPP
+#ifndef TDAP_M_ALIGNED_FRAME_HPP
+#define TDAP_M_ALIGNED_FRAME_HPP
 /*
- * speakerman/AlignedFrame.hpp
+ * tdap/AlignedFrame.hpp
  *
  * Added by michel on 2020-02-13
  * Copyright (C) 2015-2020 Michel Fleur.
@@ -276,4 +276,4 @@ AlignedFrame<T, C, A> operator-(AlignedFrame<T, C, A> &&f1,
 
 } // namespace tdap
 
-#endif // SPEAKERMAN_ALIGNEDFRAME_HPP
+#endif // TDAP_M_ALIGNED_FRAME_HPP

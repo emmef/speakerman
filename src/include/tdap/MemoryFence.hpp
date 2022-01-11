@@ -1,3 +1,5 @@
+#ifndef TDAP_M_MEMORY_FENCE_HPP
+#define TDAP_M_MEMORY_FENCE_HPP
 /*
  * tdap/MemoryFence.hpp
  *
@@ -19,9 +21,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-#ifndef TDAP_MEMORYFENCE_HEADER_GUARD
-#define TDAP_MEMORYFENCE_HEADER_GUARD
 
 #include <atomic>
 
@@ -80,4 +79,4 @@ public:
 
 } // namespace tdap
 
-#endif /* TDAP_MEMORYFENCE_HEADER_GUARD */
+#endif // TDAP_M_MEMORY_FENCE_HPP

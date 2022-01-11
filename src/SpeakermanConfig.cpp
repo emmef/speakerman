@@ -115,8 +115,8 @@ template <typename T> struct ValueParser_<T, 1> {
 
   static bool parse(T &field, const char *value, char *&end) {
     V parsed = strtoll(value, &end, 10);
-    if (*end == '\0' || config::isWhiteSpace(*end) ||
-        config::isCommentStart(*end)) {
+    if (*end == '\0' || utils::config::isWhiteSpace(*end) ||
+        utils::config::isCommentStart(*end)) {
       field = tdap::Value<T>::force_between(parsed,
                                             std::numeric_limits<T>::lowest(),
                                             std::numeric_limits<T>::max());
@@ -140,11 +140,11 @@ template <typename T> struct ValueParser_<T, 2> {
 
     return strncasecmp(keyword, value, key_length) == 0 &&
            (value[key_length] == '\0' ||
-            config::isWhiteSpace(value[key_length]));
+            utils::config::isWhiteSpace(value[key_length]));
   }
 
   static bool parse(T &field, const char *value, char *&end) {
-    for (end = const_cast<char *>(value); config::isAlphaNum(*end); end++) {
+    for (end = const_cast<char *>(value); utils::config::isAlphaNum(*end); end++) {
     }
 
     if (matches("true", value, end) || matches("1", value, end) ||
@@ -169,8 +169,8 @@ template <typename T> struct ValueParser_<T, 3> {
 
   static bool parse(T &field, const char *value, char *&end) {
     V parsed = strtold(value, &end);
-    if (*end == '\0' || config::isWhiteSpace(*end) ||
-        config::isCommentStart(*end)) {
+    if (*end == '\0' || utils::config::isWhiteSpace(*end) ||
+        utils::config::isCommentStart(*end)) {
       field = tdap::Value<V>::force_between(parsed,
                                             std::numeric_limits<T>::lowest(),
                                             std::numeric_limits<T>::max());
@@ -191,7 +191,7 @@ template <typename T> struct ValueParser_<T, 4> {
         if (dst > field) {
           *dst++ = ' ';
         }
-      } else if (config::isAlphaNum(c) || config::isQuote(c) ||
+      } else if (utils::config::isAlphaNum(c) || utils::config::isQuote(c) ||
                  strchr(".!|,;:/[]{}*#@~%^()-_+=\\", c) != nullptr) {
         *dst++ = c;
       }
@@ -226,7 +226,7 @@ static int read_value_array(FixedSizeArray<T, N> &values, const char *value,
     }
     values[i] = parsed;
     bool hadDelimiter = false;
-    while (config::isWhiteSpace(*end) || *end == ';' || *end == ',') {
+    while (utils::config::isWhiteSpace(*end) || *end == ';' || *end == ',') {
       if (*end == ';' || *end == ',') {
         if (hadDelimiter) {
           return -1;
@@ -235,7 +235,7 @@ static int read_value_array(FixedSizeArray<T, N> &values, const char *value,
       }
       end++;
     }
-    if (*end == '\0' || config::isCommentStart(*end)) {
+    if (*end == '\0' || utils::config::isCommentStart(*end)) {
       break;
     }
     read_from = end;
@@ -455,14 +455,14 @@ public:
     const char *start;
     for (start = line; *start != '\0' && start - line <= 1024; start++) {
       char c = *start;
-      if (config::isCommentStart(c)) {
+      if (utils::config::isCommentStart(c)) {
         return ReaderStatus::SKIP;
       }
-      if (config::isAlpha(c)) {
+      if (utils::config::isAlpha(c)) {
         result = start;
         return ReaderStatus::SUCCESS;
       }
-      if (!config::isWhiteSpace(c)) {
+      if (!utils::config::isWhiteSpace(c)) {
         cerr << "Unexpected characters @ " << (start - line) << ": " << line
              << endl;
         break;
@@ -476,7 +476,7 @@ public:
       return ReaderStatus::SKIP;
     }
     char end = start[key_.length()];
-    if (config::isWhiteSpace(end) || end == '=') {
+    if (utils::config::isWhiteSpace(end) || end == '=') {
       after_key = start + key_.length();
       return ReaderStatus::SUCCESS;
     }
@@ -486,7 +486,7 @@ public:
   static ReaderStatus skip_assignment(const char *&value, const char *start,
                                       const char *line) {
     const char *rd = start;
-    while (config::isWhiteSpace(*rd)) {
+    while (utils::config::isWhiteSpace(*rd)) {
       rd++;
     }
     if (*rd != '=') {
@@ -496,7 +496,7 @@ public:
       return ReaderStatus::FAULT;
     }
     rd++;
-    while (config::isWhiteSpace(*rd)) {
+    while (utils::config::isWhiteSpace(*rd)) {
       rd++;
     }
     if (*rd == '\0') {
@@ -908,7 +908,7 @@ static void actualReadConfig(SpeakermanConfig &config, istream &stream,
     if (stream.eof()) {
       break;
     }
-    if (config::isLineDelimiter(c)) {
+    if (utils::config::isLineDelimiter(c)) {
       if (line_pos != 0) {
         line[std::min(line_pos, LINE_LENGTH)] = '\0';
         config_manager.read_line(config, line, initial ? config : basedUpon);
@@ -1059,4 +1059,4 @@ void SpeakermanConfig::set_if_unset(const SpeakermanConfig &config_if_unset,
   timeStamp = -1;
 }
 
-} /* End of namespace speakerman */
+} // namespace speakerman

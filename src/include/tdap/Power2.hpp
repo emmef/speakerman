@@ -1,5 +1,7 @@
+#ifndef TDAP_M_POWER2_HPP
+#define TDAP_M_POWER2_HPP
 /*
- * tdap/power2.hpp
+ * tdap/Power2.hpp
  *
  * Part of TdAP
  * Time-domain Audio Processing
@@ -19,9 +21,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-#ifndef TDAP_POWEROF2_HEADER_GUARD
-#define TDAP_POWEROF2_HEADER_GUARD
 
 #include <cstddef>
 
@@ -187,4 +186,4 @@ struct Power2 : public helpers_tdap::PowerOfTwoHelper<false> {
 
 } // namespace tdap
 
-#endif /* TDAP_POWEROF2_HEADER_GUARD */
+#endif // TDAP_M_POWER2_HPP

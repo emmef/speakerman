@@ -40,11 +40,11 @@ bool web_server::work(int *errorCode) {
 }
 
 void web_server::thread_static_function(web_server *server) {
-  CountedThreadGuard guard("Web server configuration updater");
+  jack::CountedThreadGuard guard("Web server configuration updater");
 
   try {
     server->thread_function();
-  } catch (const signal_exception &e) {
+  } catch (const jack::signal_exception &e) {
     e.handle("Web server configuration update and level fetching");
   }
 }
@@ -135,7 +135,7 @@ void web_server::thread_function() {
   double threshold_scaling = threshold_scaling_setting;
   double new_threshold_scaling = threshold_scaling;
 
-  while (!SignalHandler::check_raised()) {
+  while (!jack::SignalHandler::check_raised()) {
     count++;
     bool got_levels = false;
     if ((count % CONFIG_NUMBER_OF_SLEEPS) == 0) {
@@ -186,7 +186,7 @@ void web_server::thread_function() {
             if (chr >= '1' && chr <= '5') {
               threshold_scaling_setting = chr - '0';
               break;
-            } else if (!config::isWhiteSpace(chr)) {
+            } else if (!utils::config::isWhiteSpace(chr)) {
               break;
             }
           }
@@ -357,7 +357,7 @@ void web_server::handle_request() {
         response().write_string("\t\"periods\": \"");
         response().write_string(itostr(numbers, 30, levels.count()));
         response().write_string("\", \r\n");
-        const ProcessingStatistics &statistics = manager_.getStatistics();
+        const jack::ProcessingStatistics &statistics = manager_.getStatistics();
         response().write_string("\t\"cpuLongTerm\": \"");
         response().write_string(itostr(numbers, 10, statistics.getLongTermCorePercentage()));
         response().write_string("\",\r\n\t\"cpuShortTerm\": \"");
@@ -410,4 +410,4 @@ void web_server::handle_request() {
     // No more mix-mode, but a put could be useful for other purposes
   }
 }
-} /* End of namespace speakerman */
+} // namespace speakerman

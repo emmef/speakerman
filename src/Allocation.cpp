@@ -627,7 +627,7 @@ namespace tdap {
                 "consecutive_alloc::lock_memory(const consecutive_block_handle_t * handle): handle=nullptr")->unlock_memory();
     }
 
-} /* End of namespace speakerman */
+} // namespace speakerman
 
 void* operator new  ( std::size_t count )
 {

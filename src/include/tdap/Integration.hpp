@@ -1,3 +1,5 @@
+#ifndef TDAP_M_INTEGRATION_HPP
+#define TDAP_M_INTEGRATION_HPP
 /*
  * tdap/Integration.hpp
  *
@@ -19,9 +21,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-#ifndef TDAP_INTEGRATION_HEADER_GUARD
-#define TDAP_INTEGRATION_HEADER_GUARD
 
 #include <cmath>
 #include <limits>
@@ -460,4 +459,4 @@ template <typename F> struct SmoothHoldMaxAttackReleaseIntegrator {
 
 } // namespace tdap
 
-#endif /* TDAP_INTEGRATION_HEADER_GUARD */
+#endif // TDAP_M_INTEGRATION_HPP

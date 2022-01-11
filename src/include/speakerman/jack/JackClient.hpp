@@ -1,5 +1,7 @@
+#ifndef SPEAKERMAN_JACK_M_JACK_CLIENT_HPP
+#define SPEAKERMAN_JACK_M_JACK_CLIENT_HPP
 /*
- * JackClient.hpp
+ * speakerman/jack/JackClient.hpp
  *
  * Part of 'Speaker management system'
  *
@@ -19,9 +21,6 @@
  * limitations under the License.
  */
 
-#ifndef SMS_SPEAKERMAN_JACKCLIENT_GUARD_H_
-#define SMS_SPEAKERMAN_JACKCLIENT_GUARD_H_
-
 #include "Port.hpp"
 #include <algorithm>
 #include <atomic>
@@ -35,7 +34,7 @@
 #include <thread>
 #include <unordered_set>
 
-namespace speakerman {
+namespace speakerman::jack {
 
 class ClientOpenRetryPolicy {
   static constexpr long minWaitMillis = 100;
@@ -275,6 +274,6 @@ public:
   virtual ~JackClient();
 };
 
-} /* End of namespace speakerman */
+} // namespace speakerman::jack
 
-#endif /* SMS_SPEAKERMAN_JACKCLIENT_GUARD_H_ */
+#endif // SPEAKERMAN_JACK_M_JACK_CLIENT_HPP

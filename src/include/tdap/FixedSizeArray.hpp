@@ -1,3 +1,5 @@
+#ifndef TDAP_M_FIXED_SIZE_ARRAY_HPP
+#define TDAP_M_FIXED_SIZE_ARRAY_HPP
 /*
  * tdap/FixedSizeArray.hpp
  *
@@ -19,9 +21,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-#ifndef TDAP_FIXEDSIZEARRAY_HEADER_GUARD
-#define TDAP_FIXEDSIZEARRAY_HEADER_GUARD
 
 #include <tdap/ArrayTraits.hpp>
 
@@ -80,4 +79,4 @@ public:
 
 } // namespace tdap
 
-#endif /* TDAP_FIXEDSIZEARRAY_HEADER_GUARD */
+#endif // TDAP_M_FIXED_SIZE_ARRAY_HPP

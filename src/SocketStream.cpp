@@ -224,4 +224,4 @@ void socket_output_stream::before_close_file() { flush(); }
 
 socket_output_stream::~socket_output_stream() { close(); }
 
-} /* End of namespace speakerman */
+} // namespace speakerman

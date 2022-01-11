@@ -97,7 +97,7 @@ ConsecutiveAllocatedObjectOwner<AbstractSpeakerManager> manager(100 * 1000 *
 SpeakermanConfig configFileConfig;
 
 static void webServer() {
-  CountedThreadGuard guard("Web server listening thread");
+  jack::CountedThreadGuard guard("Web server listening thread");
   web_server server(manager.get());
 
   try {
@@ -106,13 +106,13 @@ static void webServer() {
     cout << "Web server exit" << endl;
   } catch (const std::exception &e) {
     std::cerr << "Web server error: " << e.what() << std::endl;
-  } catch (const signal_exception &e) {
+  } catch (const jack::signal_exception &e) {
     cerr << "Web server thread stopped" << endl;
     e.handle();
   }
 }
 
-int mainLoop(ConsecutiveAllocatedObjectOwner<JackClient> &) {
+int mainLoop(ConsecutiveAllocatedObjectOwner<jack::JackClient> &) {
   std::thread webServerThread(webServer);
   webServerThread.detach();
 
@@ -120,15 +120,15 @@ int mainLoop(ConsecutiveAllocatedObjectOwner<JackClient> &) {
   try {
     while (true) {
       this_thread::sleep_for(sleep_time);
-      SignalHandler::check_raised();
+      jack::SignalHandler::check_raised();
     }
-  } catch (const signal_exception &e) {
+  } catch (const jack::signal_exception &e) {
     e.handle();
     return e.signal();
   }
 }
 
-// speakerman::config::Reader configReader;
+// speakerman::utils::config::Reader configReader;
 speakerman::server_socket webserver;
 
 template <typename F, size_t GROUPS, size_t CROSSOVERS>
@@ -184,8 +184,8 @@ AbstractSpeakerManager *create_manager(const SpeakermanConfig &config) {
   throw invalid_argument("Number of crossovers must be between 1 and 3");
 }
 
-JackClient *create_client(const char *name) {
-  auto result = JackClient::createDefault(name);
+jack::JackClient *create_client(const char *name) {
+  auto result = jack::JackClient::createDefault(name);
   if (!result.success()) {
     cerr << "Could not create jack client \"" << name << "\"" << endl;
   }
@@ -215,7 +215,7 @@ int main(int count, char *arguments[]) {
       return 0;
     }
   }
-  AwaitThreadFinishedAfterExit await(5000, "Await thread shutdown...");
+  jack::AwaitThreadFinishedAfterExit await(5000, "Await thread shutdown...");
   MemoryFence::release();
 
   manager.generate<AbstractSpeakerManager, const SpeakermanConfig &>(
@@ -223,7 +223,7 @@ int main(int count, char *arguments[]) {
 
   display_owner_info(manager, "Processor");
 
-  ConsecutiveAllocatedObjectOwner<JackClient> clientOwner(4048576);
+  ConsecutiveAllocatedObjectOwner<jack::JackClient> clientOwner(4048576);
 
   clientOwner.generate(create_client, "Speaker manager");
 

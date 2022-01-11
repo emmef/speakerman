@@ -1,7 +1,7 @@
-#ifndef SPEAKERMAN_GROUPVOLUME_HPP
-#define SPEAKERMAN_GROUPVOLUME_HPP
+#ifndef TDAP_M_GROUP_VOLUME_HPP
+#define TDAP_M_GROUP_VOLUME_HPP
 /*
- * speakerman/GroupVolume.hpp
+ * tdap/GroupVolume.hpp
  *
  * Added by michel on 2020-02-18
  * Copyright (C) 2015-2020 Michel Fleur.
@@ -322,4 +322,4 @@ private:
 
 } // namespace tdap
 
-#endif // SPEAKERMAN_GROUPVOLUME_HPP
+#endif // TDAP_M_GROUP_VOLUME_HPP

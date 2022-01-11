@@ -1,3 +1,5 @@
+#ifndef TDAP_M_DELAY_HPP
+#define TDAP_M_DELAY_HPP
 /*
  * tdap/Delay.hpp
  *
@@ -19,9 +21,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-#ifndef TDAP_DELAY_HEADER_GUARD
-#define TDAP_DELAY_HEADER_GUARD
 
 #include <tdap/Array.hpp>
 #include <tdap/Power2.hpp>
@@ -256,4 +255,4 @@ public:
 
 } // namespace tdap
 
-#endif /* TDAP_DELAY_HEADER_GUARD */
+#endif // TDAP_M_DELAY_HPP

@@ -1,3 +1,5 @@
+#ifndef TDAP_M_IIR_COEFFICIENTS_HPP
+#define TDAP_M_IIR_COEFFICIENTS_HPP
 /*
  * tdap/IirCoefficients.hpp
  *
@@ -19,9 +21,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-#ifndef TDAP_IIRCOEFFICIENTS_HEADER_GUARD
-#define TDAP_IIRCOEFFICIENTS_HEADER_GUARD
 
 #include <cstddef>
 #include <memory>
@@ -1088,4 +1087,4 @@ private:
 
 } // namespace tdap
 
-#endif /* TDAP_IIRCOEFFICIENTS_HEADER_GUARD */
+#endif // TDAP_M_IIR_COEFFICIENTS_HPP

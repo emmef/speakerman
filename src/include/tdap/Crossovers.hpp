@@ -1,3 +1,5 @@
+#ifndef TDAP_M_CROSSOVERS_HPP
+#define TDAP_M_CROSSOVERS_HPP
 /*
  * tdap/Crossovers.hpp
  *
@@ -19,9 +21,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-#ifndef TDAP_CROSSOVER_HEADER_GUARD
-#define TDAP_CROSSOVER_HEADER_GUARD
 
 #include <tdap/FixedSizeArray.hpp>
 #include <tdap/IirButterworth.hpp>
@@ -217,4 +216,4 @@ struct Crossovers {
 
 } // namespace tdap
 
-#endif /* TDAP_CROSSOVER_HEADER_GUARD */
+#endif // TDAP_M_CROSSOVERS_HPP

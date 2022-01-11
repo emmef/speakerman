@@ -1,3 +1,5 @@
+#ifndef TDAP_M_ARRAY_TRAITS_HPP
+#define TDAP_M_ARRAY_TRAITS_HPP
 /*
  * tdap/ArrayTraits.hpp
  *
@@ -19,9 +21,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-#ifndef TDAP_ARRAYTRAITS_HEADER_GUARD
-#define TDAP_ARRAYTRAITS_HEADER_GUARD
 
 #include <cstring>
 
@@ -373,4 +372,4 @@ enum class ConstructionPolicy { SIZE_BECOMES_CAPACITY, INHERIT_CAPACITY };
 
 } // namespace tdap
 
-#endif /* TDAP_ARRAYTRAITS_HEADER_GUARD */
+#endif // TDAP_M_ARRAY_TRAITS_HPP

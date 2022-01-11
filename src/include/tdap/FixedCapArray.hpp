@@ -1,3 +1,5 @@
+#ifndef TDAP_M_FIXED_CAP_ARRAY_HPP
+#define TDAP_M_FIXED_CAP_ARRAY_HPP
 /*
  * tdap/FixedCapArray.hpp
  *
@@ -19,9 +21,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-#ifndef TDAP_FIXEDCAPARRAY_HEADER_GUARD
-#define TDAP_FIXEDCAPARRAY_HEADER_GUARD
 
 #include <tdap/ArrayTraits.hpp>
 #include <tdap/Power2.hpp>
@@ -78,4 +77,4 @@ public:
 
 } // namespace tdap
 
-#endif /* TDAP_FIXEDCAPARRAY_HEADER_GUARD */
+#endif // TDAP_M_FIXED_CAP_ARRAY_HPP

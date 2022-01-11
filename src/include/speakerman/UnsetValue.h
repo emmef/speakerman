@@ -1,5 +1,5 @@
-#ifndef SPEAKERMAN_UNSETVALUE_H
-#define SPEAKERMAN_UNSETVALUE_H
+#ifndef SPEAKERMAN_M_UNSET_VALUE_H
+#define SPEAKERMAN_M_UNSET_VALUE_H
 /*
  * speakerman/UnsetValue.h
  *
@@ -204,4 +204,4 @@ static bool setFromSetSource(T &value, T sourceValue) {
 
 } // namespace speakerman
 
-#endif // SPEAKERMAN_UNSETVALUE_H
+#endif // SPEAKERMAN_M_UNSET_VALUE_H

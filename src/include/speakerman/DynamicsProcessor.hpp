@@ -1,5 +1,7 @@
+#ifndef SPEAKERMAN_M_DYNAMICS_PROCESSOR_HPP
+#define SPEAKERMAN_M_DYNAMICS_PROCESSOR_HPP
 /*
- * SignalGroup.hpp
+ * speakerman/DynamicsProcessor.hpp
  *
  * Part of 'Speaker management system'
  *
@@ -19,8 +21,6 @@
  * limitations under the License.
  */
 
-#ifndef SMS_SPEAKERMAN_SIGNALGROUP_GUARD_H_
-#define SMS_SPEAKERMAN_SIGNALGROUP_GUARD_H_
 
 #include <cmath>
 #include <speakerman/SpeakermanRuntimeData.hpp>
@@ -566,6 +566,6 @@ private:
   }
 };
 
-} /* End of namespace speakerman */
+} // namespace speakerman
 
-#endif /* SMS_SPEAKERMAN_SIGNALGROUP_GUARD_H_ */
+#endif // SPEAKERMAN_M_DYNAMICS_PROCESSOR_HPP

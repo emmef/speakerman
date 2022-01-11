@@ -151,4 +151,4 @@ file_entry::~file_entry() {
   }
 }
 
-} /* End of namespace speakerman */
+} // namespace speakerman

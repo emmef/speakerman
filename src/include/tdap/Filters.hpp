@@ -1,3 +1,5 @@
+#ifndef TDAP_M_FILTERS_HPP
+#define TDAP_M_FILTERS_HPP
 /*
  * tdap/Filters.hpp
  *
@@ -19,9 +21,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-#ifndef TDAP_FILTERS_HEADER_GUARD
-#define TDAP_FILTERS_HEADER_GUARD
 
 #include <cstddef>
 #include <limits>
@@ -172,4 +171,4 @@ size_t effectiveLength(Filter<Sample> &filter, size_t bucketSize,
 
 } // namespace tdap
 
-#endif /* TDAP_FILTERS_HEADER_GUARD */
+#endif // TDAP_M_FILTERS_HPP

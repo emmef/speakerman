@@ -1,7 +1,7 @@
-#ifndef SPEAKERMAN_NAMEDCONFIG_H
-#define SPEAKERMAN_NAMEDCONFIG_H
+#ifndef SPEAKERMAN_M_NAMED_CONFIG_H
+#define SPEAKERMAN_M_NAMED_CONFIG_H
 /*
- * speakerman/ConfigNames.h
+ * speakerman/NamedConfig.h
  *
  * Added by michel on 2022-01-09
  * Copyright (C) 2015-2022 Michel Fleur.
@@ -74,4 +74,4 @@ struct NamedConfig {
 
 } // namespace speakerman
 
-#endif // SPEAKERMAN_NAMEDCONFIG_H
+#endif // SPEAKERMAN_M_NAMED_CONFIG_H

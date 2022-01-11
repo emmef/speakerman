@@ -29,7 +29,7 @@
 #include <speakerman/jack/JackClient.hpp>
 #include <speakerman/jack/SignalHandler.hpp>
 
-namespace speakerman {
+namespace speakerman::jack {
 
 using namespace std;
 using namespace tdap;
@@ -295,7 +295,7 @@ void JackClient::setActive() {
   processor_->onActivate(client_);
 }
 
-speakerman::ClientState JackClient::getState() {
+ClientState JackClient::getState() {
   unique_lock<mutex> lock(mutex_);
   return state_;
 }
@@ -304,7 +304,7 @@ void JackClient::notifyShutdown(const char *reason) {
   onShutdown(ShutDownInfo::withReason(reason));
 }
 
-speakerman::ShutDownInfo JackClient::awaitClose() {
+ShutDownInfo JackClient::awaitClose() {
   unique_lock<mutex> lock(mutex_);
   if (state_ != ClientState::ACTIVE) {
     throw runtime_error("setProcessor: Not in ACTIVE state");
@@ -313,7 +313,7 @@ speakerman::ShutDownInfo JackClient::awaitClose() {
   return shutdownInfo_;
 }
 
-speakerman::PortNames JackClient::portNames(jack_client_t *client,
+PortNames JackClient::portNames(jack_client_t *client,
                                             const char *namePattern,
                                             const char *typePattern,
                                             unsigned long flags) {
@@ -321,7 +321,7 @@ speakerman::PortNames JackClient::portNames(jack_client_t *client,
   return PortNames(names, jack_portnames_free, 1024);
 }
 
-speakerman::PortNames JackClient::portNames(const char *namePattern,
+PortNames JackClient::portNames(const char *namePattern,
                                             const char *typePattern,
                                             unsigned long flags) {
   unique_lock<mutex> lock(mutex_);
@@ -331,7 +331,7 @@ speakerman::PortNames JackClient::portNames(const char *namePattern,
   return portNames(client_, namePattern, typePattern, flags);
 }
 
-speakerman::ShutDownInfo JackClient::close() {
+ShutDownInfo JackClient::close() {
   unique_lock<mutex> lock(mutex_);
   if (notifyShutdownUnsafe(ShutDownInfo::withReason("Explicit close"))) {
     closeUnsafe();
@@ -353,4 +353,4 @@ JackClient::~JackClient() {
   cout << "destructor -- done!" << endl;
 }
 
-} /* End of namespace speakerman */
+} // namespace speakerman

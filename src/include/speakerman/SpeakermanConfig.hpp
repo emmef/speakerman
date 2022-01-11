@@ -1,5 +1,7 @@
+#ifndef SPEAKERMAN_M_SPEAKERMAN_CONFIG_HPP
+#define SPEAKERMAN_M_SPEAKERMAN_CONFIG_HPP
 /*
- * SpeakermanConfig.hpp
+ * speakerman/SpeakermanConfig.hpp
  *
  * Part of 'Speaker management system'
  *
@@ -18,9 +20,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-#ifndef SMS_SPEAKERMAN_SPEAKERMANCONFIG_GUARD_H_
-#define SMS_SPEAKERMAN_SPEAKERMANCONFIG_GUARD_H_
 
 #include <speakerman/jack/JackProcessor.hpp>
 #include <speakerman/LogicalGroupConfig.h>
@@ -102,6 +101,6 @@ long long getFileTimeStamp(const char *fileName);
 
 long long getConfigFileTimeStamp();
 
-} /* End of namespace speakerman */
+} // namespace speakerman
 
-#endif /* SMS_SPEAKERMAN_SPEAKERMANCONFIG_GUARD_H_ */
+#endif // SPEAKERMAN_M_SPEAKERMAN_CONFIG_HPP

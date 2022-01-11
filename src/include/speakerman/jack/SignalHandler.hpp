@@ -1,5 +1,7 @@
+#ifndef SPEAKERMAN_JACK_M_SIGNAL_HANDLER_HPP
+#define SPEAKERMAN_JACK_M_SIGNAL_HANDLER_HPP
 /*
- * SignalHandler.hpp
+ * speakerman/jack/SignalHandler.hpp
  *
  * Part of 'Speaker management system'
  *
@@ -19,12 +21,9 @@
  * limitations under the License.
  */
 
-#ifndef SMS_SPEAKERMAN_SIGNAL_HANDLER_GUARD_H_
-#define SMS_SPEAKERMAN_SIGNAL_HANDLER_GUARD_H_
-
 #include <chrono>
 
-namespace speakerman {
+namespace speakerman::jack {
 
 class SignalHandler {
   int int_get_signal() const;
@@ -108,6 +107,6 @@ public:
   }
 };
 
-} /* End of namespace speakerman */
+} // namespace speakerman::jack
 
-#endif /* SMS_SPEAKERMAN_SIGNAL_HANDLER_GUARD_H_ */
+#endif // SPEAKERMAN_JACK_M_SIGNAL_HANDLER_HPP

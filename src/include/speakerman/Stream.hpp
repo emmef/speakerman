@@ -1,5 +1,7 @@
+#ifndef SPEAKERMAN_M_STREAM_HPP
+#define SPEAKERMAN_M_STREAM_HPP
 /*
- * Stream.hpp
+ * speakerman/Stream.hpp
  *
  * Part of 'Speaker management system'
  *
@@ -18,9 +20,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-#ifndef SMS_SPEAKERMAN_STREAM_GUARD_H_
-#define SMS_SPEAKERMAN_STREAM_GUARD_H_
 
 #include <cstddef>
 #include <type_traits>
@@ -179,6 +178,6 @@ public:
   size_t allocated_size() const;
 };
 
-} /* End of namespace speakerman */
+} // namespace speakerman
 
-#endif /* SMS_SPEAKERMAN_STREAM_GUARD_H_ */
+#endif // SPEAKERMAN_M_STREAM_HPP

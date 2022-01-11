@@ -1,7 +1,7 @@
-#ifndef SPEAKERMAN_TRUERMS_HPP
-#define SPEAKERMAN_TRUERMS_HPP
+#ifndef TDAP_M_TRUE_RMS_HPP
+#define TDAP_M_TRUE_RMS_HPP
 /*
- * speakerman/TrueRms.hpp
+ * tdap/TrueRms.hpp
  *
  * Added by michel on 2020-02-23
  * Copyright (C) 2015-2020 Michel Fleur.
@@ -709,4 +709,4 @@ public:
 
 } // namespace tdap
 
-#endif // SPEAKERMAN_TRUERMS_HPP
+#endif // TDAP_M_TRUE_RMS_HPP

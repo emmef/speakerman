@@ -1,3 +1,5 @@
+#ifndef TDAP_M_NOISE_HPP
+#define TDAP_M_NOISE_HPP
 /*
  * tdap/Noise.hpp
  *
@@ -19,9 +21,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-#ifndef TDAP_NOISE_HEADER_GUARD
-#define TDAP_NOISE_HEADER_GUARD
 
 #include <random>
 #include <tdap/Integration.hpp>
@@ -183,4 +182,4 @@ template <typename Sample> struct AddedNoise {
 
 } // namespace tdap
 
-#endif /* TDAP_NOISE_HEADER_GUARD */
+#endif // TDAP_M_NOISE_HPP

@@ -28,7 +28,7 @@
 #include <thread>
 #include <chrono>
 
-namespace speakerman {
+namespace speakerman::jack {
 
 using namespace std;
 using namespace tdap;
@@ -175,4 +175,4 @@ JackProcessor::~JackProcessor() {
   }
 }
 
-} /* End of namespace speakerman */
+} // namespace speakerman

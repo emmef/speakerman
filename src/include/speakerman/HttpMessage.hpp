@@ -1,5 +1,7 @@
+#ifndef SPEAKERMAN_M_HTTP_MESSAGE_HPP
+#define SPEAKERMAN_M_HTTP_MESSAGE_HPP
 /*
- * HttpMessage.hpp
+ * speakerman/HttpMessage.hpp
  *
  * Part of 'Speaker management system'
  *
@@ -18,9 +20,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-#ifndef SMS_SPEAKERMAN_HTTP_MESSAGE_GUARD_H_
-#define SMS_SPEAKERMAN_HTTP_MESSAGE_GUARD_H_
 
 #include <atomic>
 #include <speakerman/SocketStream.hpp>
@@ -177,6 +176,6 @@ private:
   input_stream *content_stream_;
 };
 
-} /* End of namespace speakerman */
+} // namespace speakerman
 
-#endif /* SMS_SPEAKERMAN_HTTP_MESSAGE_GUARD_H_ */
+#endif // SPEAKERMAN_M_HTTP_MESSAGE_HPP

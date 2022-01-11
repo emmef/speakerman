@@ -1,3 +1,5 @@
+#ifndef TDAP_M_CAPACITY_POLICY_HPP
+#define TDAP_M_CAPACITY_POLICY_HPP
 /*
  * tdap/CapacityPolicy.hpp
  *
@@ -19,9 +21,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-#ifndef TDAP_CAPACITY_POLICY_HEADER_GUARD
-#define TDAP_CAPACITY_POLICY_HEADER_GUARD
 
 #include <tdap/Value.hpp>
 
@@ -74,4 +73,4 @@ public:
 
 } // namespace tdap
 
-#endif /* TDAP_CAPACITY_POLICY_HEADER_GUARD */
+#endif // TDAP_M_CAPACITY_POLICY_HPP

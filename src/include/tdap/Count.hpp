@@ -1,5 +1,7 @@
+#ifndef TDAP_M_COUNT_HPP
+#define TDAP_M_COUNT_HPP
 /*
- * tdap/count.hpp
+ * tdap/Count.hpp
  *
  * Part of TdAP
  * Time-domain Audio Processing
@@ -19,9 +21,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-#ifndef TDAP_COUNT_HEADER_GUARD
-#define TDAP_COUNT_HEADER_GUARD
 
 #include <cstddef>
 #include <limits>
@@ -142,4 +141,4 @@ static constexpr int constexpr_string_length(const char *str) {
 
 } // namespace tdap
 
-#endif /* TDAP_COUNT_HEADER_GUARD */
+#endif // TDAP_M_COUNT_HPP

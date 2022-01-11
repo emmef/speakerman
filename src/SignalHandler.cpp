@@ -30,7 +30,7 @@
 #include <tdap/MemoryFence.hpp>
 #include <thread>
 
-namespace speakerman {
+namespace speakerman::jack {
 
 using namespace std;
 using namespace tdap;
@@ -293,4 +293,4 @@ bool CountedThreadGuard::await_finished(std::chrono::milliseconds timeout,
   return THREAD_ENTITIES.await_and_report(timeout, wait_message);
 }
 
-} /* End of namespace speakerman */
+} // namespace speakerman
