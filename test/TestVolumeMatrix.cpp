@@ -58,7 +58,7 @@ void testEqualMatrix(const tdap::VolumeMatrix<double, I, O, A> &actual,
       out << ", ";
     }
     out << "{";
-    for (size_t input = 0; input < actual.inputs; input++) {
+    for (size_t input = 0; input < actual.volumes; input++) {
       if (input) {
         out << ", ";
       }
