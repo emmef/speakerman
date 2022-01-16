@@ -69,7 +69,7 @@ set(TDAP_HEADERS
     src/include/tdap/ValueRange.hpp
     src/include/tdap/VolumeMatrix.hpp
     src/include/tdap/Weighting.hpp
-    src/include/tdap/Limiter.hpp src/include/tdap/AlignedFrame.hpp src/include/tdap/Errors.hpp src/include/tdap/GroupVolume.hpp
+    src/include/tdap/Limiter.hpp src/include/tdap/AlignedFrame.hpp src/include/tdap/Errors.hpp
     src/include/tdap/TrueRms.hpp)
 
 set(HEADER_FILES

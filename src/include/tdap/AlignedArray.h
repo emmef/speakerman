@@ -39,6 +39,10 @@ struct alignas(A) AlignedArray : public std::array<T, S> {
     std::copy(value.begin(), value.end(), this->begin());
   }
 
+  AlignedArray(AlignedArray &&value) noexcept {
+    std::copy(value.begin(), value.end(), this->begin());
+  }
+
   explicit AlignedArray(const std::array<T, S> &value) {
     std::copy(value.begin(), value.end(), this->begin());
   }

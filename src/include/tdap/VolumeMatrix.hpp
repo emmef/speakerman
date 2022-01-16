@@ -84,7 +84,7 @@ template <typename T, size_t ALIGN_BYTES = 32> class VolumeMatrix {
   }
 
   inline T *volumes(size_t output) {
-    return std::assume_aligned<ALIGN_BYTES>(vol + in_block * output);
+    return std::assume_aligned<ALIGN_BYTES>(vol + in_block * ALIGN_ELEMENTS * output);
   }
 
   inline const T *volumes(size_t output) const {
@@ -251,73 +251,29 @@ public:
     }
   }
 
-  void applyAlignedInputUnsafe(__restrict T *out, __restrict const T *in) {
+  void applyAlignedInputUnsafe(T * __restrict out, const T * __restrict in) const {
     const size_t block = in_block * ALIGN_ELEMENTS;
     T *input = std::assume_aligned<ALIGN_ELEMENTS>(in);
     T *v1 = std::assume_aligned<ALIGN_BYTES>(volumes(0));
     for (size_t output = 0; output < outs; output++, v1 += block) {
-      out[output] = v1[0] + input[0];
+      out[output] = v1[0] * input[0];
       for (size_t i = 1; i < ins; i++) {
-        out[output] += v1[i] + input[i];
+        out[output] += v1[i] * input[i];
       }
     }
   }
 
   template <size_t INS, size_t OUTS>
-  void applyAlignedInputUnsafeFixed(__restrict T *out, __restrict const T *in) {
+  void applyAlignedInputUnsafeFixed(T *__restrict out, const T *__restrict in) const {
     const size_t block = in_block * ALIGN_ELEMENTS;
-    T *input = std::assume_aligned<ALIGN_ELEMENTS>(in);
-    T *v1 = std::assume_aligned<ALIGN_BYTES>(volumes(0));
+    const T *input = std::assume_aligned<ALIGN_ELEMENTS>(in);
+    const T *v1 = std::assume_aligned<ALIGN_BYTES>(volumes(0));
     for (size_t output = 0; output < OUTS; output++, v1 += block) {
-      out[output] = v1[0] + input[0];
+      out[output] = v1[0] * input[0];
       for (size_t i = 1; i < INS; i++) {
-        out[output] += v1[i] + input[i];
+        out[output] += v1[i] * input[i];
       }
     }
-  }
-
-  /**
-   * Apply all volumes for all input channels in volumes to all outputs and
-   * return the result. All outputs also get added the seed value.
-   * @tparam A alignment of input frame.
-   * @param inputs The input frame.
-   * @param seed The seed value, added to all outputs.
-   * @return The output frame.
-   */
-  template <size_t O, size_t I, size_t A>
-  AlignedArray<T, O, A> apply(const AlignedArray<T, I, A> &input) const {
-    static_assert((A % ALIGN_BYTES) == 0);
-    if (I != ins || O != outs) {
-      throw std::invalid_argument(
-          "VolumeMatrix::apply: input and output sizes do not match");
-    }
-    AlignedArray<T, O, A> result;
-    applyAlignedInputUnsafeFixed<I, O>(result.begin(), input);
-    return result;
-  }
-
-  /**
-   * Apply all volumes for all input channels in volumes to all outputs and
-   * return the result. All outputs also get added the seed value.
-   * @tparam A alignment of input frame.
-   * @param inputs The input frame.
-   * @param seed The seed value, added to all outputs.
-   * @return The output frame.
-   */
-  template <size_t O, size_t I>
-  std::array<T, O> apply(const std::array<T, I> &input) const {
-    if (I != ins || O != outs) {
-      throw std::invalid_argument(
-          "VolumeMatrix::apply: input and output sizes do not match");
-    }
-    std::array<T, O> result;
-    if (((input.begin() - static_cast<T *>(nullptr)) % ALIGN_BYTES) == 0) {
-      applyAlignedInputUnsafeFixed<I, O>(result.begin(), input);
-    } else {
-      std::copy(input.begin(), input.begin() + ins, volumes(outs));
-      applyAlignedInputUnsafeFixed<I, O>(result.begin(), volumes(outs));
-    }
-    return result;
   }
 
   /**
@@ -336,8 +292,7 @@ public:
       throw std::invalid_argument(
           "VolumeMatrix::apply: input and output sizes do not match");
     }
-    applyAlignedInputUnsafeFixed<I, O>(result.begin(), input);
-    return result;
+    applyAlignedInputUnsafeFixed<I, O>(result.begin(), input.begin());
   }
 
   /**
@@ -360,7 +315,6 @@ public:
       std::copy(input.begin(), input.begin() + ins, volumes(outs));
       applyAlignedInputUnsafeFixed<I, O>(result.begin(), volumes(outs));
     }
-    return result;
   }
 
   /**
