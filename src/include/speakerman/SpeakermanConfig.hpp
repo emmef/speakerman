@@ -24,6 +24,7 @@
 #include <speakerman/jack/JackProcessor.hpp>
 #include <speakerman/LogicalGroupConfig.h>
 #include <speakerman/ProcessingGroupConfig.h>
+#include <speakerman/MatrixConfig.h>
 #include <speakerman/DetectionConfig.h>
 #include <speakerman/UnsetValue.h>
 #include "LogicalGroupConfig.h"
@@ -70,6 +71,7 @@ struct SpeakermanConfig {
   LogicalInputsConfig logicalInputs;
   LogicalOutputsConfig logicalOutputs;
   ProcessingGroupsConfig processingGroups;
+  MatrixConfig inputMatrix;
   EqualizerConfig eq[MAX_EQS];
   size_t eqs = DEFAULT_EQS;
 

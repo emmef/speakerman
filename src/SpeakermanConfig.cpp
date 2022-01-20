@@ -144,7 +144,8 @@ template <typename T> struct ValueParser_<T, 2> {
   }
 
   static bool parse(T &field, const char *value, char *&end) {
-    for (end = const_cast<char *>(value); utils::config::isAlphaNum(*end); end++) {
+    for (end = const_cast<char *>(value); utils::config::isAlphaNum(*end);
+         end++) {
     }
 
     if (matches("true", value, end) || matches("1", value, end) ||
@@ -639,8 +640,10 @@ public:
   }
 
   ConfigManager() {
-    add_reader(SPEAKER_MANAGER_CONFIG_KEY_GROUP_COUNT, false, processingGroups.groups);
-    add_reader(SPEAKER_MANAGER_CONFIG_KEY_CHANNELS, false, processingGroups.channels);
+    add_reader(SPEAKER_MANAGER_CONFIG_KEY_GROUP_COUNT, false,
+               processingGroups.groups);
+    add_reader(SPEAKER_MANAGER_CONFIG_KEY_CHANNELS, false,
+               processingGroups.channels);
     add_reader(SPEAKER_MANAGER_CONFIG_KEY_CROSSOVERS, false, crossovers);
 
     add_reader(SPEAKER_MANAGER_CONFIG_KEY_SUB_THRESHOLD, true,
@@ -728,14 +731,30 @@ public:
 
         key = eqKey;
         key += EQ_CONFIG_KEY_CENTER;
-        add_reader(key, true, processingGroups.group[group_idx].eq[eq_idx].center);
+        add_reader(key, true,
+                   processingGroups.group[group_idx].eq[eq_idx].center);
         key = eqKey;
         key += EQ_CONFIG_KEY_GAIN;
-        add_reader(key, true, processingGroups.group[group_idx].eq[eq_idx].gain);
+        add_reader(key, true,
+                   processingGroups.group[group_idx].eq[eq_idx].gain);
         key = eqKey;
         key += EQ_CONFIG_KEY_BANDWIDTH;
-        add_reader(key, true, processingGroups.group[group_idx].eq[eq_idx].bandwidth);
+        add_reader(key, true,
+                   processingGroups.group[group_idx].eq[eq_idx].bandwidth);
       }
+    }
+
+    string matrixSnippet = PROCESSING_GROUP_CONFIG_KEY_GROUP;
+    matrixSnippet += "s/in/";
+    for (size_t pc = 0; pc < ProcessingGroupConfig::MAX_CHANNELS; pc++) {
+      string pcChannelSnippet = matrixSnippet;
+      if (pc > 9) {
+        pcChannelSnippet += char('0' + (pc / 10));
+      }
+      pcChannelSnippet += char('0' + (pc % 10));
+      pcChannelSnippet += "/logical-channel-weights";
+      add_array_reader<double, LogicalGroupConfig::MAX_CHANNELS>(
+          pcChannelSnippet, true, *inputMatrix.weightsFor(pc));
     }
   }
 
@@ -1020,11 +1039,17 @@ void SpeakermanConfig::set_if_unset(const SpeakermanConfig &config_if_unset,
     logicalInputs.sanitizeInitial();
     logicalOutputs.sanitizeInitial();
     processingGroups.sanitizeInitial(logicalInputs.getTotalChannels());
-  }
-  else {
+    inputMatrix.replaceWithDefaultsIfUnset(processingGroups.groups *
+                                               processingGroups.channels,
+                                           logicalInputs.getTotalChannels());
+  } else {
     logicalInputs.changeRuntimeValues(config_if_unset.logicalInputs);
     logicalOutputs.changeRuntimeValues(config_if_unset.logicalOutputs);
     processingGroups.changeRuntimeValues(config_if_unset.processingGroups);
+    inputMatrix.changeRuntimeValues(config_if_unset.inputMatrix,
+                                    processingGroups.groups *
+                                        processingGroups.channels,
+                                    logicalInputs.getTotalChannels());
   }
 
   detection.set_if_unset(config_if_unset.detection);
