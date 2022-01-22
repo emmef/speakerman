@@ -84,7 +84,8 @@ template <typename T, size_t ALIGN_BYTES = 32> class VolumeMatrix {
   }
 
   inline T *volumes(size_t output) {
-    return std::assume_aligned<ALIGN_BYTES>(vol + in_block * ALIGN_ELEMENTS * output);
+    return std::assume_aligned<ALIGN_BYTES>(vol +
+                                            in_block * ALIGN_ELEMENTS * output);
   }
 
   inline const T *volumes(size_t output) const {
@@ -96,6 +97,10 @@ template <typename T, size_t ALIGN_BYTES = 32> class VolumeMatrix {
   size_t outs;
   T *data;
   T *vol;
+
+  void unsafeCopy(const VolumeMatrix &source) const {
+    std::copy(source.vol, source.vol + (in_block * outs * ALIGN_ELEMENTS), vol);
+  }
 
 public:
   VolumeMatrix(size_t inputs, size_t outputs)
@@ -114,7 +119,18 @@ public:
    */
   explicit VolumeMatrix(const VolumeMatrix &source)
       : VolumeMatrix(source.ins, source.outs) {
-    std::copy(source.vol, source.vol + (in_block * outs * ALIGN_ELEMENTS), vol);
+    unsafeCopy(source);
+  }
+
+  /**
+   * Creates a volume matrix with the same values als the source, including
+   * epsilon, the minimum representable volume.
+   * @param source The source matrix to copy.
+   */
+  template<size_t ALIGN>
+  explicit VolumeMatrix(const VolumeMatrix<T, ALIGN> &source)
+      : VolumeMatrix(source.ins, source.outs) {
+    unsafeCopy(source);
   }
 
   VolumeMatrix(VolumeMatrix &&moved)
@@ -130,6 +146,15 @@ public:
       data = nullptr;
     }
     vol = nullptr;
+  }
+
+  template<size_t ALIGN>
+  bool assign(const VolumeMatrix<T, ALIGN> &source) {
+    if (ins == source.ins &&outs = source.outs) {
+      unsafeCopy(source);
+      return true;
+    }
+    return false;
   }
 
   /**
@@ -251,7 +276,8 @@ public:
     }
   }
 
-  void applyAlignedInputUnsafe(T * __restrict out, const T * __restrict in) const {
+  void applyAlignedInputUnsafe(T *__restrict out,
+                               const T *__restrict in) const {
     const size_t block = in_block * ALIGN_ELEMENTS;
     T *input = std::assume_aligned<ALIGN_ELEMENTS>(in);
     T *v1 = std::assume_aligned<ALIGN_BYTES>(volumes(0));
@@ -264,7 +290,8 @@ public:
   }
 
   template <size_t INS, size_t OUTS>
-  void applyAlignedInputUnsafeFixed(T *__restrict out, const T *__restrict in) const {
+  void applyAlignedInputUnsafeFixed(T *__restrict out,
+                                    const T *__restrict in) const {
     const size_t block = in_block * ALIGN_ELEMENTS;
     const T *input = std::assume_aligned<ALIGN_ELEMENTS>(in);
     const T *v1 = std::assume_aligned<ALIGN_BYTES>(volumes(0));
@@ -352,12 +379,47 @@ private:
   inline void
   approachValue(const T &out, T sourceValue,
                 const IntegrationCoefficients<T> &coefficients) const {
-    T integrated = coefficients.template getIntegrated(sourceValue, out);
-    if (fabs(integrated - sourceValue) < eps) {
-      out = sourceValue;
-    } else {
-      out = integrated;
-    }
+    out += flushToZero(coefficients.template getIntegrated(sourceValue, out) -
+                       out);
+  }
+};
+
+template <typename T, size_t ALIGN_BYTES = 32>
+class IntegratedVolumeMatrix : public VolumeMatrix<T, ALIGN_BYTES> {
+  VolumeMatrix<T, ALIGN_BYTES> toFollow;
+  IntegrationCoefficients<T> integration;
+
+public:
+  IntegratedVolumeMatrix(size_t inputs, size_t outputs,
+                         double integrationSamples)
+      : VolumeMatrix<T, ALIGN_BYTES>(inputs, outputs),
+        toFollow(inputs, outputs),
+        integration(IntegrationCoefficients<T>(integrationSamples)) {
+  }
+
+  /**
+   * Creates a volume matrix with the same values als the source, including
+   * epsilon, the minimum representable volume.
+   * @param source The source matrix to copy.
+   */
+  template<size_t ALIGN>
+  explicit IntegratedVolumeMatrix(const VolumeMatrix<T, ALIGN> &source)
+      : VolumeMatrix<T, ALIGN_BYTES>(source), toFollow(source) {
+  }
+
+  IntegratedVolumeMatrix(IntegratedVolumeMatrix &&moved) = default;
+
+  void setIntegrationSamples(double integrationSamples) {
+    integration.setCharacteristicSamples(integrationSamples);
+  }
+
+  template <size_t ALIGN>
+  bool assign(const VolumeMatrix<T, ALIGN> *source) {
+    return toFollow.template assign(source);
+  }
+
+  void approach() {
+    approach(toFollow, integration);
   }
 };
 
