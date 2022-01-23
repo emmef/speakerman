@@ -398,7 +398,7 @@ unsigned http_message::handle(socket_stream &stream) {
     read_version();
     read_headers();
     headers_.flush();
-    handle_request();
+    handle_request(stream_);
     return handle_ok();
   } catch (const StatusCode &status) {
     if (status.is_ok()) {

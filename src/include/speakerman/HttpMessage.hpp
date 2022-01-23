@@ -128,7 +128,7 @@ protected:
    * If request and its headers have been read, start the hard work
    * @param stream request and response stream
    */
-  virtual void handle_request(){};
+  virtual void handle_request(input_stream *pStream){};
 
   virtual bool content_stream_delete() const = 0;
 
