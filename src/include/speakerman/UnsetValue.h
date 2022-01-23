@@ -142,7 +142,7 @@ template <typename T>
 static void fixedValueIfUnsetOrBoxedIfOutOfRange(T &value, T value_if_unset, T minimum,
                                 T maximum) {
   if (UnsetValue<T>::is(value)) {
-    value = value_if_unset;
+    value = std::clamp(value_if_unset, minimum, maximum);
   } else if (value < minimum) {
     value = minimum;
   } else if (value > maximum) {
@@ -153,6 +153,7 @@ static void fixedValueIfUnsetOrBoxedIfOutOfRange(T &value, T value_if_unset, T m
 template <typename T>
 static bool setDefaultOrBoxedFromSourceIfUnset(T &value, T defaultValue, T sourceValue, T minimum, T maximum) {
   if (!isUnsetConfigValue(value)) {
+    value = std::clamp(value, minimum, maximum);
     return true;
   }
   if (isUnsetConfigValue(sourceValue)) {
