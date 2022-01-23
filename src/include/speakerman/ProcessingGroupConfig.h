@@ -38,10 +38,6 @@ struct ProcessingGroupConfig : public NamedConfig {
   static constexpr double DEFAULT_THRESHOLD = 0.1;
   static constexpr double MAX_THRESHOLD = 0.9;
 
-  static constexpr double MIN_VOLUME = 0;
-  static constexpr double DEFAULT_VOLUME = 1.0;
-  static constexpr double MAX_VOLUME = 40.0;
-
   static constexpr double MIN_DELAY = 0;
   static constexpr double DEFAULT_DELAY = 0;
   static constexpr double MAX_DELAY = 0.020;
@@ -51,7 +47,6 @@ struct ProcessingGroupConfig : public NamedConfig {
   static constexpr int DEFAULT_MONO = 0;
 
   double threshold = UnsetValue<double>::value;
-  double volume[MAX_CHANNELS];
   double delay = UnsetValue<double>::value;
   int useSub = UnsetValue<int>::value;
 

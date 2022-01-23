@@ -699,10 +699,6 @@ public:
       key += PROCESSING_GROUP_CONFIG_KEY_THRESHOLD;
       add_reader(key, true, processingGroups.group[group_idx].threshold);
       key = groupKey;
-      key += PROCESSING_GROUP_CONFIG_KEY_VOLUME;
-      add_array_reader<double, LogicalGroupConfig::MAX_CHANNELS>(
-          key, true, processingGroups.group[group_idx].volume[0]);
-      key = groupKey;
       key += PROCESSING_GROUP_CONFIG_KEY_DELAY;
       add_reader(key, true, processingGroups.group[group_idx].delay);
       key = groupKey;

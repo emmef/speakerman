@@ -34,11 +34,6 @@ void ProcessingGroupConfig::makeValidateBasedOn(
   size_t zeroCount = std::min(
       logicalChannels ? logicalChannels : LogicalGroupConfig::DEFAULT_CHANNELS,
       MAX_CHANNELS);
-  std::fill(volume, volume + zeroCount, 0.0);
-  if (zeroCount < MAX_CHANNELS) {
-    std::fill(volume + zeroCount, volume + MAX_CHANNELS,
-              UnsetValue<double>::value);
-  }
   // Other values
   setDefaultOrBoxedFromSourceIfUnset(delay, DEFAULT_DELAY, copyFrom.delay,
                                      MIN_DELAY, MAX_DELAY);
@@ -50,7 +45,6 @@ void ProcessingGroupConfig::makeValidateBasedOn(
 }
 
 ProcessingGroupConfig::ProcessingGroupConfig() : NamedConfig({0}) {
-  std::fill(volume, volume + MAX_CHANNELS, UnsetValue<double>::value);
   std::fill(eq, eq + MAX_EQS, EqualizerConfig::unsetConfig());
 }
 
@@ -73,9 +67,6 @@ void ProcessingGroupConfig::copyRuntimeValues(
   }
   for (; i < MAX_EQS; i++) {
     eq[i] = EqualizerConfig::unsetConfig();
-  }
-  for (size_t i = 0; i < MAX_CHANNELS && !isUnsetConfigValue(volume[i]); i++) {
-    setBoxedFromSetSource(volume[i], copyFrom.volume[i], MIN_VOLUME, MAX_VOLUME);
   }
   setBoxedFromSetSource(delay, copyFrom.delay,
                                      MIN_DELAY, MAX_DELAY);
