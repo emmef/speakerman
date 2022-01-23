@@ -386,7 +386,6 @@ public:
         EqualizerFilterData<T>::createConfigured(config, sampleRate));
 
     compensateDelays();
-    dump();
   }
 
   void dump() const {
