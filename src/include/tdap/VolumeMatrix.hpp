@@ -237,7 +237,7 @@ public:
    */
   void approach(const VolumeMatrix &source,
                 const IntegrationCoefficients<T> &coefficients) {
-    if (ins() != source.ins || outs() != source.outs) {
+    if (ins() != source.ins() || outs() != source.outs()) {
       throw std::invalid_argument("Approach matrix must have same dimensions");
     }
     for (size_t output = 0; output < outs(); output++) {
@@ -349,7 +349,7 @@ private:
   }
 
   inline void
-  approachValue(const T &out, T sourceValue,
+  approachValue(T &out, T sourceValue,
                 const IntegrationCoefficients<T> &coefficients) const {
     out += flushToZero(coefficients.template getIntegrated(sourceValue, out) -
                        out);
@@ -446,7 +446,6 @@ public:
    * @param source The source matrix to copy.
    */
   explicit FixedVolumeMatrix(const FixedVolumeMatrix &source) = default;
-  FixedVolumeMatrix(FixedVolumeMatrix &&source) noexcept = default;
 
   size_t getInputs() const { return INPUTS; }
   size_t getAlignedInputs() const { return ALIGNED_INPUTS; }

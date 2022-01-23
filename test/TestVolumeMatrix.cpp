@@ -107,7 +107,7 @@ tdap::AlignedArray<double, OUTPUTS, ALIGN> getRandomOutput() {
 
 } // end of anonymous namespace
 
-BOOST_AUTO_TEST_SUITE(testVolumeMatrix)
+BOOST_AUTO_TEST_SUITE(test_tdap_VolumeMatrix)
 
 BOOST_AUTO_TEST_CASE(testVolumeMatrixZero) {
   const double expected[] = {0, 0, 0};
