@@ -351,8 +351,8 @@ bool server_socket::work(int *errorCode, server_socket_worker worker,
   lock.unlock();
 
   timeval tv;
-  tv.tv_sec = 2;
-  tv.tv_usec = 0;
+  tv.tv_sec = 0;
+  tv.tv_usec = 500000;
 
   bool raised = false;
   while (state == State::WORKING && !raised) {
@@ -398,6 +398,9 @@ void server_socket::close(Lock &lock) {
     std::cerr << "Aborted waiting for work stop: " << strerror(error)
               << std::endl;
   }
+  if (closeSocket(sockfd_) != 0) {
+    std::cerr << "Error when closing socket: " << strerror(errno) << std::endl;
+  }
   sockfd_ = -1;
   timeval tv;
   tv.tv_sec = 2;
@@ -405,9 +408,6 @@ void server_socket::close(Lock &lock) {
   socket_selector_iterator iterator = selector_.do_select(tv, true);
   while (iterator.has_next()) {
     closeSocket(iterator.get_next());
-  }
-  if (closeSocket(sockfd_) != 0) {
-    std::cerr << "Error when closing socket: " << strerror(errno) << std::endl;
   }
   state_ = State::CLOSED;
   condition_.notify_all();
