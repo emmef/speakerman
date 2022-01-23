@@ -35,7 +35,7 @@ struct alignas(A) AlignedArray : public std::array<T, S> {
     std::fill(this->begin(), this->end(), 0);
   }
 
-  explicit AlignedArray(const AlignedArray &value) {
+  AlignedArray(const AlignedArray &value) {
     std::copy(value.begin(), value.end(), this->begin());
   }
 
@@ -45,6 +45,11 @@ struct alignas(A) AlignedArray : public std::array<T, S> {
 
   explicit AlignedArray(const std::array<T, S> &value) {
     std::copy(value.begin(), value.end(), this->begin());
+  }
+
+  AlignedArray &operator = (const AlignedArray &source) {
+    std::copy(source.begin(), source.end(), this->begin());
+    return *this;
   }
 
   AlignedArray(std::initializer_list<T> elements)  {
