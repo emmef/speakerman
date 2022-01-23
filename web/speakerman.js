@@ -336,7 +336,7 @@ function sendLevelRequest() {
         console.log("Postpone");
     }
     else {
-        var url = "/levels.json";
+        var url = "/levels";
         xHttpRequest = createCORSRequest('GET', url);
         try {
             xHttpRequest.onload = handleRequest;

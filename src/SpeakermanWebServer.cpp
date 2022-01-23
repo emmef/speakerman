@@ -123,7 +123,6 @@ void web_server::thread_function() {
   static std::chrono::milliseconds sleep(SLEEP_MILLIS);
   int count = 1;
 
-  SpeakermanConfig configFileConfig;
   {
     tdap::MemoryFence fence;
     configFileConfig = manager_.getConfig();
@@ -319,7 +318,10 @@ static const char *itostr(char *buffer, size_t len, long long value) {
   return buffer;
 }
 
-void web_server::handle_request() {
+void web_server::handle_request(input_stream *pStream) {
+  static constexpr size_t LENGTH = 10240;
+  std::unique_ptr<char> str(new char[LENGTH + 1]);
+
   if (strncmp("/", url_, 32) == 0) {
     strncpy(url_, "/index.html", 32);
   }
@@ -329,9 +331,9 @@ void web_server::handle_request() {
       break;
     }
   }
-  if (method == Method::GET) {
 
-    if (strncasecmp("/levels.json", url_, 32) == 0) {
+  if (method == Method::GET) {
+    if (strncasecmp("/levels", url_, 32) == 0) {
       char numbers[60];
       LevelEntry entry;
       level_buffer.get(levelTimeStamp, entry);
@@ -342,42 +344,68 @@ void web_server::handle_request() {
         set_header("Access-Control-Allow-Origin", "*");
         set_content_type("application/json");
         response().write_string("{\r\n");
-        response().write_string("\t\"elapsedMillis\": \"");
+        response().write_string("\t\"elapsedMillis\": ");
         response().write_string(
             itostr(numbers, 30, entry.stamp - levelTimeStamp));
-        response().write_string("\", \r\n");
-        response().write_string("\t\"thresholdScale\": \"");
+        response().write_string(", \r\n");
+        response().write_string("\t\"thresholdScale\": ");
         response().write_string(
             ftostr(numbers, 30, manager_.getConfig().threshold_scaling));
-        response().write_string("\", \r\n");
-        response().write_string("\t\"subLevel\": \"");
+        response().write_string(", \r\n");
+        response().write_string("\t\"subLevel\": ");
         response().write_string(ftostr(numbers, 30, levels.getSignal(0)));
-        response().write_string("\", \r\n");
-        response().write_string("\t\"periods\": \"");
+        response().write_string(", \r\n");
+        response().write_string("\t\"periods\": ");
         response().write_string(itostr(numbers, 30, levels.count()));
-        response().write_string("\", \r\n");
+        response().write_string(", \r\n");
         const jack::ProcessingStatistics &statistics = manager_.getStatistics();
-        response().write_string("\t\"cpuLongTerm\": \"");
+        response().write_string("\t\"cpuLongTerm\": ");
         response().write_string(itostr(numbers, 10, statistics.getLongTermCorePercentage()));
-        response().write_string("\",\r\n\t\"cpuShortTerm\": \"");
+        response().write_string(",\r\n\t\"cpuShortTerm\": ");
         response().write_string(itostr(numbers, 10, statistics.getShortTermCorePercentage()));
-        response().write_string("\",\r\n");
+        response().write_string(",\r\n");
+        // group volumes
         response().write_string("\t\"group\" : [\r\n");
         for (size_t i = 0; i < levels.groups(); i++) {
           response().write_string("\t\t{\r\n");
           response().write_string("\t\t\t\"group_name\": \"");
           response().write_string(manager_.getConfig().processingGroups.group[i].name);
           response().write_string("\", \r\n");
-          response().write_string("\t\t\t\"level\": \"");
+          response().write_string("\t\t\t\"level\": ");
           response().write_string(ftostr(numbers, 30, levels.getSignal(i + 1)));
-          response().write_string("\"\r\n");
+          response().write_string("\r\n");
           response().write_string("\t\t}");
           if (i < levels.groups() - 1) {
             response().write(',');
           }
           response().write_string("\r\n");
         }
+        response().write_string("\t],\r\n");
+        // inputs
+        response().write_string("\t\"inputMaxVolume\": ");
+        response().write_string(ftostr(numbers, 30, LogicalGroupConfig::MAX_VOLUME));
+        response().write_string(",\r\n");
+        response().write_string("\t\"input\": [\r\n");
+        const LogicalInputsConfig &liConfig = manager_.getConfig().logicalInputs;
+        size_t groupCount = liConfig.getGroupCount();
+        for (size_t i = 0; i < groupCount; i++) {
+          response().write_string("\t\t{\r\n");
+          response().write_string("\t\t\t\"id\": \"");
+          response().write_string(ftostr(numbers, 20, i));
+          response().write_string("\",\r\n");
+          response().write_string("\t\t\t\"name\": \"");
+          response().write_string(liConfig.group[i].name);
+          response().write_string("\",\r\n");
+          response().write_string("\t\t\t\"volume\": ");
+          response().write_string(ftostr(numbers, 30, liConfig.group[i].volume));
+          response().write_string("\r\n\t\t}");
+          if (i < groupCount - 1) {
+            response().write(',');
+          }
+          response().write_string("\r\n");
+        }
         response().write_string("\t]\r\n");
+        // end
         response().write_string("}\r\n");
       } else {
         set_error(http_status::SERVICE_UNAVAILABLE);
@@ -403,10 +431,29 @@ void web_server::handle_request() {
       faviconFile.reset();
       handle_content(faviconFile.size(), &faviconFile);
     } else {
-      set_error(404);
+      set_error(404, url_);
     }
   } else if (method == Method::PUT) {
-    // No more mix-mode, but a put could be useful for other purposes
+    if (strncasecmp("/inputs", url_, 32) == 0) {
+      if (pStream && pStream->read_line(str.get(), LENGTH) >= 1) {
+        handleConfigurationChanges(str.get());
+      }
+    }
+    else {
+      set_error(404, url_);
+    }
   }
 }
+
+void web_server::handleConfigurationChanges(char *inputVolumeJson) {
+  static std::chrono::milliseconds wait(WAIT_MILLIS);
+  DynamicProcessorLevels levels;
+  SpeakermanConfig newConf;
+  if (readConfigFromJson(newConf, inputVolumeJson, configFileConfig)) {
+    if (manager_.applyConfigAndGetLevels(configFileConfig, &levels, wait)) {
+      level_buffer.put(levels);
+    }
+  }
+}
+
 } // namespace speakerman

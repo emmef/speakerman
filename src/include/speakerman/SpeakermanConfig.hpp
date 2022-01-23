@@ -96,6 +96,9 @@ const char *getWatchDogScript();
 
 SpeakermanConfig readSpeakermanConfig();
 
+bool readConfigFromJson(SpeakermanConfig &destination, const char *json,
+                        const SpeakermanConfig &basedUpon);
+
 SpeakermanConfig readSpeakermanConfig(const SpeakermanConfig &basedUpon,
                                       bool initial);
 

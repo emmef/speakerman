@@ -125,7 +125,7 @@ protected:
 
   virtual void on_header(const char *header, const char *value) override;
 
-  virtual void handle_request() override;
+  virtual void handle_request(input_stream *pStream) override;
 
   virtual const char *on_method(const char *method_name) override;
 
@@ -143,6 +143,7 @@ private:
   std::thread level_fetch_thread;
   long long levelTimeStamp = 0;
   Method method = Method::GET;
+  SpeakermanConfig configFileConfig;
 
   static void thread_static_function(web_server *);
 
@@ -152,6 +153,7 @@ private:
 
   static Result worker_function(Stream &stream, const server_socket &socket,
                                 void *data);
+  void handleConfigurationChanges(char *inputVolumeJson);
 };
 
 } // namespace speakerman

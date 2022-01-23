@@ -988,6 +988,13 @@ void dumpSpeakermanConfig(const SpeakermanConfig &dump, ostream &output) {
   config_manager.dump(dump, output);
 }
 
+bool readConfigFromJson(SpeakermanConfig &destination, const char *json,
+                              const SpeakermanConfig &basedUpon) {
+  std::cout << "Reading configuration JSON: " << std::endl;
+  std::cout << json << std::endl;
+  return false;
+}
+
 const SpeakermanConfig SpeakermanConfig::defaultConfig() {
   SpeakermanConfig result;
   result.logicalInputs = LogicalInputsConfig::defaultConfig();
