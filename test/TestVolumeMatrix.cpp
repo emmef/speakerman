@@ -13,8 +13,8 @@ static constexpr size_t INPUTS = 4;
 static constexpr size_t OUTPUTS = 3;
 static constexpr size_t ALIGN = 32;
 
-
-typedef tdap::VolumeMatrix<double, ALIGN> Matrix;
+typedef tdap::DefaultVolumeMatrix<double, ALIGN> Matrix;
+typedef tdap::FixedVolumeMatrix<double, INPUTS, OUTPUTS, ALIGN> FixedMatrix;
 
 bool same(double x, double y) {
   double norm = fabs(x) + fabs(y);
@@ -49,7 +49,7 @@ void testEqual(const tdap::AlignedArray<double, C, A> &actual,
 }
 
 template <size_t I, size_t O, size_t A>
-void testEqualMatrix(const tdap::VolumeMatrix<double, A> &actual,
+void testEqualMatrix(const tdap::DefaultVolumeMatrix<double, A> &actual,
                      const char *expected, const char *description) {
   std::ostringstream out;
   out << "{";
@@ -70,8 +70,8 @@ void testEqualMatrix(const tdap::VolumeMatrix<double, A> &actual,
   out << "}";
   if (out.str() != expected) {
     std::ostringstream message;
-    message << description << ": expected \"" << expected << "\" != actual \"" << out.str()
-            << "\"";
+    message << description << ": expected \"" << expected << "\" != actual \""
+            << out.str() << "\"";
     BOOST_FAIL(message.str());
   }
 }
@@ -89,46 +89,106 @@ tdap::AlignedArray<double, INPUTS, ALIGN> getNumberedInput() {
   return frame;
 }
 
+tdap::AlignedArray<double, INPUTS, ALIGN> getRandomInput() {
+  tdap::AlignedArray<double, INPUTS, ALIGN> frame;
+  for (double &x : frame) {
+    x = (RAND_MAX - 2 * rand()) / (2 * RAND_MAX);
+  }
+  return frame;
+}
+
+tdap::AlignedArray<double, OUTPUTS, ALIGN> getRandomOutput() {
+  tdap::AlignedArray<double, OUTPUTS, ALIGN> frame;
+  for (double &x : frame) {
+    x = (RAND_MAX - 2 * rand()) / (2 * RAND_MAX);
+  }
+  return frame;
+}
+
 } // end of anonymous namespace
 
 BOOST_AUTO_TEST_SUITE(testVolumeMatrix)
 
 BOOST_AUTO_TEST_CASE(testVolumeMatrixZero) {
-  tdap::AlignedArray<double, INPUTS, ALIGN> inputs = getNumberedInput();
-  Matrix matrix(INPUTS, OUTPUTS);
+  const double expected[] = {0, 0, 0};
+  const tdap::AlignedArray<double, INPUTS, ALIGN> inputs = getNumberedInput();
   tdap::AlignedArray<double, OUTPUTS, ALIGN> outputs;
-  matrix.zero();
-  matrix.apply(outputs, inputs);
-  double expected[] = {0, 0, 0};
-  testEqual(outputs, expected);
+
+  {
+    Matrix matrix(INPUTS, OUTPUTS);
+    outputs = getRandomOutput();
+    matrix.zero();
+    matrix.apply(outputs, inputs);
+    testEqual(outputs, expected);
+  }
+  {
+    FixedMatrix matrix;
+    outputs = getRandomOutput();
+    matrix.zero();
+    matrix.apply(outputs, inputs);
+    testEqual(outputs, expected);
+  }
 }
 
 BOOST_AUTO_TEST_CASE(testVolumeMatrixIdentity) {
-  tdap::AlignedArray<double, INPUTS, ALIGN> inputs = getNumberedInput();
-  Matrix matrix(INPUTS, OUTPUTS);
+  const double expected[] = {1, 2, 3};
+  const tdap::AlignedArray<double, INPUTS, ALIGN> inputs = getNumberedInput();
   tdap::AlignedArray<double, OUTPUTS, ALIGN> outputs;
-  matrix.identity();
-  matrix.apply(outputs, inputs);
-  double expected[] = {1, 2, 3};
-  testEqual(outputs, expected);
+
+  {
+    Matrix matrix(INPUTS, OUTPUTS);
+    outputs = getRandomOutput();
+    matrix.identity();
+    matrix.apply(outputs, inputs);
+    testEqual(outputs, expected);
+  }
+
+  {
+    FixedMatrix matrix;
+    outputs = getRandomOutput();
+    matrix.identity();
+    matrix.apply(outputs, inputs);
+    testEqual(outputs, expected);
+  }
 }
 BOOST_AUTO_TEST_CASE(testVolumeMatrixScaledIdentity) {
-  tdap::AlignedArray<double, INPUTS, ALIGN> inputs = getNumberedInput();
-  Matrix matrix(INPUTS, OUTPUTS);
-  tdap::AlignedArray<double, OUTPUTS, ALIGN> outputs;
-  matrix.identity(2);
-  matrix.apply(outputs, inputs);
   double expected[] = {2, 4, 6};
-  testEqual(outputs, expected);
+  const tdap::AlignedArray<double, INPUTS, ALIGN> inputs = getNumberedInput();
+  tdap::AlignedArray<double, OUTPUTS, ALIGN> outputs;
+
+  {
+    Matrix matrix(INPUTS, OUTPUTS);
+    outputs = getRandomOutput();
+    matrix.identity(2);
+    matrix.apply(outputs, inputs);
+    testEqual(outputs, expected);
+  }
+  {
+    FixedMatrix matrix;
+    outputs = getRandomOutput();
+    matrix.identity(2);
+    matrix.apply(outputs, inputs);
+    testEqual(outputs, expected);
+  }
 }
 BOOST_AUTO_TEST_CASE(testVolumeMatrixWrappedIdentity) {
-  tdap::AlignedArray<double, INPUTS, ALIGN> inputs = getNumberedInput();
-  Matrix matrix(INPUTS, OUTPUTS);
-  tdap::AlignedArray<double, OUTPUTS, ALIGN> outputs;
-  matrix.identityWrapped();
-  matrix.apply(outputs, inputs);
   double expected[] = {5, 2, 3};
-  testEqual(outputs, expected);
+  const tdap::AlignedArray<double, INPUTS, ALIGN> inputs = getNumberedInput();
+  tdap::AlignedArray<double, OUTPUTS, ALIGN> outputs;
+
+  {
+    Matrix matrix(INPUTS, OUTPUTS);
+    outputs = getRandomOutput();
+    matrix.identityWrapped();
+    matrix.apply(outputs, inputs);
+    testEqual(outputs, expected);
+  }
+  {
+    FixedMatrix matrix;
+    outputs = getRandomOutput();
+    matrix.identityWrapped();
+    matrix.apply(outputs, inputs);
+    testEqual(outputs, expected);
+  }
 }
 BOOST_AUTO_TEST_SUITE_END()
-
