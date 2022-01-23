@@ -147,7 +147,7 @@ void web_server::thread_function() {
       if (stamp != configFileConfig.timeStamp) {
         cout << "read config!" << std::endl;
         try {
-          configFileConfig = readSpeakermanConfig(configFileConfig, false);
+          configFileConfig = readSpeakermanConfig(configFileConfig, true);
           read = true;
         } catch (const runtime_error &e) {
           cerr << "Error reading configuration: " << e.what() << endl;
@@ -160,8 +160,7 @@ void web_server::thread_function() {
         read = true;
       }
       if (read) {
-        SpeakermanConfig usedConfig;
-        if (manager_.applyConfigAndGetLevels(usedConfig, &levels, wait)) {
+        if (manager_.applyConfigAndGetLevels(configFileConfig, &levels, wait)) {
           level_buffer.put(levels);
           got_levels = true;
         }

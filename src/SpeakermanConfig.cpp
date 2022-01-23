@@ -256,9 +256,6 @@ protected:
   virtual void read(SpeakermanConfig &config, const char *key,
                     const char *value) const = 0;
 
-  virtual void copy(SpeakermanConfig &config,
-                    const SpeakermanConfig &basedUpon) const = 0;
-
 public:
   [[nodiscard]] bool runtime_changeable() const { return runtime_changeable_; }
   [[nodiscard]] bool is_deprecated() const { return is_deprecated_; }
@@ -271,12 +268,10 @@ public:
   }
 
   bool read(SpeakermanConfig &config, const char *key, const char *value,
-            const SpeakermanConfig &basedUpon) const {
-    if (&config == &basedUpon || runtime_changeable_) {
+            bool isRuntime) const {
+    if (!isRuntime || runtime_changeable_) {
       read(config, key, value);
       return true;
-    } else {
-      copy(config, basedUpon);
     }
     cout << "Ignoring (not runtime changeable): " << key << endl;
     return false;
@@ -512,12 +507,12 @@ public:
   }
 
   bool read(SpeakermanConfig &manager, const string &key, const char *value,
-            const SpeakermanConfig &basedUpon) {
+            bool runtime) {
     if (reader_->is_deprecated()) {
       std::cout << "Warning: variable \"" << key_ << "\" is deprecated!"
                 << std::endl;
     }
-    return reader_->read(manager, key.c_str(), value, basedUpon);
+    return reader_->read(manager, key.c_str(), value, runtime);
   }
 
   void write(const SpeakermanConfig &config, ostream &output) const {
@@ -760,8 +755,7 @@ public:
 
   size_t size() const { return size_; }
 
-  bool read_line(SpeakermanConfig &config, const char *line,
-                 const SpeakermanConfig &basedUpon) {
+  bool read_line(SpeakermanConfig &config, const char *line, bool runtime) {
     const char *key_start;
 
     ReaderStatus status = KeyVariableReader::skip_to_key_start(key_start, line);
@@ -790,7 +784,7 @@ public:
     if (status != ReaderStatus::SUCCESS) {
       return false;
     }
-    return reader->read(config, reader->get_key(), value_start, basedUpon);
+    return reader->read(config, reader->get_key(), value_start, runtime);
   }
 
   void dump(const SpeakermanConfig &config, ostream &stream) {
@@ -914,12 +908,11 @@ static void resetStream(istream &stream) {
   }
 }
 
-static void actualReadConfig(SpeakermanConfig &config, istream &stream,
-                             const SpeakermanConfig &basedUpon, bool initial) {
+static SpeakermanConfig actualReadConfig(istream &stream, bool runtime) {
   static constexpr size_t LINE_LENGTH = 1024;
   char line[LINE_LENGTH + 1];
   size_t line_pos = 0;
-  config = SpeakermanConfig::unsetConfig();
+  SpeakermanConfig config = SpeakermanConfig::unsetConfig();
 
   resetStream(stream);
   while (true) {
@@ -930,7 +923,7 @@ static void actualReadConfig(SpeakermanConfig &config, istream &stream,
     if (utils::config::isLineDelimiter(c)) {
       if (line_pos != 0) {
         line[std::min(line_pos, LINE_LENGTH)] = '\0';
-        config_manager.read_line(config, line, initial ? config : basedUpon);
+        config_manager.read_line(config, line, runtime);
         line_pos = 0;
       }
     } else if (line_pos < LINE_LENGTH) {
@@ -938,16 +931,15 @@ static void actualReadConfig(SpeakermanConfig &config, istream &stream,
       continue;
     } else if (line_pos == LINE_LENGTH) {
       line[LINE_LENGTH] = '\0';
-      config_manager.read_line(config, line, initial ? config : basedUpon);
+      config_manager.read_line(config, line, runtime);
       line_pos++;
     }
   }
   if (line_pos != 0) {
     line[std::min(line_pos, LINE_LENGTH)] = '\0';
-    config_manager.read_line(config, line, initial ? config : basedUpon);
+    config_manager.read_line(config, line, runtime);
   }
-  config.set_if_unset(basedUpon, initial);
-  config.threshold_scaling = basedUpon.threshold_scaling;
+  return config;
 }
 
 long long getFileTimeStamp(const char *fileName) {
@@ -962,9 +954,7 @@ long long getConfigFileTimeStamp() {
   return getFileTimeStamp(configFileName());
 }
 
-SpeakermanConfig readSpeakermanConfig(const SpeakermanConfig &basedUpon,
-                                      bool initial) {
-  SpeakermanConfig result;
+SpeakermanConfig readSpeakermanConfig(const SpeakermanConfig &basedUpon, bool isRuntime) {
   ifstream stream;
   long long stamp = getFileTimeStamp(configFileName());
   stream.open(configFileName());
@@ -974,8 +964,15 @@ SpeakermanConfig readSpeakermanConfig(const SpeakermanConfig &basedUpon,
     cerr << "Stream not open..." << endl;
     return basedUpon;
   }
+  SpeakermanConfig result;
   try {
-    actualReadConfig(result, stream, basedUpon, initial);
+    if (isRuntime) {
+      result = basedUpon;
+      result.updateRuntimeValues(actualReadConfig(stream, isRuntime));
+    } else {
+      result = actualReadConfig(stream, isRuntime);
+      result.setInitial();
+    }
   } catch (const ReadConfigException &e) {
     cerr << "E: " << e.what() << endl;
     return basedUpon;
@@ -987,7 +984,7 @@ SpeakermanConfig readSpeakermanConfig(const SpeakermanConfig &basedUpon,
 
 SpeakermanConfig readSpeakermanConfig() {
   SpeakermanConfig basedUpon = SpeakermanConfig::defaultConfig();
-  return readSpeakermanConfig(basedUpon, true);
+  return readSpeakermanConfig(basedUpon, false);
 }
 
 void dumpSpeakermanConfig(const SpeakermanConfig &dump, ostream &output) {
@@ -1033,55 +1030,76 @@ const SpeakermanConfig SpeakermanConfig::unsetConfig() {
   return result;
 }
 
-void SpeakermanConfig::set_if_unset(const SpeakermanConfig &config_if_unset,
-                                    bool initial) {
-  if (initial) {
-    logicalInputs.sanitizeInitial();
-    logicalOutputs.sanitizeInitial();
-    processingGroups.sanitizeInitial(logicalInputs.getTotalChannels());
-    inputMatrix.replaceWithDefaultsIfUnset(processingGroups.groups *
-                                               processingGroups.channels,
-                                           logicalInputs.getTotalChannels());
-  } else {
-    logicalInputs.changeRuntimeValues(config_if_unset.logicalInputs);
-    logicalOutputs.changeRuntimeValues(config_if_unset.logicalOutputs);
-    processingGroups.changeRuntimeValues(config_if_unset.processingGroups);
-    inputMatrix.changeRuntimeValues(config_if_unset.inputMatrix,
-                                    processingGroups.groups *
-                                        processingGroups.channels,
-                                    logicalInputs.getTotalChannels());
-  }
+void SpeakermanConfig::updateRuntimeValues(
+    const SpeakermanConfig &newRuntimeConfig) {
+  logicalInputs.changeRuntimeValues(newRuntimeConfig.logicalInputs);
+  logicalOutputs.changeRuntimeValues(newRuntimeConfig.logicalOutputs);
+  processingGroups.changeRuntimeValues(newRuntimeConfig.processingGroups);
+  inputMatrix.changeRuntimeValues(newRuntimeConfig.inputMatrix,
+                                  processingGroups.groups *
+                                      processingGroups.channels,
+                                  logicalInputs.getTotalChannels());
 
-  detection.set_if_unset(config_if_unset.detection);
+  detection.set_if_unset(newRuntimeConfig.detection);
+  copyEqualizers(newRuntimeConfig);
+
+  setBoxedFromSetSource(relativeSubThreshold,
+                        newRuntimeConfig.relativeSubThreshold,
+                        MIN_REL_SUB_THRESHOLD, MAX_REL_SUB_THRESHOLD);
+  setBoxedFromSetSource(subDelay, newRuntimeConfig.subDelay, MIN_SUB_DELAY,
+                        MAX_SUB_DELAY);
+  setBoxedFromSetSource(generateNoise, newRuntimeConfig.generateNoise, 0, 1);
+  setBoxedFromSetSource(threshold_scaling, newRuntimeConfig.threshold_scaling,
+                        MIN_THRESHOLD_SCALING, MAX_THRESHOLD_SCALING);
+  timeStamp = -1;
+}
+
+void SpeakermanConfig::setInitial() {
+  logicalInputs.sanitizeInitial();
+
+  logicalOutputs.sanitizeInitial();
+
+  processingGroups.sanitizeInitial(logicalInputs.getTotalChannels());
+
+  inputMatrix.replaceWithDefaultsIfUnset(processingGroups.groups *
+                                             processingGroups.channels,
+                                         logicalInputs.getTotalChannels());
+
+  detection.set_if_unset(DetectionConfig::defaultConfig());
+  copyEqualizers(*this);
+
+  setDefaultOrBoxedFromSourceIfUnset(subOutput, DEFAULT_SUB_OUTPUT, subOutput,
+                                     MIN_SUB_OUTPUT, MAX_SUB_OUTPUT);
+
+  setDefaultOrBoxedFromSourceIfUnset(
+      relativeSubThreshold, DEFAULT_REL_SUB_THRESHOLD, relativeSubThreshold,
+      MIN_REL_SUB_THRESHOLD, MAX_REL_SUB_THRESHOLD);
+  setDefaultOrBoxedFromSourceIfUnset(subDelay, DEFAULT_SUB_DELAY, subDelay,
+                                     MIN_SUB_DELAY, MAX_SUB_DELAY);
+  setDefaultOrBoxedFromSourceIfUnset(generateNoise, DEFAULT_GENERATE_NOISE,
+                                     generateNoise, 0, 1);
+  setDefaultOrBoxedFromSourceIfUnset(
+      threshold_scaling, DEFAULT_THRESHOLD_SCALING, threshold_scaling,
+      MIN_THRESHOLD_SCALING, MAX_THRESHOLD_SCALING);
+  timeStamp = -1;
+}
+
+void SpeakermanConfig::copyEqualizers(const SpeakermanConfig &sourceConfig) {
   size_t eq_idx;
-  if (fixedValueIfUnsetOrOutOfRange(eqs, config_if_unset.eqs, MIN_EQS,
-                                    MAX_EQS)) {
+  if (fixedValueIfUnsetOrOutOfRange(eqs, sourceConfig.eqs, MIN_EQS, MAX_EQS)) {
     for (eq_idx = 0; eq_idx < eqs; eq_idx++) {
-      eq[eq_idx] = config_if_unset.eq[eq_idx];
+      eq[eq_idx] = sourceConfig.eq[eq_idx];
+      eq[eq_idx].set_if_unset(EqualizerConfig::defaultConfig());
     }
   } else {
     for (eq_idx = 0; eq_idx < eqs; eq_idx++) {
-      eq[eq_idx].set_if_unset(config_if_unset.eq[eq_idx]);
+      eq[eq_idx].set_if_unset(sourceConfig.eq[eq_idx]);
+      eq[eq_idx].set_if_unset(EqualizerConfig::defaultConfig());
     }
   }
   for (; eq_idx < MAX_EQS; eq_idx++) {
     eq[eq_idx] = EqualizerConfig::defaultConfig();
   }
-
-  fixedValueIfUnsetOrOutOfRange(subOutput, config_if_unset.subOutput,
-                                MIN_SUB_OUTPUT, MAX_SUB_OUTPUT);
-
-  fixedValueIfUnsetOrOutOfRange(relativeSubThreshold,
-                                config_if_unset.relativeSubThreshold,
-                                MIN_REL_SUB_THRESHOLD, MAX_REL_SUB_THRESHOLD);
-  fixedValueIfUnsetOrOutOfRange(subDelay, config_if_unset.subDelay,
-                                MIN_SUB_DELAY, MAX_SUB_DELAY);
-  fixedValueIfUnsetOrOutOfRange(generateNoise, config_if_unset.generateNoise, 0,
-                                1);
-  fixedValueIfUnsetOrOutOfRange(threshold_scaling,
-                                config_if_unset.threshold_scaling,
-                                MIN_THRESHOLD_SCALING, MAX_THRESHOLD_SCALING);
-  timeStamp = -1;
 }
 
 } // namespace speakerman

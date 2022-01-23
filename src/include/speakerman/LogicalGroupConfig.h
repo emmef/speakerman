@@ -29,7 +29,7 @@
 namespace speakerman {
 
 struct LogicalGroupConfig : public NamedConfig {
-  static constexpr size_t MAX_CHANNELS = 16;
+  static constexpr size_t MAX_CHANNELS = 8;
   static constexpr size_t DEFAULT_CHANNELS = 2;
 
   static_assert(MAX_CHANNELS >= 1);
@@ -39,7 +39,7 @@ struct LogicalGroupConfig : public NamedConfig {
 
   static constexpr double MIN_VOLUME = 0.0;
   static constexpr double DEFAULT_VOLUME = 1.0;
-  static constexpr double MAX_VOLUME = 1.0;
+  static constexpr double MAX_VOLUME = 40.0;
   double volume = UnsetValue<double>::value;
 
   /**
@@ -108,6 +108,8 @@ struct AbstractLogicalGroupsConfig {
   size_t getTotalChannels() const;
 
   const LogicalPortMap createMapping() const;
+
+  double volumeForChannel(size_t channel) const;
 
 protected:
   size_t compactGroups(LogicalGroupConfig::Direction direction);

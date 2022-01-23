@@ -74,7 +74,7 @@ void LogicalGroupConfig::replaceWithDefaultsIfUnset(Direction direction,
 void LogicalGroupConfig::changeRuntimeValues(
     const LogicalGroupConfig &newRuntimeConfig) {
   if (!isUnsetConfigValue(newRuntimeConfig.volume)) {
-    volume = std::clamp(newRuntimeConfig.volume, MIN_VOLUME, MAX_VOLUME);
+    setBoxedFromSetSource(volume, newRuntimeConfig.volume, MIN_VOLUME, MAX_VOLUME);
   }
   if (!isUnsetConfigValue(newRuntimeConfig.name)) {
     copyToName(newRuntimeConfig.name);
@@ -223,11 +223,9 @@ const AbstractLogicalGroupsConfig &AbstractLogicalGroupsConfig::unsetConfig() {
 void AbstractLogicalGroupsConfig::changeRuntimeValues(
     const AbstractLogicalGroupsConfig &runtimeValues,
     LogicalGroupConfig::Direction direction) {
-  AbstractLogicalGroupsConfig copy = runtimeValues;
-  size_t groupCount = copy.validateGroups(direction);
-  size_t changes = std::min(groupCount, getGroupCount());
+  size_t changes = getGroupCount();
   for (size_t g = 0; g < changes; g++) {
-    group[g].changeRuntimeValues(copy.group[g]);
+    group[g].changeRuntimeValues(runtimeValues.group[g]);
   }
 }
 void AbstractLogicalGroupsConfig::sanitizeInitial(
@@ -260,6 +258,20 @@ size_t AbstractLogicalGroupsConfig::getTotalChannels() const {
   return channels;
 }
 
+double AbstractLogicalGroupsConfig::volumeForChannel(size_t channel) const {
+  size_t groups = getGroupCount();
+  size_t startChannel = 0;
+  double volume = 0.0;
+  for (size_t g = 0; g < groups; g++) {
+    if (channel < startChannel) {
+      return volume;
+    }
+    volume = group[g].volume;
+    startChannel += group[g].getPortCount();
+  }
+  return volume;
+}
+
 LogicalPortMapEntry &LogicalPortMap::operator[](size_t i) {
   return entries[tdap::IndexPolicy::array(i, count)];
 }
@@ -281,6 +293,6 @@ const LogicalPortMapEntry *LogicalPortMap::end() const {
   return entries + count;
 }
 size_t LogicalPortMapEntry::wrappedPort(size_t maximumPort) const {
-  return 1 + std::max(0lu, port - 1) % std::max(1lu, maximumPort);
+  return std::max(0lu, port - 1) % std::max(1lu, maximumPort);
 }
 } // namespace speakerman

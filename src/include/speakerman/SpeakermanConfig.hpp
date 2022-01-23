@@ -79,7 +79,9 @@ struct SpeakermanConfig {
 
   static const SpeakermanConfig unsetConfig();
 
-  void set_if_unset(const SpeakermanConfig &config_if_unset, bool initial);
+  void updateRuntimeValues(const SpeakermanConfig &newRuntimeConfig);
+  void setInitial();
+  void copyEqualizers(const SpeakermanConfig &sourceConfig);
 };
 
 const char *getInstallBaseDirectory();
