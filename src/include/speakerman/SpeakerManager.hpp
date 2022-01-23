@@ -43,23 +43,22 @@ class AbstractSpeakerManager : public SpeakerManagerControl,
                                public jack::JackProcessor {};
 
 template <typename T, size_t CHANNELS_PER_GROUP, size_t GROUPS,
-          size_t CROSSOVERS>
+          size_t CROSSOVERS, size_t LOGICAL_INPUTS>
 class SpeakerManager : public AbstractSpeakerManager {
   static_assert(is_floating_point<T>::value,
                 "expected floating-point value parameter");
 
   using Processor =
-      DynamicsProcessor<T, CHANNELS_PER_GROUP, GROUPS, CROSSOVERS>;
+      DynamicsProcessor<T, CHANNELS_PER_GROUP, GROUPS, CROSSOVERS, LOGICAL_INPUTS>;
   using CrossoverFrequencies = typename Processor::CrossoverFrequencies;
   using ThresholdValues = typename Processor::ThresholdValues;
   using Levels = DynamicProcessorLevels;
   using ConfigData = typename Processor::ConfigData;
 
-  static constexpr size_t INPUTS = Processor::INPUTS;
   static constexpr size_t OUTPUTS = Processor::OUTPUTS;
-  RefArray<jack_default_audio_sample_t> inputs[INPUTS];
+  RefArray<jack_default_audio_sample_t> inputs[LOGICAL_INPUTS];
   RefArray<jack_default_audio_sample_t> outputs[OUTPUTS];
-  FixedSizeArray<T, INPUTS> inFrame;
+  AlignedArray<T, LOGICAL_INPUTS, 32> inFrame;
   FixedSizeArray<T, OUTPUTS> outFrame;
 
   static CrossoverFrequencies crossovers() {
@@ -81,16 +80,6 @@ class SpeakerManager : public AbstractSpeakerManager {
     }
     return cr;
   };
-
-  static ThresholdValues thresholds(double value = 0.2) {
-    ThresholdValues thres;
-    double t = Values::min(value, 1.0 / sqrt(INPUTS));
-    thres[0] = Values::min(0.9, t * INPUTS);
-    for (size_t i = 1; i < thres.size(); i++) {
-      thres[i] = t;
-    }
-    return thres;
-  }
 
   jack::PortDefinitions portDefinitions_;
   SpeakermanConfig config_;
@@ -212,13 +201,13 @@ protected:
         outputs[output] = ports.getBuffer(portNumber);
       }
     }
-    for (size_t input = 0; input < INPUTS; input++, portNumber++) {
+    for (size_t input = 0; input < LOGICAL_INPUTS; input++, portNumber++) {
       inputs[input] = ports.getBuffer(portNumber);
     }
 
     if (subPort >= 0) {
       for (size_t i = 0; i < frames; i++) {
-        for (size_t channel = 0; channel < INPUTS; channel++) {
+        for (size_t channel = 0; channel < LOGICAL_INPUTS; channel++) {
           inFrame[channel] = inputs[channel][i];
         }
 
@@ -231,7 +220,7 @@ protected:
     } else {
       double scale = 1.0 / sqrt(OUTPUTS - 1);
       for (size_t i = 0; i < frames; i++) {
-        for (size_t channel = 0; channel < INPUTS; channel++) {
+        for (size_t channel = 0; channel < LOGICAL_INPUTS; channel++) {
           inFrame[channel] = inputs[channel][i];
         }
 
@@ -297,7 +286,7 @@ public:
     return false;
   }
 
-  virtual bool
+  bool
   applyConfigAndGetLevels(const SpeakermanConfig &config,
                           DynamicProcessorLevels *levels,
                           std::chrono::milliseconds duration) override {

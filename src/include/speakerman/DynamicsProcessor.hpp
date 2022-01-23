@@ -21,10 +21,9 @@
  * limitations under the License.
  */
 
-
 #include <cmath>
-#include <speakerman/SpeakermanRuntimeData.hpp>
 #include <speakerman/DynamicProcessorLevels.h>
+#include <speakerman/SpeakermanRuntimeData.hpp>
 #include <tdap/Crossovers.hpp>
 #include <tdap/Delay.hpp>
 #include <tdap/Followers.hpp>
@@ -40,7 +39,7 @@ namespace speakerman {
 using namespace tdap;
 
 template <typename T, size_t CHANNELS_PER_GROUP, size_t GROUPS,
-          size_t CROSSOVERS>
+          size_t CROSSOVERS, size_t LOGICAL_INPUTS>
 class DynamicsProcessor {
   static_assert(is_floating_point<T>::value,
                 "expected floating-point value parameter");
@@ -63,7 +62,8 @@ public:
   // OUTPUTS
   static constexpr size_t OUTPUTS = INPUTS + 1;
 
-  static constexpr size_t RMS_DETECTION_LEVELS = DetectionConfig::MAX_PERCEPTIVE_LEVELS;
+  static constexpr size_t RMS_DETECTION_LEVELS =
+      DetectionConfig::MAX_PERCEPTIVE_LEVELS;
 
   static constexpr double GROUP_MAX_DELAY = ProcessingGroupConfig::MAX_DELAY;
   static constexpr double LIMITER_MAX_DELAY = 0.01;
@@ -82,8 +82,10 @@ public:
   using CrossoverFrequencies = FixedSizeArray<T, CROSSOVERS>;
   using ThresholdValues = FixedSizeArray<T, LIMITERS>;
   using Configurable =
-      SpeakermanRuntimeConfigurable<T, GROUPS, BANDS, CHANNELS_PER_GROUP>;
-  using ConfigData = SpeakermanRuntimeData<T, GROUPS, BANDS>;
+      SpeakermanRuntimeConfigurable<T, GROUPS, BANDS, CHANNELS_PER_GROUP,
+                                    LOGICAL_INPUTS, INPUTS>;
+  using ConfigData =
+      SpeakermanRuntimeData<T, GROUPS, BANDS, LOGICAL_INPUTS, INPUTS>;
 
   class GroupDelay : public MultiChannelAndTimeDelay<T> {
   public:
@@ -131,10 +133,11 @@ public:
                                    LimiterClass limiterClass) {
       free();
       for (size_t i = 0; i < LIMITERS; i++) {
-        limiters[i] = limiterClass == LimiterClass::SMOOTH_TRIANGULAR
-                          ? dynamic_cast<LimiterPtr>(new FastLookAheadLimiter<T>)
-                          : dynamic_cast<LimiterPtr>(
-                                new ZeroPredictionHardAttackLimiter<T>);
+        limiters[i] =
+            limiterClass == LimiterClass::SMOOTH_TRIANGULAR
+                ? dynamic_cast<LimiterPtr>(new FastLookAheadLimiter<T>)
+                : dynamic_cast<LimiterPtr>(
+                      new ZeroPredictionHardAttackLimiter<T>);
         limiters[i]->setPredictionAndThreshold(prediction, threshold,
                                                sampleRate);
       }
@@ -169,9 +172,9 @@ private:
   PinkNoise::Default noise;
   double noiseAvg = 0;
   IntegrationCoefficients<double> noiseIntegrator;
-  FixedSizeArray<T, INPUTS> inputWithVolumeAndNoise;
-  FixedSizeArray<T, PROCESSING_CHANNELS> processInput;
-  FixedSizeArray<T, OUTPUTS> output;
+  AlignedArray<T, INPUTS, 32> inputWithVolumeAndNoise;
+  AlignedArray<T, PROCESSING_CHANNELS, 32> processInput;
+  AlignedArray<T, OUTPUTS, 32> output;
   FixedSizeArray<T, BANDS> relativeBandWeights;
 
   Crossovers::Filter<double, T, INPUTS, CROSSOVERS> crossoverFilter;
@@ -206,8 +209,8 @@ public:
   DynamicProcessorLevels levels;
 
   DynamicsProcessor()
-      : noise(1.0, 9600),
-        groupDetector(new DetectorGroup[DETECTORS]), sampleRate_(0), levels(GROUPS) {
+      : noise(1.0, 9600), groupDetector(new DetectorGroup[DETECTORS]),
+        sampleRate_(0), levels(GROUPS) {
     levels.reset();
   }
 
@@ -230,7 +233,9 @@ public:
     subDetector.configure(sampleRate, perceptiveMetrics, 100);
     for (size_t band = 0, detector = 0; band < CROSSOVERS; band++) {
       for (size_t group = 0; group < GROUPS; group++, detector++) {
-        groupDetector[detector].configure(sampleRate, perceptiveMetrics, detection.rms_fast_release_seconds, 100);
+        groupDetector[detector].configure(sampleRate, perceptiveMetrics,
+                                          detection.rms_fast_release_seconds,
+                                          100);
       }
     }
     size_t rmsLatency = groupDetector[0].getLatency();
@@ -297,7 +302,7 @@ public:
     filters_[GROUPS].configure(data.filterConfig());
   }
 
-  void process(const FixedSizeArray<T, INPUTS> &input,
+  void process(const AlignedArray<T, LOGICAL_INPUTS, 32> &input,
                FixedSizeArray<T, OUTPUTS> &target) {
     runtime.approach();
     applyVolumeAddNoise(input);
@@ -314,24 +319,19 @@ public:
   }
 
 private:
-  void applyVolumeAddNoise(const FixedSizeArray<T, INPUTS> &input) {
+  void applyVolumeAddNoise(const AlignedArray<T, LOGICAL_INPUTS, 32> &input) {
+    const typename ConfigData::InputMatrix &matrix =
+        runtime.data().inputMatrix();
+
     T ns = noise();
-    for (size_t group = 0; group < GROUPS; group++) {
-      const GroupRuntimeData<T, BANDS> &conf =
-          runtime.data().groupConfig(group);
-      auto volume = conf.volume();
-      for (size_t channel = 0; channel < CHANNELS_PER_GROUP; channel++) {
-        T x = 0.0;
-        for (size_t inGroup = 0; inGroup < GROUPS; inGroup++) {
-          x += volume[inGroup] * input[inGroup * CHANNELS_PER_GROUP + channel];
-        }
-        inputWithVolumeAndNoise[group * CHANNELS_PER_GROUP + channel] = x + ns;
-      }
+    matrix.apply(inputWithVolumeAndNoise, input);
+    for (size_t i = 0; i < INPUTS; i++) {
+      inputWithVolumeAndNoise[i] += ns;
     }
   }
 
   void
-  moveToProcessingChannels(const FixedSizeArray<T, CROSSOVER_OUPUTS> &multi) {
+  moveToProcessingChannels(const AlignedArray<T, CROSSOVER_OUPUTS> &multi) {
     // Sum all lowest frequency bands
     processInput[0] = 0.0;
     for (size_t channel = 0; channel < INPUTS; channel++) {
@@ -376,7 +376,8 @@ private:
         T gain = 1.0 / detect;
         levels.addValues(1 + group, detect);
         for (size_t offset = baseOffset; offset < nextOffset; offset++) {
-          processInput[offset] = gain * rmsDelay.setAndGet(offset, processInput[offset]);
+          processInput[offset] =
+              gain * rmsDelay.setAndGet(offset, processInput[offset]);
         }
         baseOffset = nextOffset;
       }

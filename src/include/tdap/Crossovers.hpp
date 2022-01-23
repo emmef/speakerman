@@ -69,9 +69,9 @@ struct Crossovers {
 
   template <typename T, size_t CHANNELS>
   struct CrossoverExecutor<T, CHANNELS, 1> {
-    template <typename S, typename... A>
-    static void filter(const FixedSizeArrayTraits<S, CHANNELS, A...> &input,
-                       FixedSizeArray<S, 2 * CHANNELS> &output,
+    template <typename S, class A, class B>
+    static void filter(const A &input,
+                       B &output,
                        FixedSizeArray<LinkwitzRiley<T, CHANNELS>, 1> &filter) {
       for (size_t channel = 0, idx = 0; channel < CHANNELS;
            channel++, idx += 2) {
@@ -86,9 +86,9 @@ struct Crossovers {
 
   template <typename T, size_t CHANNELS>
   struct CrossoverExecutor<T, CHANNELS, 2> {
-    template <typename S, typename... A>
-    static void filter(const FixedSizeArrayTraits<S, CHANNELS, A...> &input,
-                       FixedSizeArray<S, 3 * CHANNELS> &output,
+    template <typename S, class A, class B>
+    static void filter(const A &input,
+                       B &output,
                        FixedSizeArray<LinkwitzRiley<T, CHANNELS>, 2> &filter) {
       for (size_t channel = 0, idx = 0; channel < CHANNELS;
            channel++, idx += 2) {
@@ -107,9 +107,9 @@ struct Crossovers {
 
   template <typename T, size_t CHANNELS>
   struct CrossoverExecutor<T, CHANNELS, 3> {
-    template <typename S, typename... A>
-    static void filter(const FixedSizeArrayTraits<S, CHANNELS, A...> &input,
-                       FixedSizeArray<S, 4 * CHANNELS> &output,
+    template <typename S, class A, class B>
+    static void filter(const A &input,
+                       B &output,
                        FixedSizeArray<LinkwitzRiley<T, CHANNELS>, 3> &filter) {
       for (size_t channel = 0, idx = 0; channel < CHANNELS;
            channel++, idx += 2) {
@@ -137,7 +137,7 @@ struct Crossovers {
     using Executor = CrossoverExecutor<T, CHANNELS, CROSSOVERS>;
 
     FixedSizeArray<LinkwitzRiley<T, CHANNELS>, CROSSOVERS> filter_;
-    FixedSizeArray<S, NODES> output_;
+    AlignedArray<S, NODES> output_;
 
   public:
     template <typename S1, typename S2, typename... A>
@@ -150,10 +150,10 @@ struct Crossovers {
       }
     }
 
-    template <typename... A>
-    const FixedSizeArray<S, NODES> &
-    filter(const FixedSizeArrayTraits<S, CHANNELS, A...> &input) {
-      Executor::filter(input, output_, filter_);
+    template <class A>
+    const AlignedArray<S, NODES> &
+    filter(const A &input) {
+      Executor::template filter<S>(input, output_, filter_);
       return output_;
     }
   };
@@ -197,7 +197,7 @@ struct Crossovers {
       unweightedTotal += input * input; // unweighted full-range measurement
       filtered[0] = input;              // apply keying filter
       filtered[1] = curves.filter(0, input); // apply keying filter
-      const FixedSizeArray<double, 2 *CROSSOVERS + 2> &w =
+      const auto &w =
           crossover.filter(filtered);
       for (size_t band = 0; band < 2 * CROSSOVERS + 2; band++) {
         const T x = w[band];

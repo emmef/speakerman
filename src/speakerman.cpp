@@ -131,7 +131,7 @@ int mainLoop(ConsecutiveAllocatedObjectOwner<jack::JackClient> &) {
 // speakerman::utils::config::Reader configReader;
 speakerman::server_socket webserver;
 
-template <typename F, size_t GROUPS, size_t CROSSOVERS>
+template <typename F, size_t GROUPS, size_t CROSSOVERS, size_t LOGICAL_INPUTS>
 AbstractSpeakerManager *
 createManagerSampleType(const SpeakermanConfig &config) {
   static_assert(is_floating_point<F>::value,
@@ -139,49 +139,74 @@ createManagerSampleType(const SpeakermanConfig &config) {
 
   switch (config.processingGroups.channels) {
   case 1:
-    return new SpeakerManager<F, 1, GROUPS, CROSSOVERS>(config);
+    return new SpeakerManager<F, 1, GROUPS, CROSSOVERS, LOGICAL_INPUTS>(config);
   case 2:
-    return new SpeakerManager<F, 2, GROUPS, CROSSOVERS>(config);
+    return new SpeakerManager<F, 2, GROUPS, CROSSOVERS, LOGICAL_INPUTS>(config);
   case 3:
-    return new SpeakerManager<F, 3, GROUPS, CROSSOVERS>(config);
+    return new SpeakerManager<F, 3, GROUPS, CROSSOVERS, LOGICAL_INPUTS>(config);
   case 4:
-    return new SpeakerManager<F, 4, GROUPS, CROSSOVERS>(config);
+    return new SpeakerManager<F, 4, GROUPS, CROSSOVERS, LOGICAL_INPUTS>(config);
   case 5:
-    return new SpeakerManager<F, 5, GROUPS, CROSSOVERS>(config);
+    return new SpeakerManager<F, 5, GROUPS, CROSSOVERS, LOGICAL_INPUTS>(config);
   }
   throw invalid_argument(
       "Number of channels per group must be between 1 and 5");
 }
 
-template <typename F, size_t CROSSOVERS>
+template <typename F, size_t CROSSOVERS, size_t LOGICAL_INPUTS>
 static AbstractSpeakerManager *
 createManagerGroup(const SpeakermanConfig &config) {
 
   switch (config.processingGroups.groups) {
   case 1:
-    return createManagerSampleType<F, 1, CROSSOVERS>(config);
+    return createManagerSampleType<F, 1, CROSSOVERS, LOGICAL_INPUTS>(config);
   case 2:
-    return createManagerSampleType<F, 2, CROSSOVERS>(config);
+    return createManagerSampleType<F, 2, CROSSOVERS, LOGICAL_INPUTS>(config);
   case 3:
-    return createManagerSampleType<F, 3, CROSSOVERS>(config);
+    return createManagerSampleType<F, 3, CROSSOVERS, LOGICAL_INPUTS>(config);
   case 4:
-    return createManagerSampleType<F, 4, CROSSOVERS>(config);
+    return createManagerSampleType<F, 4, CROSSOVERS, LOGICAL_INPUTS>(config);
   }
   throw invalid_argument("Number of groups must be between 1 and 4");
+}
+
+template <typename F, size_t LOGICAL_INPUTS>
+static AbstractSpeakerManager *
+createManagerCrossovers(const SpeakermanConfig &config) {
+  switch (config.crossovers) {
+  case 1:
+    return createManagerGroup<double, 1, LOGICAL_INPUTS>(config);
+  case 2:
+    return createManagerGroup<double, 2, LOGICAL_INPUTS>(config);
+  case 3:
+    return createManagerGroup<double, 3, LOGICAL_INPUTS>(config);
+  }
+  throw invalid_argument("Number of crossovers must be between 1 and 3");
 }
 
 using namespace std;
 
 AbstractSpeakerManager *create_manager(const SpeakermanConfig &config) {
-  switch (config.crossovers) {
+  switch (config.logicalInputs.getTotalChannels()) {
   case 1:
-    return createManagerGroup<double, 1>(config);
+    return createManagerCrossovers<double, 1>(config);
   case 2:
-    return createManagerGroup<double, 2>(config);
+    return createManagerCrossovers<double, 2>(config);
   case 3:
-    return createManagerGroup<double, 3>(config);
+    return createManagerCrossovers<double, 3>(config);
+  case 4:
+    return createManagerCrossovers<double, 4>(config);
+  case 5:
+    return createManagerCrossovers<double, 5>(config);
+  case 6:
+    return createManagerCrossovers<double, 6>(config);
+  case 7:
+    return createManagerCrossovers<double, 7>(config);
+  case 8:
+    return createManagerCrossovers<double, 8>(config);
   }
-  throw invalid_argument("Number of crossovers must be between 1 and 3");
+  throw invalid_argument(
+      "Number of logical input channels must be between 1 and 16");
 }
 
 jack::JackClient *create_client(const char *name) {
@@ -208,13 +233,15 @@ int main(int count, char *arguments[]) {
   cout << "Executing " << arguments[0] << endl;
   configFileConfig = readSpeakermanConfig();
 
-  if (count > 1) {
-    if (strncmp(arguments[1], "--dump-config", 20) == 0) {
-      // There is already a dump made when reading the configuration
-      //      dumpSpeakermanConfig(configFileConfig, std::cout);
+  for (int arg = 1; arg < count; arg++) {
+    if (strncmp(arguments[arg], "--dump-config", 20) == 0) {
       return 0;
+    } else {
+      cerr << "Invalid argument:" << arguments[arg] << endl;
+      return 1;
     }
   }
+
   jack::AwaitThreadFinishedAfterExit await(5000, "Await thread shutdown...");
   MemoryFence::release();
 

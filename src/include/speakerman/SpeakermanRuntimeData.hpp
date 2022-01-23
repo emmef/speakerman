@@ -21,10 +21,11 @@
  * limitations under the License.
  */
 
+#include "EqualizerConfig.h"
 #include <speakerman/SpeakermanConfig.hpp>
 #include <tdap/IirBiquad.hpp>
 #include <tdap/Integration.hpp>
-#include "EqualizerConfig.h"
+#include <tdap/VolumeMatrix.hpp>
 
 namespace speakerman {
 using namespace tdap;
@@ -35,8 +36,7 @@ struct SpeakerManLevels {
                                  ProcessingGroupConfig::MAX_THRESHOLD);
   }
 
-  static constexpr double getLimiterThreshold(double threshold,
-                                              double ) {
+  static constexpr double getLimiterThreshold(double threshold, double) {
     return Values::min(1.0, 4 * getThreshold(threshold));
   }
 
@@ -82,8 +82,8 @@ public:
     }
   }
 
-  static EqualizerFilterData<T> createConfigured(const ProcessingGroupConfig &config,
-                                                 double sampleRate) {
+  static EqualizerFilterData<T>
+  createConfigured(const ProcessingGroupConfig &config, double sampleRate) {
     return createConfigured(config.eqs, config.eq, sampleRate);
   }
 
@@ -195,12 +195,27 @@ public:
   }
 };
 
-template <typename T, size_t GROUPS, size_t BANDS> class SpeakermanRuntimeData {
+template <typename T, size_t GROUPS, size_t BANDS, size_t LOGICAL_INPUTS,
+          size_t PROCESSING_INPUTS>
+class SpeakermanRuntimeData {
+  static_assert(GROUPS > 0 &&
+                GROUPS <= AbstractLogicalGroupsConfig::MAX_GROUPS);
+  static_assert(BANDS > 0 && BANDS <= SpeakermanConfig::MAX_CROSSOVERS + 1);
+  static_assert(LOGICAL_INPUTS > 0);
+  static_assert(PROCESSING_INPUTS > 0);
+  static_assert((PROCESSING_INPUTS % GROUPS) == 0);
+
+public:
+  using InputMatrix =
+      tdap::FixedVolumeMatrix<T, LOGICAL_INPUTS, PROCESSING_INPUTS, 32>;
+
+private:
   static constexpr size_t CONTROL_INTERVAL = 16;
   static constexpr double CONTROL_CHANGE_SECONDS = 0.25;
   static constexpr double CONTROL_RATE_FACTOR =
       CONTROL_CHANGE_SECONDS / CONTROL_INTERVAL;
   FixedSizeArray<GroupRuntimeData<T, BANDS>, GROUPS> groupConfig_;
+  InputMatrix inputMatrix_;
   T subLimiterScale_;
   T subLimiterThreshold_;
   T subRmsThreshold_;
@@ -224,6 +239,11 @@ template <typename T, size_t GROUPS, size_t BANDS> class SpeakermanRuntimeData {
 
 public:
   GroupRuntimeData<T, BANDS> &groupConfig(size_t i) { return groupConfig_[i]; }
+
+  const InputMatrix &
+  inputMatrix() const {
+    return inputMatrix_;
+  }
 
   const GroupRuntimeData<T, BANDS> &groupConfig(size_t i) const {
     return groupConfig_[i];
@@ -261,21 +281,23 @@ public:
     for (size_t group = 0; group < GROUPS; group++) {
       groupConfig_[group].reset();
     }
+    inputMatrix_.zero();
     controlCount_ = 0;
     controlSpeed_.setCharacteristicSamples(5000);
     filterConfig_.reset();
   }
 
-  void init(const SpeakermanRuntimeData<T, GROUPS, BANDS> &source) {
+  void init(const SpeakermanRuntimeData &source) {
     *this = source;
     for (size_t group = 0; group < GROUPS; group++) {
       groupConfig_[group].init(source.groupConfig(group));
     }
   }
 
-  void approach(const SpeakermanRuntimeData<T, GROUPS, BANDS> &target) {
+  void approach(const SpeakermanRuntimeData &target) {
     if (controlCount_ == 0) {
-      controlSpeed_.integrate(target.subLimiterThreshold_, subLimiterThreshold_);
+      controlSpeed_.integrate(target.subLimiterThreshold_,
+                              subLimiterThreshold_);
       controlSpeed_.integrate(target.subLimiterScale_, subLimiterScale_);
       controlSpeed_.integrate(target.subRmsThreshold_, subRmsThreshold_);
       controlSpeed_.integrate(target.subRmsScale_, subRmsScale_);
@@ -283,6 +305,7 @@ public:
       for (size_t group = 0; group < GROUPS; group++) {
         groupConfig_[group].approach(target.groupConfig_[group], controlSpeed_);
       }
+      inputMatrix_.approach(target.inputMatrix_, controlSpeed_);
     }
     controlCount_++;
     controlCount_ %= CONTROL_INTERVAL;
@@ -293,14 +316,30 @@ public:
                  const ArrayTraits<A...> &bandWeights,
                  double fastestPeakWeight) {
     if (config.processingGroups.groups != GROUPS) {
-      throw std::invalid_argument("Cannot change number of groups run-time");
+      std::cerr << "GROUPS=" << GROUPS << " != "
+                << "config.processingGroups.groups=" << config.processingGroups.groups
+                << std::endl;
+      throw std::invalid_argument("Cannot change number of groups at runtime.");
+    }
+    if (config.processingGroups.channels * config.processingGroups.groups !=
+        PROCESSING_INPUTS) {
+      throw std::invalid_argument(
+          "Cannot change number of processing-channels at runtime.");
+    }
+    if (config.logicalInputs.getTotalChannels() != LOGICAL_INPUTS) {
+      std::cerr << "LOGICAL_INPUTS=" << LOGICAL_INPUTS << " != "
+                << "total channels=" << config.logicalInputs.getTotalChannels()
+                << std::endl;
+      throw std::invalid_argument(
+          "Cannot change number of logical input-channels at runtime.");
     }
     double subBaseThreshold = ProcessingGroupConfig::MAX_THRESHOLD;
     double peakWeight = Values::force_between(fastestPeakWeight, 0.1, 1.0);
     double max_group_threshold = 0;
 
     for (size_t group = 0; group < config.processingGroups.groups; group++) {
-      speakerman::ProcessingGroupConfig sourceConf = config.processingGroups.group[group];
+      speakerman::ProcessingGroupConfig sourceConf =
+          config.processingGroups.group[group];
 
       GroupRuntimeData<T, BANDS> &targetConf = groupConfig_[group];
       targetConf.setFilterConfig(
@@ -312,16 +351,29 @@ public:
       max_group_threshold =
           Value<double>::max(max_group_threshold, groupThreshold);
 
-      size_t delay =
-          0.5 + sampleRate * Values::force_between(sourceConf.delay,
+      size_t delay = 0.5 + sampleRate * Values::force_between(
+                                            sourceConf.delay,
                                             ProcessingGroupConfig::MIN_DELAY,
                                             ProcessingGroupConfig::MAX_DELAY);
       targetConf.setLevels(sourceConf, config.threshold_scaling,
-                           config.processingGroups.channels, fastestPeakWeight, delay,
-                           bandWeights);
+                           config.processingGroups.channels, fastestPeakWeight,
+                           delay, bandWeights);
 
       subBaseThreshold = Values::min(subBaseThreshold, groupThreshold);
     }
+
+    for (size_t logicalChannel = 0; logicalChannel < LOGICAL_INPUTS;
+         logicalChannel++) {
+      double volume = config.logicalInputs.volumeForChannel(logicalChannel);
+      std::cout << "Volume for logical channel " << logicalChannel << ": " << volume << std::endl;
+      for (size_t processingChannel = 0; processingChannel < PROCESSING_INPUTS;
+           processingChannel++) {
+        double weight =
+            config.inputMatrix.weight(processingChannel, logicalChannel);
+        inputMatrix_.set(processingChannel, logicalChannel, weight * volume);
+      }
+    }
+
     if (config.generateNoise) {
       noiseScale_ = 20.0;
       std::cout << "Generating testing noise" << std::endl;
@@ -350,6 +402,7 @@ public:
         EqualizerFilterData<T>::createConfigured(config, sampleRate));
 
     compensateDelays();
+    dump();
   }
 
   void dump() const {
@@ -383,6 +436,16 @@ public:
                   << " RMS: scale=" << grpConfig.bandRmsScale(band)
                   << std::endl;
       }
+    }
+    std::cout << " logical to processing input weights:" << std::endl;
+    for (size_t processingChannel = 0; processingChannel < PROCESSING_INPUTS;
+         processingChannel++) {
+      std::cout << "   processing-input[" << processingChannel << "] = ";
+      for (size_t logicalChannel = 0; logicalChannel < LOGICAL_INPUTS;
+           logicalChannel++) {
+        std::cout << " " << inputMatrix_.get(processingChannel, logicalChannel);
+      }
+      std::cout << std::endl;
     }
   }
 };
@@ -460,9 +523,11 @@ public:
   MultiFilter<T> *filter() { return filter_; }
 };
 
-template <typename T, size_t GROUPS, size_t BANDS, size_t CHANNELS_PER_GROUP>
+template <typename T, size_t GROUPS, size_t BANDS, size_t CHANNELS_PER_GROUP,
+          size_t LOGICAL_INPUTS, size_t PROCESSING_INPUTS>
 class SpeakermanRuntimeConfigurable {
-  using Data = SpeakermanRuntimeData<T, GROUPS, BANDS>;
+  using Data = SpeakermanRuntimeData<T, GROUPS, BANDS, LOGICAL_INPUTS,
+                                     PROCESSING_INPUTS>;
 
   Data active_;
   Data middle_;
