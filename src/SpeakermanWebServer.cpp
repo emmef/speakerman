@@ -339,7 +339,7 @@ void web_server::handle_request(input_stream *pStream) {
       level_buffer.get(levelTimeStamp, entry);
       if (entry.set) {
         DynamicProcessorLevels levels = entry.levels;
-        snprintf(numbers, 60, "%s=%lli", COOKIE_TIME_STAMP, entry.stamp);
+        snprintf(numbers, 60, "%s=%lli; SameSite=Strict", COOKIE_TIME_STAMP, entry.stamp);
         set_header("Set-Cookie", numbers);
         set_header("Access-Control-Allow-Origin", "*");
         set_content_type("application/json");
@@ -385,26 +385,7 @@ void web_server::handle_request(input_stream *pStream) {
         response().write_string("\t\"inputMaxVolume\": ");
         response().write_string(ftostr(numbers, 30, LogicalGroupConfig::MAX_VOLUME));
         response().write_string(",\r\n");
-        response().write_string("\t\"input\": [\r\n");
-        const LogicalInputsConfig &liConfig = manager_.getConfig().logicalInputs;
-        size_t groupCount = liConfig.getGroupCount();
-        for (size_t i = 0; i < groupCount; i++) {
-          response().write_string("\t\t{\r\n");
-          response().write_string("\t\t\t\"id\": \"");
-          response().write_string(ftostr(numbers, 20, i));
-          response().write_string("\",\r\n");
-          response().write_string("\t\t\t\"name\": \"");
-          response().write_string(liConfig.group[i].name);
-          response().write_string("\",\r\n");
-          response().write_string("\t\t\t\"volume\": ");
-          response().write_string(ftostr(numbers, 30, liConfig.group[i].volume));
-          response().write_string("\r\n\t\t}");
-          if (i < groupCount - 1) {
-            response().write(',');
-          }
-          response().write_string("\r\n");
-        }
-        response().write_string("\t]\r\n");
+        writeInputVolumes();
         // end
         response().write_string("}\r\n");
       } else {
@@ -434,7 +415,7 @@ void web_server::handle_request(input_stream *pStream) {
       set_error(404, url_);
     }
   } else if (method == Method::PUT) {
-    if (strncasecmp("/inputs", url_, 32) == 0) {
+    if (strncasecmp("/config", url_, 32) == 0) {
       if (pStream && pStream->read_line(str.get(), LENGTH) >= 1) {
         handleConfigurationChanges(str.get());
       }
@@ -444,15 +425,42 @@ void web_server::handle_request(input_stream *pStream) {
     }
   }
 }
+void web_server::writeInputVolumes() {
+  char numbers[31];
+  response().write_string("\t\"input\": [\r\n");
+  const LogicalInputsConfig &liConfig = manager_.getConfig().logicalInputs;
+  size_t groupCount = liConfig.getGroupCount();
+  for (size_t i = 0; i < groupCount; i++) {
+    response().write_string("\t\t{\r\n");
+    response().write_string("\t\t\t\"id\": \"");
+    response().write_string(ftostr(numbers, 20, i));
+    response().write_string("\",\r\n");
+    response().write_string("\t\t\t\"name\": \"");
+    response().write_string(liConfig.group[i].name);
+    response().write_string("\",\r\n");
+    response().write_string("\t\t\t\"volume\": ");
+    response().write_string(ftostr(numbers, 30, liConfig.group[i].volume));
+    response().write_string("\r\n\t\t}");
+    if (i < groupCount - 1) {
+      response().write(',');
+    }
+    response().write_string("\r\n");
+  }
+  response().write_string("\t]\r\n");
+}
 
-void web_server::handleConfigurationChanges(char *inputVolumeJson) {
+void web_server::handleConfigurationChanges(char *configurationJson) {
   static std::chrono::milliseconds wait(WAIT_MILLIS);
   DynamicProcessorLevels levels;
   SpeakermanConfig newConf;
-  if (readConfigFromJson(newConf, inputVolumeJson, configFileConfig)) {
+  if (readConfigFromJson(newConf, configurationJson, configFileConfig)) {
     if (manager_.applyConfigAndGetLevels(configFileConfig, &levels, wait)) {
       level_buffer.put(levels);
     }
+    writeInputVolumes();
+  }
+  else {
+    set_error(400, "Unable to parse configuration from input.");
   }
 }
 

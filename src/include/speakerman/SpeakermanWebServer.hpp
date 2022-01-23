@@ -153,7 +153,8 @@ private:
 
   static Result worker_function(Stream &stream, const server_socket &socket,
                                 void *data);
-  void handleConfigurationChanges(char *inputVolumeJson);
+  void handleConfigurationChanges(char *configurationJson);
+  void writeInputVolumes();
 };
 
 } // namespace speakerman
