@@ -79,6 +79,7 @@ public:
   virtual void flush() = 0;
 
   virtual ~output_stream() = default;
+  long write_json_string(const char *string);
 };
 
 signed long write_to_stream(output_stream &stream, const void *buff,

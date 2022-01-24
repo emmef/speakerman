@@ -128,6 +128,66 @@ signed long write_string_to_stream(output_stream &stream, const char *buff,
   return buff[i] == 0 ? i : stream_result::DATA_TRUNCATED;
 }
 
+signed long write_json_string_to_stream(output_stream &stream, const char *buff,
+                                        size_t length) {
+  static constexpr const char digits[] = "0123456789abcdef";
+  size_t end = length;
+  size_t i;
+  int r;
+  int extraOutputChars = 0;
+  for (i = 0; i < end; i++) {
+    char c = buff[i];
+    if (c == 0) {
+      set_last_operation_count(i);
+      return i;
+    }
+    int xChars;
+    if (c == '\"' || c == '\\' || c == '/') {
+      r = stream.write('\\');
+      r = r >= 0 ? stream.write(c) : r;
+      xChars = 1;
+    } else if (c == '\b') {
+      r = stream.write('\\');
+      r = r >= 0 ? stream.write('b') : r;
+      xChars = 1;
+    } else if (c == '\f') {
+      r = stream.write('\\');
+      r = r >= 0 ? stream.write('f') : r;
+      xChars = 1;
+    } else if (c == '\n') {
+      r = stream.write('\\');
+      r = r >= 0 ? stream.write('n') : r;
+      xChars = 1;
+    } else if (c == '\r') {
+      r = stream.write('\\');
+      r = r >= 0 ? stream.write('r') : r;
+      xChars = 1;
+    } else if (c == '\t') {
+      r = stream.write('\\');
+      r = r >= 0 ? stream.write('t') : r;
+      xChars = 1;
+    } else if (c < ' ') {
+      r = stream.write('\\');
+      r = r >= 0 ? stream.write('u') : r;
+      r = r >= 0 ? stream.write('0') : r;
+      r = r >= 0 ? stream.write('0') : r;
+      r = r >= 0 ? stream.write(digits[c / 16]) : r;
+      r = r >= 0 ? stream.write(digits[c % 16]) : r;
+      xChars = 5;
+    } else {
+      r = stream.write(c);
+      xChars = 0;
+    }
+    if (r < 0) {
+      set_last_operation_count(i);
+      return r;
+    }
+    extraOutputChars += xChars;
+  }
+
+  return buff[i] == 0 ? i : stream_result::DATA_TRUNCATED;
+}
+
 signed long input_stream::read(void *buff, size_t offs, size_t length) {
   return read_from_stream(*this, buff, offs, length);
 }
@@ -149,15 +209,27 @@ signed long output_stream::write_string(const char *string) {
   }
   auto p = string;
   size_t len;
-  for (len = 0; len < 1048576 && *p; len++, p++);
+  for (len = 0; len < 1048576 && *p; len++, p++)
+    ;
   return write_string(string, len);
+}
+
+signed long output_stream::write_json_string(const char *string) {
+  if (!string) {
+    return 0;
+  }
+  auto p = string;
+  size_t len;
+  for (len = 0; len < 1048576 && *p; len++, p++)
+    ;
+  return write_json_string_to_stream(*this, string, len);
 }
 
 file_owner::file_owner() : file_descriptor_(-1), owns_file_(false) {}
 
 void file_owner::set_file(int file_descriptor, bool owns_file) {
   //		printf("file_owner(%p)::set_file(%i, %d)\n", this,
-  //file_descriptor, owns_file);
+  // file_descriptor, owns_file);
   cleanup_file();
   file_descriptor_ = file_descriptor;
   owns_file_ = owns_file;

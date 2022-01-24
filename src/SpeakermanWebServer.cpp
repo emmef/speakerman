@@ -425,6 +425,7 @@ void web_server::handle_request(input_stream *pStream) {
     }
   }
 }
+
 void web_server::writeInputVolumes() {
   char numbers[31];
   response().write_string("\t\"input\": [\r\n");
@@ -436,7 +437,7 @@ void web_server::writeInputVolumes() {
     response().write_string(ftostr(numbers, 20, i));
     response().write_string("\",\r\n");
     response().write_string("\t\t\t\"name\": \"");
-    response().write_string(liConfig.group[i].name);
+    response().write_json_string(liConfig.group[i].name);
     response().write_string("\",\r\n");
     response().write_string("\t\t\t\"volume\": ");
     response().write_string(ftostr(numbers, 30, liConfig.group[i].volume));
