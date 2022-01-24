@@ -28,7 +28,7 @@
 namespace speakerman {
 
 struct ProcessingGroupConfig : public NamedConfig {
-  static constexpr size_t MAX_CHANNELS = 16;
+  static constexpr size_t MAX_CHANNELS = 5;
 
   static constexpr size_t MIN_EQS = 0;
   static constexpr size_t DEFAULT_EQS = 0;
@@ -67,7 +67,7 @@ struct ProcessingGroupConfig : public NamedConfig {
 };
 
 struct ProcessingGroupsConfig {
-  static constexpr size_t MAX_GROUPS = 4;
+  static constexpr size_t MAX_GROUPS = 2;
 
   static constexpr size_t MIN_GROUPS = 1;
   static constexpr size_t DEFAULT_GROUPS = 1;
