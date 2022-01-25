@@ -339,7 +339,8 @@ void web_server::handle_request(input_stream *pStream) {
       level_buffer.get(levelTimeStamp, entry);
       if (entry.set) {
         DynamicProcessorLevels levels = entry.levels;
-        snprintf(numbers, 60, "%s=%lli; SameSite=Strict", COOKIE_TIME_STAMP, entry.stamp);
+        snprintf(numbers, 60, "%s=%lli; SameSite=Strict", COOKIE_TIME_STAMP,
+                 entry.stamp);
         set_header("Set-Cookie", numbers);
         set_header("Access-Control-Allow-Origin", "*");
         set_content_type("application/json");
@@ -360,16 +361,19 @@ void web_server::handle_request(input_stream *pStream) {
         response().write_string(", \r\n");
         const jack::ProcessingStatistics &statistics = manager_.getStatistics();
         response().write_string("\t\"cpuLongTerm\": ");
-        response().write_string(itostr(numbers, 10, statistics.getLongTermCorePercentage()));
+        response().write_string(
+            itostr(numbers, 10, statistics.getLongTermCorePercentage()));
         response().write_string(",\r\n\t\"cpuShortTerm\": ");
-        response().write_string(itostr(numbers, 10, statistics.getShortTermCorePercentage()));
+        response().write_string(
+            itostr(numbers, 10, statistics.getShortTermCorePercentage()));
         response().write_string(",\r\n");
         // group volumes
         response().write_string("\t\"group\" : [\r\n");
         for (size_t i = 0; i < levels.groups(); i++) {
           response().write_string("\t\t{\r\n");
           response().write_string("\t\t\t\"group_name\": \"");
-          response().write_string(manager_.getConfig().processingGroups.group[i].name);
+          response().write_string(
+              manager_.getConfig().processingGroups.group[i].name);
           response().write_string("\", \r\n");
           response().write_string("\t\t\t\"level\": ");
           response().write_string(ftostr(numbers, 30, levels.getSignal(i + 1)));
@@ -383,7 +387,8 @@ void web_server::handle_request(input_stream *pStream) {
         response().write_string("\t],\r\n");
         // inputs
         response().write_string("\t\"inputMaxVolume\": ");
-        response().write_string(ftostr(numbers, 30, LogicalGroupConfig::MAX_VOLUME));
+        response().write_string(
+            ftostr(numbers, 30, LogicalGroupConfig::MAX_VOLUME));
         response().write_string(",\r\n");
         writeInputVolumes();
         // end
@@ -391,6 +396,12 @@ void web_server::handle_request(input_stream *pStream) {
       } else {
         set_error(http_status::SERVICE_UNAVAILABLE);
       }
+    } else if (strncasecmp("/config", url_, 32) == 0) {
+      set_header("Access-Control-Allow-Origin", "*");
+      set_content_type("application/json");
+      response().write_string("{\r\n");
+      writeInputVolumes();
+      response().write_string("}\r\n");
     } else if (strncasecmp("/favicon.ico", url_, 32) == 0) {
       set_content_type("text/plain");
       response().write_string("X", 1);
@@ -419,8 +430,7 @@ void web_server::handle_request(input_stream *pStream) {
       if (pStream && pStream->read_line(str.get(), LENGTH) >= 1) {
         handleConfigurationChanges(str.get());
       }
-    }
-    else {
+    } else {
       set_error(404, url_);
     }
   }
@@ -428,7 +438,7 @@ void web_server::handle_request(input_stream *pStream) {
 
 void web_server::writeInputVolumes() {
   char numbers[31];
-  response().write_string("\t\"input\": [\r\n");
+  response().write_string("\t\"logical-input\": [\r\n");
   const LogicalInputsConfig &liConfig = manager_.getConfig().logicalInputs;
   size_t groupCount = liConfig.getGroupCount();
   for (size_t i = 0; i < groupCount; i++) {
@@ -459,8 +469,7 @@ void web_server::handleConfigurationChanges(char *configurationJson) {
       level_buffer.put(levels);
     }
     writeInputVolumes();
-  }
-  else {
+  } else {
     set_error(400, "Unable to parse configuration from input.");
   }
 }

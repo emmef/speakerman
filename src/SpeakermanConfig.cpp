@@ -600,6 +600,224 @@ class ConfigManager : protected SpeakermanConfig {
                                                  field, true)));
   }
 
+  enum class JsonState {
+    Object,
+    Assignment,
+    PreValue,
+    Next
+  };
+
+  static const char *getStateText(JsonState state) {
+    switch (state) {
+    case JsonState::Object:
+      return "Object";
+    case JsonState::Assignment:
+      return "Assignment";
+    case JsonState::PreValue:
+      return "PreValue";
+    case JsonState::Next:
+      return "Next";
+    default:
+      return "[unknown]";
+    }
+  }
+
+  void handleKeyAndValue(SpeakermanConfig &config, vector<std::string> &stack,
+                         std::string &workSpace) {
+    // TODO implement
+  }
+
+  std::runtime_error unexpectedCharacter(const std::string &message, char c) {
+    std::string string = "JSON: ";
+    string += message;
+    static constexpr const char digit[] = "0123456789abcdef";
+    string += ": '";
+    if (c >= ' ') {
+      string += c;
+    } else {
+      string += digit[c / 16];
+      string += digit[c % 16];
+    }
+    string += "'.'";
+    return runtime_error(string);
+  }
+
+  std::runtime_error unexpectedEndOfInput() {
+    return std::runtime_error("JSON: Unexpected end of insput.");
+  }
+
+  void readEscaped(std::istream &input, std::string &name) {
+    if (!input.eof()) {
+      char c = input.get();
+      if (c == '\\' || c == '/' || c == '"') {
+        name += c;
+      } else if (c == 'b') {
+        name += '\b';
+      } else if (c == 'f') {
+        name += '\f';
+      } else if (c == 'n') {
+        name += '\n';
+      } else if (c == 'r') {
+        name += '\r';
+      } else if (c == 't') {
+        name += '\t';
+      } else {
+        throw unexpectedCharacter("Invalid or unsupported escaped character",
+                                  c);
+      }
+      return;
+    }
+    throw unexpectedEndOfInput();
+  }
+
+  const std::string &readJsonName(std::istream &input, std::string &name) {
+    static constexpr size_t NAME_LENGTH = 128;
+    name.clear();
+    size_t length = 0;
+    while (!input.eof()) {
+      char c = input.get();
+      if (c == '"') {
+        if (name.length() == 0) {
+          throw std::runtime_error("JSON: Empty name");
+        }
+        return name;
+      } else {
+        if (name.length() >= NAME_LENGTH) {
+          std::string message =
+              "JSON: cannot add characters to already maximum-length name: ";
+          message += name;
+          throw std::runtime_error(message);
+        }
+        if (c == '\\') {
+          readEscaped(input, name);
+        } else if (c >= 0 && c < ' ') {
+          throw unexpectedCharacter("Invalid character in name", c);
+        } else {
+          name += c;
+        }
+      }
+    }
+    throw unexpectedEndOfInput();
+  }
+
+  void readJsonValueQuoted(SpeakermanConfig &config, std::istream &input,
+                           vector<std::string> &stack, std::string &value) {
+    static constexpr size_t VALUE_LENGTH = 1024;
+    value.clear();
+    while (!input.eof()) {
+      char c = input.get();
+      if (c == '"') {
+        if (value.length() > 0) {
+          handleKeyAndValue(config, stack, value);
+        } else {
+          throw std::runtime_error("JSON: Empty value");
+        }
+      } else {
+        if (value.length() >= VALUE_LENGTH) {
+          std::string message = "Cannot add characters to already maximum-length value: ";
+          message += value;
+          throw std::runtime_error(message);
+        }
+        if (c == '\\') {
+          readEscaped(input, value);
+        } else if (c >= 0 && c < ' ') {
+          throw unexpectedCharacter("Invalid character in quoted value", c);
+        }
+      }
+    }
+  }
+
+  void readJsonValueUnquoted(SpeakermanConfig &config, std::istream &input,
+                             vector<std::string> &stack,
+                             std::string &value) {
+    static constexpr size_t VALUE_LENGTH = 1024;
+    while (!input.eof()) {
+      char c = input.get();
+      if (utils::config::isJsonWhitespace(c)) {
+        handleKeyAndValue(config, stack, value);
+      } else {
+        if (value.length() >= VALUE_LENGTH) {
+          std::string message = "Cannot add characters to already maximum-length value: ";
+          message += value;
+          throw std::runtime_error(message);
+        }
+        if (c == '\\') {
+          readEscaped(input, value);
+        } else if (c >= 0 && c < ' ') {
+          throw unexpectedCharacter("Invalid character in quoted value", c);
+        }
+      }
+    }
+  }
+
+  void readJsonArray(SpeakermanConfig &config, std::istream &input,
+                     std::vector<std::string> &stack, std::string &workSpace) {
+    // TODO use stack to push number; rest see value in readJsonObject.
+  }
+
+  void readJsonObject(SpeakermanConfig &config, std::istream &input,
+                      std::vector<std::string> &stack, std::string &workSpace) {
+    if (stack.size() > 10) {
+      throw std::runtime_error("JSON: recursion level exceeded");
+    }
+    JsonState state = JsonState::Object;
+    while (!input.eof()) {
+      char c = input.get();
+      switch (state) {
+      case JsonState::Object:
+        if (c == '"') {
+          stack.push_back(readJsonName(input, workSpace));
+          state = JsonState::Assignment;
+        } else if (!utils::config::isJsonWhitespace(c)) {
+          throw unexpectedCharacter(
+              "Expecting quote '\"' for name, but got unexpected character", c);
+        }
+        break;
+      case JsonState::Assignment:
+        if (c == ':') {
+          state = JsonState::PreValue;
+        } else if (!utils::config::isJsonWhitespace(c)) {
+          throw unexpectedCharacter(
+              "Expecting assignment ':', but got unexpected character", c);
+        }
+        break;
+      case JsonState::PreValue:
+        if (c == '"') {
+          readJsonValueQuoted(config, input, stack, workSpace);
+        } else if (c == '[') {
+          readJsonArray(config, input, stack, workSpace);
+        } else if (c == '{') {
+          readJsonObject(config, input, stack, workSpace);
+        } else if (utils::config::isAlphaNum(c) || c == ',' || c == '-' ||
+                   c == '+') {
+          workSpace.clear();
+          workSpace += c;
+          readJsonValueUnquoted(config, input, stack, workSpace);
+        } else if (!utils::config::isJsonWhitespace(c)) {
+          throw unexpectedCharacter(
+              "Expecting object value, but got unexpected character", c);
+        }
+        state = JsonState::Next;
+        break;
+      case JsonState::Next:
+        if (c == ',') {
+          stack.erase(stack.end() - 1);
+          state = JsonState::Object;
+        }
+        else if (c == '}') {
+          stack.erase(stack.end() - 1);
+          return;
+        }
+        else if (!utils::config::isJsonWhitespace(c)) {
+          throw unexpectedCharacter(
+              "Expecting ',' for next name-value pair or '}' for end of object, but but got unexpected character", c);
+        }
+        break;
+      }
+    }
+    throw unexpectedEndOfInput();
+  }
+
 public:
   void addLogicalGroups(AbstractLogicalGroupsConfig &config,
                         const char *snippet) {
@@ -661,7 +879,8 @@ public:
 
     addLogicalGroups(logicalInputs, LOGICAL_GROUP_CONFIG_KEY_INPUT);
     // Disabled outputs for now, as we are not going to use them
-    // addLogicalGroups(logicalOutputs, LogicalGroupConfig::KEY_SNIPPET_OUTPUT);
+    // addLogicalGroups(logicalOutputs,
+    // LogicalGroupConfig::KEY_SNIPPET_OUTPUT);
 
     string key;
 
@@ -788,6 +1007,18 @@ public:
       readers_[i]->write(config, stream);
     }
   }
+
+  bool readJson(SpeakermanConfig &config, std::istream &input, int levels = 5) {
+    std::vector<std::string> stack;
+    std::string workSpace;
+    try {
+      readJsonObject(config, input, stack, workSpace);
+      return true;
+    } catch (const std::runtime_error &e) {
+      std::cerr << e.what() << std::endl;
+      return false;
+    }
+  }
 };
 
 static ConfigManager config_manager;
@@ -809,7 +1040,8 @@ class InstallBase {
 
     if (!prefix_value) {
       throw std::runtime_error(
-          "Installation prefix not set. This should be done at compile time or "
+          "Installation prefix not set. This should be done at compile "
+          "time or "
           "using the SPEAKERMAN_INSTALLATION_PREFIX environment variable");
     }
 
@@ -950,7 +1182,8 @@ long long getConfigFileTimeStamp() {
   return getFileTimeStamp(configFileName());
 }
 
-SpeakermanConfig readSpeakermanConfig(const SpeakermanConfig &basedUpon, bool isRuntime) {
+SpeakermanConfig readSpeakermanConfig(const SpeakermanConfig &basedUpon,
+                                      bool isRuntime) {
   ifstream stream;
   long long stamp = getFileTimeStamp(configFileName());
   stream.open(configFileName());
@@ -989,7 +1222,7 @@ void dumpSpeakermanConfig(const SpeakermanConfig &dump, ostream &output) {
 }
 
 bool readConfigFromJson(SpeakermanConfig &destination, const char *json,
-                              const SpeakermanConfig &basedUpon) {
+                        const SpeakermanConfig &basedUpon) {
   std::cout << "Reading configuration JSON: " << std::endl;
   std::cout << json << std::endl;
   return false;

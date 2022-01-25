@@ -74,6 +74,8 @@ struct config {
     return c == '\n' || c == '\r';
   }
 
+  static constexpr bool isJsonWhitespace(char c) { return c == ' ' || c == '\t' || c == '\r' || c == '\n'; }
+
   static constexpr bool isAssignment(char c) { return c == '=' || c == ':'; }
 
   static constexpr bool isCommentStart(char c) { return c == ';' || c == '#'; }
