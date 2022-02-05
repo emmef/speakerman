@@ -112,7 +112,7 @@ protected:
   }
 
   inline size_t getCapacity() const {
-    return static_cast<const D *>(this)->capacity();
+    return static_cast<const D *>(this)->maxCapacity();
   }
 
   void unsafeCopy(const VolumeMatrix &source) const {
