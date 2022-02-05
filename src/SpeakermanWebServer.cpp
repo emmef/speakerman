@@ -343,7 +343,7 @@ void web_server::handle_request(input_stream *pStream) {
                  entry.stamp);
         set_header("Set-Cookie", numbers);
         set_header("Access-Control-Allow-Origin", "*");
-        set_content_type("application/json");
+        set_content_type("application/json; charset=UTF-8");
         response().write_string("{\r\n");
         response().write_string("\t\"elapsedMillis\": ");
         response().write_string(
@@ -398,7 +398,7 @@ void web_server::handle_request(input_stream *pStream) {
       }
     } else if (strncasecmp("/config", url_, 32) == 0) {
       set_header("Access-Control-Allow-Origin", "*");
-      set_content_type("application/json");
+      set_content_type("application/json; charset=UTF-8");
       response().write_string("{\r\n");
       writeInputVolumes();
       response().write_string("}\r\n");
@@ -407,11 +407,11 @@ void web_server::handle_request(input_stream *pStream) {
       response().write_string("X", 1);
       set_success();
     } else if (strncasecmp(url_, "/index.html", 32) == 0) {
-      set_content_type("text/html");
+      set_content_type("text/html; charset=UTF-8");
       indexHtmlFile.reset();
       handle_content(indexHtmlFile.size(), &indexHtmlFile);
     } else if (strncasecmp(url_, "/speakerman.css", 32) == 0) {
-      set_content_type("text/css");
+      set_content_type("text/css; charset=UTF-8");
       cssFile.reset();
       handle_content(cssFile.size(), &cssFile);
     } else if (strncasecmp(url_, "/speakerman.js", 32) == 0) {
