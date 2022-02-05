@@ -33,6 +33,7 @@ static constexpr const char *INSTALLATION_PREFIX =
 #include <iostream>
 #include <mutex>
 #include <speakerman/SpeakermanConfig.hpp>
+#include <speakerman/JsonCanonicalReader.h>
 #include <speakerman/StreamOwner.h>
 #include <speakerman/UnsetValue.h>
 #include <speakerman/utils/Config.hpp>
@@ -467,7 +468,14 @@ public:
     return ReaderStatus::FAULT;
   }
 
-  ReaderStatus read_key(const char *&after_key, const char *start) {
+  ReaderStatus is(const char *start) const {
+    if (strncasecmp(key_.c_str(), start, key_.length()) != 0) {
+      return ReaderStatus::SKIP;
+    }
+    return ReaderStatus::SUCCESS;
+  }
+
+  ReaderStatus read_key(const char *&after_key, const char *start) const {
     if (strncasecmp(key_.c_str(), start, key_.length()) != 0) {
       return ReaderStatus::SKIP;
     }
@@ -507,7 +515,7 @@ public:
   }
 
   bool read(SpeakermanConfig &manager, const string &key, const char *value,
-            bool runtime) {
+            bool runtime) const {
     if (reader_->is_deprecated()) {
       std::cout << "Warning: variable \"" << key_ << "\" is deprecated!"
                 << std::endl;
@@ -515,15 +523,25 @@ public:
     return reader_->read(manager, key.c_str(), value, runtime);
   }
 
+  bool read(SpeakermanConfig &manager, const char *key, const char *value,
+            bool runtime) const {
+    if (reader_->is_deprecated()) {
+      std::cout << "Warning: variable \"" << key_ << "\" is deprecated!"
+                << std::endl;
+    }
+    return reader_->read(manager, key, value, runtime);
+  }
+
   void write(const SpeakermanConfig &config, ostream &output) const {
     reader_->write(config, key_.c_str(), output);
   }
 };
 
-class ConfigManager : protected SpeakermanConfig {
+class ConfigManager : protected SpeakermanConfig, protected JsonCanonicalReader {
   KeyVariableReader **readers_ = nullptr;
   size_t capacity_ = 0;
   size_t size_ = 0;
+  static thread_local SpeakermanConfig *threadLocalConfig;
 
   void ensure_capacity(size_t new_capacity) {
     if (new_capacity == 0) {
@@ -634,7 +652,7 @@ public:
     addLogicalGroups(logicalGroupsConfig, snippet);
   }
 
-  ConfigManager() {
+  ConfigManager() : JsonCanonicalReader(128, 128, 10) {
     add_reader(SPEAKER_MANAGER_CONFIG_KEY_GROUP_COUNT, false,
                processingGroups.groups);
     add_reader(SPEAKER_MANAGER_CONFIG_KEY_CHANNELS, false,
@@ -752,7 +770,17 @@ public:
 
   size_t size() const { return size_; }
 
-  bool read_line(SpeakermanConfig &config, const char *line, bool runtime) {
+  const KeyVariableReader *find(const char *keyName) const {
+    for (size_t i = 0; i < size_; i++) {
+      const KeyVariableReader *reader = readers_[i];
+      if (reader->is(keyName) == ReaderStatus::SUCCESS) {
+        return reader;
+      }
+    }
+    return nullptr;
+  }
+
+  bool read_line(SpeakermanConfig &config, const char *line, bool runtime) const {
     const char *key_start;
 
     ReaderStatus status = KeyVariableReader::skip_to_key_start(key_start, line);
@@ -790,18 +818,59 @@ public:
     }
   }
 
-  bool readJson(SpeakermanConfig &config, std::istream &input, int levels = 5) {
+  bool readJson(SpeakermanConfig &config, org::simple::util::text::InputStream<char> &input) {
     std::vector<std::string> stack;
     std::string workSpace;
+
+    struct Guard {
+      Guard(SpeakermanConfig &c) {
+        threadLocalConfig = &c;
+      }
+      ~Guard() {
+        threadLocalConfig = nullptr;
+      }
+    } guard(config);
+
     try {
-//      readJsonObject(config, input, stack, workSpace);
+      JsonCanonicalReader::readJson(input);
       return true;
     } catch (const std::runtime_error &e) {
       std::cerr << e.what() << std::endl;
       return false;
     }
   }
+
+  void setString(const char *path, const char *string) final {
+    const KeyVariableReader *reader = find(path);
+    if (reader && threadLocalConfig) {
+      reader->read(*threadLocalConfig, path, string, true);
+    }
+  }
+
+  void setNumber(const char *path, const char *string) final {
+    const KeyVariableReader *reader = find(path);
+    if (reader && threadLocalConfig) {
+      reader->read(*threadLocalConfig, path, string, true);
+    }
+  }
+
+  void setBoolean(const char *path, bool value) final {
+    const KeyVariableReader *reader = find(path);
+    if (reader && threadLocalConfig) {
+      reader->read(*threadLocalConfig, path, value ? "1" : "0", true);
+    }
+  }
+
+  void setNull(const char *path) final {
+    const KeyVariableReader *reader = find(path);
+    if (reader && threadLocalConfig) {
+      reader->read(*threadLocalConfig, path, "", true);
+    }
+  }
+
 };
+
+thread_local SpeakermanConfig *ConfigManager::threadLocalConfig;
 
 static ConfigManager config_manager;
 
@@ -1005,6 +1074,23 @@ void dumpSpeakermanConfig(const SpeakermanConfig &dump, ostream &output) {
 
 bool readConfigFromJson(SpeakermanConfig &destination, const char *json,
                         const SpeakermanConfig &basedUpon) {
+  class Input : public org::simple::util::text::InputStream<char> {
+    const char *string;
+    const char *at;
+  public:
+    Input(const char *source) : string(source), at(string) {}
+
+    bool get(char &c) final {
+      if (*at && (at - string) >= 1048576l) {
+        c = *at++;
+        return true;
+      }
+      return false;
+    }
+  };
+  Input stream(json);
+  config_manager.readJson(destination, stream);
+
   std::cout << "Reading configuration JSON: " << std::endl;
   std::cout << json << std::endl;
   return false;

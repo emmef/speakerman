@@ -443,9 +443,6 @@ void web_server::writeInputVolumes() {
   size_t groupCount = liConfig.getGroupCount();
   for (size_t i = 0; i < groupCount; i++) {
     response().write_string("\t\t{\r\n");
-    response().write_string("\t\t\t\"id\": \"");
-    response().write_string(ftostr(numbers, 20, i));
-    response().write_string("\",\r\n");
     response().write_string("\t\t\t\"name\": \"");
     response().write_json_string(liConfig.group[i].name);
     response().write_string("\",\r\n");
@@ -463,8 +460,9 @@ void web_server::writeInputVolumes() {
 void web_server::handleConfigurationChanges(char *configurationJson) {
   static std::chrono::milliseconds wait(WAIT_MILLIS);
   DynamicProcessorLevels levels;
-  SpeakermanConfig newConf;
+  SpeakermanConfig newConf = configFileConfig;
   if (readConfigFromJson(newConf, configurationJson, configFileConfig)) {
+    configFileConfig.updateRuntimeValues(newConf);
     if (manager_.applyConfigAndGetLevels(configFileConfig, &levels, wait)) {
       level_buffer.put(levels);
     }

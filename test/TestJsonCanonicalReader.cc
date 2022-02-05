@@ -109,20 +109,20 @@ std::vector<Scenario> generateScenerios() {
   std::vector<Scenario> result;
 
   result.push_back({R"(
-    {
-      "name1" : true,
-      "name2" : 13
-    })",
+      {
+        "name1" : true,
+        "name2" : 13
+      })",
                     {{"Boolean name1", "true"}, {"Number name2", "13"}}});
 
   result.push_back(
       {R"(
-    {
-      "name1" : [
-        {"name2" : 13},
-        {"name3" : 14 }
-      ]
-    })",
+      {
+        "name1" : [
+          {"name2" : 13},
+          {"name3" : 14 }
+        ]
+      })",
        {{"Number name1/0/name2", "13"}, {"Number name1/1/name3", "14"}}});
 
   result.push_back(
@@ -145,14 +145,15 @@ std::vector<Scenario> generateScenerios() {
         })",
        {{"Null name1/0/name2", ""}, {"Number name1/1/name2", "16"}}});
 
-  result.push_back({R"(
-        {
-          "name1" : {
-            "name2" : null,
-            "name2" : 16
-          }
-        })",
-                    {{"Null name1/name2", ""}, {"Number name1/name2", "16"}}});
+  result.push_back({
+      R"(
+      {
+        "name1" : {
+          "name2" : null,
+          "name2" : 16
+        }
+      })",
+      {{"Null name1/name2", ""}, {"Number name1/name2", "16"}}});
 
   return result;
 }
