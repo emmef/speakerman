@@ -63,7 +63,7 @@ static constexpr const char *EQ_CONFIG_KEY_EQUALIZER = "equalizer";
 static constexpr const char *EQ_CONFIG_KEY_CENTER = "center";
 static constexpr const char *EQ_CONFIG_KEY_GAIN = "gain";
 static constexpr const char *EQ_CONFIG_KEY_BANDWIDTH = "bandwidth";
-static constexpr const char *LOGICAL_GROUP_CONFIG_KEY_INPUT = "logical-input";
+static constexpr const char *LOGICAL_GROUP_CONFIG_KEY_INPUT = "logicalInput";
 [[maybe_unused]] static constexpr const char *LOGICAL_GROUP_CONFIG_KEY_OUTPUT =
     "logical-output";
 static constexpr const char *LOGICAL_GROUP_CONFIG_KEY_VOLUME = "volume";
@@ -843,28 +843,51 @@ public:
   void setString(const char *path, const char *string) final {
     const KeyVariableReader *reader = find(path);
     if (reader && threadLocalConfig) {
+      std::cout << "JSON: String " << path << " = " << string << std::endl;
       reader->read(*threadLocalConfig, path, string, true);
+    }
+    else {
+      std::cout << "JSON: NOT found: String " << path << " = " << string << std::endl;
     }
   }
 
   void setNumber(const char *path, const char *string) final {
     const KeyVariableReader *reader = find(path);
     if (reader && threadLocalConfig) {
+      std::cout << "JSON: Number " << path << " = " << string << std::endl;
       reader->read(*threadLocalConfig, path, string, true);
+    }
+    else {
+      std::cout << "JSON: NOT found: Number " << path << " = " << string << std::endl;
     }
   }
 
   void setBoolean(const char *path, bool value) final {
     const KeyVariableReader *reader = find(path);
+    if (value && strncmp(path, "clear", 30) == 0) {
+      std::cout << "JSON: Reset config!" << std::endl;
+      if (threadLocalConfig) {
+        *threadLocalConfig = SpeakermanConfig::unsetConfig();
+      }
+      return;
+    }
     if (reader && threadLocalConfig) {
+      std::cout << "JSON: Boolean " << path << " = " << (value ? "true" : "false") << std::endl;
       reader->read(*threadLocalConfig, path, value ? "1" : "0", true);
+    }
+    else {
+      std::cout << "JSON: NOT found: Boolean " << path << " = " << (value ? "true" : "false") << std::endl;
     }
   }
 
   void setNull(const char *path) final {
     const KeyVariableReader *reader = find(path);
     if (reader && threadLocalConfig) {
+      std::cout << "JSON: NULL " << path << std::endl;
       reader->read(*threadLocalConfig, path, "", true);
+    }
+    else {
+      std::cout << "JSON: NOT found " << path << std::endl;
     }
   }
 
