@@ -138,3 +138,82 @@ body {
 .mix-mode-message-enabled {
     color: rgba(0,255,255,1.0);
 }
+
+.logical-input-label {
+    font-width: bold;
+    color: white;
+}
+
+.logical-input {
+    position: relative;
+    margin: 0.6ex 0 0 0;
+    vertical-align: middle;
+    background: none;
+    padding: 0.4ex 0 0.6ex 0;
+}
+
+.logical-input * {
+    vertical-align: middle;
+}
+
+.logical-input-unmuted {
+    opacity: 1.0;
+}
+
+.logical-input-muted * {
+    opacity: 0.4;
+}
+
+.logical-input-label {
+    display: inline-block;
+    font-weight: bolder;
+    color: white;
+    text-overflow: ellipsis;
+    width:20ex;
+    max-width:20ex;
+}
+
+.logical-input-mute {
+    display: inline-block;
+    width: 1.5ex;
+    min-width: 2ex;
+    max-width: 2ex;
+    align-content: center;
+    border-width: 1px;
+    border-style: solid;
+    cursor: pointer;
+    padding: 2px;
+    font-size: 70%;
+    border-color: rgba(64,192,255,0.5);
+    padding: 0 0.5ex 0 0.5em;
+}
+
+.logical-input-mute-enabled {
+    background: rgba(64,192,255,1.0);
+    color: black;
+    font-weight: bold;
+    opacity: 0.8;
+}
+
+.logical-input-mute-disabled {
+    background: rgba(0,0,0,0.0);;
+    color: rgba(64,192,255,0.5);
+    font-weight: normal;
+}
+
+.logical-group-group-muted {
+    opacity: 0.5;
+}
+
+.logical-input-slider {
+    display: inline-block;
+}
+
+.logical-input-volume {
+    display: inline-block;
+    width: 2.2em;
+    max-width: 2.2em;
+    text-align: right;
+    text-overflow: ellipsis;
+
+}

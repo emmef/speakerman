@@ -1,169 +1,236 @@
 <!DOCTYPE html>
 <head>
     <meta charset="UTF-8">
-	<link href='http://fonts.googleapis.com/css?family=Open+Sans:400italic,600italic,400,600' rel='stylesheet' type='text/css'>
-	<link rel="stylesheet" type="text/css" href="/speakerman.css?version=1.0">
-	<script type="text/javascript" src="/speakerman.js?version=1.0"></script>
-	<title>SpeakerMan &trade;</title>
+    <link href='http://fonts.googleapis.com/css?family=Open+Sans:400italic,600italic,400,600'
+          rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" type="text/css" href="/speakerman.css?version=1.0">
+    <script type="text/javascript" src="/speakerman.js?version=1.0"></script>
+    <title>SpeakerMan &trade;</title>
 </head>
 <body onload="sendLevelRequest()">
-    <div id="new_group" class="background">
-        <div id="meter-messages">
-            <span class="threshold-message">Level-up:&nbsp;</span><span id="threshold-message" class="threshold-message">0 dB</span><span id="connection-message" style="display:none">&nbsp;&nbsp;Connection problem</span>
-        </div>
-        <div id="meter-sub" class="meter-group">
-            <p class="meter-title">SUB</p>
-            <div class="meter-levels">
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-            </div>
-        </div>
-        <div id="meter-group0" class="meter-group">
-            <p class="meter-title">GROUP 1</p>
-            <div class="meter-levels">
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-            </div>
-        </div>
-        <div id="meter-group1" class="meter-group">
-            <p class="meter-title">GROUP 2</p>
-            <div class="meter-levels">
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-            </div>
-        </div>
-        <div id="meter-group2" class="meter-group">
-            <p class="meter-title">GROUP 3</p>
-            <div class="meter-levels">
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-            </div>
-        </div>
-        <div id="meter-group3" class="meter-group">
-            <p class="meter-title">GROUP 4</p>
-            <div class="meter-levels">
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-                <div class="meter-level-pixel">&nbsp;</div>
-            </div>
-        </div>
-        <div id="input-group-volumes"></div>
-        <span id="cpu-usage-stats"></span>
-
+<div id="new_group" class="background">
+    <div id="meter-messages">
+        <span class="threshold-message">Level-up:&nbsp;</span><span
+            id="threshold-message" class="threshold-message">0 dB</span><span
+            id="connection-message" style="display:none">&nbsp;&nbsp;Connection problem</span>
     </div>
+    <div id="meter-sub" class="meter-group" style="display: none">
+        <p class="meter-title">SUB</p>
+        <div class="meter-levels">
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+        </div>
+    </div>
+    <div id="meter-group0" class="meter-group" style="display: none">
+        <p class="meter-title">GROUP 1</p>
+        <div class="meter-levels">
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+        </div>
+    </div>
+    <div id="meter-group1" class="meter-group" style="display: none">
+        <p class="meter-title">GROUP 2</p>
+        <div class="meter-levels">
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+        </div>
+    </div>
+    <div id="meter-group2" class="meter-group" style="display: none">
+        <p class="meter-title">GROUP 3</p>
+        <div class="meter-levels">
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+        </div>
+    </div>
+    <div id="meter-group3" class="meter-group" style="display: none; ">
+        <p class="meter-title">GROUP 4</p>
+        <div class="meter-levels">
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+            <div class="meter-level-pixel">&nbsp;</div>
+        </div>
+    </div>
+    <div id="logicalInputs">
+        <div id="logicalInput0" class="logical-input logical-input-unmuted"
+             style="display: none">
+            <div class="logical-input-mute">M</div>
+            <div class="logical-input-label">Group</div>
+            <input class="logical-input-slider" type="range" name="weight"
+                   min="-20" max="20" value="0"/>
+            <span class="logical-input-volume">0 dB</span>
+        </div>
+        <div id="logicalInput1" class="logical-input logical-input-unmuted"
+             style="display: none">
+            <div class="logical-input-mute">M</div>
+            <div class="logical-input-label">Group 2</div>
+            <input class="logical-input-slider" type="range" name="weight"
+                   min="-20" max="20" value="0" step="0.1"/>
+            <span class="logical-input-volume">0 dB</span>
+        </div>
+        <div id="logicalInput2" class="logical-input logical-input-unmuted"
+             style="display: none">
+            <span class="logical-input-label">Group 3</span>
+            <span class="logical-input-mute">M</span>
+            <input class="logical-input-slider" type="range" name="weight"
+                   min="-20" max="20" value="0"/>
+            <span class="logical-input-volume">0 dB</span>
+        </div>
+        <div id="logicalInput3" class="logical-input logical-input-unmuted"
+             style="display: none">
+            <span class="logical-input-mute">M</span>
+            <span class="logical-input-label">Group 4</span>
+            <input class="logical-input-slider" type="range" name="weight"
+                   min="-20" max="20" value="0"/>
+            <span class="logical-input-volume">0 dB</span>
+        </div>
+        <div id="logicalInput4" class="logical-input logical-input-unmuted"
+             style="display: none">
+            <span class="logical-input-mute">M</span>
+            <span class="logical-input-label">Group 5</span>
+            <input class="logical-input-slider" type="range" name="weight"
+                   min="-20" max="20" value="0"/>
+            <span class="logical-input-volume">0 dB</span>
+        </div>
+        <div id="logicalInput5" class="logical-input logical-input-unmuted"
+             style="display: none">
+            <span class="logical-input-mute">M</span>
+            <span class="logical-input-label">Group 6</span>
+            <input class="logical-input-slider" type="range" name="weight"
+                   min="-20" max="20" value="0"/>
+            <span class="logical-input-volume">0 dB</span>
+        </div>
+        <div id="logicalInput6" class="logical-input logical-input-unmuted"
+             style="display: none">
+            <span class="logical-input-mute">M</span>
+            <span class="logical-input-label">Group 7</span>
+            <input class="logical-input-slider" type="range" name="weight"
+                   min="-20" max="20" value="0"/>
+            <span class="logical-input-volume">0 dB</span>
+        </div>
+        <div id="logicalInput7" class="logical-input logical-input-unmuted"
+             style="display: none">
+            <span class="logical-input-mute">M</span>
+            <span class="logical-input-label">Group 8</span>
+            <input class="logical-input-slider" type="range" name="weight"
+                   min="-20" max="20" value="0"/>
+            <span class="logical-input-volume">0 dB</span>
+        </div>
+    </div>
+    <span id="cpu-usage-stats"></span>
+</div>
 </body>
 </html>
