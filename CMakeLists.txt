@@ -84,10 +84,7 @@ set(HEADER_FILES
     src/include/speakerman/utils/Config.hpp
     src/include/speakerman/utils/Mutex.hpp
     src/include/speakerman/DynamicsProcessor.hpp
-    src/include/speakerman/HttpMessage.hpp
-    src/include/speakerman/ServerSocket.hpp
     src/include/speakerman/SingleThreadFileCache.hpp
-    src/include/speakerman/SocketStream.hpp
     src/include/speakerman/SpeakerManager.hpp
     src/include/speakerman/SpeakermanConfig.hpp
     src/include/speakerman/SpeakermanRuntimeData.hpp
@@ -100,16 +97,13 @@ set(HEADER_FILES
 set(SOURCE_FILES
     src/Allocation.cpp
     src/ErrorHandler.cpp
-    src/HttpMessage.cpp
     src/JackClient.cpp
     src/JackProcessor.cpp
     src/Names.cpp
     src/Port.cpp
     src/PortDefinition.cpp
-    src/ServerSocket.cpp
     src/SignalHandler.cpp
     src/SingleThreadFileCache.cpp
-    src/SocketStream.cpp
     src/SpeakermanConfig.cpp
     src/SpeakermanWebServer.cpp
     src/Stream.cpp
