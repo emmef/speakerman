@@ -23,13 +23,12 @@
 
 #include <chrono>
 #include <mutex>
-#include <speakerman/HttpMessage.hpp>
-#include <speakerman/ServerSocket.hpp>
-#include <speakerman/SingleThreadFileCache.hpp>
+#include <speakerman/Webserver.h>
 #include <speakerman/DynamicProcessorLevels.h>
 #include <speakerman/SpeakerManagerControl.h>
 #include <tdap/Count.hpp>
 #include <tdap/Power2.hpp>
+#include <org-simple/util/text/Json.h>
 #include <thread>
 
 namespace speakerman {
@@ -86,75 +85,115 @@ public:
   }
 };
 
-class web_server : protected http_message {
+class web_server : public WebServer {
 public:
-  using Result = server_worker_result;
-  using State = server_socket_state;
-  using Stream = server_socket::Stream;
-  static constexpr size_t URL_LENGTH = 1023;
   static constexpr const char *COOKIE_TIME_STAMP = "levelTimeStamp";
   static constexpr size_t COOKIE_TIME_STAMP_LENGTH =
       tdap::constexpr_string_length(COOKIE_TIME_STAMP);
 
   web_server(SpeakerManagerControl &speakerManager);
 
-  bool open(const char *service, int timeoutSeconds, int backLog,
-            int *errorCode);
-
-  const char *service() const { return socket_.service(); }
-
-  State state() const { return socket_.state(); }
-
-  bool isOpen() const { return state() != State::CLOSED; }
-
-  bool isWorking() const { return state() == State::WORKING; }
-
-  bool work(int *errorCode);
-
-  void close();
-
   ~web_server() {
     cout << "Closing web server" << endl;
-    close();
   }
 
 protected:
-  virtual bool content_stream_delete() const override { return false; }
 
-  virtual const char *on_url(const char *url) override;
-
-  virtual void on_header(const char *header, const char *value) override;
-
-  virtual void handle_request(input_stream *pStream) override;
-
-  virtual const char *on_method(const char *method_name) override;
+  HttpResultHandleResult handle(mg_connection *connection, mg_http_message *httpMessage) override;
 
 private:
-  enum class Method { GET, PUT };
+  class Response {
+    std::string body;
+    std::string headers;
+    std::string response;
+    std::string contentType;
+    char contentLength[24];
+
+    static void addHeader(std::string &headers, const char *name,
+                          const char *value, const char *extra) {
+      headers += name;
+      headers += ": ";
+      headers += value;
+      if (extra) {
+        headers += "; ";
+        headers += extra;
+      }
+      headers += "\r\n";
+    }
+
+  public:
+    void clear() {
+      body.clear();
+      headers.clear();
+      response.clear();
+      contentType.clear();
+    }
+
+    void addHeader(const char *name, const char *value,
+                   const char *extra = nullptr) {
+      addHeader(headers, name, value, extra);
+    }
+
+    void setContentType(const char *type, bool addUtf8) {
+      contentType.clear();
+      if (addUtf8) {
+        addHeader(contentType, "Content-Type", type, "charset=UTF-8");
+      } else {
+        addHeader(contentType, "Content-Type", type, nullptr);
+      }
+    };
+
+    void createReply(mg_connection *connection, int code = 200) {
+      if (contentType.length() > 0) {
+        headers += contentType;
+      }
+      snprintf(contentLength, 24, "%zu", body.length());
+      addHeader("Content-Length", contentLength);
+
+      mg_http_reply(connection, code, headers.c_str(), body.c_str());
+    }
+
+    void write_string(const char *str) {
+      body += str;
+    }
+
+    void write_string(const std::string &str) {
+      body += str;
+    }
+
+    void write_json_string(const char *string) {
+      org::simple::util::text::JsonEscapeState state = {};
+      for (const char *p = string; *p != 0; p++) {
+        org::simple::util::text::addJsonStringCharacter(*p, state, [this](char c) {
+          body += c;
+          return true;
+        });
+      }
+    }
+
+    void write(char c) {
+      body += c;
+    }
+  };
+
+
+  void handleTimeStampCookie(const char *header, const char *value);
+  static void thread_static_function(web_server *);
+  void thread_function();
+  void handleConfigurationChanges(mg_connection *connection,
+                                  const char *configurationJson);
+  void writeInputVolumes();
+  bool applyConfigAndGetLevels(DynamicProcessorLevels &levels, milliseconds &wait);
 
   SpeakerManagerControl &manager_;
-  file_entry indexHtmlFile;
-  file_entry cssFile;
-  file_entry javaScriptFile;
-  file_entry faviconFile;
-  server_socket socket_;
   LevelEntryBuffer level_buffer;
-  char url_[URL_LENGTH + 1];
   std::thread level_fetch_thread;
   long long levelTimeStamp = 0;
-  Method method = Method::GET;
   SpeakermanConfig configFileConfig;
-
-  static void thread_static_function(web_server *);
-
-  void thread_function();
-
-  Result accept_work(Stream &stream, const server_socket &socket);
-
-  static Result worker_function(Stream &stream, const server_socket &socket,
-                                void *data);
-  void handleConfigurationChanges(char *configurationJson);
-  void writeInputVolumes();
+  SpeakermanConfig clientFileConfig;
+  SpeakermanConfig usedFileConfig;
+  std::mutex handlingMutex;
+  Response response;
 };
 
 } // namespace speakerman

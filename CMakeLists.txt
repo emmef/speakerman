@@ -70,7 +70,8 @@ set(TDAP_HEADERS
     src/include/tdap/VolumeMatrix.hpp
     src/include/tdap/Weighting.hpp
     src/include/tdap/Limiter.hpp src/include/tdap/AlignedFrame.hpp src/include/tdap/Errors.hpp
-    src/include/tdap/TrueRms.hpp)
+    src/include/tdap/TrueRms.hpp
+    src/include/mongoose.h)
 
 set(HEADER_FILES
     src/include/speakerman/jack/ErrorHandler.hpp
@@ -94,7 +95,7 @@ set(HEADER_FILES
     src/include/speakerman/Stream.hpp
     src/include/speakerman/UnsetValue.h
     src/include/speakerman/NamedConfig.h
-    src/include/speakerman/LogicalGroupConfig.h src/include/speakerman/ProcessingGroupConfig.h src/include/speakerman/DetectionConfig.h src/include/speakerman/DynamicProcessorLevels.h src/include/speakerman/SpeakerManagerControl.h src/include/speakerman/StreamOwner.h src/include/speakerman/ConfigStage.h src/include/tdap/AlignedArray.h src/include/speakerman/MatrixConfig.h src/include/speakerman/JsonCanonicalReader.h)
+    src/include/speakerman/LogicalGroupConfig.h src/include/speakerman/ProcessingGroupConfig.h src/include/speakerman/DetectionConfig.h src/include/speakerman/DynamicProcessorLevels.h src/include/speakerman/SpeakerManagerControl.h src/include/speakerman/StreamOwner.h src/include/speakerman/ConfigStage.h src/include/tdap/AlignedArray.h src/include/speakerman/MatrixConfig.h src/include/speakerman/JsonCanonicalReader.h src/include/speakerman/Webserver.h src/include/speakerman/SpeakerManagerGenerator.h)
 
 set(SOURCE_FILES
     src/Allocation.cpp
@@ -117,7 +118,8 @@ set(SOURCE_FILES
     src/LogicalGroupConfig.cc
     src/ProcessingGroupConfig.cc
     src/DetectionConfig.cc
-    src/StreamOwner.cc src/MatrixConfig.cc src/JsonCanonicalReader.cc)
+    src/StreamOwner.cc src/MatrixConfig.cc src/JsonCanonicalReader.cc
+    src/mongoose/mongoose.c src/WebServer.cc src/speakerManagerGenerator.cc)
 
 # Removed: src/include/speakerman/webserver.h src/webserver.cc src/include/util/FileBuffer.h src/FileBuffer.cc
 

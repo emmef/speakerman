@@ -30,24 +30,6 @@
 #include <unistd.h>
 
 namespace speakerman {
-bool web_server::open(const char *service, int timeoutSeconds, int backLog,
-                      int *errorCode) {
-  return socket_.open(service, timeoutSeconds, backLog, errorCode);
-}
-
-bool web_server::work(int *errorCode) {
-  return socket_.work(errorCode, web_server::worker_function, this);
-}
-
-void web_server::thread_static_function(web_server *server) {
-  jack::CountedThreadGuard guard("Web server configuration updater");
-
-  try {
-    server->thread_function();
-  } catch (const jack::signal_exception &e) {
-    e.handle("Web server configuration update and level fetching");
-  }
-}
 
 static void create_command_and_file(string &rangeFile, string &command_line) {
   char number[33];
@@ -118,6 +100,16 @@ static void approach_threshold_scaling(double &value, int new_value) {
   }
 }
 
+void web_server::thread_static_function(web_server *server) {
+  jack::CountedThreadGuard guard("Web server configuration updater");
+
+  try {
+    server->thread_function();
+  } catch (const jack::signal_exception &e) {
+    e.handle("Web server configuration update and level fetching");
+  }
+}
+
 void web_server::thread_function() {
   static std::chrono::milliseconds wait(WAIT_MILLIS);
   static std::chrono::milliseconds sleep(SLEEP_MILLIS);
@@ -159,10 +151,7 @@ void web_server::thread_function() {
         read = true;
       }
       if (read) {
-        if (manager_.applyConfigAndGetLevels(configFileConfig, &levels, wait)) {
-          level_buffer.put(levels);
-          got_levels = true;
-        }
+        got_levels = applyConfigAndGetLevels(levels, wait);
       }
     }
     if (!got_levels && manager_.getLevels(&levels, wait)) {
@@ -198,62 +187,28 @@ void web_server::thread_function() {
     this_thread::sleep_for(sleep);
   }
 }
+bool web_server::applyConfigAndGetLevels(DynamicProcessorLevels &levels,
+                                         milliseconds &wait) {
+  double scaling = configFileConfig.threshold_scaling;
+  usedFileConfig = configFileConfig;
+  usedFileConfig.updateRuntimeValues(clientFileConfig);
+  usedFileConfig.threshold_scaling = scaling;
+  if (manager_.applyConfigAndGetLevels(usedFileConfig, &levels, wait)) {
+    level_buffer.put(levels);
+    return true;
+  }
+  return false;
+}
 
 web_server::web_server(SpeakerManagerControl &speakerManager)
-    : http_message(10240, 2048), manager_(speakerManager),
-      indexHtmlFile("index.html"), cssFile("speakerman.css"),
-      javaScriptFile("speakerman.js"), faviconFile("favicon.png") {
+    : WebServer(getWebSiteDirectory()), manager_(speakerManager) {
   thread t(thread_static_function, this);
   level_fetch_thread.swap(t);
   level_fetch_thread.detach();
 }
 
-web_server::Result web_server::worker_function(server_socket::Stream &stream,
-                                               const server_socket &socket,
-                                               void *data) {
-  return static_cast<web_server *>(data)->accept_work(stream, socket);
-}
-
-void web_server::close() { socket_.close(); }
-
-web_server::Result web_server::accept_work(Stream &stream,
-                                           const server_socket &) {
-  levelTimeStamp = 0;
-  handle(stream);
-  return Result::CONTINUE;
-}
-
-const char *web_server::on_method(const char *method_name) {
-  if (strncmp("GET", method_name, 10) == 0) {
-    method = Method::GET;
-    return nullptr;
-  }
-  if (strncmp("PUT", method_name, 10) == 0) {
-    method = Method::PUT;
-    return nullptr;
-  }
-  return method_name;
-}
-
-const char *web_server::on_url(const char *url) {
-  size_t i;
-  for (i = 0; i < URL_LENGTH; i++) {
-    char c = url[i];
-    if (c != 0) {
-      url_[i] = c;
-    } else {
-      break;
-    }
-  }
-  if (i < URL_LENGTH) {
-    url_[i] = 0;
-    //			std::cout << "D: URL = " << url_ << std::endl;
-    return nullptr;
-  }
-  return "URL too long";
-}
-
-void web_server::on_header(const char *header, const char *value) {
+// TODO rename to handleCookieTimestamp
+void web_server::handleTimeStampCookie(const char *header, const char *value) {
   static constexpr int ASSIGN = 1;
   static constexpr int VALUE = 2;
   static constexpr int NUM = 3;
@@ -318,158 +273,156 @@ static const char *itostr(char *buffer, size_t len, long long value) {
   return buffer;
 }
 
-void web_server::handle_request(input_stream *pStream) {
+static bool matches(const mg_str &string1, const char *string2) {
+  return strncmp(string2, string1.ptr, string1.len) == 0;
+}
+
+static bool matchesCI(const mg_str &string1, const char *string2) {
+  return strncasecmp(string2, string1.ptr, string1.len) == 0;
+}
+
+static bool operator==(const mg_str &string1, const char *string2) {
+  return matches(string1, string2);
+}
+
+
+HttpResultHandleResult web_server::handle(mg_connection *connection,
+                                          mg_http_message *httpMessage) {
+  std::unique_lock<std::mutex> guard(handlingMutex);
+  response.clear();
+
   static constexpr size_t LENGTH = 10240;
   std::unique_ptr<char> str(new char[LENGTH + 1]);
 
-  if (strncmp("/", url_, 32) == 0) {
-    strncpy(url_, "/index.html", 32);
-  }
-  for (size_t i = 0; i < URL_LENGTH && url_[i] != '\0'; i++) {
-    if (url_[i] == '?') {
-      url_[i] = '\0';
-      break;
-    }
-  }
-
-  if (method == Method::GET) {
-    if (strncasecmp("/levels", url_, 32) == 0) {
+  mg_str &method = httpMessage->method;
+  mg_str &uri = httpMessage->uri;
+  if (matchesCI(method, "GET")) {
+    if (uri == "/levels") {
       char numbers[60];
       LevelEntry entry;
       level_buffer.get(levelTimeStamp, entry);
       if (entry.set) {
+        mg_str *cookie = mg_http_get_header(httpMessage, "cookie");
+        if (cookie) {
+          handleTimeStampCookie("cookie", cookie->ptr);
+        }
         DynamicProcessorLevels levels = entry.levels;
         snprintf(numbers, 60, "%s=%lli; SameSite=Strict", COOKIE_TIME_STAMP,
                  entry.stamp);
-        set_header("Set-Cookie", numbers);
-        set_header("Access-Control-Allow-Origin", "*");
-        set_content_type("application/json; charset=UTF-8");
-        response().write_string("{\r\n");
-        response().write_string("\t\"elapsedMillis\": ");
-        response().write_string(
+        response.addHeader("Set-Cookie", numbers);
+        response.addHeader("Access-Control-Allow-Origin", "*");
+        response.setContentType("application/json", true);
+        response.write_string("{\r\n");
+        response.write_string("\t\"elapsedMillis\": ");
+        response.write_string(
             itostr(numbers, 30, entry.stamp - levelTimeStamp));
-        response().write_string(", \r\n");
-        response().write_string("\t\"thresholdScale\": ");
-        response().write_string(
+        response.write_string(", \r\n");
+        response.write_string("\t\"thresholdScale\": ");
+        response.write_string(
             ftostr(numbers, 30, manager_.getConfig().threshold_scaling));
-        response().write_string(", \r\n");
-        response().write_string("\t\"subLevel\": ");
-        response().write_string(ftostr(numbers, 30, levels.getSignal(0)));
-        response().write_string(", \r\n");
-        response().write_string("\t\"periods\": ");
-        response().write_string(itostr(numbers, 30, levels.count()));
-        response().write_string(", \r\n");
+        response.write_string(", \r\n");
+        response.write_string("\t\"subLevel\": ");
+        response.write_string(ftostr(numbers, 30, levels.getSignal(0)));
+        response.write_string(", \r\n");
+        response.write_string("\t\"periods\": ");
+        response.write_string(itostr(numbers, 30, levels.count()));
+        response.write_string(", \r\n");
         const jack::ProcessingStatistics &statistics = manager_.getStatistics();
-        response().write_string("\t\"cpuLongTerm\": ");
-        response().write_string(
+        response.write_string("\t\"cpuLongTerm\": ");
+        response.write_string(
             itostr(numbers, 10, statistics.getLongTermCorePercentage()));
-        response().write_string(",\r\n\t\"cpuShortTerm\": ");
-        response().write_string(
+        response.write_string(",\r\n\t\"cpuShortTerm\": ");
+        response.write_string(
             itostr(numbers, 10, statistics.getShortTermCorePercentage()));
-        response().write_string(",\r\n");
+        response.write_string(",\r\n");
         // group volumes
-        response().write_string("\t\"group\" : [\r\n");
+        response.write_string("\t\"group\" : [\r\n");
         for (size_t i = 0; i < levels.groups(); i++) {
-          response().write_string("\t\t{\r\n");
-          response().write_string("\t\t\t\"group_name\": \"");
-          response().write_string(
+          response.write_string("\t\t{\r\n");
+          response.write_string("\t\t\t\"group_name\": \"");
+          response.write_string(
               manager_.getConfig().processingGroups.group[i].name);
-          response().write_string("\", \r\n");
-          response().write_string("\t\t\t\"level\": ");
-          response().write_string(ftostr(numbers, 30, levels.getSignal(i + 1)));
-          response().write_string("\r\n");
-          response().write_string("\t\t}");
+          response.write_string("\", \r\n");
+          response.write_string("\t\t\t\"level\": ");
+          response.write_string(ftostr(numbers, 30, levels.getSignal(i + 1)));
+          response.write_string("\r\n");
+          response.write_string("\t\t}");
           if (i < levels.groups() - 1) {
-            response().write(',');
+            response.write(',');
           }
-          response().write_string("\r\n");
+          response.write_string("\r\n");
         }
-        response().write_string("\t],\r\n");
+        response.write_string("\t],\r\n");
         // inputs
-        response().write_string("\t\"inputMaxVolume\": ");
-        response().write_string(
+        response.write_string("\t\"inputMaxVolume\": ");
+        response.write_string(
             ftostr(numbers, 30, LogicalGroupConfig::MAX_VOLUME));
-        response().write_string(",\r\n");
+        response.write_string(",\r\n");
         writeInputVolumes();
         // end
-        response().write_string("}\r\n");
+        response.write_string("}\r\n");
+        response.createReply(connection, 200);
+        return HttpResultHandleResult::Ok;
       } else {
-        set_error(http_status::SERVICE_UNAVAILABLE);
+        mg_http_reply(connection, 503, NULL, "Temporarily unavailable");
+        return HttpResultHandleResult::Ok;
       }
-    } else if (strncasecmp("/config", url_, 32) == 0) {
-      set_header("Access-Control-Allow-Origin", "*");
-      set_content_type("application/json; charset=UTF-8");
-      response().write_string("{\r\n");
+    } else if (uri == "/config") {
+      response.addHeader("Access-Control-Allow-Origin", "*");
+      response.setContentType("application/json", true);
+      response.write_string("{\r\n");
       writeInputVolumes();
-      response().write_string("}\r\n");
-    } else if (strncasecmp("/favicon.ico", url_, 32) == 0) {
-      set_content_type("text/plain");
-      response().write_string("X", 1);
-      set_success();
-    } else if (strncasecmp(url_, "/index.html", 32) == 0) {
-      set_content_type("text/html; charset=UTF-8");
-      indexHtmlFile.reset();
-      handle_content(indexHtmlFile.size(), &indexHtmlFile);
-    } else if (strncasecmp(url_, "/speakerman.css", 32) == 0) {
-      set_content_type("text/css; charset=UTF-8");
-      cssFile.reset();
-      handle_content(cssFile.size(), &cssFile);
-    } else if (strncasecmp(url_, "/speakerman.js", 32) == 0) {
-      set_content_type("text/javascript");
-      javaScriptFile.reset();
-      handle_content(javaScriptFile.size(), &javaScriptFile);
-    } else if (strncasecmp(url_, "/favicon.ico", 32) == 0) {
-      set_content_type("image/png");
-      faviconFile.reset();
-      handle_content(faviconFile.size(), &faviconFile);
-    } else {
-      set_error(404, url_);
-    }
-  } else if (method == Method::PUT) {
-    if (strncasecmp("/config", url_, 32) == 0) {
-      if (pStream && pStream->read_line(str.get(), LENGTH) >= 1) {
-        handleConfigurationChanges(str.get());
-      }
-    } else {
-      set_error(404, url_);
+      response.write_string("}\r\n");
+      response.createReply(connection, 200);
+      return HttpResultHandleResult::Ok;
     }
   }
+  else if (matchesCI(method, "POST") || matchesCI(method, "PUT")) {
+    if (uri == "/config") {
+      handleConfigurationChanges(connection, httpMessage->body.ptr);
+      return HttpResultHandleResult::Ok;
+    }
+  }
+  return HttpResultHandleResult::Default;
 }
 
 void web_server::writeInputVolumes() {
   char numbers[31];
-  response().write_string("\t\"logical-input\": [\r\n");
+  response.write_string("\t\"logicalInput\": [\r\n");
   const LogicalInputsConfig &liConfig = manager_.getConfig().logicalInputs;
   size_t groupCount = liConfig.getGroupCount();
   for (size_t i = 0; i < groupCount; i++) {
-    response().write_string("\t\t{\r\n");
-    response().write_string("\t\t\t\"name\": \"");
-    response().write_json_string(liConfig.group[i].name);
-    response().write_string("\",\r\n");
-    response().write_string("\t\t\t\"volume\": ");
-    response().write_string(ftostr(numbers, 30, liConfig.group[i].volume));
-    response().write_string("\r\n\t\t}");
+    response.write_string("\t\t{\r\n");
+    response.write_string("\t\t\t\"name\": \"");
+    response.write_json_string(liConfig.group[i].name);
+    response.write_string("\",\r\n");
+    response.write_string("\t\t\t\"volume\": ");
+    response.write_string(ftostr(numbers, 30, liConfig.group[i].volume));
+    response.write_string("\r\n\t\t}");
     if (i < groupCount - 1) {
-      response().write(',');
+      response.write(',');
     }
-    response().write_string("\r\n");
+    response.write_string("\r\n");
   }
-  response().write_string("\t]\r\n");
+  response.write_string("\t]\r\n");
 }
 
-void web_server::handleConfigurationChanges(char *configurationJson) {
+void web_server::handleConfigurationChanges(mg_connection *connection,
+                                            const char *configurationJson) {
   static std::chrono::milliseconds wait(WAIT_MILLIS);
   DynamicProcessorLevels levels;
-  SpeakermanConfig newConf = configFileConfig;
+  SpeakermanConfig newConf = clientFileConfig;
   if (readConfigFromJson(newConf, configurationJson, configFileConfig)) {
-    configFileConfig.updateRuntimeValues(newConf);
-    if (manager_.applyConfigAndGetLevels(configFileConfig, &levels, wait)) {
-      level_buffer.put(levels);
-    }
+    clientFileConfig.updateRuntimeValues(newConf);
+    applyConfigAndGetLevels(levels, wait);
     writeInputVolumes();
+    response.addHeader("Access-Control-Allow-Origin", "*");
+    response.setContentType("application/json", true);
+    response.createReply(connection, 200);
   } else {
-    set_error(400, "Unable to parse configuration from input.");
+    mg_http_reply(connection, 400, nullptr, "Unable to parse configuration from input.");
   }
 }
+
 
 } // namespace speakerman
