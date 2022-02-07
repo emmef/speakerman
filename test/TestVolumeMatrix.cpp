@@ -92,7 +92,7 @@ tdap::AlignedArray<double, INPUTS, ALIGN> getNumberedInput() {
 tdap::AlignedArray<double, INPUTS, ALIGN> getRandomInput() {
   tdap::AlignedArray<double, INPUTS, ALIGN> frame;
   for (double &x : frame) {
-    x = (RAND_MAX - 2 * rand()) / (2 * RAND_MAX);
+    x = (RAND_MAX - 2.0 * rand()) / (2.0 * RAND_MAX);
   }
   return frame;
 }
@@ -100,7 +100,7 @@ tdap::AlignedArray<double, INPUTS, ALIGN> getRandomInput() {
 tdap::AlignedArray<double, OUTPUTS, ALIGN> getRandomOutput() {
   tdap::AlignedArray<double, OUTPUTS, ALIGN> frame;
   for (double &x : frame) {
-    x = (RAND_MAX - 2 * rand()) / (2 * RAND_MAX);
+    x = (RAND_MAX - 2.0 * rand()) / (2.0 * RAND_MAX);
   }
   return frame;
 }

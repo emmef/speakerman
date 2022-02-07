@@ -58,9 +58,7 @@ void WebServer::defaultHandle(mg_connection *connection,
     default:
       break;
     }
-    mg_http_serve_opts opts = {0};
-    opts.root_dir = documentRoot;
-    opts.ssi_pattern = "#.shtml";
+    mg_http_serve_opts opts = { .root_dir = documentRoot, .ssi_pattern = "#.shtml" };
     mg_http_serve_dir(connection, httpMessage, &opts);
   } catch (const std::exception &e) {
     mg_http_reply(connection, 500, nullptr, e.what());
@@ -114,7 +112,7 @@ void WebServer::awaitStop(long waitMillis) {
     bool didSet;
     StopGuard(std::atomic_bool &s) : stop(s) {
       bool expected = false;
-      bool didSet = stop.compare_exchange_strong(expected, true);
+      didSet = stop.compare_exchange_strong(expected, true);
     }
     ~StopGuard() {
       if (didSet) {
@@ -177,8 +175,8 @@ const char *WebServer::eventName(int event) {
   }
 }
 
-HttpResultHandleResult WebServer::handle(mg_connection *connection,
-                                         mg_http_message *httpMessage) {
+HttpResultHandleResult WebServer::handle(mg_connection *,
+                                         mg_http_message *) {
   return HttpResultHandleResult::Default;
 };
 

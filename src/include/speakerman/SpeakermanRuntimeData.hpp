@@ -26,6 +26,7 @@
 #include <tdap/IirBiquad.hpp>
 #include <tdap/Integration.hpp>
 #include <tdap/VolumeMatrix.hpp>
+#include <iostream>
 
 namespace speakerman {
 using namespace tdap;
