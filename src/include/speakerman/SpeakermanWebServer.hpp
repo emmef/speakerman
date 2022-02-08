@@ -23,12 +23,12 @@
 
 #include <chrono>
 #include <mutex>
-#include <speakerman/Webserver.h>
+#include <org-simple/util/text/Json.h>
 #include <speakerman/DynamicProcessorLevels.h>
 #include <speakerman/SpeakerManagerControl.h>
+#include <speakerman/Webserver.h>
 #include <tdap/Count.hpp>
 #include <tdap/Power2.hpp>
-#include <org-simple/util/text/Json.h>
 #include <thread>
 
 namespace speakerman {
@@ -93,21 +93,20 @@ public:
 
   web_server(SpeakerManagerControl &speakerManager);
 
-  ~web_server() {
-    cout << "Closing web server" << endl;
-  }
+  ~web_server() { cout << "Closing web server" << endl; }
 
 protected:
-
-  HttpResultHandleResult handle(mg_connection *connection, mg_http_message *httpMessage) override;
+  HttpResultHandleResult handle(mg_connection *connection,
+                                mg_http_message *httpMessage) override;
 
 private:
   class Response {
+    static constexpr size_t LENGTH = 30;
+    char numberPad[LENGTH + 1] = {0};
     std::string body;
     std::string headers;
     std::string response;
     std::string contentType;
-    char contentLength[24];
 
     static void addHeader(std::string &headers, const char *name,
                           const char *value, const char *extra) {
@@ -147,43 +146,143 @@ private:
       if (contentType.length() > 0) {
         headers += contentType;
       }
-      snprintf(contentLength, 24, "%zu", body.length());
-      addHeader("Content-Length", contentLength);
+      snprintf(numberPad, 24, "%zu", body.length());
+      addHeader("Content-Length", numberPad);
 
       mg_http_reply(connection, code, headers.c_str(), body.c_str());
     }
 
-    void write_string(const char *str) {
-      body += str;
-    }
+    void write_string(const char *str) { body += str; }
 
-    void write_string(const std::string &str) {
-      body += str;
+    void write_string(const std::string &str) { body += str; }
+
+    template <typename V>
+    requires(std::is_integral_v<V> || std::is_floating_point_v<V>) //
+        void write_number(V number) {
+      const char *format;
+      if constexpr (std::is_integral_v<V>) {
+        signed long long v = number;
+        snprintf(numberPad, LENGTH, "%lld", v);
+      } else if constexpr (std::is_floating_point_v<V>) {
+        long double v = number;
+        snprintf(numberPad, LENGTH, "%llf", v);
+      }
+      numberPad[LENGTH] = 0;
+      body += numberPad;
     }
 
     void write_json_string(const char *string) {
-      org::simple::util::text::JsonEscapeState state = {};
       for (const char *p = string; *p != 0; p++) {
-        org::simple::util::text::addJsonStringCharacter(*p, state, [this](char c) {
+        org::simple::util::text::addCharacterToJsonString(*p, [this](char c) {
           body += c;
           return true;
         });
       }
     }
 
-    void write(char c) {
-      body += c;
-    }
+    void write(char c) { body += c; }
   };
 
+  class Json {
+    Response *response;
+    char scopeEnd;
+    bool first = true;
+
+    void startValue() {
+      if (first) {
+        first = false;
+      } else {
+        response->write(',');
+        response->write(' ');
+      }
+    }
+    bool addName(const char *name) {
+      if (!response) {
+        return false;
+      }
+      startValue();
+      response->write('"');
+      response->write_json_string(name);
+      response->write_string("\": ");
+      return true;
+    }
+
+    Json(Json &j, char scope, char endScope)
+        : response(j.response), scopeEnd(endScope), first(true) {
+      response->write(scope);
+    }
+    Json() : response(nullptr), scopeEnd('}') { response->write('{'); }
+
+  public:
+    Json(Response &r) : response(&r), scopeEnd('}') { response->write('{'); }
+
+    Json(Json &&j)
+        : response(j.response), scopeEnd(j.scopeEnd), first(j.first) {
+      j.response = nullptr;
+    }
+
+    void setString(const char *name, const char *value) {
+      if (addName(name)) {
+        response->write('"');
+        response->write_json_string(value);
+        response->write('"');
+      }
+    }
+
+    template <typename V>
+    requires(std::is_integral_v<V> || std::is_floating_point_v<V>) //
+        void setNumber(const char *name, V value) {
+      if (addName(name)) {
+        response->write_number(value);
+      }
+    }
+
+    void setBoolean(const char *name, bool value) {
+      if (addName(name)) {
+        response->write_string(value ? "true" : "false");
+      }
+    }
+
+    void setNull(const char *name) {
+      if (addName(name)) {
+        response->write_string("null");
+      }
+    }
+
+    Json addObject(const char *name) {
+      if (addName(name)) {
+        return Json(*this, '{', '}');
+      }
+      return Json();
+    }
+
+    Json addArrayObject() {
+      startValue();
+      return Json(*this, '{', '}');
+    }
+
+    Json addArray(const char *name) {
+      if (addName(name)) {
+        return Json(*this, '[', ']');
+      }
+      return Json();
+    }
+
+    ~Json() {
+      if (response) {
+        response->write(scopeEnd);
+      }
+    }
+  };
 
   void handleTimeStampCookie(const char *header, const char *value);
   static void thread_static_function(web_server *);
   void thread_function();
   void handleConfigurationChanges(mg_connection *connection,
                                   const char *configurationJson);
-  void writeInputVolumes();
-  bool applyConfigAndGetLevels(DynamicProcessorLevels &levels, milliseconds &wait);
+  void writeInputVolumes(Json &json);
+  bool applyConfigAndGetLevels(DynamicProcessorLevels &levels,
+                               milliseconds &wait);
 
   SpeakerManagerControl &manager_;
   LevelEntryBuffer level_buffer;

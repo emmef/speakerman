@@ -312,55 +312,25 @@ HttpResultHandleResult web_server::handle(mg_connection *connection,
         response.addHeader("Set-Cookie", numbers);
         response.addHeader("Access-Control-Allow-Origin", "*");
         response.setContentType("application/json", true);
-        response.write_string("{\r\n");
-        response.write_string("\t\"elapsedMillis\": ");
-        response.write_string(
-            itostr(numbers, 30, entry.stamp - levelTimeStamp));
-        response.write_string(", \r\n");
-        response.write_string("\t\"thresholdScale\": ");
-        response.write_string(
-            ftostr(numbers, 30, manager_.getConfig().threshold_scaling));
-        response.write_string(", \r\n");
-        response.write_string("\t\"subLevel\": ");
-        response.write_string(ftostr(numbers, 30, levels.getSignal(0)));
-        response.write_string(", \r\n");
-        response.write_string("\t\"periods\": ");
-        response.write_string(itostr(numbers, 30, levels.count()));
-        response.write_string(", \r\n");
-        const jack::ProcessingStatistics &statistics = manager_.getStatistics();
-        response.write_string("\t\"cpuLongTerm\": ");
-        response.write_string(
-            itostr(numbers, 10, statistics.getLongTermCorePercentage()));
-        response.write_string(",\r\n\t\"cpuShortTerm\": ");
-        response.write_string(
-            itostr(numbers, 10, statistics.getShortTermCorePercentage()));
-        response.write_string(",\r\n");
-        // group volumes
-        response.write_string("\t\"group\" : [\r\n");
-        for (size_t i = 0; i < levels.groups(); i++) {
-          response.write_string("\t\t{\r\n");
-          response.write_string("\t\t\t\"group_name\": \"");
-          response.write_string(
-              manager_.getConfig().processingGroups.group[i].name);
-          response.write_string("\", \r\n");
-          response.write_string("\t\t\t\"level\": ");
-          response.write_string(ftostr(numbers, 30, levels.getSignal(i + 1)));
-          response.write_string("\r\n");
-          response.write_string("\t\t}");
-          if (i < levels.groups() - 1) {
-            response.write(',');
+        {
+          Json json(response);
+          json.setNumber("elapsedMillis", entry.stamp - levelTimeStamp);
+          json.setNumber("thresholdScale", manager_.getConfig().threshold_scaling);
+          json.setNumber("subLevel", levels.getSignal(0));
+          json.setNumber("periods", levels.count());
+          const jack::ProcessingStatistics &statistics = manager_.getStatistics();
+          json.setNumber("cpuLongTerm", statistics.getLongTermCorePercentage());
+          json.setNumber("cpuShortTerm", statistics.getShortTermCorePercentage());
+          {
+            auto groups = json.addArray("group");
+            for (size_t i = 0; i < levels.groups(); i++) {
+              Json group = groups.addArrayObject();
+              group.setString("group_name", manager_.getConfig().processingGroups.group[i].name);
+              group.setNumber("level", levels.getSignal(i + 1));
+            }
           }
-          response.write_string("\r\n");
+          writeInputVolumes(json);
         }
-        response.write_string("\t],\r\n");
-        // inputs
-        response.write_string("\t\"inputMaxVolume\": ");
-        response.write_string(
-            ftostr(numbers, 30, LogicalGroupConfig::MAX_VOLUME));
-        response.write_string(",\r\n");
-        writeInputVolumes();
-        // end
-        response.write_string("}\r\n");
         response.createReply(connection, 200);
         return HttpResultHandleResult::Ok;
       } else {
@@ -370,9 +340,10 @@ HttpResultHandleResult web_server::handle(mg_connection *connection,
     } else if (uri == "/config") {
       response.addHeader("Access-Control-Allow-Origin", "*");
       response.setContentType("application/json", true);
-      response.write_string("{\r\n");
-      writeInputVolumes();
-      response.write_string("}\r\n");
+      {
+        Json json(response);
+        writeInputVolumes(json);
+      }
       response.createReply(connection, 200);
       return HttpResultHandleResult::Ok;
     }
@@ -386,25 +357,15 @@ HttpResultHandleResult web_server::handle(mg_connection *connection,
   return HttpResultHandleResult::Default;
 }
 
-void web_server::writeInputVolumes() {
-  char numbers[31];
-  response.write_string("\t\"logicalInput\": [\r\n");
+void web_server::writeInputVolumes(Json &json) {
   const LogicalInputsConfig &liConfig = manager_.getConfig().logicalInputs;
   size_t groupCount = liConfig.getGroupCount();
+  Json inputs = json.addArray("logicalInput");
   for (size_t i = 0; i < groupCount; i++) {
-    response.write_string("\t\t{\r\n");
-    response.write_string("\t\t\t\"name\": \"");
-    response.write_json_string(liConfig.group[i].name);
-    response.write_string("\",\r\n");
-    response.write_string("\t\t\t\"volume\": ");
-    response.write_string(ftostr(numbers, 30, liConfig.group[i].volume));
-    response.write_string("\r\n\t\t}");
-    if (i < groupCount - 1) {
-      response.write(',');
-    }
-    response.write_string("\r\n");
+    Json group = inputs.addArrayObject();
+    group.setString("name", liConfig.group[i].name);
+    group.setNumber("volume", liConfig.group[i].volume);
   }
-  response.write_string("\t]\r\n");
 }
 
 void web_server::handleConfigurationChanges(mg_connection *connection,
@@ -415,7 +376,10 @@ void web_server::handleConfigurationChanges(mg_connection *connection,
   if (readConfigFromJson(newConf, configurationJson, configFileConfig)) {
     clientFileConfig.updateRuntimeValues(newConf);
     applyConfigAndGetLevels(levels, wait);
-    writeInputVolumes();
+    {
+      Json json(response);
+      writeInputVolumes(json);
+    }
     response.addHeader("Access-Control-Allow-Origin", "*");
     response.setContentType("application/json", true);
     response.createReply(connection, 200);
