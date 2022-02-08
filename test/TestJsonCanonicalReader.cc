@@ -41,7 +41,8 @@ public:
   const std::vector<Setter> &run(const std::string &input) {
     actualOutput.clear();
     org::simple::util::text::StringInputStream<char> stream(input);
-    this->readJson(stream);
+    org::simple::util::text::TextFilePositionData<char> position;
+    this->readJson(stream, position);
     return actualOutput;
   }
 

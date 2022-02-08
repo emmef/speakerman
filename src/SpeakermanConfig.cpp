@@ -65,7 +65,7 @@ static constexpr const char *EQ_CONFIG_KEY_GAIN = "gain";
 static constexpr const char *EQ_CONFIG_KEY_BANDWIDTH = "bandwidth";
 static constexpr const char *LOGICAL_GROUP_CONFIG_KEY_INPUT = "logicalInput";
 [[maybe_unused]] static constexpr const char *LOGICAL_GROUP_CONFIG_KEY_OUTPUT =
-    "logical-output";
+    "logicalOutput";
 static constexpr const char *LOGICAL_GROUP_CONFIG_KEY_VOLUME = "volume";
 static constexpr const char *LOGICAL_GROUP_CONFIG_KEY_NUMBER = "port-numbers";
 static constexpr const char *NAMED_CONFIG_KEY_NAME = "name";
@@ -73,7 +73,6 @@ static constexpr const char *PROCESSING_GROUP_CONFIG_KEY_GROUP = "group";
 static constexpr const char *PROCESSING_GROUP_CONFIG_KEY_MONO = "mono";
 static constexpr const char *PROCESSING_GROUP_CONFIG_KEY_USE_SUB = "use-sub";
 static constexpr const char *PROCESSING_GROUP_CONFIG_KEY_DELAY = "delay";
-static constexpr const char *PROCESSING_GROUP_CONFIG_KEY_VOLUME = "volume";
 static constexpr const char *PROCESSING_GROUP_CONFIG_KEY_THRESHOLD =
     "threshold";
 static constexpr const char *PROCESSING_GROUP_CONFIG_KEY_EQ_COUNT =
@@ -818,7 +817,7 @@ public:
     }
   }
 
-  bool readJson(SpeakermanConfig &config, org::simple::util::text::InputStream<char> &input) {
+  bool readJson(SpeakermanConfig &config, org::simple::util::text::InputStream<char> &input, std::string &message) {
     std::vector<std::string> stack;
     std::string workSpace;
 
@@ -830,14 +829,20 @@ public:
         threadLocalConfig = nullptr;
       }
     } guard(config);
-
+    org::simple::util::text::TextFilePositionData<char> position;
     try {
-      JsonCanonicalReader::readJson(input);
+      JsonCanonicalReader::readJson(input, position);
       return true;
-    } catch (const std::runtime_error &e) {
-      std::cerr << e.what() << std::endl;
-      return false;
+    } catch (const std::exception &e) {
+      message = "At line ";
+      message += std::to_string(position.getLine() + 1);
+      message += ", col ";
+      message += std::to_string(position.getColumn() + 1);
+      message += ": ";
+      message += e.what();
+      std::cerr << message << std::endl;
     }
+    return false;
   }
 
   void setString(const char *path, const char *string) final {
@@ -1104,7 +1109,7 @@ bool readConfigFromJson(SpeakermanConfig &destination, const char *json,
     Input(const char *source) : string(source), at(string) {}
 
     bool get(char &c) final {
-      if (*at && (at - string) >= 1048576l) {
+      if (*at && (at - string) <= 1048576l) {
         c = *at++;
         return true;
       }
@@ -1112,10 +1117,17 @@ bool readConfigFromJson(SpeakermanConfig &destination, const char *json,
     }
   };
   Input stream(json);
-  config_manager.readJson(destination, stream);
+  std::string errorMessage;
 
-  std::cout << "Reading configuration JSON: " << std::endl;
-  std::cout << json << std::endl;
+  if (config_manager.readJson(destination, stream, errorMessage)) {
+    std::cout << "JSON: " << json << std::endl;
+    return true;
+  }
+  else {
+    std::cerr << "Failed to read JSON: " << errorMessage << std::endl;
+    std::cerr << json << std::endl;
+  }
+
   return false;
 }
 
@@ -1123,8 +1135,6 @@ const SpeakermanConfig SpeakermanConfig::defaultConfig() {
   SpeakermanConfig result;
   result.logicalInputs = LogicalInputsConfig::defaultConfig();
   result.logicalOutputs = LogicalOutputsConfig ::defaultConfig();
-  // (already defaults as empty)
-  // result.processingGroups = ProcessingGroupsConfig::defaultConfig();
   result.detection = DetectionConfig::defaultConfig();
   for (size_t i = 0; i < MAX_EQS; i++) {
     result.eq[i] = EqualizerConfig::defaultConfig();

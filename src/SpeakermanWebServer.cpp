@@ -189,11 +189,7 @@ void web_server::thread_function() {
 }
 bool web_server::applyConfigAndGetLevels(DynamicProcessorLevels &levels,
                                          milliseconds &wait) {
-  double scaling = configFileConfig.threshold_scaling;
-  usedFileConfig = configFileConfig;
-  usedFileConfig.updateRuntimeValues(clientFileConfig);
-  usedFileConfig.threshold_scaling = scaling;
-  if (manager_.applyConfigAndGetLevels(usedFileConfig, &levels, wait)) {
+  if (manager_.applyConfigAndGetLevels(configFileConfig, &levels, wait)) {
     level_buffer.put(levels);
     return true;
   }
@@ -263,16 +259,6 @@ void web_server::handleTimeStampCookie(const char *header, const char *value) {
   }
 }
 
-static const char *ftostr(char *buffer, size_t len, double value) {
-  snprintf(buffer, len, "%lf", value);
-  return buffer;
-}
-
-static const char *itostr(char *buffer, size_t len, long long value) {
-  snprintf(buffer, len, "%lli", value);
-  return buffer;
-}
-
 static bool matches(const mg_str &string1, const char *string2) {
   return strncmp(string2, string1.ptr, string1.len) == 0;
 }
@@ -298,7 +284,6 @@ HttpResultHandleResult web_server::handle(mg_connection *connection,
   mg_str &uri = httpMessage->uri;
   if (matchesCI(method, "GET")) {
     if (uri == "/levels") {
-      char numbers[60];
       LevelEntry entry;
       level_buffer.get(levelTimeStamp, entry);
       if (entry.set) {
@@ -307,9 +292,7 @@ HttpResultHandleResult web_server::handle(mg_connection *connection,
           handleTimeStampCookie("cookie", cookie->ptr);
         }
         DynamicProcessorLevels levels = entry.levels;
-        snprintf(numbers, 60, "%s=%lli; SameSite=Strict", COOKIE_TIME_STAMP,
-                 entry.stamp);
-        response.addHeader("Set-Cookie", numbers);
+        response.addCookie(COOKIE_TIME_STAMP, entry.stamp, "SameSite=Strict");
         response.addHeader("Access-Control-Allow-Origin", "*");
         response.setContentType("application/json", true);
         {
@@ -372,9 +355,7 @@ void web_server::handleConfigurationChanges(mg_connection *connection,
                                             const char *configurationJson) {
   static std::chrono::milliseconds wait(WAIT_MILLIS);
   DynamicProcessorLevels levels;
-  SpeakermanConfig newConf = clientFileConfig;
-  if (readConfigFromJson(newConf, configurationJson, configFileConfig)) {
-    clientFileConfig.updateRuntimeValues(newConf);
+  if (readConfigFromJson(configFileConfig, configurationJson, configFileConfig)) {
     applyConfigAndGetLevels(levels, wait);
     {
       Json json(response);

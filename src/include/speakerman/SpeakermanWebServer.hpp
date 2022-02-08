@@ -102,12 +102,42 @@ protected:
 private:
   class Response {
     static constexpr size_t LENGTH = 30;
+    static constexpr const char *const NEWLINE = "\r\n";
     char numberPad[LENGTH + 1] = {0};
     std::string body;
     std::string headers;
     std::string response;
     std::string contentType;
 
+    template <typename V>
+    requires(std::is_integral_v<V> || std::is_floating_point_v<V>) //
+        void write_number(std::string &string, V number) {
+      if constexpr (std::is_integral_v<V>) {
+        signed long long v = number;
+        snprintf(numberPad, LENGTH, "%lld", v);
+      } else if constexpr (std::is_floating_point_v<V>) {
+        double v = number;
+        snprintf(numberPad, LENGTH, "%lf", v);
+      }
+      numberPad[LENGTH] = 0;
+      string += numberPad;
+    }
+
+    template <typename V>
+    requires(std::is_integral_v<V> || std::is_floating_point_v<V>) //
+        void addHeader(std::string &headers, const char *name,
+                              V value, const char *extra) {
+      headers += name;
+      headers += ": ";
+      write_number(headers, value);
+      headers += value;
+      if (extra) {
+        headers += "; ";
+        headers += extra;
+      }
+      headers += NEWLINE;
+
+    }
     static void addHeader(std::string &headers, const char *name,
                           const char *value, const char *extra) {
       headers += name;
@@ -117,7 +147,7 @@ private:
         headers += "; ";
         headers += extra;
       }
-      headers += "\r\n";
+      headers += NEWLINE;
     }
 
   public:
@@ -129,6 +159,13 @@ private:
     }
 
     void addHeader(const char *name, const char *value,
+                   const char *extra = nullptr) {
+      addHeader(headers, name, value, extra);
+    }
+
+    template <typename V>
+    requires(std::is_integral_v<V> || std::is_floating_point_v<V>) //
+    void addHeader(const char *name, V value,
                    const char *extra = nullptr) {
       addHeader(headers, name, value, extra);
     }
@@ -154,21 +191,10 @@ private:
 
     void write_string(const char *str) { body += str; }
 
-    void write_string(const std::string &str) { body += str; }
-
     template <typename V>
     requires(std::is_integral_v<V> || std::is_floating_point_v<V>) //
         void write_number(V number) {
-      const char *format;
-      if constexpr (std::is_integral_v<V>) {
-        signed long long v = number;
-        snprintf(numberPad, LENGTH, "%lld", v);
-      } else if constexpr (std::is_floating_point_v<V>) {
-        long double v = number;
-        snprintf(numberPad, LENGTH, "%llf", v);
-      }
-      numberPad[LENGTH] = 0;
-      body += numberPad;
+      write_number(body, number);
     }
 
     void write_json_string(const char *string) {
@@ -181,6 +207,26 @@ private:
     }
 
     void write(char c) { body += c; }
+
+    template <typename V>
+    void addCookie(const char *const name, V value,
+                   const char *extra) {
+      headers += "Set-Cookie";
+      headers += ": ";
+      headers += name;
+      headers += '=';
+      if constexpr (std::is_same_v<V,const char *>) {
+        headers += value;
+      }
+      else {
+        write_number(headers, value);
+      }
+      if (extra) {
+        headers += "; ";
+        headers += extra;
+      }
+      headers += NEWLINE;
+    }
   };
 
   class Json {
@@ -193,7 +239,6 @@ private:
         first = false;
       } else {
         response->write(',');
-        response->write(' ');
       }
     }
     bool addName(const char *name) {
@@ -203,7 +248,7 @@ private:
       startValue();
       response->write('"');
       response->write_json_string(name);
-      response->write_string("\": ");
+      response->write_string("\":");
       return true;
     }
 

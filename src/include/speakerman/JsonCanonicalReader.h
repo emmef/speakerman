@@ -32,7 +32,7 @@ class PartitionBasedJsonStringBuilder
     : public org::simple::util::text::JsonStringBuilder {
   char *start = nullptr;
   char *rendered = nullptr;
-  char *last  = nullptr;
+  char *last = nullptr;
   char *local = nullptr;
   char *at = nullptr;
 
@@ -98,8 +98,7 @@ protected:
   void setNull() final;
 
 public:
-  JsonCanonicalReader(size_t pathLength, size_t valueLength,
-                                       size_t depth);
+  JsonCanonicalReader(size_t pathLength, size_t valueLength, size_t depth);
 
   virtual void setString(const char *path, const char *string) = 0;
 
@@ -109,13 +108,15 @@ public:
 
   virtual void setNull(const char *path) = 0;
 
-  void readJson(org::simple::util::text::InputStream<char> &input) {
-    JsonContext::readJson(*this, input);
+  void readJson(org::simple::util::text::InputStream<char> &input,
+                org::simple::util::text::TextFilePositionData<char> &position) {
+    JsonContext::readJson(*this, input, position);
   }
 
   void readJson(std::istream &input) {
     class Stream : public org::simple::util::text::InputStream<char> {
       std::istream &input;
+
     public:
       Stream(std::istream &in) : input(in) {}
       bool get(char &c) final {
