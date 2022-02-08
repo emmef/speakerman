@@ -196,7 +196,7 @@ public:
 
 private:
   static constexpr size_t CONTROL_INTERVAL = 16;
-  static constexpr double CONTROL_CHANGE_SECONDS = 0.25;
+  static constexpr double CONTROL_CHANGE_SECONDS = 0.1;
   static constexpr double CONTROL_RATE_FACTOR =
       CONTROL_CHANGE_SECONDS / CONTROL_INTERVAL;
   FixedSizeArray<GroupRuntimeData<T, BANDS>, GROUPS> groupConfig_;
