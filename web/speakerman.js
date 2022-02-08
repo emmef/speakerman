@@ -204,9 +204,10 @@ class LogicalInputElement {
             if (this.previousVolumeValue == logicalInput.volume) {
                 return;
             }
+            console.info("Server-side volume change: " + JSON.stringify(logicalInput));
             let wasMuted = this.volume.isMuted;
             if (this.volume.setVolume(logicalInput.volume)) {
-                this.element.slider.setAttribute("value", this.volume.getDecibelValue());
+                this.element.slider.value = this.volume.getDecibelValue();
                 this.element.volume.innerHTML = "" + this.volume.getDecibelValue();
             }
             if (this.volume.isMuted != wasMuted) {
@@ -237,10 +238,12 @@ class LogicalInputElement {
 }
 
 class LogicalInputsController {
+    static UPDATE_INTERVAL = 150;
     inputGroupControlElements = undefined;
     initialLogicalInputs = undefined;
     userChangeTimeStamp = undefined;
     logicalInputCache = undefined;
+    unsetNewValues = undefined;
 
     constructor(groupsRootElement, logicalInputs) {
         this.initialLogicalInputs = logicalInputs;
@@ -253,21 +256,105 @@ class LogicalInputsController {
                 element.style.display = 'block';
             }
         }
+        let self = this;
+        window.setTimeout(function() {
+            LogicalInputsController.subMitUnsetValuesStatic(self);
+        }, LogicalInputsController.UPDATE_INTERVAL);
+    }
+
+    submitUnsetValues() {
+        let volumes = this.unsetNewValues;
+        if (volumes) {
+            this.unsetNewValues = null;
+            LogicalInputsController.submitVolumes(volumes);
+        }
+    }
+
+    static subMitUnsetValuesStatic(self) {
+        self.submitUnsetValues();
+        window.setTimeout(function() { LogicalInputsController.subMitUnsetValuesStatic(self); }, LogicalInputsController.UPDATE_INTERVAL)
     }
 
     update(logicalInputs) {
         if (logicalInputs && logicalInputs.length > 0) {
-            if (this.userChangeTimeStamp && Date.now() - this.userChangeTimeStamp > 500) {
+            if (!this.userChangeTimeStamp || Date.now() - this.userChangeTimeStamp > 1000) {
                 let length = Math.min(logicalInputs.length, this.initialLogicalInputs.length);
                 for (let i = 0; i < length; i++) {
                     this.inputGroupControlElements[i].update(logicalInputs[i]);
                 }
                 this.logicalInputCache = logicalInputs;
-            }
-            else if (!this.logicalInputCache) {
+            } else if (!this.logicalInputCache) {
                 this.logicalInputCache = logicalInputs;
             }
         }
+    }
+
+    static validInputVolumes(logicalVolumes){
+        if (!(logicalVolumes && logicalVolumes.length && typeof(logicalVolumes.length) == 'number' && logicalVolumes.length > 0)) {
+            return false;
+        }
+        for (let i = 0; i < logicalVolumes.length; i++) {
+            if (typeof (logicalVolumes[i].volume) != 'number') {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    static copyLogicalInput(logicalVolumes, overrideIndex, overrideVolume) {
+        if (!LogicalInputsController.validInputVolumes(logicalVolumes)) {
+            return null;
+        }
+        let validOverrides = (typeof overrideIndex == 'number' && typeof overrideVolume == 'number');
+        let overrider = validOverrides ? {
+            index: overrideIndex,
+            volume: overrideVolume
+        } : {index: -1, volume: 0};
+
+        let result = new Array();
+        for (let i = 0; i < logicalVolumes.length; i++) {
+            if (i == overrider.index) {
+                result.push({volume: overrider.volume });
+            }
+            else {
+                result.push({volume: logicalVolumes[i].volume});
+            }
+        }
+
+        return result;
+    }
+
+    static submitVolumes(logicalVolumes) {
+        if (LogicalInputsController.validInputVolumes(logicalVolumes)) {
+            let output = { logicalInput : logicalVolumes };
+            console.debug("Submitting: " + JSON.stringify(output));
+            try {
+                fetch('/config', {
+                    method: "PUT",
+                    header: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(output)
+                });
+                return true;
+            } catch (e) {
+                log.error("Error sending volume data: " + e.description);
+            }
+        }
+        return false;
+    }
+
+    static copyLogicalInputVolumes(target, source) {
+        if (!LogicalInputsController.validInputVolumes(target) || !LogicalInputsController.validInputVolumes(source)) {
+            return false;
+        }
+        if (target.length != source.length) {
+            return false;
+        }
+        for (let i = 0; i < target.length; i++) {
+            target[i].volume = source[i].volume;
+        }
+        return true;
     }
 
     setNewVolume(index, volume) {
@@ -277,30 +364,18 @@ class LogicalInputsController {
             this.logicalInputCache.length > index)) {
             return;
         }
-        this.userChangeTimeStamp = Date.now();
-        let newVolumes = new Array();
-        for (let i = 0; i < this.logicalInputCache.length; i++) {
-            let v = i == index ? volume : this.logicalInputCache[i].volume;
-            newVolumes.push({
-                volume : v
-            });
+
+        this.unsetNewValues = LogicalInputsController.copyLogicalInput(this.logicalInputCache, index, volume);
+        let now = Date.now();
+        let interval = now - this.userChangeTimeStamp;
+        this.userChangeTimeStamp = now;
+        if (interval < LogicalInputsController.UPDATE_INTERVAL) {
+            return;
         }
-        let output = {
-            logicalInput : newVolumes
-        };
-        this.logicalInputCache[index].volume = volume;
-        try {
-            fetch('/config', {
-                method: "PUT",
-                header: {
-                    'Content-Type' : 'application/json'
-                },
-                body: JSON.stringify(output)
-            });
-        }
-        catch(e) {
-            log.error("Error sending volume data: " + e.description);
-        }
+        let setValues = this.unsetNewValues;
+        this.unsetNewValues = null;
+        LogicalInputsController.copyLogicalInputVolumes(this.logicalInputCache, setValues);
+        LogicalInputsController.submitVolumes(setValues);
     }
 }
 
@@ -524,12 +599,14 @@ function setMeters(levels) {
     }
     var cpuElement = document.getElementById("cpu-usage-stats");
     if (cpuElement) {
-        var message = "CPU: now=";
-        message += levels.cpuShortTerm;
-        message += "%; average="
-        message += levels.cpuLongTerm;
-        message += "%";
-        cpuElement.innerText = message;
+        let now = Date.now();
+        if (!meterGroups.lastCpuStamp || (now - meterGroups.lastCpuStamp > 1000)) {
+            var message = "CPU: ";
+            message += Math.round(levels.cpuShortTerm * 10) / 10;
+            message += "%";
+            cpuElement.innerText = message;
+            meterGroups.lastCpuStamp = now;
+        }
     }
 }
 
