@@ -350,7 +350,6 @@ public:
     for (size_t logicalChannel = 0; logicalChannel < LOGICAL_INPUTS;
          logicalChannel++) {
       double volume = config.logicalInputs.volumeForChannel(logicalChannel);
-      std::cout << "Volume for logical channel " << logicalChannel << ": " << volume << std::endl;
       for (size_t processingChannel = 0; processingChannel < PROCESSING_INPUTS;
            processingChannel++) {
         double weight =
@@ -361,7 +360,6 @@ public:
 
     if (config.generateNoise) {
       noiseScale_ = 20.0;
-      std::cout << "Generating testing noise" << std::endl;
     } else {
       noiseScale_ = subBaseThreshold * 1e-6;
     }

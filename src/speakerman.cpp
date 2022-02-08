@@ -158,6 +158,7 @@ int main(int count, char *arguments[]) {
 
   for (int arg = 1; arg < count; arg++) {
     if (strncmp(arguments[arg], "--dump-config", 20) == 0) {
+      dumpSpeakermanConfig(configFileConfig, cout);
       return 0;
     } else {
       cerr << "Invalid argument:" << arguments[arg] << endl;

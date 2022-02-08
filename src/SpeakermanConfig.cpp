@@ -1085,7 +1085,6 @@ SpeakermanConfig readSpeakermanConfig(const SpeakermanConfig &basedUpon,
     cerr << "E: " << e.what() << endl;
     return basedUpon;
   }
-  dumpSpeakermanConfig(result, cout);
   result.timeStamp = stamp;
   return result;
 }

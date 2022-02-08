@@ -229,7 +229,7 @@ public:
         Perceptive::Metrics::createWithEvenSteps(
             detection.maximum_window_seconds, detection.minimum_window_seconds,
             std::min(RMS_DETECTION_LEVELS, detection.perceptive_levels));
-    std::cout << perceptiveMetrics << std::endl;
+//    std::cout << perceptiveMetrics << std::endl;
     subDetector.configure(sampleRate, perceptiveMetrics, 100);
     for (size_t band = 0, detector = 0; band < CROSSOVERS; band++) {
       for (size_t group = 0; group < GROUPS; group++, detector++) {
