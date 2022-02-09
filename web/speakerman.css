@@ -81,6 +81,21 @@ body {
     vertical-align: middle;
 }
 
+#meter-messages, #logicalInputs {
+    padding: 1ex 0 0 0;
+    border: none;
+    margin: 0.5ex 0 0 0;
+}
+
+#meter-messages span {
+    margin: 0;
+    padding: 0 2ex 0 0;
+}
+
+.meter-group {
+    padding: 0 0 1ex 0;
+}
+
 .meter-levels {
     display: block;
     visibility: visible;
@@ -107,6 +122,7 @@ body {
 .meter-title {
     color: white;
     text-align: left;
+    padding: 0 0 0.5ex 0;
 }
 
 #connection-message {
@@ -114,29 +130,24 @@ body {
     font-weight: bold;
 }
 
-.threshold-message {
-    color: lightblue;;
+.section-caption {
+    color: lightblue;
     font-weight: bold;
 }
 
-.mix-mode-message-disabled, .mix-mode-message-enabled {
+.section-caption {
+  width:40ex;
+}
+
+.reset-button {
+    margin-right: 1ex;
+    font-size: 70%;
     font-weight: bold;
-    margin-left: 0.5ex;
-    margin-right: 0.5ex;
-}
-
-.mix-mode-message-disabled:hover {
-    text-decoration: underline;
-    color: rgba(0,255,255,0.7);
-}
-
-.mix-mode-message-disabled {
-    color: rgba(0,255,255,0.3);
-    cursor: hand;
-}
-
-.mix-mode-message-enabled {
-    color: rgba(0,255,255,1.0);
+    padding: 0.125ex 0.25em 0.125ex 0.25em;
+    color: black;
+    background-color: lightblue;
+    opacity: 0.7;
+    cursor: pointer;
 }
 
 .logical-input-label {
@@ -146,10 +157,10 @@ body {
 
 .logical-input {
     position: relative;
-    margin: 0.6ex 0 0 0;
+    margin: 0.5ex 0 0 0;
     vertical-align: middle;
     background: none;
-    padding: 0.4ex 0 0.6ex 0;
+    padding: 0.5ex 0.4ex 0 0.6ex;
 }
 
 .logical-input * {
@@ -166,26 +177,23 @@ body {
 
 .logical-input-label {
     display: inline-block;
-    font-weight: bolder;
+    font-weight: normal;
     color: white;
     text-overflow: ellipsis;
-    width:20ex;
-    max-width:20ex;
+    padding-left: 1ex;
 }
 
 .logical-input-mute {
     display: inline-block;
-    width: 1.5ex;
-    min-width: 2ex;
-    max-width: 2ex;
     align-content: center;
     border-width: 1px;
     border-style: solid;
     cursor: pointer;
-    padding: 2px;
     font-size: 70%;
     border-color: rgba(64,192,255,0.5);
-    padding: 0 0.5ex 0 0.5em;
+    padding: 0 1ex 0 1ex;
+    margin-right: 1.5ex;
+    margin-left: 0;
 }
 
 .logical-input-mute-enabled {
@@ -207,13 +215,15 @@ body {
 
 .logical-input-slider {
     display: inline-block;
+    width: 38ex;
 }
 
 .logical-input-volume {
     display: inline-block;
-    width: 2.2em;
-    max-width: 2.2em;
-    text-align: right;
+    width: 1.8em;
+    max-width: 1.8em;
+    text-align: left;
     text-overflow: ellipsis;
-
+    font-size: 80%;
+    font-weight:bold;
 }
