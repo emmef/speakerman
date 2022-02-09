@@ -139,6 +139,8 @@ void web_server::thread_function() {
         cout << "read config!" << std::endl;
         try {
           configFileConfig = readSpeakermanConfig(configFileConfig, true);
+          const char * comment = configFileConfig.timeStamp != 0 ? "Configuration file was updated" : "Reset and re-read configuration request";
+          dumpSpeakermanConfig(configFileConfig, std::cout, comment);
           read = true;
         } catch (const runtime_error &e) {
           cerr << "Error reading configuration: " << e.what() << endl;

@@ -65,8 +65,6 @@ struct SpeakermanConfig {
   double relativeSubThreshold = DEFAULT_REL_SUB_THRESHOLD;
   double subDelay = DEFAULT_SUB_DELAY;
   int generateNoise = DEFAULT_GENERATE_NOISE;
-  long long timeStamp = -1;
-  double threshold_scaling = DEFAULT_THRESHOLD_SCALING;
   DetectionConfig detection;
   LogicalInputsConfig logicalInputs;
   LogicalOutputsConfig logicalOutputs;
@@ -74,6 +72,15 @@ struct SpeakermanConfig {
   MatrixConfig inputMatrix;
   EqualizerConfig eq[MAX_EQS];
   size_t eqs = DEFAULT_EQS;
+
+  /**
+   * Indication of last refresh of this object. Never read.
+   */
+  long long timeStamp = -1;
+  /**
+   * Threshold scaling for loud events is outside of the normal configuration. Never read.
+   */
+  double threshold_scaling = DEFAULT_THRESHOLD_SCALING;
 
   static const SpeakermanConfig defaultConfig();
 
@@ -102,7 +109,8 @@ bool readConfigFromJson(SpeakermanConfig &destination, const char *json,
 SpeakermanConfig readSpeakermanConfig(const SpeakermanConfig &basedUpon,
                                       bool initial);
 
-void dumpSpeakermanConfig(const SpeakermanConfig &dump, std::ostream &output);
+void dumpSpeakermanConfig(const SpeakermanConfig &configuration,
+                          std::ostream &output, const char *comment);
 
 long long getFileTimeStamp(const char *fileName);
 

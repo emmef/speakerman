@@ -869,10 +869,10 @@ public:
 
   void setBoolean(const char *path, bool value) final {
     const KeyVariableReader *reader = find(path);
-    if (value && strncmp(path, "clear", 30) == 0) {
+    if (value && strncmp(path, "reload", 30) == 0) {
       std::cout << "JSON: Reset config!" << std::endl;
       if (threadLocalConfig) {
-        *threadLocalConfig = SpeakermanConfig::unsetConfig();
+        threadLocalConfig->timeStamp = 0;
       }
       return;
     }
@@ -1094,9 +1094,16 @@ SpeakermanConfig readSpeakermanConfig() {
   return readSpeakermanConfig(basedUpon, false);
 }
 
-void dumpSpeakermanConfig(const SpeakermanConfig &dump, ostream &output) {
-  output << "# Speakerman configuration dump" << endl << endl;
-  config_manager.dump(dump, output);
+void dumpSpeakermanConfig(const SpeakermanConfig &configuration,
+                          std::ostream &output, const char *comment) {
+  if (comment) {
+    output << "# " << comment;
+  }
+  else {
+    output << "# Speakerman configuration dump";
+  }
+  output << endl << endl;
+  config_manager.dump(configuration, output);
 }
 
 bool readConfigFromJson(SpeakermanConfig &destination, const char *json,
@@ -1119,7 +1126,6 @@ bool readConfigFromJson(SpeakermanConfig &destination, const char *json,
   std::string errorMessage;
 
   if (config_manager.readJson(destination, stream, errorMessage)) {
-    std::cout << "JSON: " << json << std::endl;
     return true;
   }
   else {

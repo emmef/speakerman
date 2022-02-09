@@ -150,7 +150,7 @@ class LogicalInputElement {
     index = undefined;
     volume = undefined;
     volumeValue = undefined;
-    previousVolumeValue;
+    previousVolumeValue = undefined;
     label = undefined;
     muted = false;
     element = {
@@ -201,10 +201,16 @@ class LogicalInputElement {
 
     update(logicalInput) {
         if (logicalInput && typeof logicalInput.volume == 'number') {
-            if (this.previousVolumeValue == logicalInput.volume) {
+            let nameChanged = logicalInput.name && logicalInput.name != this.label;
+            let volumeChanged = this.previousVolumeValue != logicalInput.volume;
+            if (!volumeChanged && !nameChanged) {
                 return;
             }
             console.info("Server-side volume change: " + JSON.stringify(logicalInput));
+            if (nameChanged) {
+                this.element.label.innerHTML = logicalInput.name;
+                this.label = logicalInput.name;
+            }
             let wasMuted = this.volume.isMuted;
             if (this.volume.setVolume(logicalInput.volume)) {
                 this.element.slider.value = this.volume.getDecibelValue();
@@ -260,33 +266,16 @@ class LogicalInputsController {
         window.setTimeout(function() {
             LogicalInputsController.subMitUnsetValuesStatic(self);
         }, LogicalInputsController.UPDATE_INTERVAL);
-    }
 
-    submitUnsetValues() {
-        let volumes = this.unsetNewValues;
-        if (volumes) {
-            this.unsetNewValues = null;
-            LogicalInputsController.submitVolumes(volumes);
+        let resetButton = document.getElementById("reset-button");
+        if (resetButton) {
+            resetButton.addEventListener("click", function () { LogicalInputsController.submitReset(); });
         }
     }
 
     static subMitUnsetValuesStatic(self) {
         self.submitUnsetValues();
         window.setTimeout(function() { LogicalInputsController.subMitUnsetValuesStatic(self); }, LogicalInputsController.UPDATE_INTERVAL)
-    }
-
-    update(logicalInputs) {
-        if (logicalInputs && logicalInputs.length > 0) {
-            if (!this.userChangeTimeStamp || Date.now() - this.userChangeTimeStamp > 1000) {
-                let length = Math.min(logicalInputs.length, this.initialLogicalInputs.length);
-                for (let i = 0; i < length; i++) {
-                    this.inputGroupControlElements[i].update(logicalInputs[i]);
-                }
-                this.logicalInputCache = logicalInputs;
-            } else if (!this.logicalInputCache) {
-                this.logicalInputCache = logicalInputs;
-            }
-        }
     }
 
     static validInputVolumes(logicalVolumes){
@@ -344,6 +333,23 @@ class LogicalInputsController {
         return false;
     }
 
+    static submitReset() {
+        console.info("Reset: requesting reload of server-side configuration.");
+        let output = { reload: true };
+        try {
+            fetch('/config', {
+                method: "PUT",
+                header: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(output)
+            });
+            return true;
+        } catch (e) {
+            log.error("Error sending volume data: " + e.description);
+        }
+    }
+
     static copyLogicalInputVolumes(target, source) {
         if (!LogicalInputsController.validInputVolumes(target) || !LogicalInputsController.validInputVolumes(source)) {
             return false;
@@ -355,6 +361,28 @@ class LogicalInputsController {
             target[i].volume = source[i].volume;
         }
         return true;
+    }
+
+    submitUnsetValues() {
+        let volumes = this.unsetNewValues;
+        if (volumes) {
+            this.unsetNewValues = null;
+            LogicalInputsController.submitVolumes(volumes);
+        }
+    }
+
+    update(logicalInputs) {
+        if (logicalInputs && logicalInputs.length > 0) {
+            if (!this.userChangeTimeStamp || Date.now() - this.userChangeTimeStamp > 1000) {
+                let length = Math.min(logicalInputs.length, this.initialLogicalInputs.length);
+                for (let i = 0; i < length; i++) {
+                    this.inputGroupControlElements[i].update(logicalInputs[i]);
+                }
+                this.logicalInputCache = logicalInputs;
+            } else if (!this.logicalInputCache) {
+                this.logicalInputCache = logicalInputs;
+            }
+        }
     }
 
     setNewVolume(index, volume) {
