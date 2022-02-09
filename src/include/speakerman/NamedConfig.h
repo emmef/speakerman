@@ -27,7 +27,7 @@
 namespace speakerman {
 
 struct NamedConfig {
-  static constexpr size_t NAME_LENGTH = 31;
+  static constexpr size_t NAME_LENGTH = 63;
   static constexpr size_t NAME_CAPACITY = NAME_LENGTH + 1;
 
   char name[NAME_CAPACITY];
