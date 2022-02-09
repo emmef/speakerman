@@ -74,6 +74,9 @@ void ProcessingGroupConfig::copyRuntimeValues(
                                      MAX_THRESHOLD);
   setFromSetSource(mono, copyFrom.mono);
   setFromSetSource(useSub, copyFrom.useSub);
+  if (!isUnsetConfigValue(copyFrom.name)) {
+    copyToName(copyFrom.name);
+  }
 }
 
 // ProcessingGroupsConfig
