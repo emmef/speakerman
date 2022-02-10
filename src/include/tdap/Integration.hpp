@@ -159,7 +159,8 @@ struct Integration {
   static F valid_samples(double sampleRate, double seconds) {
     double samples = Value<double>::valid_positive(sampleRate) *
                      Value<double>::valid_positive(seconds);
-    if (samples < max_samples<F>() && samples < (double)std::numeric_limits<std::size_t>::max()) {
+    if (samples < max_samples<F>() &&
+        samples < (double)std::numeric_limits<std::size_t>::max()) {
       return samples;
     }
     throw std::invalid_argument("Average:: Combination of sampleRate_ and "
@@ -455,6 +456,148 @@ template <typename F> struct SmoothHoldMaxAttackReleaseIntegrator {
   }
 
   void set_hold_count(size_t hold_count) { hold_max_.hold_count_ = hold_count; }
+};
+
+template <typename F> class SmoothDetection {
+  static_assert(std::is_floating_point<F>::value,
+                "F must be a floating-point type");
+
+  static constexpr F MinimumHoldRatio = 0.5;
+  static constexpr F MaximumIntegrationSamples =
+      2.0 / std::numeric_limits<F>::epsilon();
+  static constexpr F MinimumIntegrationSamples =
+      21.0 / MaximumIntegrationSamples;
+  static constexpr F DefaultAttackHoldRatio = 2;
+
+  IntegrationCoefficients<F> attack;
+  IntegrationCoefficients<F> release;
+
+  size_t holdSamples;
+  size_t hold;
+  F overshoot;
+  F goal = 0;
+  F intermediate = 0;
+  F y = 0;
+
+public:
+  [[nodiscard]] static F calculateOvershoot(const IntegrationCoefficients<F> &c,
+                                            size_t holdSamples) {
+    F x = 0;
+    F y = 0;
+    for (size_t i = 0; i < holdSamples; i++) {
+      x = c.template integrate(1.0, x);
+      y = c.template integrate(x, y);
+    }
+    return 1.0 / y;
+  }
+
+  SmoothDetection(SmoothDetection &&source) noexcept = default;
+  SmoothDetection(const SmoothDetection &source) noexcept = default;
+
+  SmoothDetection(double attackSamples, double releaseSamples,
+                  size_t holdSampleCount)
+      : attack(std::clamp(attackSamples, MinimumIntegrationSamples,
+                          MaximumIntegrationSamples)),
+        release(std::clamp(releaseSamples, MinimumIntegrationSamples,
+                           MaximumIntegrationSamples)),
+        holdSamples(std::max(
+            size_t(0.5 + std::max(1.0, attack.getCharacteristicSamples() *
+                                           MinimumHoldRatio)),
+            holdSampleCount)) {
+    overshoot = calculateOvershoot(attack, holdSamples);
+  }
+
+  SmoothDetection(double attackSamples, size_t holdSampleCount)
+      : SmoothDetection(attackSamples, attackSamples, holdSampleCount) {}
+
+  SmoothDetection(double attackSamples)
+      : SmoothDetection(attackSamples, attackSamples,
+                        attackSamples * DefaultAttackHoldRatio) {}
+
+  SmoothDetection() : SmoothDetection(1.0){};
+
+  [[nodiscard]] double getAttackSamples() const {
+    return attack.getCharacteristicSamples();
+  }
+
+  bool setAttackSamples(double samples) {
+    if (samples >= MinimumIntegrationSamples &&
+        samples <= maximumAttackSamples()) {
+      attack.setCharacteristicSamples(samples);
+      overshoot = calculateOvershoot(attack, holdSamples);
+      return true;
+    }
+    return false;
+  }
+
+  bool setAttackAndHold(double samples, size_t hold) {
+    if (samples >= MinimumIntegrationSamples &&
+        samples <= MaximumIntegrationSamples &&
+        samples * MinimumHoldRatio <= hold) {
+      attack.setCharacteristicSamples(samples);
+      overshoot = calculateOvershoot(attack, holdSamples);
+      return true;
+    }
+    return false;
+  }
+
+  [[nodiscard]] double getReleaseSamples() const {
+    return release.getCharacteristicSamples();
+  }
+
+  bool setReleaseSamples(double samples) {
+    if (samples >= MinimumIntegrationSamples &&
+        samples < MaximumIntegrationSamples) {
+      release.setCharacteristicSamples(samples);
+      return true;
+    }
+    return false;
+  }
+
+  [[nodiscard]] size_t getHoldSamples() const { return holdSamples; }
+
+  bool setHoldSample(size_t samples) {
+    if (holdSamples >= minimumHoldCount()) {
+      holdSamples = samples;
+      return true;
+    }
+  }
+
+  void setOutput(F value) {
+    hold = 0;
+    y = value;
+    goal = value;
+    intermediate = value;
+  }
+
+  double maximumAttackSamples() const {
+    return std::max(1.0, holdSamples / MinimumHoldRatio);
+  }
+
+  double minimumHoldCount() const {
+    return attack.getCharacteristicSamples() * MinimumHoldRatio;
+  }
+
+  template <typename V> V integrate(const V sample) {
+    const F peak = sample > y ? y + (sample - y) * overshoot : sample;
+    if (peak > goal) {
+      goal = peak;
+      hold = holdSamples;
+    } else if (hold > 0) {
+      hold--;
+    } else {
+      goal = sample;
+    }
+    if (goal > y) {
+      attack.template integrate(goal, intermediate);
+      attack.template integrate(intermediate, y);
+    } else {
+      release.template integrate(goal, intermediate);
+      release.template integrate(intermediate, y);
+    }
+
+    return y;
+  }
 };
 
 } // namespace tdap

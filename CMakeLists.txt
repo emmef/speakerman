@@ -10,7 +10,7 @@ if (MSVC)
     add_compile_options(/WX)
 else ()
     # lots of warnings
-    add_compile_options(-Wall -Wextra -pedantic)
+    add_compile_options(-Wall -Wextra -pedantic-errors -w)
     # all warnings as errors
     #add_compile_options(-Werror)
 endif ()
