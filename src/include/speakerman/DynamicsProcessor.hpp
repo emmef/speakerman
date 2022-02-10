@@ -183,9 +183,9 @@ private:
   using Detector = PerceptiveRms<
       T, (size_t)(0.5 + 192000 * DetectionConfig::MAX_MAXIMUM_WINDOW_SECONDS),
       RMS_DETECTION_LEVELS>;
-  using DetectorGroup = PerceptiveRmsGroup<
+  using DetectorGroup = PerceptiveRms<
       T, (size_t)(0.5 + 192000 * DetectionConfig::MAX_MAXIMUM_WINDOW_SECONDS),
-      RMS_DETECTION_LEVELS, CHANNELS_PER_GROUP>;
+      RMS_DETECTION_LEVELS>;
 
   Detector subDetector;
   DetectorGroup *groupDetector;
@@ -233,9 +233,7 @@ public:
     subDetector.configure(sampleRate, perceptiveMetrics, 100);
     for (size_t band = 0, detector = 0; band < CROSSOVERS; band++) {
       for (size_t group = 0; group < GROUPS; group++, detector++) {
-        groupDetector[detector].configure(sampleRate, perceptiveMetrics,
-                                          detection.rms_fast_release_seconds,
-                                          100);
+        groupDetector[detector].configure(sampleRate, perceptiveMetrics, 100);
       }
     }
     size_t rmsLatency = groupDetector[0].getLatency();
@@ -364,15 +362,15 @@ private:
             runtime.data().groupConfig(group).bandRmsScale(1 + band);
         size_t nextOffset = baseOffset + CHANNELS_PER_GROUP;
         DetectorGroup &gd = groupDetector[detector];
-        gd.reset_frame_detection();
+        T squareSum = 0.0;
         for (size_t offset = baseOffset, channel = 0; offset < nextOffset;
              offset++, delay++, channel++) {
           T x = processInput[offset];
           T y = aCurve.filter(offset, x);
           y *= scaleForUnity;
-          gd.add_square_for_channel(channel, y * y, 1.0);
+          squareSum = y * y;
         }
-        T detect = gd.get_detection();
+        T detect = gd.add_square_get_detection(squareSum, 1.0);
         T gain = 1.0 / detect;
         levels.addValues(1 + group, detect);
         for (size_t offset = baseOffset; offset < nextOffset; offset++) {

@@ -72,8 +72,8 @@ class SpeakerManager : public AbstractSpeakerManager {
       cr[1] = 120;
       break;
     case 3:
-      cr[1] = 160;
-      cr[2] = 2500;
+      cr[1] = 120;
+      cr[2] = 180;
       break;
     default:
       throw std::invalid_argument("Too many crossovers");

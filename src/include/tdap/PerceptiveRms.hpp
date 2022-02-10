@@ -190,6 +190,17 @@ static std::ostream &operator<<(std::ostream &stream,
 }
 
 namespace tdap {
+
+template <typename S>
+SmoothDetection<S> static createDetector(size_t sampleRate, const Perceptive::Metrics &metrics, size_t &predictionSamples) {
+  predictionSamples = sampleRate * std::min(0.001, metrics.holdSeconds());
+  SmoothDetection<S> follower;
+  follower.setAttackAndHold(metrics.attackSeconds() * sampleRate, 0.5 + metrics.holdSeconds() * sampleRate);
+  follower.setReleaseSamples(0.5 + metrics.releaseSeconds() * sampleRate);
+  return follower;
+}
+
+
 template <typename S, size_t MAX_WINDOW_SAMPLES, size_t LEVELS>
 class PerceptiveRms {
   static_assert(Values::is_between(LEVELS, (size_t)3, (size_t)32),
@@ -198,11 +209,12 @@ class PerceptiveRms {
   TrueFloatingPointWeightedMovingAverageSet<S> rms_;
 
   size_t used_levels_ = LEVELS;
-  SmoothHoldMaxAttackRelease<S> follower_;
+  SmoothDetection<S> follower_;
+  size_t predictionSamples = 0;
 
 public:
   PerceptiveRms()
-      : rms_(MAX_WINDOW_SAMPLES, MAX_WINDOW_SAMPLES * 10, LEVELS, 0), follower_(1, 1, 1, 1) {};
+      : rms_(MAX_WINDOW_SAMPLES, MAX_WINDOW_SAMPLES * 10, LEVELS, 0)  {};
 
   void configure(size_t sample_rate, const Perceptive::Metrics &metrics,
                  S initial_value = 0.0) {
@@ -214,11 +226,8 @@ public:
     }
 
     rms_.setAverages(initial_value);
-
-    follower_ = SmoothHoldMaxAttackRelease<S>(
-        0.5 + metrics.holdSeconds() * sample_rate,
-        metrics.attackSeconds() * sample_rate,
-        metrics.releaseSeconds() * sample_rate, 10);
+    follower_ = createDetector<S>(sample_rate, metrics, predictionSamples);
+    follower_.setOutput(initial_value);
   }
 
   S add_square_get_detection(S square, S minimum = 0) {
@@ -229,87 +238,8 @@ public:
   S add_square_get_unsmoothed(S square, S minimum = 0) {
     return sqrt(rms_.addInputGetMax(square, minimum));
   }
-};
 
-template <typename S, size_t LEVELS> class PerceptivePseudoRms {
-  Perceptive::Metrics metrics_;
-  IntegrationCoefficients<S> coefficients_[LEVELS];
-  S integration_[LEVELS];
-  S squaredWeight_[LEVELS];
-  SmoothHoldMaxAttackRelease<S> follower_;
-
-public:
-  void configure(double sample_rate, const Perceptive::Metrics &metrics,
-                 S initial_value) {
-    metrics_ = metrics;
-    for (size_t i = 0; i < metrics_.count(); i++) {
-      // Doing 0.5 correction for effective SQR -> integration -> SQRT
-      coefficients_[i].setCharacteristicSamples(0.5 * metrics_.seconds(i) *
-                                                sample_rate);
-      double weight = metrics_.weight(i);
-      squaredWeight_[i] = weight * weight;
-      integration_[i] = initial_value * initial_value;
-    }
-    follower_ = SmoothHoldMaxAttackRelease<S>(
-        0.5 + metrics_.holdSeconds() * sample_rate,
-        metrics_.attackSeconds() * sample_rate,
-        metrics_.releaseSeconds() * sample_rate, 10);
-  }
-
-  S add_square_get_detection(S square, S minimum = 0) {
-    S value = add_square_get_unsmoothed(square, minimum);
-    return follower_.apply(value);
-  }
-
-  S add_square_get_unsmoothed(S square, S minimum = 0) {
-    S squareDetect = minimum;
-
-    for (size_t i = 0; i < metrics_.count(); i++) {
-      squareDetect = std::max(squaredWeight_[i] * coefficients_[i].integrate(
-                                                      square, integration_[i]),
-                              squareDetect);
-    }
-    return sqrt(squareDetect);
-  }
-};
-
-template <typename S, size_t MAX_WINDOW_SAMPLES, size_t LEVELS, size_t CHANNELS>
-class PerceptiveRmsGroup {
-  //        using RmsClass = PerceptivePseudoRms<S, LEVELS>;
-  using RmsClass = PerceptiveRms<S, MAX_WINDOW_SAMPLES, LEVELS>;
-  RmsClass rms_[CHANNELS];
-  S maximum_unsmoothed_detection;
-  FastSmoothHoldFollower<S> follower_;
-
-public:
-  PerceptiveRmsGroup()
-      : maximum_unsmoothed_detection(0.0) {}
-
-  void configure(double sample_rate, const Perceptive::Metrics &metrics, S rmsRelease,
-                 S initial_value) {
-    for (size_t channel = 0; channel < CHANNELS; channel++) {
-      rms_[channel].configure(sample_rate, metrics, initial_value);
-    }
-
-    follower_.setPredictionAndThreshold(0.001, 1.0, sample_rate, rmsRelease, initial_value);
-  }
-
-  size_t getLatency() noexcept {
-    return follower_.latency();
-  }
-
-  void reset_frame_detection() { maximum_unsmoothed_detection = 0.0; }
-
-  void add_square_for_channel(size_t channel, S square, S minimim = 0.0) {
-    maximum_unsmoothed_detection = Values::max(
-        maximum_unsmoothed_detection,
-        rms_[IndexPolicy::force(channel, CHANNELS)].add_square_get_unsmoothed(
-            square, minimim));
-  }
-
-  S get_detection() {
-    return follower_.getDetection(maximum_unsmoothed_detection);
-  }
+  size_t getLatency() const { return predictionSamples; }
 };
 
 } // namespace tdap
