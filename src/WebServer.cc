@@ -5,6 +5,7 @@
 #include <iostream>
 #include <speakerman/Webserver.h>
 #include <speakerman/jack/SignalHandler.hpp>
+#include <cstring>
 
 namespace speakerman {
 
@@ -49,6 +50,13 @@ void WebServer::defaultHandle(mg_connection *connection,
                               mg_http_message *httpMessage) {
 
   try {
+    if (std::strncmp(httpMessage->uri.ptr, "/ ", 2) == 0) {
+      std::string path = documentRoot;
+      path += "/index.html";
+      mg_http_serve_opts opts = { .root_dir = documentRoot, .ssi_pattern = "#.shtml", .mime_types="text/html" };
+      mg_http_serve_file(connection, httpMessage, path.c_str(), &opts);
+      return ;
+    }
     switch (handle(connection, httpMessage)) {
     case HttpResultHandleResult::Ok:
       return;
