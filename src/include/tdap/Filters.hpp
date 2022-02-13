@@ -97,6 +97,34 @@ template <typename Sample> struct MultiFilter {
   }
 };
 
+template <typename Vector> struct VectorFilter;
+
+template <typename Vector> struct IdentityVectorFilter : public VectorFilter<Vector>{
+  bool filter(Vector &output, const Vector &input) override {
+    output = input;
+    return true;
+  }
+
+  void reset() override {}
+};
+
+template <typename Vector> struct VectorFilter {
+  static_assert(std::is_arithmetic<Vector>::value,
+                "Sample type must be arithmetic");
+
+  virtual bool filter(Vector &output, const Vector &input) = 0;
+  virtual bool filter(Vector &output, const Vector &input, size_t rows) = 0;
+
+  virtual void reset() = 0;
+
+  virtual ~VectorFilter() = default;
+
+  static VectorFilter<Vector> &identity() {
+    static IdentityVectorFilter<Vector> filter;
+    return filter;
+  }
+};
+
 /**
  * Returns the length in samples after which the impulse response of the
  * provided filter can be "neglected".
@@ -168,6 +196,8 @@ size_t effectiveLength(Filter<Sample> &filter, size_t bucketSize,
 
   return 0;
 }
+
+
 
 } // namespace tdap
 

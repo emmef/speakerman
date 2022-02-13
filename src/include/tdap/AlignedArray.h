@@ -21,16 +21,20 @@
  * limitations under the License.
  */
 
+#include <tdap/Alignment.h>
 #include <tdap/Power2.hpp>
 #include <algorithm>
 #include <array>
 
 namespace tdap {
 
-template <typename T, size_t S, size_t A = sizeof(double) * 4>
-struct alignas(A) AlignedArray : public std::array<T, S> {
 
-  static_assert(Power2::constant::is(A));
+template <typename T, size_t S, size_t A = AlignmentDefaultBytes>
+struct alignas(A) AlignedArray : public std::array<T, S> {
+  static_assert(validAlignmentBytesForConsecutiveArrayOf<T>(A));
+  static constexpr size_t alignBytes = A;
+  static constexpr size_t alignedElements = alignBytes / sizeof(T);
+
   AlignedArray() {
     std::fill(this->begin(), this->end(), 0);
   }
@@ -72,8 +76,8 @@ struct alignas(A) AlignedArray : public std::array<T, S> {
       }
     }
   }
-
 };
+
 
 } // namespace tdap
 

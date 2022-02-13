@@ -9,6 +9,7 @@
  * Source https://bitbucket.org/emmef/tdap
  * Email  tdap@emmef.org
  *
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -24,7 +25,9 @@
 
 #include <cstddef>
 #include <memory>
+#include <tdap/AlignedArray.h>
 #include <tdap/AlignedFrame.hpp>
+#include <tdap/AlignedPointer.h>
 #include <tdap/Count.hpp>
 #include <tdap/Denormal.hpp>
 #include <tdap/Filters.hpp>
@@ -36,76 +39,425 @@ namespace tdap {
 
 using namespace std;
 
-template <typename C, typename S, size_t ORDER, bool FLUSH = false>
-inline static S iir_filter_fixed(const C *const c, // (ORDER + 1) C-coefficients
-                                 const C *const d, // (ORDER + 1) D-coefficients
-                                 S *const xHistory, // (ORDER) x value history
-                                 S *const yHistory, // (ORDER) y value history
-                                 const S input)     // input sample value
-{
-  static_assert(is_floating_point<C>::value,
-                "Coefficient type should be floating-point");
-  static_assert(is_arithmetic<S>::value, "Sample type should be arithmetic");
-  static_assert(ORDER > 0, "ORDER of filter must be positive");
+/*
+ * IRR Filter algorithm and algorithm parts for scalars.
+ *
+ * The pointers to values and buffers are completely unchecked here.
+ */
 
-  C Y = 0;
-  C X = input; // input is xN0
-  C yN0 = 0.0;
-  size_t i, j;
-  for (i = 0, j = 1; i < ORDER; i++, j++) {
-    const C xN1 = xHistory[i];
-    const C yN1 = yHistory[i];
-    xHistory[i] = X;
-    X = xN1;
-    yHistory[i] = Y;
-    Y = yN1;
-    yN0 += c[j] * xN1 + d[j] * yN1;
+/**
+ * Calculates the scalar output for a scalar input for the specified IIR filter
+ * coefficients and the history of input and output values.
+ *
+ * A filter of order \c N, requires
+ * <ul>
+ *   <li><code>N + 1</code> feed-forward (FF) coefficients</li>
+ *   <li><code>N + 1</code> feed-backward (FF) coefficients, though only \c N
+ * are actually used. This is for backward compatibility reasons and a newer
+ * implementation should only use \c N coefficients.</li>
+ *   <li>\c N elements of input history</li>
+ *   <li>\c N elements of output history</li>
+ * </ul>
+ *
+ * The \c Scale parameter configures whether the first feed-forward coefficient
+ * functions as scaling factor. This should only be used when the application
+ * has write access to both input and output history and also uses the provided
+ * shift-history functions. In all other cases do not use it or reset the
+ * coefficient to unity.
+ *
+ * With scale:
+ * <code><pre>output = input * FF[0] +
+ *   inputHistory[0] * FF[1] + outputHistory[0] * FB[1] +
+ *   ...
+ *   inputHistory[order - 1] * FF[order] + outputHistory[order - 1] * FB[order];
+ * </pre></code>
+ *
+ * Without scale:
+ *
+ * <code><pre>output = input +
+ *   inputHistory[0] * FF[1] + outputHistory[0] * FB[1] +
+ *   ...
+ *   inputHistory[order - 1] * FF[order] + outputHistory[order - 1] * FB[order];
+ * </pre></code>
+ *
+ * The choice was made to use addition for both forward and backward
+ * coefficients, which is reflected in all filter designs that are part of this
+ * library. <strong>Pay attention when using designs from other libraries: you
+ * might need to swap the sign of the feed-backward coefficients!</strong>
+ *
+ * The \c Flush parameter configures whether the output flushes de-normal values
+ * to zero. Processors in with multimedia extension can often be put in an
+ * operation mode that does this automatically. There are other ways to prevent
+ * de-normal numbers, like dithering. But is all this cannot be applied, the
+ * option is there to flush.
+ *
+ * @tparam Scalar The (accurate) type for coefficients and intermediate results.
+ * @tparam Value The input and output values of the filter.
+ * @tparam Scaled Indicates if the filter scales all input with the zeroth
+ * feed-forward coefficient.
+ * @param output Will contain the output value.
+ * @param input Contains the input value
+ * @param order The order of the filter. This can be zero, in which case the
+ * output is just the input, that is Scaled by the first feed-forward
+ * coefficient if \c Scaled is \c true.
+ * @param feedForward The (\c order + 1) feed-forward coefficients.
+ * @param feedBackward The (\c order + 1) feed-backward coefficients.
+ * @param inHistory The \c order previous input values.
+ * @param outHistory The \c order previous output values.
+ */
+template <typename Scalar, typename Value, bool Scaled>
+requires(is_floating_point_v<Scalar> &&std::is_arithmetic_v<Value>) //
+    inline static void iir_calculate_output_scalar(
+        Value &output,      // output sample value
+        const Value &input, // input sample value
+        size_t order,
+        const Scalar *__restrict feedForward,  // (ORDER + 1) C-coefficients
+        const Scalar *__restrict feedBackward, // (ORDER + 1) D-coefficients
+        const Value *__restrict inHistory,     // (ORDER) x value history
+        const Value *__restrict outHistory     // (ORDER) y value history
+    ) {
+  if constexpr (Scaled) {
+    output = feedForward[0] * input;
+  } else {
+    output = input;
   }
-  yN0 += c[0] * input;
-
-  if (FLUSH) {
-    Denormal::flush(yN0);
+  for (size_t i = 0; i < order; i++) {
+    output +=
+        feedForward[i + 1] * inHistory[i] + feedBackward[i + 1] * outHistory[i];
   }
-  yHistory[0] = yN0;
-
-  return yN0;
 }
 
-template <typename C, typename S, bool FLUSH = false>
-inline static S iir_filter(int order,
-                           const C *const c,  // (order + 1) C-coefficients
-                           const C *const d,  // (order + 1) D-coefficients
-                           S *const xHistory, // (order) x value history
-                           S *const yHistory, // (order) y value history
-                           const S input)     // input sample value
-{
-  static_assert(is_floating_point<C>::value,
-                "Coefficient type should be floating-point");
-  static_assert(is_arithmetic<S>::value, "Sample type should be arithmetic");
-
-  C Y = 0;
-  C X = input; // input is xN0
-  C yN0 = 0.0;
-  int i, j;
-  for (i = 0, j = 1; i < order; i++, j++) {
-    const C xN1 = xHistory[i];
-    const C yN1 = yHistory[i];
-    xHistory[i] = X;
-    X = xN1;
-    yHistory[i] = Y;
-    Y = yN1;
-    yN0 += c[j] * xN1 + d[j] * yN1;
+/**
+ * Shifts the input and output history one sample back in time and sets the
+ * most recent values to the provided input and output value.
+ * @tparam Value The value type.
+ * @param output The output element.
+ * @param input The input element.
+ * @param order The filter order.
+ * @param inHistory The input history, that must be \c order in size.
+ * @param outHistory The output history, that must be \c order in size.
+ */
+template <typename Value>
+inline static void
+iir_shift_history_scalar(Value &output,      // output sample value
+                         const Value &input, // input sample value
+                         size_t order,
+                         Value *__restrict inHistory, // (ORDER) x value history
+                         Value *__restrict outHistory // (ORDER) y value history
+) {
+  for (size_t i = order - 1; order > 1 && i > 0; i--) {
+    inHistory[i] = inHistory[i - 1];
+    outHistory[i] = outHistory[i - 1];
   }
-  yN0 += c[0] * input;
-
-  if (FLUSH) {
-    Denormal::flush(yN0);
-  }
-  yHistory[0] = yN0;
-
-  return yN0;
+  inHistory[0] = input;
+  outHistory[0] = output;
 }
 
+template <typename Value>
+requires(std::is_arithmetic_v<Value>) //
+    inline static void iir_flush_denormal_to_zero_scalar(
+        Value &output // output sample value
+    ) {
+  Denormal::flush(output);
+}
+
+template <typename Scalar, typename Value, bool Flush = false>
+requires(is_floating_point_v<Scalar>) //
+    inline static void iir_filter_scalar(
+        Value &output,      // output sample value
+        const Value &input, // input sample value
+        size_t order,
+        const Scalar *__restrict feedForward,  // (ORDER + 1) C-coefficients
+        const Scalar *__restrict feedBackward, // (ORDER + 1) D-coefficients
+        Value *__restrict inHistory,           // (ORDER) x value history
+        Value *__restrict outHistory           // (ORDER) y value history
+    ) {
+  iir_calculate_output_scalar<Scalar, Value, true>(
+      output, input, order, feedForward, feedBackward, inHistory, outHistory);
+  iir_shift_history_scalar(output, input, order, inHistory, outHistory);
+
+  if constexpr (Flush) {
+    iir_flush_denormal_to_zero_scalar(output);
+  }
+}
+
+template <typename C, typename S, bool Flush = false>
+requires(std::is_floating_point_v<C> &&std::is_arithmetic_v<S>) //
+    inline static S
+    iir_filter(int order,
+               const C *__restrict feedForward,  // (order + 1) C-coefficients
+               const C *__restrict feedBackward, // (order + 1) D-coefficients
+               S *__restrict xHistory,           // (order) x value history
+               S *__restrict yHistory,           // (order) y value history
+               const S input)                    // input sample value
+{
+  S result;
+  iir_filter_scalar<C, S, Flush>(result, input, order, feedForward,
+                                 feedBackward, xHistory, yHistory);
+  return result;
+}
+
+template <typename C, typename S, size_t ORDER, bool Flush = false>
+requires(std::is_floating_point_v<C> &&std::is_arithmetic_v<S> &&ORDER > 0) //
+    inline static S iir_filter_fixed(
+        const C *__restrict feedForward,  // (ORDER + 1) C-coefficients
+        const C *__restrict feedBackward, // (ORDER + 1) D-coefficients
+        S *__restrict xHistory,           // (ORDER) x value history
+        S *__restrict yHistory,           // (ORDER) y value history
+        const S input)                    // input sample value
+{
+  return iir_filter<C, S, Flush>(ORDER, feedForward, feedBackward, xHistory,
+                                 yHistory, input);
+}
+
+/**
+ * Calculates the vector output for a vector input for the specified IIR filter
+ * coefficients and the history of input and output values.
+ *
+ * A filter of order \c N, requires
+ * <ul>
+ *   <li><code>N + 1</code> feed-forward (FF) coefficients</li>
+ *   <li><code>N + 1</code> feed-backward (FF) coefficients, though only \c N
+ * are actually used. This is for backward compatibility reasons and a newer
+ * implementation should only use \c N coefficients.</li>
+ *   <li>\c N elements of input history</li>
+ *   <li>\c N elements of output history</li>
+ * </ul>
+ *
+ * The \c Scale parameter configures whether the first feed-forward coefficient
+ * functions as scaling factor. This should only be used when the application
+ * has write access to both input and output history and also uses the provided
+ * shift-history functions. In all other cases do not use it or reset the
+ * coefficient to unity.
+ *
+ * With scale:
+ * <code><pre>output = input * FF[0] +
+ *   inputHistory[0] * FF[1] + outputHistory[0] * FB[1] +
+ *   ...
+ *   inputHistory[order - 1] * FF[order] + outputHistory[order - 1] * FB[order];
+ * </pre></code>
+ *
+ * Without scale:
+ *
+ * <code><pre>output = input +
+ *   inputHistory[0] * FF[1] + outputHistory[0] * FB[1] +
+ *   ...
+ *   inputHistory[order - 1] * FF[order] + outputHistory[order - 1] * FB[order];
+ * </pre></code>
+ *
+ * The choice was made to use addition for both forward and backward
+ * coefficients, which is reflected in all filter designs that are part of this
+ * library. <strong>Pay attention when using designs from other libraries: you
+ * might need to swap the sign of the feed-backward coefficients!</strong>
+ *
+ * The \c Flush parameter configures whether the output flushes de-normal values
+ * to zero. Processors in with multimedia extension can often be put in an
+ * operation mode that does this automatically. There are other ways to prevent
+ * de-normal numbers, like dithering. But is all this cannot be applied, the
+ * option is there to flush.
+ *
+ * @tparam Scalar The (accurate) type for coefficients and intermediate results.
+ * @tparam Value The input and output values of the filter.
+ * @tparam Scaled Indicates if the filter scales all input with the zeroth
+ * feed-forward coefficient.
+ * @param output Will contain the output value.
+ * @param input Contains the input value
+ * @param rows The number of rows per vector, that should be positive.
+ * @param order The order of the filter. This can be zero, in which case the
+ * output is just the input, that is Scaled by the first feed-forward
+ * coefficient if \c Scaled is \c true.
+ * @param feedForward The (\c order + 1) feed-forward coefficients.
+ * @param feedBackward The (\c order + 1) feed-backward coefficients.
+ * @param inHistory The \c order previous input values.
+ * @param outHistory The \c order previous output values.
+ */
+template <typename Scalar, typename Vector, bool Scaled>
+requires(is_floating_point_v<Scalar>) //
+    inline static void iir_calculate_output_vector(
+        Vector &output,      // output sample value
+        const Vector &input, // input sample value
+        size_t rows, size_t order,
+        const Scalar *__restrict feedForward,  // (ORDER + 1) C-coefficients
+        const Scalar *__restrict feedBackward, // (ORDER + 1) D-coefficients
+        const Vector *__restrict inHistory,    // (ORDER) x value history
+        const Vector *__restrict outHistory    // (ORDER) y value history
+    ) {
+  if constexpr (Scaled) {
+    for (size_t r = 0; r < rows; r++) {
+      output[r] = feedForward[0] * input[r];
+    }
+  } else {
+    for (size_t r = 0; r < rows; r++) {
+      output[r] = input[r];
+    }
+  }
+  for (size_t i = 0; i < order; i++) {
+    const Scalar &forward = feedForward[i + 1];
+    const Scalar &backward = feedBackward[i + 1];
+    for (size_t r = 0; r < rows; r++) {
+      output[r] += forward * inHistory[i][r] + backward * outHistory[i][r];
+    }
+  }
+}
+
+template <typename Scalar, typename Vector>
+requires(is_floating_point_v<Scalar>) //
+    inline static void iir_calculate_output_vector_with_history_pointer_scaled(
+        Vector &output,      // output sample value
+        const Vector &input, // input sample value
+        size_t rows, size_t order, size_t &historyPtr,
+        const Scalar *__restrict feedForward,  // (ORDER + 1) C-coefficients
+        const Scalar *__restrict feedBackward, // (ORDER + 1) D-coefficients
+        const Vector *__restrict inHistory,    // (ORDER) x value history
+        const Vector *__restrict outHistory    // (ORDER) y value history
+    ) {
+  Vector scaledIn;
+  for (size_t r = 0; r < rows; r++) {
+    const auto v = feedForward[0] * input[r];
+    output[r] = v;
+    scaledIn[r] = v;
+  }
+  for (size_t i = 1, h = historyPtr; i <= order; i++, h = ((h + 1) % order)) {
+    const Scalar &forward = feedForward[i];
+    const Scalar &backward = feedBackward[i];
+    for (size_t r = 0; r < rows; r++) {
+      output[r] += forward * inHistory[h][r] + backward * outHistory[h][r];
+    }
+  }
+  historyPtr = historyPtr > 0 ? historyPtr - 1 : order - 1;
+  auto &in = inHistory[historyPtr];
+  auto &out = outHistory[historyPtr];
+  for (size_t r = 0; r < rows; r++) {
+    in[r] = scaledIn[r];
+    out[r] = output[r];
+  }
+}
+
+template <typename Scalar, typename Vector>
+requires(is_floating_point_v<Scalar>) //
+    inline static void iir_calculate_output_vector_with_history_pointer(
+        Vector &output,      // output sample value
+        const Vector &input, // input sample value
+        size_t rows, size_t order, size_t &historyPtr,
+        const Scalar *__restrict feedForward,  // (ORDER + 1) C-coefficients
+        const Scalar *__restrict feedBackward, // (ORDER + 1) D-coefficients
+        const Vector *__restrict inHistory,    // (ORDER) x value history
+        const Vector *__restrict outHistory    // (ORDER) y value history
+    ) {
+  for (size_t r = 0; r < rows; r++) {
+    output[r] = feedForward[0] * input[r];
+  }
+  for (size_t i = 1, h = historyPtr; i <= order; i++, h = ((h + 1) % order)) {
+    const Scalar &forward = feedForward[i];
+    const Scalar &backward = feedBackward[i];
+    for (size_t r = 0; r < rows; r++) {
+      output[r] += forward * inHistory[h][r] + backward * outHistory[h][r];
+    }
+  }
+  historyPtr = historyPtr > 0 ? historyPtr - 1 : order - 1;
+  auto &in = inHistory[historyPtr];
+  auto &out = outHistory[historyPtr];
+  for (size_t r = 0; r < rows; r++) {
+    in[r] = input[r];
+    out[r] = output[r];
+  }
+}
+
+/**
+ * Shifts the input and output history one sample back in time and sets the
+ * most recent values to the provided input and output value.
+ * @tparam Vector The vector type.
+ * @param output The output element.
+ * @param input The input element.
+ * @param rows The number of rows of each element (vector).
+ * @param order The filter order.
+ * @param inHistory The input history, that must be \c order in size.
+ * @param outHistory The output history, that must be \c order in size.
+ */
+template <typename Vector>
+inline static void iir_shift_history_vector(
+    Vector &output,      // output sample value
+    const Vector &input, // input sample value
+    size_t rows, size_t order,
+    Vector *__restrict inHistory, // (ORDER) x value history
+    Vector *__restrict outHistory // (ORDER) y value history
+) {
+  for (size_t i = order - 1; order > 1 && i > 0; i--) {
+    for (size_t r = 0; r < rows; r++) {
+      inHistory[i][r] = inHistory[i - 1][r];
+      outHistory[i][r] = outHistory[i - 1][r];
+    }
+  }
+  for (size_t r = 0; r < rows; r++) {
+    inHistory[0][r] = input[r];
+    outHistory[0][r] = output[r];
+  }
+}
+
+template <typename Vector>
+inline static void
+iir_flush_denormal_to_zero_vector(Vector &output, // output sample value
+                                  size_t rows) {
+  for (size_t r = 0; r < rows; r++) {
+    Denormal::flush(output[r]);
+  }
+}
+
+template <typename Scalar, typename Vector, bool Flush = false>
+requires(is_floating_point_v<Scalar>) //
+    inline static void iir_filter_vector(
+        Vector &output,      // output sample value
+        const Vector &input, // input sample value
+        size_t rows, size_t order,
+        const Scalar *__restrict feedForward,  // (ORDER + 1) C-coefficients
+        const Scalar *__restrict feedBackward, // (ORDER + 1) D-coefficients
+        Vector *__restrict inHistory,          // (ORDER) x value history
+        Vector *__restrict outHistory          // (ORDER) y value history
+    ) {
+  iir_calculate_output_vector<Scalar, Vector, true>(output, input, rows, order,
+                                                    feedForward, feedBackward,
+                                                    inHistory, outHistory);
+
+  iir_filter_vector_shift(output, input, rows, order, inHistory, outHistory);
+
+  if constexpr (Flush) {
+    iir_flush_denormal_to_zero_vector(output);
+  }
+}
+
+template <typename Scalar, typename Vector, size_t ROWS, size_t ORDER,
+          bool Flush = false>
+requires(is_floating_point_v<Scalar> &&ROWS > 0 && ORDER > 0) //
+    inline static void iir_filter_fixed_vector(
+        Vector &output,                        // output sample value
+        const Vector &input,                   // input sample value
+        const Scalar *__restrict feedForward,  // (ORDER + 1) C-coefficients
+        const Scalar *__restrict feedBackward, // (ORDER + 1) D-coefficients
+        Vector *__restrict inHistory,          // (ORDER) x value history
+        Vector *__restrict outHistory          // (ORDER) y value history
+    ) {
+  iir_filter_vector<Scalar, Vector, Flush>(output, input, ROWS, ORDER,
+                                           feedForward, feedBackward, inHistory,
+                                           outHistory);
+}
+
+/*
+ * The coefficients define infinite impulse response (IIR) recursive filters. A
+ * filter of order \c N, requires
+ * <ul>
+ *   <li><code>N + 1</code> feed-forward (FF) coefficients</li>
+ *   <li><code>N + 1</code> feed-backward (FF) coefficients, though only \c N
+ * are actually used. This is for backward compatibility reasons and a newer
+ * implementation should only use \c N coefficients.</li>
+ *   <li>\c N elements of input history</li>
+ *   <li>\c N elements of output history</li>
+ * </ul>
+ *
+ * The algorithm is executed by one of the above filter methods.
+ *
+ * @see #iir_calculate_output_scalar
+ * @see iir_calculate_output_vector
+ */
 struct IirCoefficients {
   static constexpr size_t coefficientsForOrder(size_t order) {
     return order + 1;
@@ -343,6 +695,116 @@ public:
 
 private:
   alignas(Count<C>::align()) C data[TOTAL_COEEFS];
+};
+
+template <typename C, size_t ORDER, size_t Rows, typename V = C>
+requires(std::is_floating_point_v<C> &&std::is_arithmetic_v<V> &&Rows >
+         0) class AlignedArrayFilter
+    : public tdap::VectorFilter<AlignedArray<V, Rows>> {
+  std::array<AlignedArray<V, Rows>, 2 * ORDER> history;
+  size_t historyPtr;
+
+public:
+  const FixedSizeIirCoefficients<C, ORDER> coefficients_;
+
+  AlignedArrayFilter(const FixedSizeIirCoefficients<C, ORDER> &coeffs)
+      : coefficients_(coeffs) {}
+
+  bool filter(AlignedArray<V, Rows> &output,
+              const AlignedArray<V, Rows> &input) override {
+    iir_calculate_output_vector_with_history_pointer_scaled<
+        C, AlignedArray<V, Rows>>(
+        output, input, Rows, ORDER, historyPtr, &coefficients_.getC(0),
+        &coefficients_.getD(0), history.begin(), history.begin() + ORDER);
+    return true;
+  }
+
+  bool filter(AlignedArray<V, Rows> &output,
+              const AlignedArray<V, Rows> &input, size_t rows) override {
+    if (rows <= Rows) {
+      iir_calculate_output_vector_with_history_pointer_scaled<
+          C, AlignedArray<V, Rows>>(
+          output, input, Rows, ORDER, historyPtr, &coefficients_.getC(0),
+          &coefficients_.getD(0), history.begin(), history.begin() + ORDER);
+      return true;
+    }
+    return false;
+  }
+
+  template<size_t rows>
+  bool filter(AlignedArray<V, Rows> &output,
+              const AlignedArray<V, Rows> &input) {
+    if constexpr (rows <= Rows) {
+      iir_calculate_output_vector_with_history_pointer_scaled<
+          C, AlignedArray<V, Rows>>(
+          output, input, Rows, ORDER, historyPtr, &coefficients_.getC(0),
+          &coefficients_.getD(0), history.begin(), history.begin() + ORDER);
+      return true;
+    }
+    return false;
+  }
+
+  void reset() override {
+    for (size_t i = 0; i < 2 * ORDER; i++) {
+      std::fill(history[i].begin(), history[i].end(), 0);
+    }
+    historyPtr = 0;
+  }
+};
+
+template <typename C, size_t ORDER, size_t Rows, typename V = C>
+requires(std::is_floating_point_v<C> &&std::is_arithmetic_v<V> &&Rows >
+         0) class AlignedPointerFilter
+    : public tdap::VectorFilter<AlignedPointer<V, Rows>> {
+  std::array<AlignedArray<V, Rows>, 2 * ORDER> history;
+  size_t historyPtr;
+
+public:
+  const FixedSizeIirCoefficients<C, ORDER> coefficients_;
+
+  AlignedPointerFilter(const FixedSizeIirCoefficients<C, ORDER> &coeffs)
+      : coefficients_(coeffs) {}
+
+  bool filter(AlignedPointer<V, Rows> &output,
+              const AlignedPointer<V, Rows> &input) override {
+    iir_calculate_output_vector_with_history_pointer_scaled<
+        C, AlignedArray<V, Rows>>(
+        output, input, Rows, ORDER, historyPtr, &coefficients_.getC(0),
+        &coefficients_.getD(0), history.begin(), history.begin() + ORDER);
+    return true;
+  }
+
+  bool filter(AlignedPointer<V, Rows> &output,
+              const AlignedPointer<V, Rows> &input, size_t rows) override {
+    if (rows <= Rows) {
+      iir_calculate_output_vector_with_history_pointer_scaled<
+          C, AlignedArray<V, Rows>>(
+          output, input, Rows, ORDER, historyPtr, &coefficients_.getC(0),
+          &coefficients_.getD(0), history.begin(), history.begin() + ORDER);
+      return true;
+    }
+    return false;
+  }
+
+  template <size_t rows>
+  bool filter(AlignedPointer<V, Rows> &output,
+              const AlignedPointer<V, Rows> &input) {
+    if constexpr (rows <= Rows) {
+      iir_calculate_output_vector_with_history_pointer_scaled<
+          C, AlignedArray<V, Rows>>(
+          output, input, Rows, ORDER, historyPtr, &coefficients_.getC(0),
+          &coefficients_.getD(0), history.begin(), history.begin() + ORDER);
+      return true;
+    }
+    return false;
+  }
+
+  void reset() override {
+    for (size_t i = 0; i < 2 * ORDER; i++) {
+      std::fill(history[i].begin(), history[i].end(), 0);
+    }
+    historyPtr = 0;
+  }
 };
 
 template <typename C> class VariableSizedIirCoefficients {
@@ -804,10 +1266,9 @@ protected:
     }
   }
 
-  tdap_force_inline void unsafeSingleChannelIterations(C *__restrict y,
-                                                       const C *__restrict x,
-                                                       size_t count) const
-      noexcept {
+  tdap_force_inline void
+  unsafeSingleChannelIterations(C *__restrict y, const C *__restrict x,
+                                size_t count) const noexcept {
     for (size_t n = ORDER; n < count; n++) {
       C yN = c[0] * x[n];
       for (size_t j = 1; j <= ORDER; j++) {
@@ -844,8 +1305,8 @@ protected:
 
   template <size_t CHANNELS>
   tdap_force_inline void unsafeIterationsAlt(C *__restrict yPtr,
-                                          const C *__restrict xPtr,
-                                          size_t count) const noexcept {
+                                             const C *__restrict xPtr,
+                                             size_t count) const noexcept {
     static constexpr size_t FRAME_ELEMENTS =
         Power2::constant::aligned_with(CHANNELS, ALIGN_SAMPLES);
 
@@ -856,16 +1317,19 @@ protected:
 
     for (size_t n = start; n < end; n += FRAME_ELEMENTS) {
       C yN[CHANNELS];
-      for (size_t channel = 0, offs = n; channel < CHANNELS; channel++, offs++) {
+      for (size_t channel = 0, offs = n; channel < CHANNELS;
+           channel++, offs++) {
         yN[channel] = c[0] * x[offs];
       }
       for (size_t j = 1, h = n; j <= ORDER; j++) {
         h -= FRAME_ELEMENTS;
-        for (size_t channel = 0, offs = h; channel < CHANNELS; channel++, offs++) {
+        for (size_t channel = 0, offs = h; channel < CHANNELS;
+             channel++, offs++) {
           yN[channel] += x[h] * c[j] + y[h] * d[j];
         }
       }
-      for (size_t channel = 0, offs = n; channel < CHANNELS; channel++, offs++) {
+      for (size_t channel = 0, offs = n; channel < CHANNELS;
+           channel++, offs++) {
         y[offs] = yN[channel];
       }
     }
