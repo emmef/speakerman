@@ -850,13 +850,9 @@ public:
     } else {
       goal = sample;
     }
-    if (goal > y) {
-      attack.template integrate(goal, intermediate);
-      attack.template integrate(intermediate, y);
-    } else {
-      release.template integrate(goal, intermediate);
-      release.template integrate(intermediate, y);
-    }
+    auto const &integrator = goal > y ? attack : release;
+    integrator.template integrate(goal, intermediate);
+    integrator.template integrate(intermediate, y);
 
     return y;
   }
