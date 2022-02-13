@@ -192,10 +192,10 @@ static std::ostream &operator<<(std::ostream &stream,
 namespace tdap {
 
 template <typename S>
-SmoothDetection<S> static createDetector(size_t sampleRate, const Perceptive::Metrics &metrics, size_t &predictionSamples) {
-  predictionSamples = sampleRate * std::min(0.001, metrics.holdSeconds());
+SmoothDetection<S> static createDetector(size_t sampleRate, const Perceptive::Metrics &metrics) {
+  S predictionSamples = 0.5 + sampleRate * std::min(0.001, metrics.holdSeconds());
   SmoothDetection<S> follower;
-  follower.setAttackAndHold(metrics.attackSeconds() * sampleRate, 0.5 + metrics.holdSeconds() * sampleRate);
+  follower.setAttackAndHold(metrics.attackSeconds() * sampleRate, predictionSamples);
   follower.setReleaseSamples(0.5 + metrics.releaseSeconds() * sampleRate);
   return follower;
 }
@@ -208,9 +208,7 @@ class PerceptiveRms {
 
   TrueFloatingPointWeightedMovingAverageSet<S> rms_;
 
-  size_t used_levels_ = LEVELS;
   SmoothDetection<S> follower_;
-  size_t predictionSamples = 0;
 
 public:
   PerceptiveRms()
@@ -224,9 +222,8 @@ public:
       rms_.setWindowSizeAndScale(i, 0.5 + sample_rate * metrics.seconds(i),
                                  weight * weight);
     }
-
     rms_.setAverages(initial_value);
-    follower_ = createDetector<S>(sample_rate, metrics, predictionSamples);
+    follower_ = createDetector<S>(sample_rate, metrics);
     follower_.setOutput(initial_value);
   }
 
@@ -235,11 +232,7 @@ public:
     return follower_.apply(value);
   }
 
-  S add_square_get_unsmoothed(S square, S minimum = 0) {
-    return sqrt(rms_.addInputGetMax(square, minimum));
-  }
-
-  size_t getLatency() const { return predictionSamples; }
+  size_t getLatency() const { return follower_.getHoldSamples(); }
 };
 
 } // namespace tdap

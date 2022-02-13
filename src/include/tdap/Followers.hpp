@@ -797,6 +797,7 @@ public:
         samples <= MaximumIntegrationSamples &&
         samples * MinimumHoldRatio <= hold) {
       attack.setCharacteristicSamples(samples);
+      holdSamples = hold;
       overshoot = calculateOvershoot(attack, holdSamples);
       return true;
     }

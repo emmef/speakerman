@@ -368,7 +368,7 @@ private:
           T x = processInput[offset];
           T y = aCurve.filter(offset, x);
           y *= scaleForUnity;
-          squareSum = y * y;
+          squareSum += y * y;
         }
         T detect = gd.add_square_get_detection(squareSum, 1.0);
         T gain = 1.0 / detect;
@@ -474,53 +474,6 @@ private:
         counter++;
       }
       historyPointer = (historyPointer + 1) % HISTORY;
-      //                if (counter == 100000) {
-      //                    counter = -1;
-      //                }
-      //
-      //
-      //                for (size_t channel = 0, offs = offs_start; channel <
-      //                CHANNELS_PER_GROUP; channel++, offs++) {
-      //                    counter++;
-      //                    signalPeak = Floats::max(signalPeak, prePeak);
-      //                    signalDetection = Floats::max(signalDetection,
-      //                    detection); limiterGain = Floats::min(limiterGain,
-      //                    gain); const T x = target[offs]; T peak = fabs(x);
-      //                    if (peak > 1.0) {
-      //                        peakCount++;
-      //                        maxPeak = Floats::max(maxPeak, peak);
-      //                    }
-      //                    square *= decay;
-      //                    square += multiply * x * x;
-      //                    T rms = sqrt(square);
-      //                    if (rms > 0.25) {
-      //                        peakRmsCount++;
-      //                        maxRms = Floats::max(maxRms, sqrt(square));
-      //                    }
-      //
-      //
-      //                    if (counter > 100000) {
-      //                        if (peakRmsCount > 0 || peakCount > 0) {
-      //                            maxMaxRms = Floats::max(maxMaxRms, maxRms);
-      //                            maxMaxPeak = Floats::max(maxMaxPeak,
-      //                            maxPeak); printf("%8zu PEAKS : %8lg/%8lg;
-      //                            %8zu HIGH-RMS : %8lg/%8lg\n", peakCount,
-      //                            maxPeak, maxMaxPeak, peakRmsCount, maxRms,
-      //                            maxMaxRms); peakCount = 0; peakRmsCount = 0;
-      //                            maxRms = 0;
-      //                            maxPeak = 0;
-      //                        }
-      //                        printf("Limiter %lf peak   %lf detect   %lf gain
-      //                        %zu OVER (%d)\n", signalPeak, signalDetection,
-      //                        limiterGain, peakGreaterThanDetectionCount,
-      //                        signalPeak > signalDetection); signalPeak =
-      //                        numeric_limits<T>::lowest(); signalDetection =
-      //                        numeric_limits<T>::lowest(); limiterGain =
-      //                        numeric_limits<T>::max();
-      //                        peakGreaterThanDetectionCount = 0;
-      //                        counter = 0;
-      //                    }
-      //                }
     }
   } analysis;
 
