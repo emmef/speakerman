@@ -31,7 +31,7 @@ namespace tdap {
 
 template <typename T, size_t S, size_t A = AlignmentDefaultBytes>
 struct alignas(A) AlignedArray : public std::array<T, S> {
-  static_assert(validAlignmentBytesForConsecutiveArrayOf<T>(A));
+  static_assert(validAlignmentBytesForConsecutiveArrayOf(A, sizeof(T)));
   static constexpr size_t alignBytes = A;
   static constexpr size_t alignedElements = alignBytes / sizeof(T);
 

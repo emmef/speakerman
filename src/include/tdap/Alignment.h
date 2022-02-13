@@ -44,7 +44,7 @@ static constexpr bool validAlignmentBytesGeneric(size_t alignment) {
 }
 
 static constexpr bool validAlignmentBytesForConsecutiveArrayOf(size_t alignment, size_t sizeOf) {
-  return sizeOf && Power2::is(alignment) && ((alignment % sizeOf) == 0);
+  return sizeOf && Power2::constant::is(alignment) && ((alignment % sizeOf) == 0);
 }
 
 template<typename T>
