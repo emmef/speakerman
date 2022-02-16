@@ -164,8 +164,7 @@ public:
   AttackReleaseFilter<C> &integrator() { return integrator_; }
 };
 
-template <typename T>
-class FastSmoothHoldFollower {
+template <typename T> class FastSmoothHoldFollower {
   IntegrationCoefficients<T> attack_;
   IntegrationCoefficients<T> release_;
   T releaseInt1_ = 1;
@@ -193,9 +192,9 @@ class FastSmoothHoldFollower {
   }
 
 public:
-  void setPredictionAndThreshold(T predictionSeconds, T threshold,
-                                 T sampleRate, T releaseSeconds, T initialValue = -1)  {
-    T initValue = std::clamp(initialValue, threshold, threshold *  100);
+  void setPredictionAndThreshold(T predictionSeconds, T threshold, T sampleRate,
+                                 T releaseSeconds, T initialValue = -1) {
+    T initValue = std::clamp(initialValue, threshold, threshold * 100);
     threshold_ = threshold;
     releaseInt1_ = initValue;
     releaseInt2_ = initValue;
@@ -207,7 +206,8 @@ public:
     prediction_ = 0.5 + predictionSeconds * sampleRate;
     attack_.setCharacteristicSamples(std::max(prediction_ / 6, 8lu));
     overshoot_ = calculateOverShoot(prediction_);
-    release_.setCharacteristicSamples(sampleRate * std::clamp(releaseSeconds, 0.001, 0.1));
+    release_.setCharacteristicSamples(sampleRate *
+                                      std::clamp(releaseSeconds, 0.001, 0.1));
     count_ = 0;
   }
 
@@ -215,23 +215,20 @@ public:
 
   T threshold() const noexcept { return threshold_; }
 
-  T getDetection(T sample) noexcept  {
+  T getDetection(T sample) noexcept {
     T limitValue = std::max(threshold_, sample);
     if (limitValue > holdPeak_) {
       holdPeak_ = limitValue;
       count_ = prediction_;
-    }
-    else if (count_ > 0) {
+    } else if (count_ > 0) {
       count_--;
-    }
-    else {
+    } else {
       holdPeak_ = limitValue;
     }
     T correctedValue = threshold_ + (holdPeak_ - threshold_) * overshoot_;
     if (correctedValue > releaseInt2_) {
       releaseInt2_ = releaseInt1_ = correctedValue;
-    }
-    else {
+    } else {
       release_.integrate(correctedValue, releaseInt1_);
       release_.integrate(releaseInt1_, releaseInt2_);
     }
@@ -245,7 +242,6 @@ public:
 
   T getGain(T sample) noexcept { return threshold() / getDetection(sample); }
 };
-
 
 template <typename C> class SmoothHoldMaxAttackRelease {
   static_assert(is_arithmetic<C>::value, "Sample type S must be arithmetic");
@@ -733,16 +729,30 @@ template <typename F> class SmoothDetection {
   static constexpr F MinimumIntegrationSamples =
       21.0 / MaximumIntegrationSamples;
   static constexpr F DefaultAttackHoldRatio = 2;
+  static constexpr F relaxFactor = 0;
 
   IntegrationCoefficients<F> attack;
   IntegrationCoefficients<F> release;
 
   size_t holdSamples;
-  size_t hold;
+  size_t hold = 0;
+  bool peakToHorizontal = false;
   F overshoot;
   F goal = 0;
   F intermediate = 0;
   F y = 0;
+
+  inline F attackIntegrate(F input) {
+    attack.template integrate(input, intermediate);
+    attack.template integrate(intermediate, y);
+    return y;
+  }
+
+  inline F releaseIntegrate(F input) {
+    release.template integrate(input, intermediate);
+    release.template integrate(intermediate, y);
+    return y;
+  }
 
 public:
   [[nodiscard]] static F calculateOvershoot(const IntegrationCoefficients<F> &c,
@@ -831,6 +841,7 @@ public:
     y = value;
     goal = value;
     intermediate = value;
+    peakToHorizontal = false;
   }
 
   double maximumAttackSamples() const {
@@ -846,16 +857,25 @@ public:
     if (peak > goal) {
       goal = peak;
       hold = holdSamples;
+      peakToHorizontal = true;
     } else if (hold > 0) {
       hold--;
-    } else {
-      goal = sample;
+      return attackIntegrate(goal);
+    } else if (peakToHorizontal) {
+      F z = y;
+      if (attackIntegrate(relaxFactor * y) > z) {
+        return y;
+      } else {
+        y = intermediate = z;
+        peakToHorizontal = false;
+        return z;
+      }
+    } else if (sample > y) {
+      return attackIntegrate(sample);
     }
-    auto const &integrator = goal > y ? attack : release;
-    integrator.template integrate(goal, intermediate);
-    integrator.template integrate(intermediate, y);
-
-    return y;
+    else {
+      return releaseIntegrate(sample);
+    }
   }
 };
 
