@@ -862,19 +862,21 @@ public:
       hold--;
       return attackIntegrate(goal);
     } else if (peakToHorizontal) {
-      F z = y;
-      if (attackIntegrate(relaxFactor * y) > z) {
+      goal = y;
+      if (attackIntegrate(relaxFactor * y) > goal) {
         return y;
       } else {
-        y = intermediate = z;
+        y = intermediate = goal;
         peakToHorizontal = false;
-        return z;
+        return goal;
       }
-    } else if (sample > y) {
-      return attackIntegrate(sample);
+    } else if (sample <= y) {
+      goal = sample;
+      return releaseIntegrate(goal);
     }
     else {
-      return releaseIntegrate(sample);
+      goal = sample;
+      return attackIntegrate(goal);
     }
   }
 };
