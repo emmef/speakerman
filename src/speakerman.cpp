@@ -106,7 +106,7 @@ static void webServer() {
   web_server server(manager.get());
 
   try {
-    server.run("http://localhost:8088", 1000);
+    server.run("http://0.0.0.0:8088", 1000);
     cout << "Web server exit" << endl;
   } catch (const std::exception &e) {
     std::cerr << "Web server error: " << e.what() << std::endl;
