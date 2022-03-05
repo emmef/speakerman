@@ -18,7 +18,7 @@ else
   output_file="$1"
 fi
 
-URL="https://emmef.org/limiter/limiter.txt"
+URL="https://script.google.com/macros/s/AKfycbwK3NWPuTKciZoE19xpX5AiZWiPEV8wZSGmKxlULO1FjDg-BFFv/exec"
 
 exceeded_allowed() {
   #   $1 is "now" timestamp
@@ -73,7 +73,7 @@ exceeded_allowed() {
 }
 
 now=$(date +'%Y%m%d%H%M')
-curl -s "$URL" | exceeded_allowed "$now"
+curl -sL "$URL" | exceeded_allowed "$now"
 if [ -z "$checking" ] && ! test -f "$output_file"
 then
   echo "1" >"$output_file"
