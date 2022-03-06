@@ -50,6 +50,8 @@ static void create_command_and_file(string &rangeFile, string &command_line) {
   command_line = script;
   command_line += " ";
   command_line += rangeFile;
+  command_line += " ";
+  command_line += configFileName();
 }
 
 struct TemporaryFile {

@@ -2,10 +2,12 @@
 
 
 checking=
+configFile=
 
 if [ "$1" == "--check" ]
 then
   checking="yes"
+  shift
 elif [ -z "$1" ]
 then
   echo "require output file"
@@ -16,9 +18,22 @@ then
   exit 1
 else
   output_file="$1"
+  shift
+fi
+
+if [ -n "$1" ] ; then
+  configFile="$1"
 fi
 
 URL="https://emmef.org/limiter/limiter.txt"
+
+if [ -n "$configFile" ] ; then
+  if grep -E '^\s*threshold-scale-url\s*=\s*[a-z]+://' "$configFile" >/dev/null ; then
+    URL=$(grep -E '^\s*threshold-scale-url\s*=\s*[a-z]+://' "$configFile" | sed -r 's|^\s*threshold-scale-url\s*=\s*([a-z]+://.*)$|\1|')
+  fi
+fi
+
+echo "URL=$URL"
 
 exceeded_allowed() {
   #   $1 is "now" timestamp
@@ -73,7 +88,7 @@ exceeded_allowed() {
 }
 
 now=$(date +'%Y%m%d%H%M')
-curl -s "$URL" | exceeded_allowed "$now"
+curl -sL "$URL" | exceeded_allowed "$now"
 if [ -z "$checking" ] && ! test -f "$output_file"
 then
   echo "1" >"$output_file"
