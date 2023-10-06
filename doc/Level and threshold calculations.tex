@@ -1,0 +1,68 @@
+%! Author = michel
+%! Date = 6-10-23
+
+% Preamble
+\documentclass[11pt]{article}
+
+% Packages
+\usepackage{amsmath}
+
+% Document
+\begin{document}
+
+\section{Levels and thresholds}\label{sec:levels-and-thresholds}
+
+    Signals and functions are generally a function of time, like $y(t)$, but are written as $y$ — assuming the parameter $t$ — unless that would cause confusion.
+Signal measurement is based on a signal that represents the spectrum of music: a pink-noise signal $n$ that is limited between 40Hz and 12kHz. Pink noise is used by many loudness measuring devices, that also apply a frequency-based loudness curve $l(s)$, that can be applied to a signal $s$.
+This can be an A-curve or a C-curve.
+
+    If the signal passes through a crossover with $N$ crossover(s), the result is $N+1$ frequency bands.
+For simplicity, it is assumed that $N=1$.
+In this case, when the crossover is applied to a signal $s$, the result is a \emph{low} frequency signal $s_l$ and a \emph{high} frequency signal $s_h$.
+When both signals are added, we get $s' = s_l + s_h$.
+For a \emph{perfect} crossover, $s' \equiv s$; an assumption not made here.
+
+    Signal loudness measurements are always based on some kind of RMS (root-mean-square) measurement $R(s,T)$, where $s$ is the signal and $T$ the time-window to integrate the squared signal over, before we get its square root.
+$ThisT$ is omitted when irrelevant.
+
+\subsection{Establish frequency band contributions}\label{subsec:establish-frequency-band-contributions}
+
+In theory, the contribution of a frequency range in a pink noise signal is relative to the logarithmic ratio between the highest and lowest frequency.
+When the pink noise signal $n$, limited between frequencies $f_l$ and $f_h$, is used and the crossover frequency is $f_c$, the \emph{contributions} $c_l$ and $c_h$for the frequency bands are
+\[
+c_l = \dfrac{f_h - f_c}{f_h - f_l} , c_h = \dfrac{f_h - f_c}{f_h - f_l}
+\]
+
+In the example of a crossover frequency of 120Hz and the used bandwidth of 40Hz to 12kHz, $c_l=0.1$ and $c_h=0.9$.
+Though this theoretical relation can be used for relatively sharp crossovers like $4^{th}$-order Linkwitz-Riley filters, an actual measurement is used in practice, as it also allows to tweak the pink noise if necessary, leading to the following contributions
+    \[
+        c_l = \dfrac{R(n_l)}{R(n')} , c_h = \dfrac{R(n_h)}{R(n')}
+    \]
+where $n_l$ and $n_h$ denote the pink noise low-frequency and high-frequency parts respectively.
+The time window $T$ could be something like a second.
+
+If the input signal $m$ is music, the thresholds to aim for would be $T_l = c_l$ and $T_h = c_h$ respectively, and for each frequency band $R(m) = T$.
+But this does not take different loudness for different frequencies into account, as defined by the curve $l$.
+Applying $l$ to the measuring signal leads to weighed contributions $w_l$ and $w_h$ as follows:
+\[
+    x = l(n) ;
+    w_l = \dfrac{R(x_l)}{R(x')} ; w_h = \dfrac{R(x_h)}{R(x')}
+\]
+The correct threshold levels to aim for now become as follows.
+\[
+    T_l = \dfrac{{c_l}^2}{w_l} ; T_h = \dfrac{{c_h}^2}{w_h}
+\]
+Naturally, these thresholds assume we want an average RMS of 1 for the combined low and high outputs.
+Though record labels would be jealous to reach that on their loudest records, it is generally not a good idea.
+A lower threshold $T_u$ can be configured by the user, and that finally yields the following thresholds.
+\[
+    T_l = T_u \dfrac{{c_l}^2}{w_l} ; T_h = T_u \dfrac{{c_h}^2}{w_h}
+\]
+
+\subsection{Detection}\label{subsec:detection}
+
+Just using RMS works, but over what period and what method of integration?
+
+    Work in progress.
+
+\end{document}
