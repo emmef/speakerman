@@ -6,63 +6,105 @@
 
 % Packages
 \usepackage{amsmath}
+\usepackage{nameref}
+\usepackage{hyperref}
 
 % Document
 \begin{document}
 
-\section{Levels and thresholds}\label{sec:levels-and-thresholds}
+\section{Introduction}\label{sec:introduction}
 
-    Signals and functions are generally a function of time, like $y(t)$, but are written as $y$ — assuming the parameter $t$ — unless that would cause confusion.
-Signal measurement is based on a signal that represents the spectrum of music: a pink-noise signal $n$ that is limited between 40Hz and 12kHz. Pink noise is used by many loudness measuring devices, that also apply a frequency-based loudness curve $l(s)$, that can be applied to a signal $s$.
-This can be an A-curve or a C-curve.
+Speakerman functions as a crossover, splitting frequency bands, and limits both perceived and measured overall loudness in a way that is as unobtrusive as possible.
+Speakerman makes a trade-offs that balance these goals with what can be realised in practice, for example with minimal latency.
 
-    If the signal passes through a crossover with $N$ crossover(s), the result is $N+1$ frequency bands.
+Speakerman uses a signal that represents the spectrum of music, in order to make decisions on the relative weights of the frequency bands and how to measure that in combination with the perceived loudness as a function of frequency.
+This is a ``static'' measurement that can be done off-line.
+Because Speakerman is used in venues that have legal obligations with prescribed measurements, the representative signal is pink noise, and the measurement curve is an A curve.
+The pink noise is bandwidth-limited from 40Hz to 12kHz.
+When the weights are known, Speakerman calculates the correct target level for each frequency band.
+These weights are correct for a target level of 0dB loudness.
+As loudness measurements are almost by definition considerably lower than peak measurement, a target level of 0dB is a terrible idea.
+Hence, the user can specify a \emph{lower}  target like -12dB.
+Remember that the target level set represents all frequency bands, meaning that the target level for individual bands is lower.
+However, if there is only a low and a high frequency band that is separated at, say, 100Hz, the target level of the high frequency band is pretty close to the overall level.
+
+Loudness measurement is based on RMS (root-mean-square measurement), meaning the measured signal is squared for each channel, the outcomes are added, then integrated and finally, the square root of that integration determines the loudness.
+In reality, the measurement depends on the frequency spectrum of the signal and an interesting relation between the perceived loudness of bursts with the same RMS value but with different durations; this is explained in~\ref{subsec:detection}~``\nameref{subsec:detection}''.
+
+Like most crossovers and due to latency and computation constraints, Speakerman uses $4^{th}$-order Linkwitz-Riley filters instead of perfect linear-phase filtering to separate the frequency bands.\footnote{It is possible to do this in only 1.5 times the number of computations, however, this introduces latency}
+
+\subsection{Conventions}\label{subsec:conventions}
+
+Signals and functions are generally a function of time, like $y(t)$, but are written as $y$ — assuming the parameter $t$ — unless that would cause confusion.
+
+If the signal passes through a crossover with $N$ crossover(s), the result is $N+1$ frequency bands.
 For simplicity, it is assumed that $N=1$.
 In this case, when the crossover is applied to a signal $s$, the result is a \emph{low} frequency signal $s_l$ and a \emph{high} frequency signal $s_h$.
 When both signals are added, we get $s' = s_l + s_h$.
-For a \emph{perfect} crossover, $s' \equiv s$; an assumption not made here.
+For a \emph{perfect} crossover, $s' \equiv s$; an assumption not made here (see Linkwitz-Riley above).
 
-    Signal loudness measurements are always based on some kind of RMS (root-mean-square) measurement $R(s,T)$, where $s$ is the signal and $T$ the time-window to integrate the squared signal over, before we get its square root.
-$ThisT$ is omitted when irrelevant.
+Signal loudness measurements are always based on some kind of RMS (root-mean-square) measurement $R(s,T)$, where $s$ is the signal and $T$ the time-window to integrate the squared signal over, before we get its square root.
+$T$ is omitted when irrelevant.
+
+\section{Levels and thresholds}\label{sec:levels-and-thresholds}
 
 \subsection{Establish frequency band contributions}\label{subsec:establish-frequency-band-contributions}
 
-In theory, the contribution of a frequency range in a pink noise signal is relative to the logarithmic ratio between the highest and lowest frequency.
-When the pink noise signal $n$, limited between frequencies $f_l$ and $f_h$, is used and the crossover frequency is $f_c$, the \emph{contributions} $c_l$ and $c_h$for the frequency bands are
+Signal measurement is based on a signal $n$ that represents the spectrum of music: a pink-noise signal that is limited between 40Hz and 12kHz.
+
+In theory, the contribution $c$ of a frequency range in a pink noise signal is calculated by taking the ratio of the high and low frequency cut-off and divide it by the ration between the high and low bandwidth limits.
+For a single crossover with a low and high frequency band, the respective contributions $c_l$ and $c_h$ are
 \[
 c_l = \dfrac{f_h - f_c}{f_h - f_l} , c_h = \dfrac{f_h - f_c}{f_h - f_l}
 \]
-
+where $f_l$ and $f_h$ denote the low and high bandwidth limits and $f_c$ is the crossover frequency.
 In the example of a crossover frequency of 120Hz and the used bandwidth of 40Hz to 12kHz, $c_l=0.1$ and $c_h=0.9$.
-Though this theoretical relation can be used for relatively sharp crossovers like $4^{th}$-order Linkwitz-Riley filters, an actual measurement is used in practice, as it also allows to tweak the pink noise if necessary, leading to the following contributions
+
+Speakerman does not use the theoretical contributions, however, as it uses an imperfect crossover and it can be that another representative signal than pink noise will be used in the future.
+There are some other reasons that are out of scope.
+
+Speakerman determines the contributions by measuring $n$ through the actual crossover used.
     \[
         c_l = \dfrac{R(n_l)}{R(n')} , c_h = \dfrac{R(n_h)}{R(n')}
     \]
-where $n_l$ and $n_h$ denote the pink noise low-frequency and high-frequency parts respectively.
-The time window $T$ could be something like a second.
+where $n_l$ and $n_h$, as per the conventions, denote the pink noise low-frequency and high-frequency parts respectively.
 
-If the input signal $m$ is music, the thresholds to aim for would be $T_l = c_l$ and $T_h = c_h$ respectively, and for each frequency band $R(m) = T$.
-But this does not take different loudness for different frequencies into account, as defined by the curve $l$.
-Applying $l$ to the measuring signal leads to weighed contributions $w_l$ and $w_h$ as follows:
+These contributions do not take the dependency of loudness on  frequency into account.
+During the dynamic measurement, the signal will be led through the filter $l$ that represents this relation, a process called ``keying''.
+Naturally, keying affects the measurements and differently so for each frequency band.
+To establish the target level that yields the correct contribution with a keyed signal, the effect of keying on the contributions is measured first:
 \[
     x = l(n) ;
-    w_l = \dfrac{R(x_l)}{R(x')} ; w_h = \dfrac{R(x_h)}{R(x')}
+    k_l = \dfrac{R(x_l)}{R(x')} ; k_h = \dfrac{R(x_h)}{R(x')}
 \]
+Where $k_l$ and $k_h$ are the ``keys contributions''.
 The correct threshold levels to aim for now become as follows.
 \[
-    T_l = \dfrac{{c_l}^2}{w_l} ; T_h = \dfrac{{c_h}^2}{w_h}
+    T_l = \dfrac{{c_l}^2}{k_l} ; T_h = \dfrac{{c_h}^2}{k_h}
 \]
-Naturally, these thresholds assume we want an average RMS of 1 for the combined low and high outputs.
-Though record labels would be jealous to reach that on their loudest records, it is generally not a good idea.
-A lower threshold $T_u$ can be configured by the user, and that finally yields the following thresholds.
+As mentioned, using these target levels yield a total perceived loudness of 0dB which is a bad idea.
+The user can configure a lower threshold $T_u$, yielding the following thresholds for the low and high frequency bands.
 \[
     T_l = T_u \dfrac{{c_l}^2}{w_l} ; T_h = T_u \dfrac{{c_h}^2}{w_h}
 \]
 
+The targets are static for each set of crossovers and can be measured with a simple integration window of, say, a second.
+
 \subsection{Detection}\label{subsec:detection}
 
-Just using RMS works, but over what period and what method of integration?
+RMS is a goog way to
 
-    Work in progress.
+The devil is in the details.
+For the relative weights of the frequency bands it is enough to use a simple RMS based on an integration of, say, one second.
+However, Speakerman adjusts the perceived loudness \emph{dynamically} as it cannot use statistical mechanisms like Replay-gain that need to analyse the finished material.
+In this dynamic, the perceived loudness of two bursts of sound that have the same temporal RMS value, is different.
+A very detailed description of this relation can be found in standards like IBU R128.
+Simple RMS measurement over a time window larger than the short burst would yield a power relation of 0.5 (square root) as detection.
+However, the perceived relation is a 0.25 power relation for bursts smaller than 400ms, while long bursts register as equally loud.
+Speakerman therefore defines a fast detection area that uses a set of RMS windows between 0.4 and 400ms weighted according to this power relation.
+The more windows, the more accurate the result, but the more calculations.
+If Speakerman is instructed to use a window longer than 400ms, all longer windows have a unity weight.
+An advantage of the weighted measurement is that peaks are represented relatively well: if the target level for a frequency band is set below 0.25, there is almost zero chance of clipping for normal signals.
+
 
 \end{document}
