@@ -19,7 +19,7 @@
  * limitations under the License.
  */
 
-#include <mutex>
+#include <cstring>
 
 #include <speakerman/jack/Names.hpp>
 #include <tdap/Allocation.hpp>

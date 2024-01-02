@@ -90,10 +90,10 @@ void JsonCanonicalReader::checkPop() const {
     throw std::runtime_error("JsonCanonicalReader: Pop: already topmost.");
   }
 }
-org::simple::util::text::JsonStringBuilder &JsonCanonicalReader::nameBuilder() {
+org::simple::text::JsonStringBuilder &JsonCanonicalReader::nameBuilder() {
   return path;
 }
-org::simple::util::text::JsonStringBuilder &
+org::simple::text::JsonStringBuilder &
 JsonCanonicalReader::stringBuilder() {
   return value;
 }

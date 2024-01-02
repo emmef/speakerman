@@ -24,12 +24,12 @@
 #include <cstddef>
 #include <cstring>
 #include <istream>
-#include <org-simple/util/text/Json.h>
+#include <org-simple/text/Json.h>
 
 namespace speakerman {
 
 class PartitionBasedJsonStringBuilder
-    : public org::simple::util::text::JsonStringBuilder {
+    : public org::simple::text::JsonStringBuilder {
   char *start = nullptr;
   char *rendered = nullptr;
   char *last = nullptr;
@@ -59,7 +59,7 @@ public:
   ~PartitionBasedJsonStringBuilder();
 };
 
-class JsonCanonicalReader : protected org::simple::util::text::JsonContext {
+class JsonCanonicalReader : protected org::simple::text::JsonContext {
   struct StackEntry {
     char *start = nullptr;
   };
@@ -77,9 +77,9 @@ class JsonCanonicalReader : protected org::simple::util::text::JsonContext {
   void checkPop() const;
 
 protected:
-  org::simple::util::text::JsonStringBuilder &nameBuilder() final;
+  org::simple::text::JsonStringBuilder &nameBuilder() final;
 
-  org::simple::util::text::JsonStringBuilder &stringBuilder() final;
+  org::simple::text::JsonStringBuilder &stringBuilder() final;
 
   void pushIndex(int index) final;
 
@@ -108,13 +108,13 @@ public:
 
   virtual void setNull(const char *path) = 0;
 
-  void readJson(org::simple::util::text::InputStream<char> &input,
-                org::simple::util::text::TextFilePositionData<char> &position) {
+  void readJson(org::simple::text::InputStream<char> &input,
+                org::simple::text::TextFilePositionData<char> &position) {
     JsonContext::readJson(*this, input, position);
   }
 
   void readJson(std::istream &input) {
-    class Stream : public org::simple::util::text::InputStream<char> {
+    class Stream : public org::simple::text::InputStream<char> {
       std::istream &input;
 
     public:

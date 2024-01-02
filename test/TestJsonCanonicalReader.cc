@@ -2,10 +2,10 @@
 // Created by michel on 05-02-22.
 //
 #include "boost-unit-tests.h"
-#include <org-simple/util/text/StringStream.h>
+#include <org-simple/text/StringStream.h>
 #include <speakerman/JsonCanonicalReader.h>
 
-using StringStream = org::simple::util::text::StringInputStream<char>;
+using StringStream = org::simple::text::StringInputStream<char>;
 
 struct Setter {
   std::string path;
@@ -40,8 +40,8 @@ public:
 
   const std::vector<Setter> &run(const std::string &input) {
     actualOutput.clear();
-    org::simple::util::text::StringInputStream<char> stream(input);
-    org::simple::util::text::TextFilePositionData<char> position;
+    org::simple::text::StringInputStream<char> stream(input);
+    org::simple::text::TextFilePositionData<char> position;
     this->readJson(stream, position);
     return actualOutput;
   }

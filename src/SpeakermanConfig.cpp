@@ -817,7 +817,7 @@ public:
     }
   }
 
-  bool readJson(SpeakermanConfig &config, org::simple::util::text::InputStream<char> &input, std::string &message) {
+  bool readJson(SpeakermanConfig &config, org::simple::text::InputStream<char> &input, std::string &message) {
     std::vector<std::string> stack;
     std::string workSpace;
 
@@ -829,7 +829,7 @@ public:
         threadLocalConfig = nullptr;
       }
     } guard(config);
-    org::simple::util::text::TextFilePositionData<char> position;
+    org::simple::text::TextFilePositionData<char> position;
     try {
       JsonCanonicalReader::readJson(input, position);
       return true;
@@ -1108,7 +1108,7 @@ void dumpSpeakermanConfig(const SpeakermanConfig &configuration,
 
 bool readConfigFromJson(SpeakermanConfig &destination, const char *json,
                         const SpeakermanConfig &basedUpon) {
-  class Input : public org::simple::util::text::InputStream<char> {
+  class Input : public org::simple::text::InputStream<char> {
     const char *string;
     const char *at;
   public:

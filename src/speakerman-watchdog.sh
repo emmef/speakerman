@@ -25,7 +25,8 @@ if [ -n "$1" ] ; then
   configFile="$1"
 fi
 
-URL="https://emmef.org/limiter/limiter.txt"
+# URL="https://emmef.org/limiter/limiter.txt"
+URL="https://script.google.com/macros/s/AKfycbwK3NWPuTKciZoE19xpX5AiZWiPEV8wZSGmKxlULO1FjDg-BFFv/exec"
 
 if [ -n "$configFile" ] ; then
   if grep -E '^\s*threshold-scale-url\s*=\s*[a-z]+://' "$configFile" >/dev/null ; then

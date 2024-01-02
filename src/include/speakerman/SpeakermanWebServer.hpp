@@ -199,7 +199,7 @@ private:
 
     void write_json_string(const char *string) {
       for (const char *p = string; *p != 0; p++) {
-        org::simple::util::text::addCharacterToJsonString(*p, [this](char c) {
+        org::simple::text::addCharacterToJsonString(*p, [this](char c) {
           body += c;
           return true;
         });
