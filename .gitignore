@@ -42,6 +42,7 @@ src/speakerman
 *.cache
 .autotools
 speakerman.kdev4
+cmake-*/*
 
 build-*
 DEADJOE

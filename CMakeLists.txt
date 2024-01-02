@@ -92,7 +92,8 @@ set(HEADER_FILES
     src/include/speakerman/Stream.hpp
     src/include/speakerman/UnsetValue.h
     src/include/speakerman/NamedConfig.h
-    src/include/speakerman/LogicalGroupConfig.h src/include/speakerman/ProcessingGroupConfig.h src/include/speakerman/DetectionConfig.h src/include/speakerman/DynamicProcessorLevels.h src/include/speakerman/SpeakerManagerControl.h src/include/speakerman/StreamOwner.h src/include/speakerman/ConfigStage.h src/include/tdap/AlignedArray.h src/include/speakerman/MatrixConfig.h src/include/speakerman/JsonCanonicalReader.h src/include/speakerman/Webserver.h src/include/speakerman/SpeakerManagerGenerator.h src/include/tdap/Alignment.h src/include/tdap/AlignedPointer.h)
+    src/include/speakerman/LogicalGroupConfig.h src/include/speakerman/ProcessingGroupConfig.h src/include/speakerman/DetectionConfig.h src/include/speakerman/DynamicProcessorLevels.h src/include/speakerman/SpeakerManagerControl.h src/include/speakerman/StreamOwner.h src/include/speakerman/ConfigStage.h src/include/tdap/AlignedArray.h src/include/speakerman/MatrixConfig.h src/include/speakerman/JsonCanonicalReader.h src/include/speakerman/Webserver.h src/include/speakerman/SpeakerManagerGenerator.h src/include/tdap/Alignment.h src/include/tdap/AlignedPointer.h
+    src/include/audiodsp/BiQuad.h)
 
 set(SOURCE_FILES
     src/Allocation.cpp
@@ -140,7 +141,8 @@ add_definitions(-DSPEAKERMAN_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX})
 
 set(TEST_FILES
     test/main.cpp test/TestIirCoefficients.hpp test/TestIirCoefficients.cpp test/TestAlignedFrame.cpp test/TestAlignedFrame.hpp test/TestVolumeMatrix.cpp
-    test/TestJsonCanonicalReader.cc src/JsonCanonicalReader.cc)
+    test/TestJsonCanonicalReader.cc src/JsonCanonicalReader.cc test/TestBiQuadButter.cc
+)
 
 add_executable(test_speakerman ${TDAP_HEADERS} ${HEADER_FILES} ${TEST_FILES})
 target_link_libraries(test_speakerman stdc++ m)
